@@ -1,0 +1,34 @@
+{
+  "name": "instituteos",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0",
+    "npm": ">=10.0.0"
+  },
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run dev --workspace @instituteos/api",
+    "dev:web": "npm run dev --workspace @instituteos/web",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "eslint .",
+    "format": "prettier --write package.json eslint.config.js tsconfig.base.json .prettierrc.json README.md apps/api apps/web docs",
+    "format:check": "prettier --check package.json eslint.config.js tsconfig.base.json .prettierrc.json README.md apps/api apps/web docs",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.19.0",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.19.0",
+    "globals": "^15.14.0",
+    "prettier": "^3.5.0",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.22.0"
+  }
+}
