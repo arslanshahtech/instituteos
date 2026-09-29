@@ -1,0 +1,35 @@
+{
+  "name": "@instituteos/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "clean": "node scripts/clean-dist.mjs",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "lint": "eslint src",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
+    "mongoose": "^9.10.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.13.4",
+    "@types/supertest": "^6.0.2",
+    "supertest": "^7.0.0",
+    "tsx": "^4.19.3",
+    "vitest": "^3.0.5"
+  }
+}
