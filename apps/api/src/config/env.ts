@@ -4,9 +4,10 @@ import dotenv from 'dotenv';
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  '../../../',
+  '../../../../',
 );
-dotenv.config({ path: path.join(repositoryRoot, '.env') });
+export const environmentFilePath = path.join(repositoryRoot, '.env');
+dotenv.config({ path: environmentFilePath });
 
 function readInteger(
   value: string | undefined,
