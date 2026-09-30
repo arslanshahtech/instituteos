@@ -28,11 +28,20 @@ export async function apiRequest<T>(
   init?: RequestInit,
 ): Promise<T> {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const csrfToken = document.cookie
+    .split('; ')
+    .find((cookie) => cookie.startsWith('instituteos_csrf='))
+    ?.slice('instituteos_csrf='.length);
+  const method = init?.method?.toUpperCase() ?? 'GET';
   const response = await fetch(`${API_BASE_URL}${normalizedPath}`, {
     ...init,
+    credentials: 'include',
     headers: {
       Accept: 'application/json',
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(method)
+        ? { 'X-CSRF-Token': decodeURIComponent(csrfToken) }
+        : {}),
       ...init?.headers,
     },
   });
@@ -50,6 +59,8 @@ export async function apiRequest<T>(
         undefined,
     );
   }
+
+  if (response.status === 204) return undefined as T;
 
   return (await response.json()) as T;
 }

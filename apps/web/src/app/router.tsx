@@ -15,6 +15,15 @@ import {
 import { FoundationsPage } from '../pages/FoundationsPage.js';
 import { NotFoundPage } from '../pages/NotFoundPage.js';
 import { OverviewPage } from '../pages/OverviewPage.js';
+import { ProtectedRoute } from '../auth/ProtectedRoute.js';
+import {
+  ForgotPasswordPage,
+  LoginPage,
+  RegistrationPage,
+  ResetPasswordPage,
+  VerificationPendingPage,
+  VerifyEmailPage,
+} from '../pages/auth/AuthPages.js';
 
 const roleRoutes: RouteObject[] = [
   {
@@ -71,7 +80,13 @@ const roleRoutes: RouteObject[] = [
 
 const routes: RouteObject[] = [
   { path: '/', element: <Navigate to="/platform" replace /> },
-  ...roleRoutes,
+  { path: '/login', element: <LoginPage /> },
+  { path: '/register', element: <RegistrationPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
+  { path: '/reset-password', element: <ResetPasswordPage /> },
+  { path: '/verify-email', element: <VerifyEmailPage /> },
+  { path: '/verification-pending', element: <VerificationPendingPage /> },
+  { element: <ProtectedRoute />, children: roleRoutes },
   { path: '*', element: <Navigate to="/platform" replace /> },
 ];
 
