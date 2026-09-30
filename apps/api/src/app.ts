@@ -25,8 +25,9 @@ export function createApp(config: AppConfig = env) {
       origin(origin, callback) {
         callback(null, !origin || config.corsOrigins.includes(origin));
       },
+      credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'X-Request-Id'],
+      allowedHeaders: ['Content-Type', 'X-Request-Id', 'X-CSRF-Token'],
       exposedHeaders: ['X-Request-Id'],
       maxAge: 600,
     }),

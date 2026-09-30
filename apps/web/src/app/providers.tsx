@@ -5,6 +5,7 @@ import { RouterProvider } from 'react-router-dom';
 import { queryClient } from './query-client.js';
 import { AppErrorBoundary } from '../components/ui/AppErrorBoundary.js';
 import { ToastProvider } from '../components/ui/ToastProvider.js';
+import { AuthProvider } from '../auth/AuthProvider.js';
 
 interface AppProvidersProps extends PropsWithChildren {
   router?: RouterProviderProps['router'];
@@ -14,9 +15,11 @@ export function AppProviders({ children, router }: AppProvidersProps) {
   return (
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <ToastProvider>
-          {router ? <RouterProvider router={router} /> : children}
-        </ToastProvider>
+        <AuthProvider>
+          <ToastProvider>
+            {router ? <RouterProvider router={router} /> : children}
+          </ToastProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </AppErrorBoundary>
   );

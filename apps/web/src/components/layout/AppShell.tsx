@@ -16,11 +16,15 @@ import {
 import { roleLayouts } from '../../layouts/layoutTypes.js';
 import type { RoleLayoutConfig } from '../../layouts/layoutTypes.js';
 import { Breadcrumbs } from './Breadcrumbs.js';
+import { useAuth } from '../../auth/AuthProvider.js';
+import { Button } from '../ui/Button.js';
 
 export function AppShell({ role }: { role: RoleLayoutConfig }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [signOutError, setSignOutError] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const auth = useAuth();
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -118,6 +122,23 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
             <Breadcrumbs role={role} />
           </div>
           <div className="topbar-actions">
+            <span className="current-user-name">{auth.user?.displayName}</span>
+            <Button
+              className="sign-out-button"
+              onClick={async () => {
+                setSignOutError(false);
+                try {
+                  await auth.logout();
+                  navigate('/login');
+                } catch {
+                  setSignOutError(true);
+                }
+              }}
+              type="button"
+              variant="quiet"
+            >
+              Sign out
+            </Button>
             <label className="role-preview-label" htmlFor="role-preview">
               Layout preview
             </label>
@@ -142,6 +163,11 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
               />
             </div>
           </div>
+          {signOutError && (
+            <span className="visually-hidden" role="alert">
+              Sign out failed. Please try again.
+            </span>
+          )}
         </header>
 
         <main className="main-content" id="main-content" tabIndex={-1}>

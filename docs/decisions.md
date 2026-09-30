@@ -23,3 +23,9 @@ The API remains a single Express application. MongoDB connects through Mongoose 
 **Status:** Accepted
 
 The frontend uses React Router for five role-oriented layout previews, TanStack Query for server state, and a centralized API client. Shared controls and feedback patterns are implemented as accessible React/CSS primitives, with React Hook Form and Zod for validated forms. The role selector is presentation-only and does not claim to enforce authorization. No education business pages or data were added.
+
+## 2026-09-30 — Use opaque MongoDB-backed sessions for Phase 03 identity
+
+**Status:** Accepted
+
+Login and registration issue random opaque session credentials in HttpOnly, SameSite=Strict cookies. The API stores only a SHA-256 token hash with a bounded expiry; authenticated writes also require a separate session-bound CSRF token. This keeps browser JavaScript away from the session credential while allowing session revocation and current-user bootstrap. Passwords use Node.js scrypt with per-password salts. Reset and verification credentials are one-time, stored as hashes, and delivered through a configurable SMTP adapter. Local development can complete registration without email verification; production requires verification by default. Authorization, memberships, tenant resolution, and roles remain for later phases.

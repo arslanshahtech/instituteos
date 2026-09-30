@@ -23,6 +23,17 @@ function readInteger(
   return port;
 }
 
+function readBoolean(
+  value: string | undefined,
+  fallback: boolean,
+  name: string,
+): boolean {
+  if (value === undefined || value === '') return fallback;
+  if (value.toLowerCase() === 'true') return true;
+  if (value.toLowerCase() === 'false') return false;
+  throw new Error(`${name} must be true or false`);
+}
+
 export const env = {
   host: process.env.API_HOST ?? '127.0.0.1',
   port: readInteger(process.env.API_PORT, 4000, 'API_PORT', 65535),
@@ -65,4 +76,31 @@ export const env = {
     10000,
     'API_SHUTDOWN_TIMEOUT_MS',
   ),
+  authSessionTtlDays: readInteger(
+    process.env.AUTH_SESSION_TTL_DAYS,
+    7,
+    'AUTH_SESSION_TTL_DAYS',
+    30,
+  ),
+  authCookieSecure: readBoolean(
+    process.env.AUTH_COOKIE_SECURE,
+    process.env.NODE_ENV === 'production',
+    'AUTH_COOKIE_SECURE',
+  ),
+  authRequireEmailVerification: readBoolean(
+    process.env.AUTH_REQUIRE_EMAIL_VERIFICATION,
+    process.env.NODE_ENV === 'production',
+    'AUTH_REQUIRE_EMAIL_VERIFICATION',
+  ),
+  authWebAppUrl: process.env.AUTH_WEB_APP_URL ?? 'http://127.0.0.1:5173',
+  smtpHost: process.env.SMTP_HOST,
+  smtpPort: readInteger(process.env.SMTP_PORT, 587, 'SMTP_PORT', 65535),
+  smtpSecure: readBoolean(process.env.SMTP_SECURE, false, 'SMTP_SECURE'),
+  smtpUser: process.env.SMTP_USER,
+  smtpPassword: process.env.SMTP_PASSWORD,
+  smtpFrom: process.env.SMTP_FROM,
 };
+
+if (env.nodeEnv === 'production' && !env.authCookieSecure) {
+  throw new Error('AUTH_COOKIE_SECURE must be true in production.');
+}
