@@ -1,9 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import request from 'supertest';
 import { app, createApp } from './app.js';
-import { env } from './config/env.js';
+import { environmentFilePath, env } from './config/env.js';
 
 describe('API foundation', () => {
+  it('loads environment configuration from the repository-root .env file', () => {
+    const repositoryRoot = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../../../',
+    );
+
+    expect(environmentFilePath).toBe(path.join(repositoryRoot, '.env'));
+  });
+
   it('reports health under the versioned API prefix', async () => {
     const response = await request(app).get('/api/v1/health');
 
