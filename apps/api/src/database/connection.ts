@@ -1,22 +1,43 @@
 import mongoose from 'mongoose';
+import {
+  MembershipModel,
+  OrganizationModel,
+  PlatformRoleGrantModel,
+} from '../modules/tenancy/tenancy.model.js';
+
+let tenancyModelsInitialized = false;
 
 export async function connectDatabase(
   uri: string,
   serverSelectionTimeoutMs: number,
 ): Promise<void> {
+  tenancyModelsInitialized = false;
   await mongoose.connect(uri, {
     serverSelectionTimeoutMS: serverSelectionTimeoutMs,
   });
+
+  try {
+    await Promise.all([
+      OrganizationModel.init(),
+      MembershipModel.init(),
+      PlatformRoleGrantModel.init(),
+    ]);
+    tenancyModelsInitialized = true;
+  } catch (error) {
+    await mongoose.disconnect().catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function disconnectDatabase(): Promise<void> {
+  tenancyModelsInitialized = false;
   if (mongoose.connection.readyState !== 0) {
     await mongoose.disconnect();
   }
 }
 
 export function isDatabaseReady(): boolean {
-  return mongoose.connection.readyState === 1;
+  return mongoose.connection.readyState === 1 && tenancyModelsInitialized;
 }
 
 export function getDatabaseState(): string {

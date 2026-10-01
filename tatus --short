@@ -1,0 +1,17 @@
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/api/src/database/connection.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/api/src/routes/v1/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/src/app.test.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'apps/web/src/app/router.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/architecture.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/decisions.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'prompts/04-multitenancy-rbac.md', LF will be replaced by CRLF the next time Git touches it
+ README.md                           |   4 [32m+[m[31m-[m
+ apps/api/src/database/connection.ts |  23 [32m+[m[31m-[m
+ apps/api/src/routes/v1/index.ts     |   2 [32m+[m
+ apps/web/src/app.test.tsx           |  35 [32m+++[m
+ apps/web/src/app/router.tsx         |  13 [32m+[m[31m-[m
+ docs/architecture.md                |  18 [32m+[m[31m-[m
+ docs/decisions.md                   |  10 [32m+[m[31m-[m
+ prompts/04-multitenancy-rbac.md     | 526 [32m+++++++++++++++++++++++++++++++++[m[31m---[m
+ 8 files changed, 582 insertions(+), 49 deletions(-)

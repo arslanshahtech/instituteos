@@ -15,6 +15,7 @@ import {
 import { FoundationsPage } from '../pages/FoundationsPage.js';
 import { NotFoundPage } from '../pages/NotFoundPage.js';
 import { OverviewPage } from '../pages/OverviewPage.js';
+import { OrganizationContextPage } from '../pages/OrganizationContextPage.js';
 import { ProtectedRoute } from '../auth/ProtectedRoute.js';
 import {
   ForgotPasswordPage,
@@ -86,7 +87,17 @@ const routes: RouteObject[] = [
   { path: '/reset-password', element: <ResetPasswordPage /> },
   { path: '/verify-email', element: <VerifyEmailPage /> },
   { path: '/verification-pending', element: <VerificationPendingPage /> },
-  { element: <ProtectedRoute />, children: roleRoutes },
+  {
+    element: <ProtectedRoute />,
+    children: [
+      ...roleRoutes,
+      {
+        path: '/organizations/:organizationId/context',
+        element: <OrganizationContextPage />,
+        errorElement: <RouteErrorPage />,
+      },
+    ],
+  },
   { path: '*', element: <Navigate to="/platform" replace /> },
 ];
 
