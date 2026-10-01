@@ -37,11 +37,13 @@ export function createTenancyRouter(
         organizationId: string;
         role: string;
         permissions: readonly string[];
+        campusIds: readonly string[];
       };
       response.status(200).json({
         organizationId: context.organizationId,
         role: context.role,
         permissions: context.permissions,
+        campusIds: context.campusIds,
       });
     }),
   );

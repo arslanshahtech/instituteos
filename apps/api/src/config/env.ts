@@ -42,7 +42,7 @@ export const env = {
     process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017/instituteos',
   databaseServerSelectionTimeoutMs: readInteger(
     process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS,
-    5000,
+    20000,
     'MONGODB_SERVER_SELECTION_TIMEOUT_MS',
   ),
   databaseRetryDelayMs: readInteger(

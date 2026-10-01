@@ -4,6 +4,7 @@ export interface OrganizationAccessContext {
   organizationId: string;
   role: string;
   permissions: string[];
+  campusIds: string[];
 }
 
 export function getOrganizationAccessContext(

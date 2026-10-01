@@ -94,6 +94,18 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
             <BookOpenText size={18} aria-hidden="true" />
             <span>UI foundations</span>
           </NavLink>
+          {role.key === 'admin' && (
+            <NavLink
+              className={({ isActive }) =>
+                `navigation-link${isActive ? ' navigation-link-active' : ''}`
+              }
+              onClick={() => setMobileNavOpen(false)}
+              to="/admin/organizations/onboarding"
+            >
+              <LayoutDashboard size={18} aria-hidden="true" />
+              <span>Organizations</span>
+            </NavLink>
+          )}
         </nav>
 
         <div className="sidebar-bottom">

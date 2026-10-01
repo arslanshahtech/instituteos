@@ -109,6 +109,25 @@ export function requireOrganizationRole(roles: readonly OrganizationRole[]) {
   };
 }
 
+export function requireAssignedCampusScope(campusIdParameter = 'campusId') {
+  return (request: Request, response: Response, next: NextFunction) => {
+    const context = (response.locals as AuthenticatedLocals)
+      .organizationContext;
+    if (!context)
+      return next(
+        new AppError(404, 'ORGANIZATION_NOT_FOUND', 'Organization not found.'),
+      );
+    if (context.role !== 'campus_admin') return next();
+    const campusParam = request.params[campusIdParameter];
+    const requestedCampusId = Array.isArray(campusParam)
+      ? campusParam[0]
+      : campusParam;
+    if (!requestedCampusId || !context.campusIds.includes(requestedCampusId))
+      return next(new AppError(404, 'CAMPUS_NOT_FOUND', 'Campus not found.'));
+    return next();
+  };
+}
+
 export function requirePlatformRole(
   repository: OrganizationAccessRepository,
   role: PlatformRole,

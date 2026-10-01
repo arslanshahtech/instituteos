@@ -31,7 +31,7 @@ export class MongoOrganizationAccessRepository implements OrganizationAccessRepo
       userId: new Types.ObjectId(userId),
       status: 'active',
     })
-      .select('_id organizationId userId role')
+      .select('_id organizationId userId role campusIds')
       .lean();
     if (!membership) return null;
     if (!ORGANIZATION_ROLES.includes(membership.role as OrganizationRole))
@@ -48,6 +48,7 @@ export class MongoOrganizationAccessRepository implements OrganizationAccessRepo
       organizationId: String(membership.organizationId),
       userId: String(membership.userId),
       role: membership.role as OrganizationRole,
+      campusIds: (membership.campusIds ?? []).map(String),
     };
   }
 

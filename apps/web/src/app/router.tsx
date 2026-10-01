@@ -16,6 +16,11 @@ import { FoundationsPage } from '../pages/FoundationsPage.js';
 import { NotFoundPage } from '../pages/NotFoundPage.js';
 import { OverviewPage } from '../pages/OverviewPage.js';
 import { OrganizationContextPage } from '../pages/OrganizationContextPage.js';
+import {
+  AcceptOrganizationInvitationPage,
+  OrganizationAdminPage,
+  OrganizationOnboardingPage,
+} from '../pages/organizations/OrganizationPages.js';
 import { ProtectedRoute } from '../auth/ProtectedRoute.js';
 import {
   ForgotPasswordPage,
@@ -44,6 +49,14 @@ const roleRoutes: RouteObject[] = [
     children: [
       { index: true, element: <OverviewPage /> },
       { path: 'foundations', element: <FoundationsPage /> },
+      {
+        path: 'organizations/onboarding',
+        element: <OrganizationOnboardingPage />,
+      },
+      {
+        path: 'organizations/:organizationId',
+        element: <OrganizationAdminPage />,
+      },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
@@ -91,6 +104,11 @@ const routes: RouteObject[] = [
     element: <ProtectedRoute />,
     children: [
       ...roleRoutes,
+      {
+        path: '/invitations/accept',
+        element: <AcceptOrganizationInvitationPage />,
+        errorElement: <RouteErrorPage />,
+      },
       {
         path: '/organizations/:organizationId/context',
         element: <OrganizationContextPage />,

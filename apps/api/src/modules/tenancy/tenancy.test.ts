@@ -72,6 +72,7 @@ class MemoryOrganizationAccess implements OrganizationAccessRepository {
       organizationId: membership.organizationId,
       userId: membership.userId,
       role: membership.role,
+      campusIds: membership.campusIds,
     };
   }
 
@@ -226,6 +227,7 @@ function addMembership(
     userId,
     organizationId,
     role,
+    campusIds: [],
     status,
   });
 }
