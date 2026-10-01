@@ -50,6 +50,11 @@ export interface AuthRepository {
 export interface AuthEmailDelivery {
   sendVerification(email: string, token: string): Promise<boolean>;
   sendPasswordReset(email: string, token: string): Promise<boolean>;
+  sendInvitation(
+    email: string,
+    token: string,
+    organizationName: string,
+  ): Promise<boolean>;
 }
 
 export interface AuthConfig {

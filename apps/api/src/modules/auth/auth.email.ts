@@ -45,6 +45,26 @@ export class SmtpAuthEmailDelivery implements AuthEmailDelivery {
       return false;
     }
   }
+
+  async sendInvitation(
+    email: string,
+    token: string,
+    organizationName: string,
+  ): Promise<boolean> {
+    if (!transport || !env.smtpFrom) return false;
+    const url = `${env.authWebAppUrl.replace(/\/$/, '')}/invitations/accept#token=${encodeURIComponent(token)}`;
+    try {
+      await transport.sendMail({
+        from: env.smtpFrom,
+        to: email,
+        subject: `Invitation to join ${organizationName} on InstituteOS`,
+        text: `You have been invited to join ${organizationName}. Sign in or create an account, then accept this invitation: ${url}`,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 export const authEmailDelivery = new SmtpAuthEmailDelivery();

@@ -37,3 +37,9 @@ An organization ID supplied by a request is only a context request. The API must
 ## 2026-10-01 — Await tenancy model initialization before database readiness
 
 Organization, OrganizationMembership, and PlatformRoleGrant use schema-declared Mongoose indexes. The API relies on the current Mongoose `autoCreate` and `autoIndex` defaults and now explicitly awaits those models' initialization after connecting. Readiness remains false until the declared collection and index initialization completes; initialization failure disconnects and follows the existing retry path. This is the current schema-driven initialization strategy, not a migration system. A controlled development startup can create empty tenancy collections and indexes without seeding organizations, memberships, or platform grants.
+
+## 2026-10-01 — Add organization, campus, and membership administration in Phase 05
+
+**Status:** Accepted
+
+Phase 05 builds organization onboarding and administration on the existing tenancy boundary. Onboarding creates the organization, optional initial campus, initial owner membership, and audit record atomically. Campus and membership operations require tenant context and explicit permissions; Campus Admin campus operations are further limited to assigned campuses. Invitations use random one-time credentials whose hashes alone are persisted, and acceptance is bound to the authenticated user's email. Last-active-owner protections prevent removal or demotion of the final active organization owner. The API initializes the new schemas and indexes before readiness, following the existing schema-driven development strategy; a separate migration framework remains future work.

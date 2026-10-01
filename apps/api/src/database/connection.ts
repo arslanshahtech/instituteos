@@ -2,6 +2,9 @@ import mongoose from 'mongoose';
 import {
   MembershipModel,
   OrganizationModel,
+  CampusModel,
+  OrganizationAuditEventModel,
+  OrganizationInvitationModel,
   PlatformRoleGrantModel,
 } from '../modules/tenancy/tenancy.model.js';
 
@@ -21,6 +24,9 @@ export async function connectDatabase(
       OrganizationModel.init(),
       MembershipModel.init(),
       PlatformRoleGrantModel.init(),
+      CampusModel.init(),
+      OrganizationInvitationModel.init(),
+      OrganizationAuditEventModel.init(),
     ]);
     tenancyModelsInitialized = true;
   } catch (error) {

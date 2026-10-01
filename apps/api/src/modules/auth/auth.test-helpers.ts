@@ -107,6 +107,7 @@ export class MemoryAuthRepository implements AuthRepository {
 export class MemoryAuthEmailDelivery implements AuthEmailDelivery {
   readonly verificationTokens: string[] = [];
   readonly resetTokens: string[] = [];
+  readonly invitationTokens: string[] = [];
 
   async sendVerification(_email: string, token: string): Promise<boolean> {
     this.verificationTokens.push(token);
@@ -115,6 +116,11 @@ export class MemoryAuthEmailDelivery implements AuthEmailDelivery {
 
   async sendPasswordReset(_email: string, token: string): Promise<boolean> {
     this.resetTokens.push(token);
+    return true;
+  }
+
+  async sendInvitation(_email: string, token: string): Promise<boolean> {
+    this.invitationTokens.push(token);
     return true;
   }
 }

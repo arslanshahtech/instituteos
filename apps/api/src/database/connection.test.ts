@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   connection: { readyState: 0 },
   connect: vi.fn(),
   disconnect: vi.fn(),
-  modelInit: [vi.fn(), vi.fn(), vi.fn()],
+  modelInit: [vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn()],
 }));
 
 vi.mock('mongoose', () => ({
@@ -19,6 +19,9 @@ vi.mock('../modules/tenancy/tenancy.model.js', () => ({
   OrganizationModel: { init: mocks.modelInit[0] },
   MembershipModel: { init: mocks.modelInit[1] },
   PlatformRoleGrantModel: { init: mocks.modelInit[2] },
+  CampusModel: { init: mocks.modelInit[3] },
+  OrganizationInvitationModel: { init: mocks.modelInit[4] },
+  OrganizationAuditEventModel: { init: mocks.modelInit[5] },
 }));
 
 import {
