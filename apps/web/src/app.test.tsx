@@ -26,6 +26,10 @@ const authMocks = vi.hoisted(() => ({
   verifyEmailRequest: vi.fn(),
 }));
 
+const tenancyMocks = vi.hoisted(() => ({
+  getOrganizationAccessContext: vi.fn(),
+}));
+
 vi.mock('./api/client.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./api/client.js')>();
   return {
@@ -39,6 +43,7 @@ vi.mock('./api/client.js', async (importOriginal) => {
 });
 
 vi.mock('./auth/auth-api.js', () => authMocks);
+vi.mock('./tenancy/tenancy-api.js', () => tenancyMocks);
 
 function renderPath(path: string, authenticated: boolean | null = true) {
   if (authenticated === null)
@@ -67,6 +72,11 @@ describe('frontend application foundation', () => {
       verificationRequired: false,
       message:
         'If registration can be completed, you can continue by signing in.',
+    });
+    tenancyMocks.getOrganizationAccessContext.mockResolvedValue({
+      organizationId: '650000000000000000000001',
+      role: 'organization_admin',
+      permissions: ['organization.read', 'member.read'],
     });
   });
 
@@ -255,6 +265,31 @@ describe('frontend application foundation', () => {
     expect(
       screen.getByRole('link', { name: 'Forgot password?' }),
     ).toHaveAttribute('href', '/forgot-password');
+  });
+
+  it('loads server-verified organization context and gates the page by permission', async () => {
+    renderPath('/organizations/650000000000000000000001/context');
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Current organization context',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText('Role: organization admin'),
+    ).toBeInTheDocument();
+    expect(tenancyMocks.getOrganizationAccessContext).toHaveBeenCalledWith(
+      '650000000000000000000001',
+    );
+
+    tenancyMocks.getOrganizationAccessContext.mockResolvedValueOnce({
+      organizationId: '650000000000000000000002',
+      role: 'student',
+      permissions: [],
+    });
+    queryClient.clear();
+    renderPath('/organizations/650000000000000000000002/context');
+    expect(await screen.findByText('Access not available')).toBeInTheDocument();
   });
 
   it('logs out from the authenticated application shell', async () => {
