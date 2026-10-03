@@ -4,16 +4,17 @@ Update this file after every accepted phase.
 
 ## Current phase
 
-Phase: 05 — Organizations, campuses, and member administration
-Status: Ready for human acceptance; final lifecycle closeout verification passed. No commit was created.
+Phase: 06 — Admissions, students, guardians, and staff
+Status: Ready to start; Phase 05 has been accepted by the human owner.
 
 ## Last completed phase
 
-Phase 04 — Multi-tenancy and RBAC. Phase 05 closeout remains pending owner acceptance.
+Phase 05 — Organizations, campuses, and member administration
+Accepted by the human owner. Checkpoint: `5e07241` (`InstituteOS: complete phase 05`).
 
 ## Current milestone
 
-Phase 05 organization lifecycle and discovery closeout. Phase 06 has not started.
+Phase 06 — People domain. Not started.
 
 ## Current verification
 
@@ -30,7 +31,7 @@ These checks were run sequentially. An earlier run that launched the full test s
 
 ## Known issues and deliberate deferrals
 
-- Interactive browser verification was not performed; automated frontend tests cover the new directory, switcher, default route, and stale-context behavior.
+- Human acceptance verified organization discovery/switching, settings, archive/restore, permanent delete, and mobile and desktop UI, including final mobile polish.
 - Vite emits non-blocking dependency annotation notices and a bundle-size warning during build.
 - Administrative cancellation of pending invitations is deferred: the canonical Phase 05 prompt requires safe invitation creation, listing, acceptance, and duplicate/pending handling, but does not require cancellation.
 - No Phase 06 domain has been implemented.
@@ -50,4 +51,4 @@ See `docs/architecture.md` and `docs/decisions.md` for modular-monolith, tenancy
 
 ## Next phase
 
-Phase 05 status: **READY FOR HUMAN ACCEPTANCE**. Phase 06 may begin only after the owner reviews the changes, accepts Phase 05, and creates a checkpoint.
+Phase 06 status: **READY — NOT STARTED**. Phase 05 is accepted and its checkpoint exists; Phase 06 work has not begun.
