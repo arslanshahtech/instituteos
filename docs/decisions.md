@@ -43,3 +43,19 @@ Organization, OrganizationMembership, and PlatformRoleGrant use schema-declared 
 **Status:** Accepted
 
 Phase 05 builds organization onboarding and administration on the existing tenancy boundary. Onboarding creates the organization, optional initial campus, initial owner membership, and audit record atomically. Campus and membership operations require tenant context and explicit permissions; Campus Admin campus operations are further limited to assigned campuses. Invitations use random one-time credentials whose hashes alone are persisted, and acceptance is bound to the authenticated user's email. Last-active-owner protections prevent removal or demotion of the final active organization owner. The API initializes the new schemas and indexes before readiness, following the existing schema-driven development strategy; a separate migration framework remains future work.
+
+## 2026-10-02 — Close Phase 05 organization discovery and audit consistency
+
+**Status:** Accepted
+
+The authenticated organization directory is derived only from the current user's active memberships joined to active organizations. It returns only the organization identity and the user's role; it accepts no user ID and does not itself grant access. `/admin` opens the only accessible organization directly and otherwise displays discovery. The workspace switcher uses the same server response, performs navigation only, and does not persist an organization selection. A stale/inaccessible organization context falls back to discovery; every workspace API request still resolves membership and permission server-side.
+
+Organization settings/status, campus create/update, membership changes, invitation creation, invitation acceptance, and onboarding persist their Phase 05 audit event in the same narrowly scoped MongoDB transaction as the related mutation. This reconciles the implementation with the documented audit contract; no general audit or transaction framework is introduced. Administrator cancellation of pending invitations is deferred because the canonical Phase 05 prompt does not require it.
+
+The earlier authentication-test timeouts occurred during a full test run launched concurrently with typecheck, lint, and formatting work. The two Scrypt-heavy cases passed in isolated execution and a subsequent normal `npm test` run passed both workspaces without changing the test timeout or password-hash behavior. This is treated as local CPU/resource contention; final verification commands should be run sequentially.
+
+## 2026-10-02 — Require owner-controlled archive before organization deletion
+
+**Status:** Accepted
+
+Organization lifecycle operations are deliberately separate from ordinary tenant permissions. Only an active organization owner may archive an active organization, restore an archived one, or permanently delete it. Deletion requires the organization to be archived and the exact, case-sensitive organization name as confirmation. The cleanup is a single transaction scoped to Phase 05-owned organization data: campuses, memberships, invitations, existing organization audit events, and the organization record. It leaves global user accounts, platform role grants, and other organizations untouched, and writes one final `organization.deleted` audit event after removing prior events. Archived workspaces remain visible to their active owners for recovery, but are excluded from active workspace routing and switching.

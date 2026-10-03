@@ -76,6 +76,20 @@ class MemoryOrganizationAccess implements OrganizationAccessRepository {
     };
   }
 
+  async findLifecycleOwner(
+    userId: string,
+    organizationId: string,
+  ): Promise<boolean | null> {
+    if (!this.organizations.has(organizationId)) return null;
+    return this.memberships.some(
+      (membership) =>
+        membership.userId === userId &&
+        membership.organizationId === organizationId &&
+        membership.role === 'organization_owner' &&
+        membership.status === 'active',
+    );
+  }
+
   async hasPlatformRole(userId: string, role: PlatformRole): Promise<boolean> {
     return this.platformRoles.has(`${userId}:${role}`);
   }

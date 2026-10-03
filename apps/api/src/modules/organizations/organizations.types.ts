@@ -42,6 +42,13 @@ export interface MemberUpdateInput {
   campusIds?: string[];
 }
 
+export interface AccessibleOrganization {
+  id: string;
+  name: string;
+  role: OrganizationRole;
+  status: 'active' | 'archived';
+}
+
 export interface OrganizationRepository {
   provisionOrganization(
     userId: string,
@@ -53,8 +60,12 @@ export interface OrganizationRepository {
   findOrganization(
     organizationId: string,
   ): Promise<Record<string, unknown> | null>;
+  listAccessibleOrganizations(
+    userId: string,
+  ): Promise<AccessibleOrganization[]>;
   updateOrganization(
     organizationId: string,
+    actorUserId: string,
     changes: Partial<OrganizationProfileInput>,
   ): Promise<Record<string, unknown> | null>;
   setOrganizationStatus(
@@ -62,6 +73,17 @@ export interface OrganizationRepository {
     actorUserId: string,
     status: 'active' | 'suspended' | 'archived',
   ): Promise<Record<string, unknown> | null>;
+  setOwnerOrganizationStatus(
+    organizationId: string,
+    actorUserId: string,
+    expectedStatus: 'active' | 'archived',
+    status: 'archived' | 'active',
+  ): Promise<Record<string, unknown> | null>;
+  deleteArchivedOrganization(
+    organizationId: string,
+    actorUserId: string,
+    confirmationName: string,
+  ): Promise<void>;
   getDashboardCounts(
     organizationId: string,
   ): Promise<{ campuses: number; members: number }>;
@@ -71,6 +93,7 @@ export interface OrganizationRepository {
   ): Promise<Record<string, unknown>[]>;
   createCampus(
     organizationId: string,
+    actorUserId: string,
     input: CampusInput,
   ): Promise<Record<string, unknown>>;
   findCampus(
@@ -80,6 +103,7 @@ export interface OrganizationRepository {
   updateCampus(
     organizationId: string,
     campusId: string,
+    actorUserId: string,
     changes: Partial<CampusInput>,
   ): Promise<Record<string, unknown> | null>;
   listMembers(
@@ -131,6 +155,9 @@ export interface OrganizationServices {
     organization: Record<string, unknown>;
     campus: Record<string, unknown> | null;
   }>;
+  listAccessibleOrganizations(
+    userId: string,
+  ): Promise<AccessibleOrganization[]>;
   getProfile(context: OrganizationContext): Promise<Record<string, unknown>>;
   updateProfile(
     context: OrganizationContext,
@@ -175,4 +202,15 @@ export interface OrganizationServices {
     actorUserId: string,
     status: 'active' | 'suspended' | 'archived',
   ): Promise<Record<string, unknown>>;
+  setOwnerOrganizationStatus(
+    organizationId: string,
+    actorUserId: string,
+    expectedStatus: 'active' | 'archived',
+    status: 'archived' | 'active',
+  ): Promise<Record<string, unknown>>;
+  deleteArchivedOrganization(
+    organizationId: string,
+    actorUserId: string,
+    confirmationName: string,
+  ): Promise<void>;
 }

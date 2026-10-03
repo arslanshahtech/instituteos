@@ -52,6 +52,32 @@ export class MongoOrganizationAccessRepository implements OrganizationAccessRepo
     };
   }
 
+  async findLifecycleOwner(
+    userId: string,
+    organizationId: string,
+  ): Promise<boolean | null> {
+    if (
+      !mongoose.isValidObjectId(userId) ||
+      !mongoose.isValidObjectId(organizationId)
+    )
+      return null;
+
+    const organizationObjectId = new Types.ObjectId(organizationId);
+    const organizationExists = await OrganizationModel.exists({
+      _id: organizationObjectId,
+    });
+    if (!organizationExists) return null;
+
+    return Boolean(
+      await MembershipModel.exists({
+        organizationId: organizationObjectId,
+        userId: new Types.ObjectId(userId),
+        role: 'organization_owner',
+        status: 'active',
+      }),
+    );
+  }
+
   async hasPlatformRole(
     userId: string,
     role: 'platform_super_admin',

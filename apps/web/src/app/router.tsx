@@ -18,6 +18,7 @@ import { OverviewPage } from '../pages/OverviewPage.js';
 import { OrganizationContextPage } from '../pages/OrganizationContextPage.js';
 import {
   AcceptOrganizationInvitationPage,
+  MyOrganizationsPage,
   OrganizationAdminPage,
   OrganizationOnboardingPage,
 } from '../pages/organizations/OrganizationPages.js';
@@ -47,8 +48,9 @@ const roleRoutes: RouteObject[] = [
     element: <AdminLayout />,
     errorElement: <RouteErrorPage />,
     children: [
-      { index: true, element: <OverviewPage /> },
+      { index: true, element: <MyOrganizationsPage redirectSingle /> },
       { path: 'foundations', element: <FoundationsPage /> },
+      { path: 'organizations', element: <MyOrganizationsPage /> },
       {
         path: 'organizations/onboarding',
         element: <OrganizationOnboardingPage />,

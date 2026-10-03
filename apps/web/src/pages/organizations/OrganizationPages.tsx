@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
+import { ChevronDown } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '../../api/client.js';
 import { useAuth } from '../../auth/AuthProvider.js';
 import { Button } from '../../components/ui/Button.js';
+import { Dialog } from '../../components/ui/Dialog.js';
 import {
   EmptyState,
   ErrorState,
@@ -13,20 +15,25 @@ import {
 } from '../../components/ui/States.js';
 import {
   acceptOrganizationInvitation,
+  archiveOrganization,
   createCampus,
   createOrganization,
+  deleteOrganization,
+  getAccessibleOrganizations,
   getCampuses,
   getInvitations,
   getMembers,
   getOrganizationDashboard,
   inviteMember,
   ORGANIZATION_ROLES,
+  restoreOrganization,
   updateCampus,
   updateMember,
   updateOrganization,
 } from '../../organizations/organizations-api.js';
 import { getOrganizationAccessContext } from '../../tenancy/tenancy-api.js';
 import type {
+  AccessibleOrganization,
   Campus,
   OrganizationDashboard,
   OrganizationInvitation,
@@ -36,6 +43,252 @@ import type {
 function apiMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   return 'The request could not be completed. Try again.';
+}
+
+export function MyOrganizationsPage({
+  redirectSingle = false,
+}: {
+  redirectSingle?: boolean;
+}) {
+  const navigate = useNavigate();
+  const organizations = useQuery({
+    queryKey: ['accessible-organizations'],
+    queryFn: getAccessibleOrganizations,
+    retry: false,
+  });
+
+  useEffect(() => {
+    const active = (organizations.data?.organizations ?? []).filter(
+      (organization) => organization.status === 'active',
+    );
+    if (redirectSingle && active.length === 1)
+      navigate(`/admin/organizations/${active[0]!.id}`, { replace: true });
+  }, [navigate, organizations.data, redirectSingle]);
+
+  if (organizations.isPending)
+    return <LoadingState message="Loading your organizations…" />;
+  if (organizations.isError)
+    return (
+      <ErrorState
+        title="Organizations unavailable"
+        description="Your organizations could not be loaded."
+        onRetry={() => void organizations.refetch()}
+      />
+    );
+
+  const accessible = organizations.data.organizations;
+  const activeOrganizations = accessible.filter(
+    (organization) => organization.status === 'active',
+  );
+  const archivedOrganizations = accessible.filter(
+    (organization) => organization.status === 'archived',
+  );
+  if (redirectSingle && activeOrganizations.length === 1)
+    return <LoadingState message="Opening your organization…" />;
+
+  return (
+    <main className="page-stack organization-admin-page">
+      <section className="page-heading organization-heading">
+        <div>
+          <p className="eyebrow">Workspace</p>
+          <h1>Organizations</h1>
+          <p className="page-description">
+            Open an organization you belong to or create a new workspace.
+          </p>
+        </div>
+        <Link
+          className="button button-primary"
+          to="/admin/organizations/onboarding"
+        >
+          Create organization
+        </Link>
+      </section>
+      {activeOrganizations.length === 0 &&
+      archivedOrganizations.length === 0 ? (
+        <EmptyState
+          title="No organizations yet"
+          description="Create an organization to set up your InstituteOS workspace."
+          action={
+            <Link
+              className="button button-primary"
+              to="/admin/organizations/onboarding"
+            >
+              Create organization
+            </Link>
+          }
+        />
+      ) : activeOrganizations.length > 0 ? (
+        <section
+          aria-label="Active organizations"
+          className="accessible-organizations"
+        >
+          {activeOrganizations.map((organization) => (
+            <OrganizationDiscoveryCard
+              key={organization.id}
+              organization={organization}
+            />
+          ))}
+        </section>
+      ) : null}
+      {archivedOrganizations.length > 0 && (
+        <section
+          aria-label="Archived organizations"
+          className="archived-organizations"
+        >
+          <div className="section-heading">
+            <div>
+              <h2>Archived organizations</h2>
+              <p>
+                Archived organizations are not active workspaces. Owners can
+                restore or permanently delete them.
+              </p>
+            </div>
+          </div>
+          {archivedOrganizations.map((organization) => (
+            <ArchivedOrganizationCard
+              key={organization.id}
+              organization={organization}
+            />
+          ))}
+        </section>
+      )}
+    </main>
+  );
+}
+
+function ArchivedOrganizationCard({
+  organization,
+}: {
+  organization: AccessibleOrganization;
+}) {
+  const queryClient = useQueryClient();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState('');
+  const restore = useMutation({
+    mutationFn: () => restoreOrganization(organization.id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['accessible-organizations'],
+      });
+    },
+  });
+  const remove = useMutation({
+    mutationFn: () => deleteOrganization(organization.id, confirmation),
+    onSuccess: async () => {
+      setDeleteOpen(false);
+      setConfirmation('');
+      await queryClient.invalidateQueries({
+        queryKey: ['accessible-organizations'],
+      });
+    },
+  });
+  return (
+    <article className="accessible-organization archived-organization">
+      <div>
+        <p className="eyebrow">
+          Archived organization · {roleLabel(organization.role)}
+        </p>
+        <h3>{organization.name}</h3>
+        <p>Normal organization operations are unavailable while archived.</p>
+        {organization.role === 'organization_owner' ? (
+          <div className="organization-heading-actions">
+            <Button
+              disabled={restore.isPending || remove.isPending}
+              onClick={() => restore.mutate()}
+            >
+              {restore.isPending ? 'Restoring…' : 'Restore'}
+            </Button>
+            <Button
+              disabled={restore.isPending || remove.isPending}
+              onClick={() => setDeleteOpen(true)}
+              variant="danger"
+            >
+              Delete permanently
+            </Button>
+          </div>
+        ) : (
+          <p>Contact an organization owner to restore this workspace.</p>
+        )}
+        {(restore.isError || remove.isError) && (
+          <p className="form-error" role="alert">
+            {apiMessage(restore.error ?? remove.error)}
+          </p>
+        )}
+      </div>
+      <Dialog
+        description={`This permanently removes ${organization.name} and its Phase 05 campuses, memberships, and invitations. User accounts and other organizations are not deleted. This cannot be undone through the current UI.`}
+        onOpenChange={(open) => {
+          if (!remove.isPending) setDeleteOpen(open);
+          if (!open) setConfirmation('');
+        }}
+        open={deleteOpen}
+        title="Delete organization permanently"
+      >
+        <div className="delete-confirmation">
+          <p>
+            Type <strong>{organization.name}</strong> exactly to confirm.
+          </p>
+          <label>
+            Organization name
+            <input
+              autoComplete="off"
+              value={confirmation}
+              onChange={(event) => setConfirmation(event.target.value)}
+            />
+          </label>
+          {remove.isError && (
+            <p className="form-error" role="alert">
+              {apiMessage(remove.error)}
+            </p>
+          )}
+          <div className="dialog-actions">
+            <Button
+              disabled={remove.isPending}
+              onClick={() => {
+                setDeleteOpen(false);
+                setConfirmation('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={remove.isPending || confirmation !== organization.name}
+              onClick={() => remove.mutate()}
+              variant="danger"
+            >
+              {remove.isPending ? 'Deleting…' : 'Delete organization'}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+    </article>
+  );
+}
+
+function OrganizationDiscoveryCard({
+  organization,
+}: {
+  organization: AccessibleOrganization;
+}) {
+  return (
+    <article className="accessible-organization">
+      <div>
+        <h2>{organization.name}</h2>
+        <p>{roleLabel(organization.role)}</p>
+      </div>
+      <Link
+        aria-label={`Open ${organization.name}`}
+        className="button button-secondary"
+        to={`/admin/organizations/${encodeURIComponent(organization.id)}`}
+      >
+        Open
+      </Link>
+    </article>
+  );
+}
+
+function roleLabel(role: string): string {
+  return role.replaceAll('_', ' ');
 }
 
 export function OrganizationOnboardingPage() {
@@ -116,6 +369,7 @@ type AdminTab =
 export function OrganizationAdminPage() {
   const { organizationId = '' } = useParams();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const auth = useAuth();
   const [tab, setTab] = useState<AdminTab>('overview');
   const [notice, setNotice] = useState('');
@@ -123,6 +377,12 @@ export function OrganizationAdminPage() {
     queryKey: ['organization-context', organizationId],
     queryFn: () => getOrganizationAccessContext(organizationId),
     enabled: Boolean(organizationId),
+    retry: false,
+  });
+  const accessibleOrganizations = useQuery({
+    queryKey: ['accessible-organizations'],
+    queryFn: getAccessibleOrganizations,
+    enabled: Boolean(access.data),
     retry: false,
   });
   const dashboard = useQuery({
@@ -193,6 +453,15 @@ export function OrganizationAdminPage() {
   const canInvite = access.data?.permissions.includes('member.invite') ?? false;
   const canAssignOwner = access.data?.role === 'organization_owner';
 
+  useEffect(() => {
+    const accessUnavailable =
+      access.error instanceof ApiError && access.error.status === 404;
+    const dashboardUnavailable =
+      dashboard.error instanceof ApiError && dashboard.error.status === 404;
+    if (accessUnavailable || dashboardUnavailable)
+      navigate('/admin/organizations', { replace: true });
+  }, [access.error, dashboard.error, navigate]);
+
   if (access.isPending)
     return <LoadingState message="Loading organization access…" />;
   if (access.isError || !access.data)
@@ -212,17 +481,82 @@ export function OrganizationAdminPage() {
             Organization workspace · {access.data.role.replaceAll('_', ' ')}
           </p>
           <h1>{dashboard.data?.organization.name ?? 'Organization'}</h1>
-          <p className="page-description">
+          <p className="page-description organization-user-meta">
             Signed in as {auth.user?.displayName ?? 'current user'}.
           </p>
+          {accessibleOrganizations.data?.organizations.some(
+            (organization) => organization.id === organizationId,
+          ) && (
+            <label
+              className="organization-switcher"
+              htmlFor="organization-switcher"
+            >
+              <span>Current organization</span>
+              <div className="organization-switcher-control">
+                <select
+                  id="organization-switcher"
+                  aria-label="Current organization"
+                  value={organizationId}
+                  onChange={(event) =>
+                    navigate(
+                      `/admin/organizations/${encodeURIComponent(event.target.value)}`,
+                    )
+                  }
+                >
+                  {accessibleOrganizations.data.organizations
+                    .filter((organization) => organization.status === 'active')
+                    .map((organization) => (
+                      <option key={organization.id} value={organization.id}>
+                        {organization.name}
+                      </option>
+                    ))}
+                </select>
+                <ChevronDown
+                  className="select-chevron"
+                  size={14}
+                  aria-hidden="true"
+                />
+              </div>
+            </label>
+          )}
         </div>
-        <Link
-          className="button button-secondary"
-          to="/admin/organizations/onboarding"
-        >
-          Add organization
-        </Link>
+        <div className="organization-heading-actions organization-workspace-actions">
+          <Link className="button button-secondary" to="/admin/organizations">
+            All organizations
+          </Link>
+          <Link
+            className="button button-secondary"
+            to="/admin/organizations/onboarding"
+          >
+            Add organization
+          </Link>
+        </div>
       </section>
+      <label className="organization-section-selector">
+        <span>Organization section</span>
+        <select
+          aria-label="Organization section"
+          value={tab}
+          onChange={(event) => {
+            setTab(event.target.value as AdminTab);
+            setNotice('');
+          }}
+        >
+          {(
+            [
+              'overview',
+              'settings',
+              'campuses',
+              'members',
+              'invitations',
+            ] as const
+          ).map((item) => (
+            <option key={item} value={item}>
+              {item[0]!.toUpperCase() + item.slice(1)}
+            </option>
+          ))}
+        </select>
+      </label>
       <nav
         className="organization-tabs"
         aria-label="Organization administration"
@@ -254,13 +588,12 @@ export function OrganizationAdminPage() {
           {notice}
         </p>
       )}
-      {tab === 'overview' && (
-        <OverviewPanel organizationId={organizationId} dashboard={dashboard} />
-      )}
+      {tab === 'overview' && <OverviewPanel dashboard={dashboard} />}
       {tab === 'settings' && (
         <SettingsPanel
           organizationId={organizationId}
           canUpdate={canUpdate}
+          canManageLifecycle={canAssignOwner}
           onDone={mutationDone}
         />
       )}
@@ -296,10 +629,8 @@ export function OrganizationAdminPage() {
 }
 
 function OverviewPanel({
-  organizationId,
   dashboard,
 }: {
-  organizationId: string;
   dashboard: UseQueryResult<OrganizationDashboard>;
 }) {
   const data = dashboard.data;
@@ -338,7 +669,6 @@ function OverviewPanel({
           basics.
         </p>
       )}
-      <p className="muted-copy">Organization ID: {organizationId}</p>
     </section>
   );
 }
@@ -346,13 +676,17 @@ function OverviewPanel({
 function SettingsPanel({
   organizationId,
   canUpdate,
+  canManageLifecycle,
   onDone,
 }: {
   organizationId: string;
   canUpdate: boolean;
+  canManageLifecycle: boolean;
   onDone: (message: string) => Promise<void>;
 }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const query = useQuery({
     queryKey: ['organization-profile', organizationId],
     queryFn: () => getOrganizationDashboard(organizationId),
@@ -368,6 +702,15 @@ function SettingsPanel({
       await onDone('Organization settings saved.');
     },
   });
+  const archive = useMutation({
+    mutationFn: () => archiveOrganization(organizationId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['accessible-organizations'],
+      });
+      navigate('/admin/organizations', { replace: true });
+    },
+  });
   if (query.isPending) return <LoadingState message="Loading settings…" />;
   if (query.isError || !query.data)
     return (
@@ -379,92 +722,146 @@ function SettingsPanel({
   if (!canUpdate) return <PermissionDeniedState />;
   const organization = query.data.organization;
   return (
-    <form
-      className="organization-form"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const form = new FormData(event.currentTarget);
-        save.mutate({
-          name: String(form.get('name')),
-          contactEmail: String(form.get('contactEmail')) || undefined,
-          phone: String(form.get('phone')) || undefined,
-          timezone: String(form.get('timezone')) || undefined,
-          address: {
-            line1: String(form.get('line1') || ''),
-            city: String(form.get('city') || ''),
-            country: String(form.get('country') || ''),
-          },
-        });
-      }}
-    >
-      <label>
-        Organization name
-        <input
-          name="name"
-          defaultValue={organization.name}
-          required
-          minLength={2}
-          maxLength={160}
-        />
-      </label>
-      <label>
-        Contact email
-        <input
-          name="contactEmail"
-          type="email"
-          defaultValue={organization.contactEmail ?? ''}
-          maxLength={254}
-        />
-      </label>
-      <label>
-        Phone
-        <input
-          name="phone"
-          defaultValue={organization.phone ?? ''}
-          maxLength={40}
-        />
-      </label>
-      <label>
-        Timezone
-        <input
-          name="timezone"
-          defaultValue={organization.timezone ?? 'UTC'}
-          maxLength={80}
-        />
-      </label>
-      <label>
-        Address
-        <input
-          name="line1"
-          defaultValue={organization.address?.line1 ?? ''}
-          maxLength={160}
-        />
-      </label>
-      <label>
-        City
-        <input
-          name="city"
-          defaultValue={organization.address?.city ?? ''}
-          maxLength={100}
-        />
-      </label>
-      <label>
-        Country
-        <input
-          name="country"
-          defaultValue={organization.address?.country ?? ''}
-          maxLength={100}
-        />
-      </label>
-      {save.isError && (
-        <p role="alert" className="form-error">
-          {apiMessage(save.error)}
-        </p>
+    <div className="organization-settings-stack">
+      <form
+        className="organization-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const form = new FormData(event.currentTarget);
+          save.mutate({
+            name: String(form.get('name')),
+            contactEmail: String(form.get('contactEmail')) || undefined,
+            phone: String(form.get('phone')) || undefined,
+            timezone: String(form.get('timezone')) || undefined,
+            address: {
+              line1: String(form.get('line1') || ''),
+              city: String(form.get('city') || ''),
+              country: String(form.get('country') || ''),
+            },
+          });
+        }}
+      >
+        <label>
+          Organization name
+          <input
+            name="name"
+            defaultValue={organization.name}
+            required
+            minLength={2}
+            maxLength={160}
+          />
+        </label>
+        <label>
+          Contact email
+          <input
+            name="contactEmail"
+            type="email"
+            defaultValue={organization.contactEmail ?? ''}
+            maxLength={254}
+          />
+        </label>
+        <label>
+          Phone
+          <input
+            name="phone"
+            defaultValue={organization.phone ?? ''}
+            maxLength={40}
+          />
+        </label>
+        <label>
+          Timezone
+          <input
+            name="timezone"
+            defaultValue={organization.timezone ?? 'UTC'}
+            maxLength={80}
+          />
+        </label>
+        <label>
+          Address
+          <input
+            name="line1"
+            defaultValue={organization.address?.line1 ?? ''}
+            maxLength={160}
+          />
+        </label>
+        <label>
+          City
+          <input
+            name="city"
+            defaultValue={organization.address?.city ?? ''}
+            maxLength={100}
+          />
+        </label>
+        <label>
+          Country
+          <input
+            name="country"
+            defaultValue={organization.address?.country ?? ''}
+            maxLength={100}
+          />
+        </label>
+        {save.isError && (
+          <p role="alert" className="form-error">
+            {apiMessage(save.error)}
+          </p>
+        )}
+        <Button type="submit" disabled={save.isPending}>
+          {save.isPending ? 'Saving…' : 'Save settings'}
+        </Button>
+      </form>
+      {canManageLifecycle && organization.status === 'active' && (
+        <section
+          className="organization-danger-zone"
+          aria-labelledby="danger-zone-title"
+        >
+          <div>
+            <p className="eyebrow">Danger Zone</p>
+            <h2 id="danger-zone-title">Archive organization</h2>
+            <p>
+              Archiving stops normal organization operations and removes this
+              organization from active workspaces. It does not delete data;
+              owners can restore it from My Organizations.
+            </p>
+          </div>
+          {archive.isError && (
+            <p className="form-error" role="alert">
+              {apiMessage(archive.error)}
+            </p>
+          )}
+          <Button
+            disabled={archive.isPending}
+            onClick={() => setArchiveOpen(true)}
+            variant="danger"
+          >
+            Archive organization
+          </Button>
+          <Dialog
+            description={`Archiving ${organization.name} makes its normal workspace unavailable. Campuses, memberships, invitations, and audit history will be preserved. An owner can restore it later from My Organizations.`}
+            onOpenChange={(open) => {
+              if (!archive.isPending) setArchiveOpen(open);
+            }}
+            open={archiveOpen}
+            title="Archive organization?"
+          >
+            <div className="dialog-actions">
+              <Button
+                disabled={archive.isPending}
+                onClick={() => setArchiveOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={archive.isPending}
+                onClick={() => archive.mutate()}
+                variant="danger"
+              >
+                {archive.isPending ? 'Archiving…' : 'Archive organization'}
+              </Button>
+            </div>
+          </Dialog>
+        </section>
       )}
-      <Button type="submit" disabled={save.isPending}>
-        {save.isPending ? 'Saving…' : 'Save settings'}
-      </Button>
-    </form>
+    </div>
   );
 }
 

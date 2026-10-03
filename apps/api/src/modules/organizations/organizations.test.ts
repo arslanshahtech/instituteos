@@ -38,6 +38,12 @@ class FixtureAccessRepository implements OrganizationAccessRepository {
       : null;
   }
 
+  async findLifecycleOwner(userId: string, organizationId: string) {
+    if (!this.organizations.has(organizationId)) return null;
+    const member = this.members.get(`${userId}:${organizationId}`);
+    return member?.role === 'organization_owner';
+  }
+
   async hasPlatformRole() {
     return false;
   }
@@ -121,6 +127,14 @@ describe('organization administration routes', () => {
         organization: { id: organizationA, name: 'North Institute' },
         campus: { id: campusA, name: 'Main Campus' },
       }),
+      listAccessibleOrganizations: vi.fn().mockResolvedValue([
+        {
+          id: organizationA,
+          name: 'North Institute',
+          role: 'organization_owner',
+          status: 'active',
+        },
+      ]),
       getProfile: vi.fn(),
       updateProfile: vi.fn(),
       dashboard: vi.fn().mockResolvedValue({
@@ -142,8 +156,49 @@ describe('organization administration routes', () => {
       listInvitations: vi.fn(),
       acceptInvitation: vi.fn(),
       updateOrganizationStatus: vi.fn(),
+      setOwnerOrganizationStatus: vi.fn().mockResolvedValue({
+        id: organizationA,
+        name: 'North Institute',
+        status: 'archived',
+      }),
+      deleteArchivedOrganization: vi.fn().mockResolvedValue(undefined),
     };
     app = buildApp(service, access, user.authenticate);
+  });
+
+  it('lists organizations for the authenticated user and ignores a supplied user ID', async () => {
+    const response = await request(app)
+      .get('/api/v1/organizations?userId=680000000000000000000001')
+      .set('Cookie', user.cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body.organizations).toEqual([
+      {
+        id: organizationA,
+        name: 'North Institute',
+        role: 'organization_owner',
+        status: 'active',
+      },
+    ]);
+    expect(service.listAccessibleOrganizations).toHaveBeenCalledWith(user.id);
+  });
+
+  it('requires authentication to list organizations', async () => {
+    const response = await request(app).get('/api/v1/organizations');
+
+    expect(response.status).toBe(401);
+    expect(service.listAccessibleOrganizations).not.toHaveBeenCalled();
+  });
+
+  it('returns an empty organization list for a user without memberships', async () => {
+    vi.mocked(service.listAccessibleOrganizations).mockResolvedValueOnce([]);
+    const response = await request(app)
+      .get('/api/v1/organizations')
+      .set('Cookie', user.cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ organizations: [] });
+    expect(service.listAccessibleOrganizations).toHaveBeenCalledWith(user.id);
   });
 
   it('creates an organization for the authenticated creator with an initial campus', async () => {
@@ -216,6 +271,99 @@ describe('organization administration routes', () => {
     expect(ownCampus.status).toBe(200);
     expect(foreignCampus.status).toBe(404);
     expect(service.getCampus).toHaveBeenCalledOnce();
+  });
+
+  it('allows an active owner to archive and restore through the lifecycle routes', async () => {
+    const archived = await request(app)
+      .patch(`/api/v1/organizations/${organizationA}/lifecycle/archive`)
+      .set('Cookie', user.cookie)
+      .set('X-CSRF-Token', user.csrfToken);
+    expect(archived.status).toBe(200);
+    expect(service.setOwnerOrganizationStatus).toHaveBeenCalledWith(
+      organizationA,
+      user.id,
+      'active',
+      'archived',
+    );
+
+    vi.mocked(service.setOwnerOrganizationStatus).mockResolvedValueOnce({
+      id: organizationA,
+      name: 'North Institute',
+      status: 'active',
+    });
+    const restored = await request(app)
+      .patch(`/api/v1/organizations/${organizationA}/lifecycle/restore`)
+      .set('Cookie', user.cookie)
+      .set('X-CSRF-Token', user.csrfToken);
+    expect(restored.status).toBe(200);
+    expect(service.setOwnerOrganizationStatus).toHaveBeenLastCalledWith(
+      organizationA,
+      user.id,
+      'archived',
+      'active',
+    );
+  });
+
+  it('denies non-owner organization roles from archiving or deleting', async () => {
+    access.members.set(
+      `${user.id}:${organizationA}`,
+      context(user.id, organizationA, 'organization_admin'),
+    );
+    const archived = await request(app)
+      .patch(`/api/v1/organizations/${organizationA}/lifecycle/archive`)
+      .set('Cookie', user.cookie)
+      .set('X-CSRF-Token', user.csrfToken);
+    const deleted = await request(app)
+      .delete(`/api/v1/organizations/${organizationA}`)
+      .set('Cookie', user.cookie)
+      .set('X-CSRF-Token', user.csrfToken)
+      .send({ confirmationName: 'North Institute' });
+
+    expect(archived.status).toBe(404);
+    expect(deleted.status).toBe(404);
+    expect(service.setOwnerOrganizationStatus).not.toHaveBeenCalled();
+    expect(service.deleteArchivedOrganization).not.toHaveBeenCalled();
+  });
+
+  it('requires authenticated CSRF-protected deletion with the organization name', async () => {
+    const response = await request(app)
+      .delete(`/api/v1/organizations/${organizationA}`)
+      .set('Cookie', user.cookie)
+      .set('X-CSRF-Token', user.csrfToken)
+      .send({ confirmationName: 'North Institute' });
+
+    expect(response.status).toBe(204);
+    expect(service.deleteArchivedOrganization).toHaveBeenCalledWith(
+      organizationA,
+      user.id,
+      'North Institute',
+    );
+  });
+
+  it('requires CSRF protection for organization lifecycle mutations', async () => {
+    const response = await request(app)
+      .patch(`/api/v1/organizations/${organizationA}/lifecycle/archive`)
+      .set('Cookie', user.cookie);
+
+    expect(response.status).toBe(403);
+    expect(service.setOwnerOrganizationStatus).not.toHaveBeenCalled();
+  });
+
+  it('rejects missing or oversized organization deletion confirmation', async () => {
+    const missing = await request(app)
+      .delete(`/api/v1/organizations/${organizationA}`)
+      .set('Cookie', user.cookie)
+      .set('X-CSRF-Token', user.csrfToken)
+      .send({});
+    const oversized = await request(app)
+      .delete(`/api/v1/organizations/${organizationA}`)
+      .set('Cookie', user.cookie)
+      .set('X-CSRF-Token', user.csrfToken)
+      .send({ confirmationName: 'x'.repeat(161) });
+
+    expect(missing.status).toBe(400);
+    expect(oversized.status).toBe(400);
+    expect(service.deleteArchivedOrganization).not.toHaveBeenCalled();
   });
 });
 

@@ -10,6 +10,13 @@ export interface OrganizationProfile {
   address?: Record<string, string>;
 }
 
+export interface AccessibleOrganization {
+  id: string;
+  name: string;
+  role: string;
+  status: 'active' | 'archived';
+}
+
 export interface Campus {
   id: string;
   organizationId: string;
@@ -62,6 +69,12 @@ export const ORGANIZATION_ROLES = [
 const base = (organizationId: string) =>
   `/organizations/${encodeURIComponent(organizationId)}`;
 
+export function getAccessibleOrganizations() {
+  return apiRequest<{ organizations: AccessibleOrganization[] }>(
+    '/organizations',
+  );
+}
+
 export function createOrganization(input: {
   name: string;
   contactEmail?: string;
@@ -92,6 +105,30 @@ export function updateOrganization(
     `${base(organizationId)}/settings`,
     { method: 'PATCH', body: JSON.stringify(changes) },
   );
+}
+
+export function archiveOrganization(organizationId: string) {
+  return apiRequest<{ organization: OrganizationProfile }>(
+    `${base(organizationId)}/lifecycle/archive`,
+    { method: 'PATCH', body: JSON.stringify({}) },
+  );
+}
+
+export function restoreOrganization(organizationId: string) {
+  return apiRequest<{ organization: OrganizationProfile }>(
+    `${base(organizationId)}/lifecycle/restore`,
+    { method: 'PATCH', body: JSON.stringify({}) },
+  );
+}
+
+export function deleteOrganization(
+  organizationId: string,
+  confirmationName: string,
+) {
+  return apiRequest<void>(base(organizationId), {
+    method: 'DELETE',
+    body: JSON.stringify({ confirmationName }),
+  });
 }
 
 export function getCampuses(organizationId: string) {

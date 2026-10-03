@@ -5,6 +5,7 @@ import { hashOpaqueToken } from '../auth/auth.service.js';
 import { type OrganizationContext } from '../tenancy/tenancy.types.js';
 import type { AuthEmailDelivery } from '../auth/auth.types.js';
 import type {
+  AccessibleOrganization,
   CampusInput,
   MemberInvitationInput,
   MemberUpdateInput,
@@ -74,6 +75,13 @@ export class OrganizationService implements OrganizationServices {
     }
   }
 
+  async listAccessibleOrganizations(
+    userId: string,
+  ): Promise<AccessibleOrganization[]> {
+    requireObjectId(userId, 'ACCOUNT_NOT_FOUND', 'The account is unavailable.');
+    return this.repository.listAccessibleOrganizations(userId);
+  }
+
   async getProfile(context: OrganizationContext) {
     const organization = await this.repository.findOrganization(
       context.organizationId,
@@ -93,6 +101,7 @@ export class OrganizationService implements OrganizationServices {
   ) {
     const updated = await this.repository.updateOrganization(
       context.organizationId,
+      context.userId,
       changes,
     );
     if (!updated)
@@ -101,13 +110,6 @@ export class OrganizationService implements OrganizationServices {
         'ORGANIZATION_NOT_FOUND',
         'Organization not found.',
       );
-    await this.repository.recordAudit({
-      organizationId: context.organizationId,
-      actorUserId: context.userId,
-      action: 'organization.settings.updated',
-      targetId: context.organizationId,
-      details: { fields: Object.keys(changes) },
-    });
     return updated;
   }
 
@@ -137,17 +139,12 @@ export class OrganizationService implements OrganizationServices {
     try {
       const campus = await this.repository.createCampus(
         context.organizationId,
+        context.userId,
         {
           ...input,
           name: requireName(input.name),
         },
       );
-      await this.repository.recordAudit({
-        organizationId: context.organizationId,
-        actorUserId: context.userId,
-        action: 'campus.created',
-        targetId: String(campus.id),
-      });
       return campus;
     } catch (error) {
       if (isDuplicateKey(error))
@@ -198,19 +195,11 @@ export class OrganizationService implements OrganizationServices {
     const updated = await this.repository.updateCampus(
       context.organizationId,
       campusId,
+      context.userId,
       changes,
     );
     if (!updated)
       throw new AppError(404, 'CAMPUS_NOT_FOUND', 'Campus not found.');
-    await this.repository.recordAudit({
-      organizationId: context.organizationId,
-      actorUserId: context.userId,
-      action: changes.status
-        ? 'campus.status.updated'
-        : 'campus.settings.updated',
-      targetId: campusId,
-      details: { fields: Object.keys(changes) },
-    });
     return updated;
   }
 
@@ -387,6 +376,59 @@ export class OrganizationService implements OrganizationServices {
         'Organization not found.',
       );
     return updated;
+  }
+
+  async setOwnerOrganizationStatus(
+    organizationId: string,
+    actorUserId: string,
+    expectedStatus: 'active' | 'archived',
+    status: 'archived' | 'active',
+  ) {
+    requireObjectId(
+      organizationId,
+      'ORGANIZATION_NOT_FOUND',
+      'Organization not found.',
+    );
+    requireObjectId(
+      actorUserId,
+      'ACCOUNT_NOT_FOUND',
+      'The account is unavailable.',
+    );
+    const updated = await this.repository.setOwnerOrganizationStatus(
+      organizationId,
+      actorUserId,
+      expectedStatus,
+      status,
+    );
+    if (!updated)
+      throw new AppError(
+        409,
+        'ORGANIZATION_STATUS_CONFLICT',
+        'Organization status changed before the operation completed.',
+      );
+    return updated;
+  }
+
+  async deleteArchivedOrganization(
+    organizationId: string,
+    actorUserId: string,
+    confirmationName: string,
+  ): Promise<void> {
+    requireObjectId(
+      organizationId,
+      'ORGANIZATION_NOT_FOUND',
+      'Organization not found.',
+    );
+    requireObjectId(
+      actorUserId,
+      'ACCOUNT_NOT_FOUND',
+      'The account is unavailable.',
+    );
+    await this.repository.deleteArchivedOrganization(
+      organizationId,
+      actorUserId,
+      confirmationName,
+    );
   }
 
   private async assertCampusesBelong(

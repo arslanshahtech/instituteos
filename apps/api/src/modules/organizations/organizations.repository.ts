@@ -11,10 +11,13 @@ import { AppError } from '../../errors/app-error.js';
 import type {
   CampusInput,
   MemberUpdateInput,
+  AccessibleOrganization,
   OrganizationProfileInput,
   OrganizationRepository,
   ProvisionOrganizationInput,
 } from './organizations.types.js';
+import type { OrganizationRole } from '../tenancy/tenancy.types.js';
+import { ORGANIZATION_ROLES } from '../tenancy/tenancy.types.js';
 
 function idObject(id: string): Types.ObjectId {
   return new Types.ObjectId(id);
@@ -145,17 +148,95 @@ export class MongoOrganizationRepository implements OrganizationRepository {
     );
   }
 
+  async listAccessibleOrganizations(userId: string) {
+    const memberships = (await MembershipModel.find({
+      userId: idObject(userId),
+      status: 'active',
+    })
+      .select('organizationId role')
+      .lean()) as Array<{
+      organizationId: Types.ObjectId;
+      role: OrganizationRole;
+    }>;
+    if (memberships.length === 0) return [];
+    const validMemberships = memberships.filter((membership) =>
+      ORGANIZATION_ROLES.includes(membership.role),
+    );
+    if (validMemberships.length === 0) return [];
+
+    const rolesByOrganization = new Map<string, OrganizationRole>(
+      validMemberships.map((membership) => [
+        String(membership.organizationId),
+        membership.role,
+      ]),
+    );
+    const ownerOrganizationIds = validMemberships
+      .filter((membership) => membership.role === 'organization_owner')
+      .map((membership) => membership.organizationId);
+    const organizations = (await OrganizationModel.find({
+      $or: [
+        {
+          _id: {
+            $in: validMemberships.map(
+              (membership) => membership.organizationId,
+            ),
+          },
+          status: 'active',
+        },
+        { _id: { $in: ownerOrganizationIds }, status: 'archived' },
+      ],
+    })
+      .select('_id name status')
+      .sort({ name: 1 })
+      .lean()) as Array<Record<string, unknown>>;
+
+    return organizations.flatMap((organization): AccessibleOrganization[] => {
+      const role = rolesByOrganization.get(String(organization._id));
+      return role
+        ? [
+            {
+              id: String(organization._id),
+              name: String(organization.name),
+              role,
+              status: organization.status as 'active' | 'archived',
+            },
+          ]
+        : [];
+    });
+  }
+
   async updateOrganization(
     organizationId: string,
+    actorUserId: string,
     changes: Partial<OrganizationProfileInput>,
   ) {
-    return serialize(
-      (await OrganizationModel.findOneAndUpdate(
-        { _id: organizationId, status: 'active' },
-        { $set: changes },
-        { new: true, runValidators: true },
-      ).lean()) as Record<string, unknown> | null,
-    );
+    const session = await mongoose.startSession();
+    let updated: Record<string, unknown> | null = null;
+    try {
+      await session.withTransaction(async () => {
+        updated = serialize(
+          (await OrganizationModel.findOneAndUpdate(
+            { _id: organizationId, status: 'active' },
+            { $set: changes },
+            { new: true, runValidators: true, session },
+          ).lean()) as Record<string, unknown> | null,
+        );
+        if (updated)
+          await saveAudit(
+            {
+              organizationId,
+              actorUserId,
+              action: 'organization.settings.updated',
+              targetId: organizationId,
+              details: { fields: Object.keys(changes) },
+            },
+            session,
+          );
+      });
+      return updated;
+    } finally {
+      await session.endSession();
+    }
   }
 
   async setOrganizationStatus(
@@ -163,22 +244,197 @@ export class MongoOrganizationRepository implements OrganizationRepository {
     actorUserId: string,
     status: 'active' | 'suspended' | 'archived',
   ) {
-    const result = serialize(
-      (await OrganizationModel.findByIdAndUpdate(
-        organizationId,
-        { $set: { status } },
-        { new: true, runValidators: true },
-      ).lean()) as Record<string, unknown> | null,
-    );
-    if (result)
-      await saveAudit({
-        organizationId,
-        actorUserId,
-        action: 'organization.status.updated',
-        targetId: organizationId,
-        details: { status },
+    const session = await mongoose.startSession();
+    let updated: Record<string, unknown> | null = null;
+    try {
+      await session.withTransaction(async () => {
+        updated = serialize(
+          (await OrganizationModel.findByIdAndUpdate(
+            organizationId,
+            { $set: { status } },
+            { new: true, runValidators: true, session },
+          ).lean()) as Record<string, unknown> | null,
+        );
+        if (updated)
+          await saveAudit(
+            {
+              organizationId,
+              actorUserId,
+              action: 'organization.status.updated',
+              targetId: organizationId,
+              details: { status },
+            },
+            session,
+          );
       });
-    return result;
+      return updated;
+    } finally {
+      await session.endSession();
+    }
+  }
+
+  async setOwnerOrganizationStatus(
+    organizationId: string,
+    actorUserId: string,
+    expectedStatus: 'active' | 'archived',
+    status: 'archived' | 'active',
+  ) {
+    const session = await mongoose.startSession();
+    let updated: Record<string, unknown> | null = null;
+    try {
+      await session.withTransaction(async () => {
+        const organization = (await OrganizationModel.findById(organizationId)
+          .session(session)
+          .lean()) as Record<string, unknown> | null;
+        if (!organization)
+          throw new AppError(
+            404,
+            'ORGANIZATION_NOT_FOUND',
+            'Organization not found.',
+          );
+
+        const owner = await MembershipModel.exists({
+          organizationId: idObject(organizationId),
+          userId: idObject(actorUserId),
+          role: 'organization_owner',
+          status: 'active',
+        }).session(session);
+        if (!owner)
+          throw new AppError(
+            403,
+            'ORGANIZATION_OWNER_REQUIRED',
+            'Only an active organization owner can change its lifecycle.',
+          );
+        if (organization.status !== expectedStatus)
+          throw new AppError(
+            409,
+            'ORGANIZATION_STATUS_CONFLICT',
+            `Only a ${expectedStatus} organization can be ${status === 'archived' ? 'archived' : 'restored'}.`,
+          );
+
+        updated = serialize(
+          (await OrganizationModel.findOneAndUpdate(
+            { _id: organizationId, status: expectedStatus },
+            { $set: { status } },
+            { new: true, runValidators: true, session },
+          ).lean()) as Record<string, unknown> | null,
+        );
+        if (!updated)
+          throw new AppError(
+            409,
+            'ORGANIZATION_STATUS_CONFLICT',
+            'Organization status changed before the operation completed.',
+          );
+        await saveAudit(
+          {
+            organizationId,
+            actorUserId,
+            action:
+              status === 'archived'
+                ? 'organization.archived'
+                : 'organization.restored',
+            targetId: organizationId,
+            details: { previousStatus: expectedStatus, status },
+          },
+          session,
+        );
+      });
+      if (!updated)
+        throw new Error('Organization lifecycle update did not complete.');
+      return updated;
+    } finally {
+      await session.endSession();
+    }
+  }
+
+  async deleteArchivedOrganization(
+    organizationId: string,
+    actorUserId: string,
+    confirmationName: string,
+  ): Promise<void> {
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const organization = (await OrganizationModel.findById(organizationId)
+          .session(session)
+          .lean()) as Record<string, unknown> | null;
+        if (!organization)
+          throw new AppError(
+            404,
+            'ORGANIZATION_NOT_FOUND',
+            'Organization not found.',
+          );
+
+        const owner = await MembershipModel.exists({
+          organizationId: idObject(organizationId),
+          userId: idObject(actorUserId),
+          role: 'organization_owner',
+          status: 'active',
+        }).session(session);
+        if (!owner)
+          throw new AppError(
+            403,
+            'ORGANIZATION_OWNER_REQUIRED',
+            'Only an active organization owner can permanently delete this organization.',
+          );
+        if (organization.status !== 'archived')
+          throw new AppError(
+            409,
+            'ORGANIZATION_MUST_BE_ARCHIVED',
+            'Archive the organization before permanently deleting it.',
+          );
+        if (confirmationName !== organization.name)
+          throw new AppError(
+            400,
+            'ORGANIZATION_NAME_CONFIRMATION_FAILED',
+            'Enter the exact organization name to confirm deletion.',
+          );
+
+        const campuses = await CampusModel.deleteMany(
+          { organizationId: idObject(organizationId) },
+          { session },
+        );
+        const memberships = await MembershipModel.deleteMany(
+          { organizationId: idObject(organizationId) },
+          { session },
+        );
+        const invitations = await OrganizationInvitationModel.deleteMany(
+          { organizationId: idObject(organizationId) },
+          { session },
+        );
+        await OrganizationAuditEventModel.deleteMany(
+          { organizationId: idObject(organizationId) },
+          { session },
+        );
+        const deletion = await OrganizationModel.deleteOne(
+          { _id: idObject(organizationId), status: 'archived' },
+          { session },
+        );
+        if (deletion.deletedCount !== 1)
+          throw new AppError(
+            409,
+            'ORGANIZATION_DELETE_CONFLICT',
+            'The organization could not be deleted in its current state.',
+          );
+        await saveAudit(
+          {
+            organizationId,
+            actorUserId,
+            action: 'organization.deleted',
+            targetId: organizationId,
+            details: {
+              campusesDeleted: campuses.deletedCount,
+              membershipsDeleted: memberships.deletedCount,
+              invitationsDeleted: invitations.deletedCount,
+              retainedDeletionEvent: true,
+            },
+          },
+          session,
+        );
+      });
+    } finally {
+      await session.endSession();
+    }
   }
 
   async getDashboardCounts(organizationId: string) {
@@ -209,13 +465,41 @@ export class MongoOrganizationRepository implements OrganizationRepository {
     );
   }
 
-  async createCampus(organizationId: string, input: CampusInput) {
-    const created = await CampusModel.create({
-      ...input,
-      organizationId: idObject(organizationId),
-      status: input.status ?? 'active',
-    });
-    return serialize(created.toObject())!;
+  async createCampus(
+    organizationId: string,
+    actorUserId: string,
+    input: CampusInput,
+  ): Promise<Record<string, unknown>> {
+    const session = await mongoose.startSession();
+    let created: Record<string, unknown> | null = null;
+    try {
+      await session.withTransaction(async () => {
+        const [campus] = await CampusModel.create(
+          [
+            {
+              ...input,
+              organizationId: idObject(organizationId),
+              status: input.status ?? 'active',
+            },
+          ],
+          { session },
+        );
+        created = serialize(campus.toObject());
+        await saveAudit(
+          {
+            organizationId,
+            actorUserId,
+            action: 'campus.created',
+            targetId: String(campus._id),
+          },
+          session,
+        );
+      });
+    } finally {
+      await session.endSession();
+    }
+    if (!created) throw new Error('Campus creation did not complete.');
+    return created;
   }
 
   async findCampus(organizationId: string, campusId: string) {
@@ -230,15 +514,38 @@ export class MongoOrganizationRepository implements OrganizationRepository {
   async updateCampus(
     organizationId: string,
     campusId: string,
+    actorUserId: string,
     changes: Partial<CampusInput>,
   ) {
-    return serialize(
-      (await CampusModel.findOneAndUpdate(
-        { _id: campusId, organizationId: idObject(organizationId) },
-        { $set: changes },
-        { new: true, runValidators: true },
-      ).lean()) as Record<string, unknown> | null,
-    );
+    const session = await mongoose.startSession();
+    let updated: Record<string, unknown> | null = null;
+    try {
+      await session.withTransaction(async () => {
+        updated = serialize(
+          (await CampusModel.findOneAndUpdate(
+            { _id: campusId, organizationId: idObject(organizationId) },
+            { $set: changes },
+            { new: true, runValidators: true, session },
+          ).lean()) as Record<string, unknown> | null,
+        );
+        if (updated)
+          await saveAudit(
+            {
+              organizationId,
+              actorUserId,
+              action: changes.status
+                ? 'campus.status.updated'
+                : 'campus.settings.updated',
+              targetId: campusId,
+              details: { fields: Object.keys(changes) },
+            },
+            session,
+          );
+      });
+      return updated;
+    } finally {
+      await session.endSession();
+    }
   }
 
   async listMembers(organizationId: string, campusIds?: string[]) {
