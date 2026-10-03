@@ -25,6 +25,16 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
   const navigate = useNavigate();
   const location = useLocation();
   const auth = useAuth();
+  const signOut = async () => {
+    setSignOutError(false);
+    try {
+      await auth.logout();
+      navigate('/login');
+    } catch {
+      setSignOutError(true);
+    }
+  };
+  const changeRole = (key: string) => navigate(`/${key}`);
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -100,13 +110,48 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                 `navigation-link${isActive ? ' navigation-link-active' : ''}`
               }
               onClick={() => setMobileNavOpen(false)}
-              to="/admin/organizations/onboarding"
+              to="/admin/organizations"
             >
               <LayoutDashboard size={18} aria-hidden="true" />
               <span>Organizations</span>
             </NavLink>
           )}
         </nav>
+
+        <div className="mobile-account-actions">
+          <span className="current-user-name">{auth.user?.displayName}</span>
+          <Button
+            className="sign-out-button"
+            onClick={signOut}
+            type="button"
+            variant="quiet"
+          >
+            Sign out
+          </Button>
+          <label className="role-preview-label" htmlFor="mobile-role-preview">
+            Layout preview
+          </label>
+          <div className="role-preview-select-wrap">
+            <select
+              id="mobile-role-preview"
+              aria-label="Mobile role layout preview"
+              className="role-preview-select"
+              onChange={(event) => changeRole(event.target.value)}
+              value={role.key}
+            >
+              {roleLayouts.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              className="select-chevron"
+              size={15}
+              aria-hidden="true"
+            />
+          </div>
+        </div>
 
         <div className="sidebar-bottom">
           <span className="environment-indicator" aria-hidden="true" />
@@ -137,15 +182,7 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
             <span className="current-user-name">{auth.user?.displayName}</span>
             <Button
               className="sign-out-button"
-              onClick={async () => {
-                setSignOutError(false);
-                try {
-                  await auth.logout();
-                  navigate('/login');
-                } catch {
-                  setSignOutError(true);
-                }
-              }}
+              onClick={signOut}
               type="button"
               variant="quiet"
             >
@@ -159,7 +196,7 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                 id="role-preview"
                 aria-label="Role layout preview"
                 className="role-preview-select"
-                onChange={(event) => navigate(`/${event.target.value}`)}
+                onChange={(event) => changeRole(event.target.value)}
                 value={role.key}
               >
                 {roleLayouts.map((option) => (

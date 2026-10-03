@@ -34,6 +34,10 @@ export interface OrganizationAccessRepository {
     userId: string,
     organizationId: string,
   ): Promise<OrganizationMembershipContext | null>;
+  findLifecycleOwner(
+    userId: string,
+    organizationId: string,
+  ): Promise<boolean | null>;
   hasPlatformRole(userId: string, role: PlatformRole): Promise<boolean>;
 }
 

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppProviders } from './app/providers.js';
@@ -31,7 +31,11 @@ const tenancyMocks = vi.hoisted(() => ({
 }));
 
 const organizationMocks = vi.hoisted(() => ({
+  getAccessibleOrganizations: vi.fn(),
   createOrganization: vi.fn(),
+  archiveOrganization: vi.fn(),
+  restoreOrganization: vi.fn(),
+  deleteOrganization: vi.fn(),
   getOrganizationDashboard: vi.fn(),
   updateOrganization: vi.fn(),
   getCampuses: vi.fn(),
@@ -116,6 +120,16 @@ describe('frontend application foundation', () => {
       ],
       campusIds: [],
     });
+    organizationMocks.getAccessibleOrganizations.mockResolvedValue({
+      organizations: [
+        {
+          id: '650000000000000000000001',
+          name: 'North Institute',
+          role: 'organization_owner',
+          status: 'active' as const,
+        },
+      ],
+    });
     organizationMocks.createOrganization.mockResolvedValue({
       organization: {
         id: '650000000000000000000001',
@@ -128,6 +142,21 @@ describe('frontend application foundation', () => {
         status: 'active',
       },
     });
+    organizationMocks.archiveOrganization.mockResolvedValue({
+      organization: {
+        id: '650000000000000000000001',
+        name: 'North Institute',
+        status: 'archived',
+      },
+    });
+    organizationMocks.restoreOrganization.mockResolvedValue({
+      organization: {
+        id: '650000000000000000000001',
+        name: 'North Institute',
+        status: 'active',
+      },
+    });
+    organizationMocks.deleteOrganization.mockResolvedValue(undefined);
     organizationMocks.getOrganizationDashboard.mockResolvedValue({
       organization: {
         id: '650000000000000000000001',
@@ -216,6 +245,9 @@ describe('frontend application foundation', () => {
 
     await user.click(menuButton);
     expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      screen.getByRole('combobox', { name: 'Mobile role layout preview' }),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole('link', { name: 'UI foundations' }));
 
@@ -428,6 +460,119 @@ describe('frontend application foundation', () => {
     });
   });
 
+  it('lists accessible organizations with open and create actions', async () => {
+    organizationMocks.getAccessibleOrganizations.mockResolvedValueOnce({
+      organizations: [
+        {
+          id: '650000000000000000000001',
+          name: 'North Institute',
+          role: 'organization_owner',
+          status: 'active',
+        },
+        {
+          id: '650000000000000000000002',
+          name: 'South Academy',
+          role: 'teacher',
+          status: 'active',
+        },
+      ],
+    });
+    renderPath('/admin/organizations');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Organizations' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('South Academy')).toBeInTheDocument();
+    expect(screen.getByText('organization owner')).toBeInTheDocument();
+    expect(screen.getByText('teacher')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Open North Institute' }),
+    ).toHaveAttribute('href', '/admin/organizations/650000000000000000000001');
+    expect(
+      screen.getByRole('link', { name: 'Create organization' }),
+    ).toHaveAttribute('href', '/admin/organizations/onboarding');
+  });
+
+  it('shows an empty discovery state and creates from the admin landing route', async () => {
+    organizationMocks.getAccessibleOrganizations.mockResolvedValueOnce({
+      organizations: [],
+    });
+    renderPath('/admin');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Organizations' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('No organizations yet')).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('link', { name: 'Create organization' }),
+    ).toHaveLength(2);
+  });
+
+  it('opens the sole accessible organization from the admin landing route', async () => {
+    renderPath('/admin');
+
+    expect(
+      await screen.findByRole('heading', { name: 'North Institute' }),
+    ).toBeInTheDocument();
+    expect(organizationMocks.getOrganizationDashboard).toHaveBeenCalledWith(
+      '650000000000000000000001',
+    );
+  });
+
+  it('switches only to organizations returned by the authenticated listing', async () => {
+    const user = userEvent.setup();
+    organizationMocks.getAccessibleOrganizations.mockResolvedValueOnce({
+      organizations: [
+        {
+          id: '650000000000000000000001',
+          name: 'North Institute',
+          role: 'organization_owner',
+          status: 'active',
+        },
+        {
+          id: '650000000000000000000002',
+          name: 'South Academy',
+          role: 'teacher',
+          status: 'active',
+        },
+      ],
+    });
+    renderPath('/admin/organizations/650000000000000000000001');
+
+    const organizationSelect = await screen.findByRole('combobox', {
+      name: 'Current organization',
+    });
+    expect(organizationSelect).toHaveValue('650000000000000000000001');
+    await user.selectOptions(organizationSelect, '650000000000000000000002');
+
+    await waitFor(() =>
+      expect(tenancyMocks.getOrganizationAccessContext).toHaveBeenCalledWith(
+        '650000000000000000000002',
+      ),
+    );
+  });
+
+  it('shows organization names instead of route IDs in workspace navigation', async () => {
+    const organizationId = '650000000000000000000001';
+    renderPath(`/admin/organizations/${organizationId}`);
+
+    const identity = await screen.findByLabelText('Current workspace');
+    expect(identity).toHaveTextContent('Organization workspace');
+    await waitFor(() => expect(identity).toHaveTextContent('North Institute'));
+    expect(screen.queryByText(organizationId)).not.toBeInTheDocument();
+  });
+
+  it('returns an inaccessible organization route to discovery', async () => {
+    tenancyMocks.getOrganizationAccessContext.mockRejectedValueOnce(
+      new ApiError('Organization not found.', 404, 'ORGANIZATION_NOT_FOUND'),
+    );
+    renderPath('/admin/organizations/650000000000000000000099');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Organizations' }),
+    ).toBeInTheDocument();
+  });
+
   it('loads organization members and sends an invitation through the API', async () => {
     const user = userEvent.setup();
     renderPath('/admin/organizations/650000000000000000000001');
@@ -470,6 +615,175 @@ describe('frontend application foundation', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Organization settings saved.',
     );
+  });
+
+  it('allows choosing every organization section from the compact selector', async () => {
+    const user = userEvent.setup();
+    renderPath('/admin/organizations/650000000000000000000001');
+
+    const sectionSelector = await screen.findByRole('combobox', {
+      name: 'Organization section',
+    });
+    expect(sectionSelector).toHaveValue('overview');
+    await user.selectOptions(sectionSelector, 'settings');
+
+    expect(
+      await screen.findByRole('textbox', { name: 'Organization name' }),
+    ).toBeInTheDocument();
+    expect(sectionSelector).toHaveValue('settings');
+    expect(
+      within(sectionSelector).getByRole('option', { name: 'Invitations' }),
+    ).toBeInTheDocument();
+  });
+
+  it('lets only the organization owner archive from settings and returns to discovery', async () => {
+    const user = userEvent.setup();
+    tenancyMocks.getOrganizationAccessContext.mockResolvedValueOnce({
+      organizationId: '650000000000000000000001',
+      role: 'organization_owner',
+      permissions: ['organization.read', 'organization.update'],
+      campusIds: [],
+    });
+    renderPath('/admin/organizations/650000000000000000000001');
+    await user.click(await screen.findByRole('button', { name: 'settings' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Archive organization' }),
+    );
+
+    const dialog = screen.getByRole('dialog', {
+      name: 'Archive organization?',
+    });
+    expect(
+      within(dialog).getByText(/Campuses, memberships/),
+    ).toBeInTheDocument();
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Archive organization' }),
+    );
+
+    expect(organizationMocks.archiveOrganization).toHaveBeenCalledWith(
+      '650000000000000000000001',
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'Organizations' }),
+    ).toBeInTheDocument();
+  });
+
+  it('does not expose archive controls to organization administrators', async () => {
+    const user = userEvent.setup();
+    renderPath('/admin/organizations/650000000000000000000001');
+    await user.click(await screen.findByRole('button', { name: 'settings' }));
+
+    expect(
+      await screen.findByRole('button', { name: 'Save settings' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Archive organization' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('allows an archived owner to restore an organization', async () => {
+    const user = userEvent.setup();
+    organizationMocks.getAccessibleOrganizations
+      .mockResolvedValueOnce({
+        organizations: [
+          {
+            id: '650000000000000000000001',
+            name: 'North Institute',
+            role: 'organization_owner',
+            status: 'archived',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        organizations: [
+          {
+            id: '650000000000000000000001',
+            name: 'North Institute',
+            role: 'organization_owner',
+            status: 'active',
+          },
+        ],
+      });
+    renderPath('/admin/organizations');
+
+    await user.click(await screen.findByRole('button', { name: 'Restore' }));
+
+    expect(organizationMocks.restoreOrganization).toHaveBeenCalledWith(
+      '650000000000000000000001',
+    );
+    expect(
+      await screen.findByRole('link', { name: 'Open North Institute' }),
+    ).toBeInTheDocument();
+  });
+
+  it('requires an exact name before permanent deletion and removes the organization on success', async () => {
+    const user = userEvent.setup();
+    organizationMocks.getAccessibleOrganizations
+      .mockResolvedValueOnce({
+        organizations: [
+          {
+            id: '650000000000000000000001',
+            name: 'North Institute',
+            role: 'organization_owner',
+            status: 'archived',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ organizations: [] });
+    renderPath('/admin/organizations');
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Delete permanently' }),
+    );
+    const dialog = screen.getByRole('dialog', {
+      name: 'Delete organization permanently',
+    });
+    const confirmation = within(dialog).getByRole('textbox', {
+      name: 'Organization name',
+    });
+    const deleteButton = within(dialog).getByRole('button', {
+      name: 'Delete organization',
+    });
+    expect(deleteButton).toBeDisabled();
+    await user.type(confirmation, 'north institute');
+    expect(deleteButton).toBeDisabled();
+
+    await user.clear(confirmation);
+    await user.type(confirmation, 'North Institute');
+    expect(deleteButton).toBeEnabled();
+    await user.click(deleteButton);
+
+    expect(organizationMocks.deleteOrganization).toHaveBeenCalledWith(
+      '650000000000000000000001',
+      'North Institute',
+    );
+    expect(await screen.findByText('No organizations yet')).toBeInTheDocument();
+  });
+
+  it('does not expose restore or delete controls to non-owner archived members', async () => {
+    organizationMocks.getAccessibleOrganizations.mockResolvedValueOnce({
+      organizations: [
+        {
+          id: '650000000000000000000001',
+          name: 'North Institute',
+          role: 'organization_admin',
+          status: 'archived',
+        },
+      ],
+    });
+    renderPath('/admin/organizations');
+
+    expect(
+      await screen.findByText(
+        'Contact an organization owner to restore this workspace.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Restore' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Delete permanently' }),
+    ).not.toBeInTheDocument();
   });
 
   it('creates, renames, and changes campus status from the campus panel', async () => {
@@ -624,7 +938,10 @@ describe('frontend application foundation', () => {
   it('logs out from the authenticated application shell', async () => {
     const user = userEvent.setup();
     renderPath('/student');
-    await user.click(await screen.findByRole('button', { name: 'Sign out' }));
+    const signOutButtons = await screen.findAllByRole('button', {
+      name: 'Sign out',
+    });
+    await user.click(signOutButtons[0]!);
 
     expect(
       await screen.findByRole('heading', { name: 'Sign in to InstituteOS' }),

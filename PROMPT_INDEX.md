@@ -2,23 +2,23 @@
 
 Execute these prompts ONE AT A TIME.
 
-| ID | Phase | Goal | Status |
-|---|---|---|---|
-| 00 | Foundation | Repository foundation + project constitution | ☐ |
-| 01 | Backend | Express/API/database engineering foundation | ☐ |
-| 02 | Frontend | React app shell + design system | ☐ |
-| 03 | Auth | Authentication + identity | ☐ |
-| 04 | Multi-tenancy/RBAC | Tenant isolation + permissions | ☐ |
-| 05 | Organizations | Organizations, campuses, members, onboarding | ☐ |
-| 06 | People | Admissions, students, guardians, staff | ☐ |
-| 07 | Academics | Academic structure + timetable | ☐ |
-| 08 | Learning | Attendance + exams + assignments | ☐ |
-| 09 | Finance | Student/institute fees and payments | ☐ |
-| 10 | Operations | Communication, documents, reports, audit | ☐ |
-| 11 | SaaS Billing | InstituteOS subscription billing | ☐ |
-| 12 | AI | Permission-aware AI assistant | ☐ |
-| 13 | Hardening | Security, testing, production readiness | ☐ |
-| 14 | Final QA | End-to-end verification + portfolio packaging | ☐ |
+| ID  | Phase              | Goal                                          | Status                                                                       |
+| --- | ------------------ | --------------------------------------------- | ---------------------------------------------------------------------------- |
+| 00  | Foundation         | Repository foundation + project constitution  | Superseded by Phase 01; no separate checkpoint recorded                      |
+| 01  | Backend            | Express/API/database engineering foundation   | Complete                                                                     |
+| 02  | Frontend           | React app shell + design system               | Complete                                                                     |
+| 03  | Auth               | Authentication + identity                     | Complete                                                                     |
+| 04  | Multi-tenancy/RBAC | Tenant isolation + permissions                | Complete                                                                     |
+| 05  | Organizations      | Organizations, campuses, members, onboarding  | Implementation complete — final lifecycle closeout awaiting human acceptance |
+| 06  | People             | Admissions, students, guardians, staff        | ☐                                                                            |
+| 07  | Academics          | Academic structure + timetable                | ☐                                                                            |
+| 08  | Learning           | Attendance + exams + assignments              | ☐                                                                            |
+| 09  | Finance            | Student/institute fees and payments           | ☐                                                                            |
+| 10  | Operations         | Communication, documents, reports, audit      | ☐                                                                            |
+| 11  | SaaS Billing       | InstituteOS subscription billing              | ☐                                                                            |
+| 12  | AI                 | Permission-aware AI assistant                 | ☐                                                                            |
+| 13  | Hardening          | Security, testing, production readiness       | ☐                                                                            |
+| 14  | Final QA           | End-to-end verification + portfolio packaging | ☐                                                                            |
 
 ## Execution rule
 

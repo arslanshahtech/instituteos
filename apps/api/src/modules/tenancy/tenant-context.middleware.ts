@@ -109,6 +109,50 @@ export function requireOrganizationRole(roles: readonly OrganizationRole[]) {
   };
 }
 
+export function requireOrganizationLifecycleOwner(
+  repository: OrganizationAccessRepository,
+) {
+  return async (request: Request, response: Response, next: NextFunction) => {
+    const userId = authenticatedUserId(response);
+    if (!userId)
+      return next(
+        new AppError(401, 'AUTHENTICATION_REQUIRED', 'Sign in to continue.'),
+      );
+
+    const organizationParam = request.params.organizationId;
+    const organizationId = Array.isArray(organizationParam)
+      ? organizationParam[0]
+      : organizationParam;
+    if (!organizationId || !mongoose.isValidObjectId(organizationId))
+      return next(
+        new AppError(404, 'ORGANIZATION_NOT_FOUND', 'Organization not found.'),
+      );
+
+    try {
+      const owner = await repository.findLifecycleOwner(userId, organizationId);
+      if (owner === null)
+        return next(
+          new AppError(
+            404,
+            'ORGANIZATION_NOT_FOUND',
+            'Organization not found.',
+          ),
+        );
+      if (!owner)
+        return next(
+          new AppError(
+            404,
+            'ORGANIZATION_NOT_FOUND',
+            'Organization not found.',
+          ),
+        );
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  };
+}
+
 export function requireAssignedCampusScope(campusIdParameter = 'campusId') {
   return (request: Request, response: Response, next: NextFunction) => {
     const context = (response.locals as AuthenticatedLocals)

@@ -18,6 +18,7 @@ import {
 import {
   createOrganizationContextMiddleware,
   requireAssignedCampusScope,
+  requireOrganizationLifecycleOwner,
   requireOrganizationPermission,
   requirePlatformRole,
 } from '../tenancy/tenant-context.middleware.js';
@@ -313,6 +314,19 @@ export function createOrganizationRouter(
   const router = Router();
   const resolveOrganization =
     createOrganizationContextMiddleware(accessRepository);
+  const resolveLifecycleOwner =
+    requireOrganizationLifecycleOwner(accessRepository);
+
+  router.get(
+    '/',
+    authenticate,
+    asyncHandler(async (_request, response) => {
+      const user = currentUser(response);
+      response.status(200).json({
+        organizations: await service.listAccessibleOrganizations(user.id),
+      });
+    }),
+  );
 
   router.post(
     '/',
@@ -324,6 +338,68 @@ export function createOrganizationRouter(
         parseProvision(request.body),
       );
       response.status(201).json(created);
+    }),
+  );
+
+  router.patch(
+    '/:organizationId/lifecycle/archive',
+    authenticate,
+    csrfProtection,
+    resolveLifecycleOwner,
+    asyncHandler(async (request, response) => {
+      const user = currentUser(response);
+      const organization = await service.setOwnerOrganizationStatus(
+        routeParameter(request, 'organizationId'),
+        user.id,
+        'active',
+        'archived',
+      );
+      response.status(200).json({ organization });
+    }),
+  );
+
+  router.patch(
+    '/:organizationId/lifecycle/restore',
+    authenticate,
+    csrfProtection,
+    resolveLifecycleOwner,
+    asyncHandler(async (request, response) => {
+      const user = currentUser(response);
+      const organization = await service.setOwnerOrganizationStatus(
+        routeParameter(request, 'organizationId'),
+        user.id,
+        'archived',
+        'active',
+      );
+      response.status(200).json({ organization });
+    }),
+  );
+
+  router.delete(
+    '/:organizationId',
+    authenticate,
+    csrfProtection,
+    resolveLifecycleOwner,
+    asyncHandler(async (request, response) => {
+      const body = bodyObject(request.body);
+      const confirmationName = body.confirmationName;
+      if (
+        typeof confirmationName !== 'string' ||
+        confirmationName.length < 1 ||
+        confirmationName.length > 160
+      )
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Enter the exact organization name to confirm deletion.',
+        );
+      const user = currentUser(response);
+      await service.deleteArchivedOrganization(
+        routeParameter(request, 'organizationId'),
+        user.id,
+        confirmationName,
+      );
+      response.status(204).end();
     }),
   );
 

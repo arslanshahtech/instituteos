@@ -1,17 +1,40 @@
+import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router-dom';
+import { getAccessibleOrganizations } from '../../organizations/organizations-api.js';
 import type { RoleLayoutConfig } from '../../layouts/layoutTypes.js';
 
 const segmentLabels: Record<string, string> = {
   foundations: 'UI foundations',
+  organizations: 'Organizations',
+  context: 'Access context',
 };
 
 export function Breadcrumbs({ role }: { role: RoleLayoutConfig }) {
   const location = useLocation();
   const segments = location.pathname.split('/').filter(Boolean).slice(1);
+  const organizationId =
+    segments[0] === 'organizations' &&
+    segments[1] &&
+    /^[\da-f]{24}$/i.test(segments[1])
+      ? segments[1]
+      : undefined;
+  const organizations = useQuery({
+    queryKey: ['accessible-organizations'],
+    queryFn: getAccessibleOrganizations,
+    enabled: Boolean(organizationId),
+    retry: false,
+  });
+  const organizationName =
+    organizations.data?.organizations.find(
+      (organization) => organization.id === organizationId,
+    )?.name ?? 'Organization';
   const crumbs = [
     { label: role.workspaceTitle, to: `/${role.key}` },
     ...segments.map((segment, index) => ({
-      label: segmentLabels[segment] ?? segment,
+      label:
+        segment === organizationId
+          ? organizationName
+          : (segmentLabels[segment] ?? segment),
       to: `/${role.key}/${segments.slice(0, index + 1).join('/')}`,
     })),
   ];
@@ -30,6 +53,14 @@ export function Breadcrumbs({ role }: { role: RoleLayoutConfig }) {
           </li>
         ))}
       </ol>
+      <div className="mobile-workspace-identity" aria-label="Current workspace">
+        <span>{role.workspaceTitle}</span>
+        <strong>
+          {organizationId
+            ? organizationName
+            : (crumbs.at(-1)?.label ?? role.workspaceTitle)}
+        </strong>
+      </div>
     </nav>
   );
 }
