@@ -279,7 +279,7 @@ describe('organization authorization and tenant isolation', () => {
     expect(teacherContext.body).toMatchObject({
       organizationId: organizationB,
       role: 'teacher',
-      permissions: ['organization.read', 'student.read'],
+      permissions: ['organization.read', 'student.read', 'guardian.read'],
     });
   });
 
@@ -407,6 +407,7 @@ describe('organization authorization and tenant isolation', () => {
     expect(permissionsForOrganizationRole('teacher')).toEqual([
       'organization.read',
       'student.read',
+      'guardian.read'
     ]);
   });
 

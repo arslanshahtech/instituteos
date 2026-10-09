@@ -521,6 +521,14 @@ export function OrganizationAdminPage() {
           )}
         </div>
         <div className="organization-heading-actions organization-workspace-actions">
+          {access.data.permissions.includes('student.read') && (
+            <Link
+              className="button button-secondary"
+              to={`/admin/organizations/${encodeURIComponent(organizationId)}/students`}
+            >
+              Students
+            </Link>
+          )}
           <Link className="button button-secondary" to="/admin/organizations">
             All organizations
           </Link>
@@ -532,6 +540,14 @@ export function OrganizationAdminPage() {
           </Link>
         </div>
       </section>
+      {access.data.permissions.includes('student.read') && (
+        <Link
+          className="button button-secondary student-mobile-link"
+          to={`/admin/organizations/${encodeURIComponent(organizationId)}/students`}
+        >
+          Student management
+        </Link>
+      )}
       <label className="organization-section-selector">
         <span>Organization section</span>
         <select

@@ -83,11 +83,16 @@ function routeParameter(
 
 function organizationContext(response: {
   locals?: {
-    organizationContext?: { organizationId: string; campusIds?: string[] };
+    organizationContext?: {
+      organizationId: string;
+      campusIds?: string[];
+      role?: string;
+    };
   };
 }): {
   organizationId: string;
   campusIds?: string[];
+  role?: string;
 } {
   const context = response.locals?.organizationContext;
   if (!context)
@@ -184,6 +189,7 @@ export function createPeopleRouter(
             ? (body.academicHistory as Array<Record<string, unknown>>)
             : undefined,
         },
+        organizationContext(response),
       );
       response.status(201).json({ student });
     }),
@@ -198,6 +204,7 @@ export function createPeopleRouter(
       const student = await service.getStudent(
         organizationContext(response).organizationId,
         routeParameter(request, 'studentId'),
+        organizationContext(response),
       );
       response.status(200).json({ student });
     }),
@@ -207,7 +214,7 @@ export function createPeopleRouter(
     '/:organizationId/students/:studentId',
     authenticate,
     resolveOrganization,
-    requireOrganizationPermission('student.create'),
+    requireOrganizationPermission('student.update'),
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
@@ -254,6 +261,7 @@ export function createPeopleRouter(
             ? (body.academicHistory as Array<Record<string, unknown>>)
             : undefined,
         },
+        organizationContext(response),
       );
       response.status(200).json({ student });
     }),
@@ -263,7 +271,7 @@ export function createPeopleRouter(
     '/:organizationId/guardians',
     authenticate,
     resolveOrganization,
-    requireOrganizationPermission('student.read'),
+    requireOrganizationPermission('guardian.read'),
     asyncHandler(async (request, response) => {
       const query = request.query ?? {};
       const result = await service.listGuardians(
@@ -285,7 +293,7 @@ export function createPeopleRouter(
     '/:organizationId/guardians',
     authenticate,
     resolveOrganization,
-    requireOrganizationPermission('student.create'),
+    requireOrganizationPermission('guardian.create'),
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
@@ -325,7 +333,7 @@ export function createPeopleRouter(
     '/:organizationId/guardians/:guardianId/links',
     authenticate,
     resolveOrganization,
-    requireOrganizationPermission('student.create'),
+    requireOrganizationPermission('guardian.update'),
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
@@ -353,7 +361,7 @@ export function createPeopleRouter(
     '/:organizationId/staff',
     authenticate,
     resolveOrganization,
-    requireOrganizationPermission('student.read'),
+    requireOrganizationPermission('staff.read'),
     asyncHandler(async (request, response) => {
       const query = request.query ?? {};
       const result = await service.listStaff(
@@ -377,7 +385,7 @@ export function createPeopleRouter(
     '/:organizationId/staff',
     authenticate,
     resolveOrganization,
-    requireOrganizationPermission('student.create'),
+    requireOrganizationPermission('staff.create'),
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
@@ -409,7 +417,7 @@ export function createPeopleRouter(
     '/:organizationId/staff/:staffId',
     authenticate,
     resolveOrganization,
-    requireOrganizationPermission('student.create'),
+    requireOrganizationPermission('staff.update'),
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
@@ -449,7 +457,7 @@ export function createPeopleRouter(
     '/:organizationId/admissions',
     authenticate,
     resolveOrganization,
-    requireOrganizationPermission('student.read'),
+    requireOrganizationPermission('admission.read'),
     asyncHandler(async (request, response) => {
       const query = request.query ?? {};
       const inquiries = await service.listInquiries(
@@ -495,7 +503,7 @@ export function createPeopleRouter(
     '/:organizationId/admissions/inquiries',
     authenticate,
     resolveOrganization,
-    requireOrganizationPermission('student.create'),
+    requireOrganizationPermission('admission.create'),
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
@@ -520,7 +528,7 @@ export function createPeopleRouter(
     '/:organizationId/admissions/applications',
     authenticate,
     resolveOrganization,
-    requireOrganizationPermission('student.create'),
+    requireOrganizationPermission('admission.create'),
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
@@ -565,7 +573,7 @@ export function createPeopleRouter(
     '/:organizationId/admissions/applications/:applicationId',
     authenticate,
     resolveOrganization,
-    requireOrganizationPermission('student.create'),
+    requireOrganizationPermission('admission.review'),
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);

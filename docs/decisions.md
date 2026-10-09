@@ -54,6 +54,12 @@ Organization settings/status, campus create/update, membership changes, invitati
 
 The earlier authentication-test timeouts occurred during a full test run launched concurrently with typecheck, lint, and formatting work. The two Scrypt-heavy cases passed in isolated execution and a subsequent normal `npm test` run passed both workspaces without changing the test timeout or password-hash behavior. This is treated as local CPU/resource contention; final verification commands should be run sequentially.
 
+## 2026-10-09 — Connect Student Management to the tenant-scoped People API
+
+**Status:** Accepted
+
+The Student Management frontend uses the existing organization-scoped People endpoints for server-side search, status filtering, pagination, detail, create, and update. Organization permissions gate access and mutation actions; the backend remains authoritative. Campus Admin operations additionally use membership campus IDs: records outside assigned campuses and records without a campus are not readable or editable, and creating a student requires an assigned campus. The UI only offers campus assignments from the authenticated organization's campus listing and requires a campus choice for Campus Admins. No student-specific endpoint or client-selected organization authorization mechanism is introduced.
+
 ## 2026-10-02 — Require owner-controlled archive before organization deletion
 
 **Status:** Accepted

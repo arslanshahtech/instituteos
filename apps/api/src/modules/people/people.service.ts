@@ -52,9 +52,23 @@ function normalizeStatus(
 }
 
 function assertCampusScope(
-  context: { organizationId: string; campusIds?: string[] },
+  context: {
+    organizationId: string;
+    campusIds?: string[];
+    role?: string;
+  },
   campusId?: string,
 ): void {
+  if (
+    context.role === 'campus_admin' &&
+    (!campusId || !context.campusIds?.includes(campusId))
+  ) {
+    throw new AppError(
+      403,
+      'CAMPUS_FORBIDDEN',
+      'You are not authorized for this campus.',
+    );
+  }
   if (!campusId || !context.campusIds || context.campusIds.length === 0) return;
   if (!context.campusIds.includes(campusId)) {
     throw new AppError(
@@ -69,7 +83,11 @@ export class PeopleService {
   constructor(private readonly repository: PeopleRepository) {}
 
   async listStudents(
-    context: { organizationId: string; campusIds?: string[] },
+    context: {
+      organizationId: string;
+      campusIds?: string[];
+      role?: string;
+    },
     input: {
       search?: string;
       status?: StudentStatus;
@@ -78,6 +96,14 @@ export class PeopleService {
       pageSize?: number;
     },
   ): Promise<QuerySummary<StudentRecord>> {
+    if (context.role === 'campus_admin' && !context.campusIds?.length) {
+      return {
+        items: [],
+        total: 0,
+        page: Math.max(1, Number(input.page) || 1),
+        pageSize: Math.min(100, Math.max(1, Number(input.pageSize) || 20)),
+      };
+    }
     const campusIds = input.campusIds?.length
       ? input.campusIds
       : context.campusIds;
@@ -94,7 +120,7 @@ export class PeopleService {
   async createStudent(
     organizationId: string,
     input: StudentInput,
-    context?: { organizationId: string; campusIds?: string[] },
+    context?: { organizationId: string; campusIds?: string[]; role?: string },
   ): Promise<StudentRecord> {
     assertCampusScope(context ?? { organizationId }, input.campusId);
     return this.repository.createStudent(organizationId, {
@@ -109,7 +135,7 @@ export class PeopleService {
   async getStudent(
     organizationId: string,
     studentId: string,
-    context?: { organizationId: string; campusIds?: string[] },
+    context?: { organizationId: string; campusIds?: string[]; role?: string },
   ): Promise<StudentRecord> {
     const student = await this.repository.getStudent(organizationId, studentId);
     if (!student)
@@ -122,7 +148,7 @@ export class PeopleService {
     organizationId: string,
     studentId: string,
     changes: Partial<StudentInput>,
-    context?: { organizationId: string; campusIds?: string[] },
+    context?: { organizationId: string; campusIds?: string[]; role?: string },
   ): Promise<StudentRecord> {
     if (changes.firstName)
       changes.firstName = normalizeName(changes.firstName, 'first name');
@@ -323,7 +349,10 @@ export class PeopleService {
         'inquiry status',
       ) as InquiryRecord['status'];
 
-    const existing = await this.repository.getInquiry(organizationId, inquiryId);
+    const existing = await this.repository.getInquiry(
+      organizationId,
+      inquiryId,
+    );
     if (!existing)
       throw new AppError(404, 'INQUIRY_NOT_FOUND', 'Inquiry not found.');
     assertCampusScope(

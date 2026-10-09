@@ -3,19 +3,37 @@ import type { OrganizationRole, PlatformRole } from './tenancy.types.js';
 export const ORGANIZATION_PERMISSIONS = [
   'organization.read',
   'organization.update',
+
   'campus.read',
   'campus.create',
   'campus.update',
   'campus.status.update',
+
   'member.read',
   'member.invite',
   'member.manage',
+
   'student.read',
   'student.create',
+  'student.update',
+
+  'guardian.read',
+  'guardian.create',
+  'guardian.update',
+
+  'staff.read',
+  'staff.create',
+  'staff.update',
+
+  'admission.read',
+  'admission.create',
+  'admission.review',
+
   'finance.read',
 ] as const;
 
-export type OrganizationPermission = (typeof ORGANIZATION_PERMISSIONS)[number];
+export type OrganizationPermission =
+  (typeof ORGANIZATION_PERMISSIONS)[number];
 
 const rolePermissions: Record<
   OrganizationRole,
@@ -24,51 +42,154 @@ const rolePermissions: Record<
   organization_owner: [
     'organization.read',
     'organization.update',
+
     'campus.read',
     'campus.create',
     'campus.update',
     'campus.status.update',
+
     'member.read',
     'member.invite',
     'member.manage',
+
     'student.read',
     'student.create',
+    'student.update',
+
+    'guardian.read',
+    'guardian.create',
+    'guardian.update',
+
+    'staff.read',
+    'staff.create',
+    'staff.update',
+
+    'admission.read',
+    'admission.create',
+    'admission.review',
+
     'finance.read',
   ],
+
   organization_admin: [
     'organization.read',
     'organization.update',
+
     'campus.read',
     'campus.create',
     'campus.update',
     'campus.status.update',
+
     'member.read',
     'member.invite',
     'member.manage',
+
     'student.read',
     'student.create',
+    'student.update',
+
+    'guardian.read',
+    'guardian.create',
+    'guardian.update',
+
+    'staff.read',
+    'staff.create',
+    'staff.update',
+
+    'admission.read',
+    'admission.create',
+    'admission.review',
+
     'finance.read',
   ],
+
   campus_admin: [
     'organization.read',
     'campus.read',
     'campus.update',
     'member.read',
+
     'student.read',
     'student.create',
+    'student.update',
+
+    'guardian.read',
+    'guardian.create',
+    'guardian.update',
+
+    'staff.read',
+    'staff.create',
+    'staff.update',
+
+    'admission.read',
+    'admission.create',
+    'admission.review',
   ],
+
   principal_director: [
     'organization.read',
     'member.read',
+
     'student.read',
     'student.create',
+    'student.update',
+
+    'guardian.read',
+    'guardian.create',
+    'guardian.update',
+
+    'staff.read',
+    'staff.create',
+    'staff.update',
+
+    'admission.read',
+    'admission.create',
+    'admission.review',
   ],
-  academic_coordinator: ['organization.read', 'student.read', 'student.create'],
-  teacher: ['organization.read', 'student.read'],
-  accountant_finance_officer: ['organization.read', 'finance.read'],
-  admissions_reception: ['organization.read', 'student.read', 'student.create'],
-  student: ['organization.read'],
-  parent_guardian: ['organization.read'],
+
+  academic_coordinator: [
+    'organization.read',
+
+    'student.read',
+    'student.create',
+    'student.update',
+
+    'guardian.read',
+
+    'staff.read',
+
+    'admission.read',
+  ],
+
+  teacher: [
+    'organization.read',
+    'student.read',
+    'guardian.read',
+  ],
+
+  accountant_finance_officer: [
+    'organization.read',
+    'finance.read',
+  ],
+
+  admissions_reception: [
+    'organization.read',
+
+    'student.read',
+
+    'guardian.read',
+
+    'admission.read',
+    'admission.create',
+  ],
+
+  student: [
+    'organization.read',
+  ],
+
+  parent_guardian: [
+    'organization.read',
+  ],
 };
 
 export function permissionsForOrganizationRole(

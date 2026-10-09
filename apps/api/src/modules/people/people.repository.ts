@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { AppError } from '../../errors/app-error.js';
 import {
   AdmissionApplicationModel,
@@ -907,7 +907,6 @@ export class MongoPeopleRepository {
       updatedAt: new Date(record.updatedAt).toISOString(),
     };
   }
-
   async approveApplication(
     organizationId: string,
     applicationId: string,
@@ -917,260 +916,255 @@ export class MongoPeopleRepository {
     student: StudentRecord;
     enrollment: EnrollmentRecord;
   }> {
-    const application = await this.getApplication(
-      organizationId,
-      applicationId,
-    );
-    if (!application)
-      throw new AppError(
-        404,
-        'APPLICATION_NOT_FOUND',
-        'Application not found.',
-      );
+    const session = await mongoose.startSession();
 
-    const existingStudent = await StudentModel.findOne({
-      organizationId: idObject(organizationId),
-      sourceApplicationId: idObject(applicationId),
-    }).lean();
-    if (existingStudent) {
-      const existingEnrollment = await EnrollmentModel.findOne({
-        organizationId: idObject(organizationId),
-        studentId: existingStudent._id,
-      }).lean();
-      const approved = await AdmissionApplicationModel.findOneAndUpdate(
-        {
+    try {
+      let result:
+        | {
+            application: ApplicationRecord;
+            student: StudentRecord;
+            enrollment: EnrollmentRecord;
+          }
+        | undefined;
+
+      await session.withTransaction(async () => {
+        const application = await AdmissionApplicationModel.findOne({
           _id: idObject(applicationId),
           organizationId: idObject(organizationId),
-        },
-        {
-          $set: {
-            status: 'approved',
-            decisionReason: decisionReason ?? 'Approved by admissions review',
+        })
+          .session(session)
+          .lean();
+
+        if (!application) {
+          throw new AppError(
+            404,
+            'APPLICATION_NOT_FOUND',
+            'Application not found.',
+          );
+        }
+
+        const existingStudent = await StudentModel.findOne({
+          organizationId: idObject(organizationId),
+          sourceApplicationId: idObject(applicationId),
+        })
+          .session(session)
+          .lean();
+
+        let studentDocument = existingStudent;
+
+        if (!studentDocument) {
+          const [createdStudent] = await StudentModel.create(
+            [
+              {
+                organizationId: idObject(organizationId),
+                campusId: application.campusId
+                  ? idObject(String(application.campusId))
+                  : null,
+                sourceApplicationId: idObject(applicationId),
+                firstName: application.firstName,
+                lastName: application.lastName,
+                status: 'active',
+                contactEmail: application.email,
+                phone: application.phone,
+                guardianIds: [],
+              },
+            ],
+            { session },
+          );
+
+          studentDocument = createdStudent;
+        }
+
+        let enrollmentDocument = await EnrollmentModel.findOne({
+          organizationId: idObject(organizationId),
+          studentId: studentDocument._id,
+          sourceApplicationId: idObject(applicationId),
+        })
+          .session(session)
+          .lean();
+
+        if (!enrollmentDocument) {
+          const [createdEnrollment] = await EnrollmentModel.create(
+            [
+              {
+                organizationId: idObject(organizationId),
+                studentId: studentDocument._id,
+                campusId: application.campusId
+                  ? idObject(String(application.campusId))
+                  : null,
+                sourceApplicationId: idObject(applicationId),
+                status: 'active',
+                gradeLevel: 'New admission',
+              },
+            ],
+            { session },
+          );
+
+          enrollmentDocument = createdEnrollment;
+        }
+
+        const approved = await AdmissionApplicationModel.findOneAndUpdate(
+          {
+            _id: idObject(applicationId),
+            organizationId: idObject(organizationId),
           },
-        },
-        { new: true, runValidators: true },
-      ).lean();
-      if (!approved)
+          {
+            $set: {
+              status: 'approved',
+              decisionReason:
+                decisionReason ?? 'Approved by admissions review',
+            },
+          },
+          {
+            new: true,
+            runValidators: true,
+            session,
+          },
+        ).lean();
+
+        if (!approved) {
+          throw new AppError(
+            500,
+            'APPLICATION_APPROVAL_FAILED',
+            'Approval failed while updating the application.',
+          );
+        }
+
+        result = {
+          application: {
+            id: String(approved._id),
+            organizationId: String(approved.organizationId),
+            campusId: approved.campusId
+              ? String(approved.campusId)
+              : undefined,
+            inquiryId: approved.inquiryId
+              ? String(approved.inquiryId)
+              : undefined,
+            firstName: String(approved.firstName),
+            lastName: String(approved.lastName),
+            email: approved.email
+              ? String(approved.email)
+              : undefined,
+            phone: approved.phone
+              ? String(approved.phone)
+              : undefined,
+            source: approved.source
+              ? String(approved.source)
+              : undefined,
+            program: approved.program
+              ? String(approved.program)
+              : undefined,
+            status:
+              (approved.status as ApplicationRecord['status']) ??
+              'approved',
+            notes: approved.notes
+              ? String(approved.notes)
+              : undefined,
+            decisionReason: approved.decisionReason
+              ? String(approved.decisionReason)
+              : undefined,
+            createdAt: new Date(approved.createdAt).toISOString(),
+            updatedAt: new Date(approved.updatedAt).toISOString(),
+          },
+
+          student: {
+            id: String(studentDocument._id),
+            organizationId: String(studentDocument.organizationId),
+            campusId: studentDocument.campusId
+              ? String(studentDocument.campusId)
+              : undefined,
+            sourceApplicationId: studentDocument.sourceApplicationId
+              ? String(studentDocument.sourceApplicationId)
+              : undefined,
+            firstName: String(studentDocument.firstName),
+            lastName: String(studentDocument.lastName),
+            preferredName: studentDocument.preferredName
+              ? String(studentDocument.preferredName)
+              : undefined,
+            dateOfBirth: studentDocument.dateOfBirth
+              ? new Date(studentDocument.dateOfBirth).toISOString()
+              : undefined,
+            gender: studentDocument.gender
+              ? String(studentDocument.gender)
+              : undefined,
+            status:
+              (studentDocument.status as StudentRecord['status']) ??
+              'active',
+            contactEmail: studentDocument.contactEmail
+              ? String(studentDocument.contactEmail)
+              : undefined,
+            phone: studentDocument.phone
+              ? String(studentDocument.phone)
+              : undefined,
+            address: studentDocument.address
+              ? (studentDocument.address as StudentRecord['address'])
+              : undefined,
+            emergencyContact: studentDocument.emergencyContact
+              ? (studentDocument.emergencyContact as StudentRecord['emergencyContact'])
+              : undefined,
+            academicHistory: Array.isArray(
+              studentDocument.academicHistory,
+            )
+              ? (studentDocument.academicHistory as StudentRecord['academicHistory'])
+              : undefined,
+            guardianIds: convertGuardianArray(studentDocument.guardianIds),
+            createdAt: new Date(
+              studentDocument.createdAt,
+            ).toISOString(),
+            updatedAt: new Date(
+              studentDocument.updatedAt,
+            ).toISOString(),
+          },
+
+          enrollment: {
+            id: String(enrollmentDocument._id),
+            organizationId: String(
+              enrollmentDocument.organizationId,
+            ),
+            studentId: String(enrollmentDocument.studentId),
+            campusId: enrollmentDocument.campusId
+              ? String(enrollmentDocument.campusId)
+              : undefined,
+            sourceApplicationId: enrollmentDocument.sourceApplicationId
+              ? String(enrollmentDocument.sourceApplicationId)
+              : undefined,
+            gradeLevel: enrollmentDocument.gradeLevel
+              ? String(enrollmentDocument.gradeLevel)
+              : undefined,
+            startDate: enrollmentDocument.startDate
+              ? new Date(
+                  enrollmentDocument.startDate,
+                ).toISOString()
+              : undefined,
+            endDate: enrollmentDocument.endDate
+              ? new Date(
+                  enrollmentDocument.endDate,
+                ).toISOString()
+              : undefined,
+            status:
+              (enrollmentDocument.status as EnrollmentRecord['status']) ??
+              'active',
+            createdAt: new Date(
+              enrollmentDocument.createdAt,
+            ).toISOString(),
+            updatedAt: new Date(
+              enrollmentDocument.updatedAt,
+            ).toISOString(),
+          },
+        };
+      });
+
+      if (!result) {
         throw new AppError(
           500,
           'APPLICATION_APPROVAL_FAILED',
-          'Approval failed while updating the application.',
+          'Application approval did not produce a result.',
         );
-      return {
-        application: {
-          id: String(approved._id),
-          organizationId: String(approved.organizationId),
-          campusId: approved.campusId ? String(approved.campusId) : undefined,
-          inquiryId: approved.inquiryId
-            ? String(approved.inquiryId)
-            : undefined,
-          firstName: String(approved.firstName),
-          lastName: String(approved.lastName),
-          email: approved.email ? String(approved.email) : undefined,
-          phone: approved.phone ? String(approved.phone) : undefined,
-          source: approved.source ? String(approved.source) : undefined,
-          program: approved.program ? String(approved.program) : undefined,
-          status:
-            (approved.status as ApplicationRecord['status']) ?? 'approved',
-          notes: approved.notes ? String(approved.notes) : undefined,
-          decisionReason: approved.decisionReason
-            ? String(approved.decisionReason)
-            : undefined,
-          createdAt: new Date(approved.createdAt).toISOString(),
-          updatedAt: new Date(approved.updatedAt).toISOString(),
-        },
-        student: {
-          id: String(existingStudent._id),
-          organizationId: String(existingStudent.organizationId),
-          campusId: existingStudent.campusId
-            ? String(existingStudent.campusId)
-            : undefined,
-          sourceApplicationId: existingStudent.sourceApplicationId
-            ? String(existingStudent.sourceApplicationId)
-            : undefined,
-          firstName: String(existingStudent.firstName),
-          lastName: String(existingStudent.lastName),
-          preferredName: existingStudent.preferredName
-            ? String(existingStudent.preferredName)
-            : undefined,
-          dateOfBirth: existingStudent.dateOfBirth
-            ? new Date(existingStudent.dateOfBirth).toISOString()
-            : undefined,
-          gender: existingStudent.gender
-            ? String(existingStudent.gender)
-            : undefined,
-          status:
-            (existingStudent.status as StudentRecord['status']) ?? 'active',
-          contactEmail: existingStudent.contactEmail
-            ? String(existingStudent.contactEmail)
-            : undefined,
-          phone: existingStudent.phone
-            ? String(existingStudent.phone)
-            : undefined,
-          address: existingStudent.address
-            ? (existingStudent.address as StudentRecord['address'])
-            : undefined,
-          emergencyContact: existingStudent.emergencyContact
-            ? (existingStudent.emergencyContact as StudentRecord['emergencyContact'])
-            : undefined,
-          academicHistory: Array.isArray(existingStudent.academicHistory)
-            ? (existingStudent.academicHistory as StudentRecord['academicHistory'])
-            : undefined,
-          guardianIds: convertGuardianArray(existingStudent.guardianIds),
-          createdAt: new Date(existingStudent.createdAt).toISOString(),
-          updatedAt: new Date(existingStudent.updatedAt).toISOString(),
-        },
-        enrollment: {
-          id: String(existingEnrollment?._id ?? ''),
-          organizationId: String(
-            existingEnrollment?.organizationId ?? organizationId,
-          ),
-          studentId: String(
-            existingEnrollment?.studentId ?? existingStudent._id,
-          ),
-          campusId: existingEnrollment?.campusId
-            ? String(existingEnrollment.campusId)
-            : undefined,
-          sourceApplicationId: existingEnrollment?.sourceApplicationId
-            ? String(existingEnrollment.sourceApplicationId)
-            : undefined,
-          gradeLevel: existingEnrollment?.gradeLevel
-            ? String(existingEnrollment.gradeLevel)
-            : undefined,
-          startDate: existingEnrollment?.startDate
-            ? new Date(existingEnrollment.startDate).toISOString()
-            : undefined,
-          endDate: existingEnrollment?.endDate
-            ? new Date(existingEnrollment.endDate).toISOString()
-            : undefined,
-          status:
-            (existingEnrollment?.status as EnrollmentRecord['status']) ??
-            'active',
-          createdAt: existingEnrollment
-            ? new Date(existingEnrollment.createdAt).toISOString()
-            : new Date().toISOString(),
-          updatedAt: existingEnrollment
-            ? new Date(existingEnrollment.updatedAt).toISOString()
-            : new Date().toISOString(),
-        },
-      };
-    }
+      }
 
-    const student = await StudentModel.create({
-      organizationId: idObject(organizationId),
-      campusId: application.campusId ? idObject(application.campusId) : null,
-      sourceApplicationId: idObject(applicationId),
-      firstName: application.firstName,
-      lastName: application.lastName,
-      status: 'active',
-      contactEmail: application.email,
-      phone: application.phone,
-      guardianIds: [],
-    });
-    const enrollment = await EnrollmentModel.create({
-      organizationId: idObject(organizationId),
-      studentId: student._id,
-      campusId: application.campusId ? idObject(application.campusId) : null,
-      sourceApplicationId: idObject(applicationId),
-      status: 'active',
-      gradeLevel: 'New admission',
-    });
-    const updated = await AdmissionApplicationModel.findOneAndUpdate(
-      {
-        _id: idObject(applicationId),
-        organizationId: idObject(organizationId),
-      },
-      {
-        $set: {
-          status: 'approved',
-          decisionReason: decisionReason ?? 'Approved by admissions review',
-        },
-      },
-      { new: true, runValidators: true },
-    ).lean();
-    if (!updated) {
-      throw new AppError(
-        500,
-        'APPLICATION_APPROVAL_FAILED',
-        'Approval failed while updating the application.',
-      );
+      return result;
+    } finally {
+      await session.endSession();
     }
-    const approved: ApplicationRecord = {
-      id: String(updated._id),
-      organizationId: String(updated.organizationId),
-      campusId: updated.campusId ? String(updated.campusId) : undefined,
-      inquiryId: updated.inquiryId ? String(updated.inquiryId) : undefined,
-      firstName: String(updated.firstName),
-      lastName: String(updated.lastName),
-      email: updated.email ? String(updated.email) : undefined,
-      phone: updated.phone ? String(updated.phone) : undefined,
-      source: updated.source ? String(updated.source) : undefined,
-      program: updated.program ? String(updated.program) : undefined,
-      status: (updated.status as ApplicationRecord['status']) ?? 'approved',
-      notes: updated.notes ? String(updated.notes) : undefined,
-      decisionReason: updated.decisionReason
-        ? String(updated.decisionReason)
-        : undefined,
-      createdAt: new Date(updated.createdAt).toISOString(),
-      updatedAt: new Date(updated.updatedAt).toISOString(),
-    };
-    return {
-      application: approved,
-      student: {
-        id: String(student._id),
-        organizationId: String(student.organizationId),
-        campusId: student.campusId ? String(student.campusId) : undefined,
-        sourceApplicationId: student.sourceApplicationId
-          ? String(student.sourceApplicationId)
-          : undefined,
-        firstName: String(student.firstName),
-        lastName: String(student.lastName),
-        preferredName: student.preferredName
-          ? String(student.preferredName)
-          : undefined,
-        dateOfBirth: student.dateOfBirth
-          ? new Date(student.dateOfBirth).toISOString()
-          : undefined,
-        gender: student.gender ? String(student.gender) : undefined,
-        status: (student.status as StudentRecord['status']) ?? 'active',
-        contactEmail: student.contactEmail
-          ? String(student.contactEmail)
-          : undefined,
-        phone: student.phone ? String(student.phone) : undefined,
-        address: student.address
-          ? (student.address as StudentRecord['address'])
-          : undefined,
-        emergencyContact: student.emergencyContact
-          ? (student.emergencyContact as StudentRecord['emergencyContact'])
-          : undefined,
-        academicHistory: Array.isArray(student.academicHistory)
-          ? (student.academicHistory as StudentRecord['academicHistory'])
-          : undefined,
-        guardianIds: convertGuardianArray(student.guardianIds),
-        createdAt: new Date(student.createdAt).toISOString(),
-        updatedAt: new Date(student.updatedAt).toISOString(),
-      },
-      enrollment: {
-        id: String(enrollment._id),
-        organizationId: String(enrollment.organizationId),
-        studentId: String(enrollment.studentId),
-        campusId: enrollment.campusId ? String(enrollment.campusId) : undefined,
-        sourceApplicationId: enrollment.sourceApplicationId
-          ? String(enrollment.sourceApplicationId)
-          : undefined,
-        gradeLevel: enrollment.gradeLevel
-          ? String(enrollment.gradeLevel)
-          : undefined,
-        startDate: enrollment.startDate
-          ? new Date(enrollment.startDate).toISOString()
-          : undefined,
-        endDate: enrollment.endDate
-          ? new Date(enrollment.endDate).toISOString()
-          : undefined,
-        status: (enrollment.status as EnrollmentRecord['status']) ?? 'active',
-        createdAt: new Date(enrollment.createdAt).toISOString(),
-        updatedAt: new Date(enrollment.updatedAt).toISOString(),
-      },
-    };
   }
 }

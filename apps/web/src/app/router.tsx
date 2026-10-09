@@ -22,6 +22,12 @@ import {
   OrganizationAdminPage,
   OrganizationOnboardingPage,
 } from '../pages/organizations/OrganizationPages.js';
+import {
+  StudentCreatePage,
+  StudentDetailPage,
+  StudentEditPage,
+  StudentsListPage,
+} from '../students/StudentPages.js';
 import { ProtectedRoute } from '../auth/ProtectedRoute.js';
 import {
   ForgotPasswordPage,
@@ -58,6 +64,22 @@ const roleRoutes: RouteObject[] = [
       {
         path: 'organizations/:organizationId',
         element: <OrganizationAdminPage />,
+      },
+      {
+        path: 'organizations/:organizationId/students',
+        element: <StudentsListPage />,
+      },
+      {
+        path: 'organizations/:organizationId/students/new',
+        element: <StudentCreatePage />,
+      },
+      {
+        path: 'organizations/:organizationId/students/:studentId/edit',
+        element: <StudentEditPage />,
+      },
+      {
+        path: 'organizations/:organizationId/students/:studentId',
+        element: <StudentDetailPage />,
       },
       { path: '*', element: <NotFoundPage /> },
     ],
