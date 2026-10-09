@@ -332,6 +332,19 @@ class MemoryPeopleRepository implements PeopleRepository {
     };
   }
 
+  async getInquiry(
+    organizationId: string,
+    inquiryId: string,
+  ): Promise<InquiryRecord | null> {
+  return (
+    this.inquiries.find(
+      (inquiry) =>
+        inquiry.organizationId === organizationId &&
+        inquiry.id === inquiryId,
+    ) ?? null
+   );
+  }
+
   async createInquiry(
     organizationId: string,
     input: InquiryInput,
@@ -473,7 +486,7 @@ class MemoryPeopleRepository implements PeopleRepository {
       campusId: application.campusId,
       status: 'active',
     });
-    const enrollment = {
+    const enrollment: EnrollmentRecord = {
       id: `enrollment-${student.id}`,
       organizationId,
       studentId: student.id,
@@ -555,6 +568,54 @@ describe('people domain services', () => {
         organizationId: 'org-1',
         campusIds: ['campus-1'],
       }),
+    ).rejects.toMatchObject({ code: 'CAMPUS_FORBIDDEN' });
+  });
+
+  it('does not expose students to campus admins without an assigned campus', async () => {
+    const repository = new MemoryPeopleRepository();
+    const service = new PeopleService(repository);
+    await service.createStudent('org-1', {
+      firstName: 'Lena',
+      lastName: 'Brown',
+      status: 'active',
+      campusId: 'campus-1',
+    });
+
+    const result = await service.listStudents(
+      { organizationId: 'org-1', role: 'campus_admin', campusIds: [] },
+      {},
+    );
+    expect(result).toMatchObject({ items: [], total: 0, page: 1, pageSize: 20 });
+  });
+
+  it('blocks campus admins from unassigned student records and campus transfers', async () => {
+    const repository = new MemoryPeopleRepository();
+    const service = new PeopleService(repository);
+    const student = await service.createStudent('org-1', {
+      firstName: 'Lena',
+      lastName: 'Brown',
+      status: 'active',
+    });
+
+    await expect(
+      service.getStudent('org-1', student.id, {
+        organizationId: 'org-1',
+        role: 'campus_admin',
+        campusIds: ['campus-1'],
+      }),
+    ).rejects.toMatchObject({ code: 'CAMPUS_FORBIDDEN' });
+
+    await expect(
+      service.updateStudent(
+        'org-1',
+        student.id,
+        { campusId: 'campus-2' },
+        {
+          organizationId: 'org-1',
+          role: 'campus_admin',
+          campusIds: ['campus-1'],
+        },
+      ),
     ).rejects.toMatchObject({ code: 'CAMPUS_FORBIDDEN' });
   });
 
