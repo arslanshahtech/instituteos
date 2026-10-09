@@ -74,7 +74,13 @@ studentSchema.index({
 });
 studentSchema.index(
   { organizationId: 1, sourceApplicationId: 1 },
-  { unique: true, sparse: true, name: 'uniq_student_applicant_record' },
+  {
+    unique: true,
+    name: 'uniq_student_applicant_record',
+    partialFilterExpression: {
+      sourceApplicationId: { $type: 'objectId' },
+    },
+  },
 );
 
 const guardianSchema = new Schema(
