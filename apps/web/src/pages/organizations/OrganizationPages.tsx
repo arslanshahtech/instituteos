@@ -597,34 +597,7 @@ export function OrganizationAdminPage() {
             </label>
           )}
         </div>
-        <div className="organization-heading-actions organization-workspace-actions">
-          {access.data.permissions.includes('staff.read') && (
-            <Link
-              className="button button-secondary"
-              to={`/admin/organizations/${encodeURIComponent(organizationId)}/staff`}
-            >
-              Staff & teachers
-            </Link>
-          )}
-          {access.data.permissions.includes('admission.read') && (
-            <Link
-              className="button button-secondary"
-              to={`/admin/organizations/${encodeURIComponent(organizationId)}/admissions`}
-            >
-              Admissions
-            </Link>
-          )}
-          {access.data.permissions.includes('student.read') && (
-            <Link
-              className="button button-secondary"
-              to={`/admin/organizations/${encodeURIComponent(organizationId)}/students`}
-            >
-              Students
-            </Link>
-          )}
-          <Link className="button button-secondary" to="/admin/organizations">
-            All organizations
-          </Link>
+        <div className="organization-heading-actions">
           <Link
             className="button button-secondary"
             to="/admin/organizations/onboarding"
@@ -633,30 +606,6 @@ export function OrganizationAdminPage() {
           </Link>
         </div>
       </section>
-      {access.data.permissions.includes('staff.read') && (
-        <Link
-          className="button button-secondary student-mobile-link"
-          to={`/admin/organizations/${encodeURIComponent(organizationId)}/staff`}
-        >
-          Staff & teacher management
-        </Link>
-      )}
-      {access.data.permissions.includes('admission.read') && (
-        <Link
-          className="button button-secondary student-mobile-link"
-          to={`/admin/organizations/${encodeURIComponent(organizationId)}/admissions`}
-        >
-          Admissions management
-        </Link>
-      )}
-      {access.data.permissions.includes('student.read') && (
-        <Link
-          className="button button-secondary student-mobile-link"
-          to={`/admin/organizations/${encodeURIComponent(organizationId)}/students`}
-        >
-          Student management
-        </Link>
-      )}
       <label className="organization-section-selector">
         <span>Organization section</span>
         <select
