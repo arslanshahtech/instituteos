@@ -5,6 +5,11 @@ import {
   LayoutDashboard,
   Menu,
   X,
+  Users,
+  UserCheck,
+  UserPlus,
+  GraduationCap,
+  CalendarDays,
 } from 'lucide-react';
 import {
   Link,
@@ -12,7 +17,9 @@ import {
   Outlet,
   useLocation,
   useNavigate,
+  useParams,
 } from 'react-router-dom';
+
 import { roleLayouts } from '../../layouts/layoutTypes.js';
 import type { RoleLayoutConfig } from '../../layouts/layoutTypes.js';
 import { Breadcrumbs } from './Breadcrumbs.js';
@@ -24,6 +31,7 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
   const [signOutError, setSignOutError] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { organizationId } = useParams();
   const auth = useAuth();
   const signOut = async () => {
     setSignOutError(false);
@@ -115,6 +123,68 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
               <LayoutDashboard size={18} aria-hidden="true" />
               <span>Organizations</span>
             </NavLink>
+          )}
+          {organizationId && (
+            <>
+              <div className="sidebar-label" style={{ marginTop: '1rem' }}>
+                Academic Workspace
+              </div>
+
+              <NavLink
+                className={({ isActive }) =>
+                  `navigation-link${isActive ? ' navigation-link-active' : ''}`
+                }
+                onClick={() => setMobileNavOpen(false)}
+                to={`/admin/organizations/${organizationId }}/students`}
+              >
+                <Users size={18} aria-hidden="true" />
+                <span>Students</span>
+              </NavLink>
+
+              <NavLink
+                className={({ isActive }) =>
+                  `navigation-link${isActive ? ' navigation-link-active' : ''}`
+                }
+                onClick={() => setMobileNavOpen(false)}
+                to={`/admin/organizations/${organizationId}/guardians`}
+              >
+                <UserCheck size={18} aria-hidden="true" />
+                <span>Guardians</span>
+              </NavLink>
+
+              <NavLink
+                className={({ isActive }) =>
+                  `navigation-link${isActive ? ' navigation-link-active' : ''}`
+                }
+                onClick={() => setMobileNavOpen(false)}
+                to={`/admin/organizations/${organizationId}/admissions`}
+              >
+                <UserPlus size={18} aria-hidden="true" />
+                <span>Admissions</span>
+              </NavLink>
+
+              <NavLink
+                className={({ isActive }) =>
+                  `navigation-link${isActive ? ' navigation-link-active' : ''}`
+                }
+                onClick={() => setMobileNavOpen(false)}
+                to={`/admin/organizations/${organizationId}/staff`}
+              >
+                <GraduationCap size={18} aria-hidden="true" />
+                <span>Staff & Teachers</span>
+              </NavLink>
+
+              <NavLink
+                className={({ isActive }) =>
+                  `navigation-link${isActive ? ' navigation-link-active' : ''}`
+                }
+                onClick={() => setMobileNavOpen(false)}
+                to={`/admin/organizations/${organizationId}/academics`}
+              >
+                <CalendarDays size={18} aria-hidden="true" />
+                <span>Academics</span>
+              </NavLink>
+            </>
           )}
         </nav>
 

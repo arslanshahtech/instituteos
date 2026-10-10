@@ -76,6 +76,71 @@ a {
   clip-path: inset(50%);
 }
 
+.academics-page {
+  min-width: 0;
+}
+
+.academics-tabs {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.academics-tab {
+  flex: 0 0 auto;
+  padding: 0.75rem 0.95rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--color-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.academics-tab-active {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-accent-dark);
+  font-weight: 650;
+}
+
+.academics-panel-heading,
+.academics-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.academics-panel-heading {
+  margin-bottom: 1rem;
+}
+
+.academics-panel-heading h2,
+.academics-panel-heading p {
+  margin: 0;
+}
+
+.academics-panel-heading p {
+  margin-top: 0.25rem;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.academics-row-actions {
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .academics-panel-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .academics-row-actions {
+    flex-wrap: wrap;
+  }
+}
+
 .auth-page {
   display: flex;
   min-height: 100vh;
@@ -2213,10 +2278,6 @@ a {
   height: 16px;
 }
 
-.student-mobile-link {
-  display: none;
-}
-
 @media (max-width: 720px) {
   .organization-row,
   .accessible-organization {
@@ -2257,25 +2318,12 @@ a {
 }
 
 @media (max-width: 620px) {
-  .organization-heading > div > .eyebrow,
-  .organization-user-meta,
-  .organization-heading h1 {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    clip-path: inset(50%);
+  .organization-heading-actions {
+    align-items: flex-start;
   }
 
-  .organization-workspace-actions {
-    display: none;
-  }
-
-  .student-mobile-link {
-    display: inline-flex;
-    justify-self: start;
+  .organization-heading-actions > .button {
+    width: auto;
   }
 
   .organization-section-selector {
