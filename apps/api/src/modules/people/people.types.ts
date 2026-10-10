@@ -1,8 +1,9 @@
 export type StudentStatus = 'active' | 'inactive' | 'withdrawn';
 export type GuardianRelationshipType =
   'father' | 'mother' | 'guardian' | 'other';
-export type StaffStatus = 'active' | 'on_leave' | 'inactive';
-export type InquiryStatus = 'new' | 'contacted' | 'qualified' | 'converted';
+export type StaffStatus = 'active' | 'on_leave' | 'terminated' | 'inactive';
+export type InquiryStatus =
+  'new' | 'contacted' | 'qualified' | 'converted' | 'closed';
 export type ApplicationStatus =
   'draft' | 'submitted' | 'in_review' | 'approved' | 'rejected' | 'admitted';
 export type EnrollmentStatus = 'active' | 'completed' | 'withdrawn';
@@ -136,8 +137,14 @@ export interface GuardianStudentRelation {
 export interface StaffInput {
   firstName: string;
   lastName: string;
+  employeeCode?: string;
   department?: string;
+  designation?: string;
   qualification?: string;
+  qualifications?: string[];
+  subjects?: string[];
+  dateOfBirth?: string;
+  gender?: string;
   status?: StaffStatus;
   role?: string;
   email?: string;
@@ -151,8 +158,14 @@ export interface StaffRecord {
   campusId?: string;
   firstName: string;
   lastName: string;
+  employeeCode?: string;
   department?: string;
+  designation?: string;
   qualification?: string;
+  qualifications?: string[];
+  subjects?: string[];
+  dateOfBirth?: string;
+  gender?: string;
   status: StaffStatus;
   role?: string;
   email?: string;
@@ -168,6 +181,7 @@ export interface InquiryInput {
   phone?: string;
   source?: string;
   status?: InquiryStatus;
+  gradeLevelInterest?: string;
   notes?: string;
   campusId?: string;
 }
@@ -182,6 +196,7 @@ export interface InquiryRecord {
   phone?: string;
   source?: string;
   status: InquiryStatus;
+  gradeLevelInterest?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -212,6 +227,7 @@ export interface ApplicationRecord {
   source?: string;
   program?: string;
   status: ApplicationStatus;
+  convertedStudentId?: string;
   notes?: string;
   decisionReason?: string;
   createdAt: string;
@@ -322,6 +338,8 @@ export interface PeopleRepository {
     query?: {
       status?: string;
       department?: string;
+      campusId?: string;
+      search?: string;
       campusIds?: string[];
       page?: number;
       pageSize?: number;
@@ -367,6 +385,7 @@ export interface PeopleRepository {
     query?: {
       status?: ApplicationStatus;
       campusIds?: string[];
+      search?: string;
       page?: number;
       pageSize?: number;
     },
@@ -455,6 +474,8 @@ export interface PeopleServices {
     input?: {
       status?: string;
       department?: string;
+      campusId?: string;
+      search?: string;
       campusIds?: string[];
       page?: number;
       pageSize?: number;

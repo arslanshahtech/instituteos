@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { ChevronDown } from 'lucide-react';
@@ -43,6 +50,76 @@ import type {
 function apiMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   return 'The request could not be completed. Try again.';
+}
+
+function CampusScopeSelect({
+  campuses,
+  label,
+  selectedCampusIds,
+  onChange,
+}: {
+  campuses: Campus[];
+  label: string;
+  selectedCampusIds: string[];
+  onChange: (campusIds: string[]) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const optionsId = useId();
+  const selectedCount = selectedCampusIds.length;
+  return (
+    <div
+      className={`campus-scope-dropdown${isOpen ? ' is-open' : ''}`}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') setIsOpen(false);
+      }}
+    >
+      <button
+        aria-controls={optionsId}
+        aria-expanded={isOpen}
+        aria-label={label}
+        className="campus-scope-trigger"
+        onClick={() => setIsOpen((open) => !open)}
+        type="button"
+      >
+        <span>
+          {selectedCount === 0
+            ? 'Select campuses'
+            : `${selectedCount} campus${selectedCount === 1 ? '' : 'es'} selected`}
+        </span>
+        <ChevronDown aria-hidden="true" size={15} />
+      </button>
+      {isOpen && (
+        <div
+          aria-label={label}
+          className="campus-scope-options"
+          id={optionsId}
+          role="group"
+        >
+          {campuses.length ? (
+            campuses.map((campus) => (
+              <label key={campus.id} className="campus-scope-option">
+                <input
+                  checked={selectedCampusIds.includes(campus.id)}
+                  onChange={(event) =>
+                    onChange(
+                      event.target.checked
+                        ? [...selectedCampusIds, campus.id]
+                        : selectedCampusIds.filter((id) => id !== campus.id),
+                    )
+                  }
+                  type="checkbox"
+                  value={campus.id}
+                />
+                <span>{campus.name}</span>
+              </label>
+            ))
+          ) : (
+            <span className="campus-scope-empty">No campuses available</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function MyOrganizationsPage({
@@ -521,6 +598,22 @@ export function OrganizationAdminPage() {
           )}
         </div>
         <div className="organization-heading-actions organization-workspace-actions">
+          {access.data.permissions.includes('staff.read') && (
+            <Link
+              className="button button-secondary"
+              to={`/admin/organizations/${encodeURIComponent(organizationId)}/staff`}
+            >
+              Staff & teachers
+            </Link>
+          )}
+          {access.data.permissions.includes('admission.read') && (
+            <Link
+              className="button button-secondary"
+              to={`/admin/organizations/${encodeURIComponent(organizationId)}/admissions`}
+            >
+              Admissions
+            </Link>
+          )}
           {access.data.permissions.includes('student.read') && (
             <Link
               className="button button-secondary"
@@ -540,6 +633,22 @@ export function OrganizationAdminPage() {
           </Link>
         </div>
       </section>
+      {access.data.permissions.includes('staff.read') && (
+        <Link
+          className="button button-secondary student-mobile-link"
+          to={`/admin/organizations/${encodeURIComponent(organizationId)}/staff`}
+        >
+          Staff & teacher management
+        </Link>
+      )}
+      {access.data.permissions.includes('admission.read') && (
+        <Link
+          className="button button-secondary student-mobile-link"
+          to={`/admin/organizations/${encodeURIComponent(organizationId)}/admissions`}
+        >
+          Admissions management
+        </Link>
+      )}
       {access.data.permissions.includes('student.read') && (
         <Link
           className="button button-secondary student-mobile-link"
@@ -1247,27 +1356,12 @@ function MembersPanel({
             </select>
           </label>
           {role === 'campus_admin' && (
-            <label>
-              Campus scope
-              <select
-                multiple
-                value={inviteCampusIds}
-                onChange={(event) =>
-                  setInviteCampusIds(
-                    Array.from(
-                      event.target.selectedOptions,
-                      (option) => option.value,
-                    ),
-                  )
-                }
-              >
-                {campuses.map((campus) => (
-                  <option key={campus.id} value={campus.id}>
-                    {campus.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <CampusScopeSelect
+              campuses={campuses}
+              label="Campus scope for invitation"
+              onChange={setInviteCampusIds}
+              selectedCampusIds={inviteCampusIds}
+            />
           )}
           <Button type="submit" disabled={invite.isPending}>
             Invite member
@@ -1289,13 +1383,25 @@ function MembersPanel({
             };
             return (
               <article key={member.id} className="organization-row member-row">
-                <div>
+                <div className="member-identity">
                   <strong>
                     {member.user?.displayName ?? 'Unavailable account'}
                   </strong>
-                  <span>
-                    {member.user?.email ?? 'Account details unavailable'} ·{' '}
-                    {member.status}
+                  <span
+                    className="member-email"
+                    title={member.user?.email ?? 'Account details unavailable'}
+                  >
+                    {member.user?.email ?? 'Account details unavailable'}
+                  </span>
+                  <span className="member-tags">
+                    <span className="member-tag member-role-tag">
+                      {member.role.replaceAll('_', ' ')}
+                    </span>
+                    <span
+                      className={`member-tag ${member.status === 'active' ? 'member-active-tag' : 'member-inactive-tag'}`}
+                    >
+                      {member.status}
+                    </span>
                   </span>
                 </div>
                 {canManage && (
@@ -1337,29 +1443,17 @@ function MembersPanel({
                       <option value="suspended">suspended</option>
                       <option value="revoked">revoked</option>
                     </select>
-                    <select
-                      aria-label={`Campus scope for ${member.user?.email ?? member.id}`}
-                      multiple
-                      value={draft.campusIds}
-                      onChange={(event) =>
+                    <CampusScopeSelect
+                      campuses={campuses}
+                      label={`Campus scope for ${member.user?.email ?? member.id}`}
+                      onChange={(campusIds) =>
                         setDrafts({
                           ...drafts,
-                          [member.id]: {
-                            ...draft,
-                            campusIds: Array.from(
-                              event.target.selectedOptions,
-                              (option) => option.value,
-                            ),
-                          },
+                          [member.id]: { ...draft, campusIds },
                         })
                       }
-                    >
-                      {campuses.map((campus) => (
-                        <option key={campus.id} value={campus.id}>
-                          {campus.name}
-                        </option>
-                      ))}
-                    </select>
+                      selectedCampusIds={draft.campusIds}
+                    />
                     <Button
                       variant="secondary"
                       onClick={() => save.mutate({ id: member.id, draft })}

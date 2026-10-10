@@ -305,6 +305,9 @@ class MemoryPeopleRepository implements PeopleRepository {
     query?: {
       status?: string;
       department?: string;
+      campusId?: string;
+      search?: string;
+      campusIds?: string[];
       page?: number;
       pageSize?: number;
     },
@@ -313,16 +316,39 @@ class MemoryPeopleRepository implements PeopleRepository {
       (staff) =>
         staff.organizationId === organizationId &&
         (!query?.status || staff.status === query.status) &&
+        (!query?.campusId || staff.campusId === query.campusId) &&
+        (!query?.campusIds?.length ||
+          (staff.campusId !== undefined &&
+            query.campusIds.includes(staff.campusId))) &&
         (!query?.department ||
           (staff.department ?? '')
             .toLowerCase()
             .includes(query.department.toLowerCase())),
     );
+    const searched = query?.search
+      ? items.filter((staff) =>
+          [
+            staff.firstName,
+            staff.lastName,
+            staff.email,
+            staff.employeeCode,
+            staff.department,
+            staff.designation,
+            staff.role,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+            .includes(query.search!.toLowerCase()),
+        )
+      : items;
+    const page = query?.page ?? 1;
+    const pageSize = query?.pageSize ?? 20;
     return {
-      items: items.slice(0, query?.pageSize ?? 20),
-      total: items.length,
-      page: query?.page ?? 1,
-      pageSize: query?.pageSize ?? 20,
+      items: searched.slice((page - 1) * pageSize, page * pageSize),
+      total: searched.length,
+      page,
+      pageSize,
     };
   }
 
@@ -348,8 +374,14 @@ class MemoryPeopleRepository implements PeopleRepository {
       campusId: input.campusId,
       firstName: input.firstName,
       lastName: input.lastName,
+      employeeCode: input.employeeCode,
       department: input.department,
+      designation: input.designation ?? input.role,
       qualification: input.qualification,
+      qualifications: input.qualifications,
+      subjects: input.subjects,
+      dateOfBirth: input.dateOfBirth,
+      gender: input.gender,
       status: input.status ?? 'active',
       role: input.role,
       email: input.email,
@@ -429,6 +461,7 @@ class MemoryPeopleRepository implements PeopleRepository {
       phone: input.phone,
       source: input.source,
       status: input.status ?? 'new',
+      gradeLevelInterest: input.gradeLevelInterest,
       notes: input.notes,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -879,6 +912,95 @@ describe('people domain services', () => {
     ).rejects.toMatchObject({ code: 'CAMPUS_FORBIDDEN' });
   });
 
+  it('supports staff profiles, filtered search, details and scoped updates', async () => {
+    const repository = new MemoryPeopleRepository();
+    const service = new PeopleService(repository);
+    const campusAdmin = {
+      organizationId: 'org-1',
+      role: 'campus_admin',
+      campusIds: ['campus-1'],
+    };
+    const staff = await service.createStaff(
+      'org-1',
+      {
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        employeeCode: 'EMP-014',
+        department: 'Science',
+        designation: 'Teacher',
+        status: 'active',
+        email: 'ADA@EXAMPLE.TEST',
+        phone: '+1 555 0199',
+        dateOfBirth: '1988-12-10',
+        gender: 'female',
+        qualifications: ['MSc Physics', 'BEd'],
+        subjects: ['Physics', 'Mathematics'],
+        campusId: 'campus-1',
+      },
+      campusAdmin,
+    );
+
+    expect(staff).toMatchObject({
+      employeeCode: 'EMP-014',
+      designation: 'Teacher',
+      email: 'ada@example.test',
+      dateOfBirth: '1988-12-10T00:00:00.000Z',
+      qualifications: ['MSc Physics', 'BEd'],
+      subjects: ['Physics', 'Mathematics'],
+    });
+    expect(
+      (
+        await service.listStaff(campusAdmin, {
+          search: 'emp-014',
+          department: 'science',
+          status: 'active',
+        })
+      ).items.map((record) => record.id),
+    ).toEqual([staff.id]);
+    await expect(
+      service.getStaff(
+        { organizationId: 'org-1', role: 'campus_admin', campusIds: [] },
+        staff.id,
+      ),
+    ).rejects.toMatchObject({ code: 'CAMPUS_FORBIDDEN' });
+    await expect(
+      service.updateStaff(
+        'org-1',
+        staff.id,
+        { department: 'Arts' },
+        { organizationId: 'org-1', role: 'campus_admin', campusIds: [] },
+      ),
+    ).rejects.toMatchObject({ code: 'CAMPUS_FORBIDDEN' });
+
+    const changed = await service.updateStaff(
+      'org-1',
+      staff.id,
+      { status: 'terminated', subjects: ['Physics'] },
+      campusAdmin,
+    );
+    expect(changed).toMatchObject({
+      status: 'terminated',
+      subjects: ['Physics'],
+    });
+  });
+
+  it('keeps staff search and detail organization scoped', async () => {
+    const repository = new MemoryPeopleRepository();
+    const service = new PeopleService(repository);
+    const staff = await service.createStaff('org-1', {
+      firstName: 'Grace',
+      lastName: 'Hopper',
+      employeeCode: 'EMP-100',
+    });
+
+    expect(
+      (await service.listStaff({ organizationId: 'org-2' }, {})).total,
+    ).toBe(0);
+    await expect(
+      service.getStaff({ organizationId: 'org-2' }, staff.id),
+    ).rejects.toMatchObject({ code: 'STAFF_MEMBER_NOT_FOUND' });
+  });
+
   it('does not expose students to campus admins without an assigned campus', async () => {
     const repository = new MemoryPeopleRepository();
     const service = new PeopleService(repository);
@@ -958,6 +1080,87 @@ describe('people domain services', () => {
       status: 'active',
     });
     expect(result.application.status).toBe('approved');
+  });
+
+  it('supports inquiry search filters, closed status, linked applications, and campus isolation', async () => {
+    const repository = new MemoryPeopleRepository();
+    const service = new PeopleService(repository);
+    const campusAdmin = {
+      organizationId: 'org-1',
+      role: 'campus_admin',
+      campusIds: ['campus-1'],
+    };
+    const inquiry = await service.createInquiry(
+      'org-1',
+      {
+        firstName: 'Nora',
+        lastName: 'Ali',
+        email: 'nora@example.test',
+        campusId: 'campus-1',
+        gradeLevelInterest: 'Year 4',
+      },
+      campusAdmin,
+    );
+
+    const page = await service.listInquiries(
+      'org-1',
+      { search: 'Nora Ali', status: 'new', page: 1, pageSize: 10 },
+      campusAdmin,
+    );
+    expect(page.items[0]).toMatchObject({
+      id: inquiry.id,
+      gradeLevelInterest: 'Year 4',
+    });
+
+    const closed = await service.updateInquiry(
+      'org-1',
+      inquiry.id,
+      { status: 'closed' },
+      campusAdmin,
+    );
+    expect(closed.status).toBe('closed');
+
+    const application = await service.createApplication(
+      'org-1',
+      {
+        inquiryId: inquiry.id,
+        firstName: inquiry.firstName,
+        lastName: inquiry.lastName,
+        status: 'submitted',
+      },
+      campusAdmin,
+    );
+    expect(application).toMatchObject({
+      inquiryId: inquiry.id,
+      campusId: 'campus-1',
+      status: 'submitted',
+    });
+
+    const foreignInquiry = await service.createInquiry('org-2', {
+      firstName: 'Ravi',
+      lastName: 'Shah',
+      campusId: 'campus-2',
+    });
+    await expect(
+      service.createApplication(
+        'org-1',
+        {
+          inquiryId: foreignInquiry.id,
+          firstName: 'Ravi',
+          lastName: 'Shah',
+          status: 'submitted',
+        },
+        campusAdmin,
+      ),
+    ).rejects.toMatchObject({ code: 'INQUIRY_NOT_FOUND' });
+
+    await expect(
+      service.createApplication('org-1', {
+        firstName: 'Mina',
+        lastName: 'Rao',
+        status: 'approved',
+      }),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
   });
 
   it('rejects invalid workflow transitions', async () => {

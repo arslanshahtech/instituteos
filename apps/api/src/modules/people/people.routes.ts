@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import { AppError } from '../../errors/app-error.js';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { authEmailDelivery } from '../auth/auth.email.js';
@@ -73,6 +74,41 @@ function optionalEmail(value: unknown): string | undefined {
   return normalized;
 }
 
+function optionalStringList(
+  body: Record<string, unknown>,
+  field: string,
+  maxItems: number,
+  maxLength: number,
+): string[] | undefined {
+  const value = body[field];
+  if (value === undefined) return undefined;
+  if (
+    !Array.isArray(value) ||
+    value.length > maxItems ||
+    value.some(
+      (item) =>
+        typeof item !== 'string' ||
+        item.trim().length === 0 ||
+        item.trim().length > maxLength,
+    )
+  ) {
+    throw new AppError(400, 'VALIDATION_ERROR', `Enter valid ${field}.`);
+  }
+  return value.map((item: string) => item.trim());
+}
+
+function staffStatus(value: unknown) {
+  if (value === undefined) return undefined;
+  if (
+    value === 'active' ||
+    value === 'on_leave' ||
+    value === 'terminated' ||
+    value === 'inactive'
+  )
+    return value;
+  throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid staff status.');
+}
+
 function guardianRelationship(
   value: unknown,
   fallback?: 'father' | 'mother' | 'guardian' | 'other',
@@ -104,6 +140,44 @@ function communicationPreference(
   );
 }
 
+function queryEnum<T extends string>(
+  query: Record<string, unknown>,
+  field: string,
+  allowed: readonly T[],
+): T | undefined {
+  const value = query[field];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || !allowed.includes(value as T))
+    throw new AppError(400, 'VALIDATION_ERROR', `Select a valid ${field}.`);
+  return value as T;
+}
+
+function queryString(
+  query: Record<string, unknown>,
+  field: string,
+  maxLength: number,
+): string | undefined {
+  const value = query[field];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || value.trim().length > maxLength) {
+    throw new AppError(400, 'VALIDATION_ERROR', `Enter a valid ${field}.`);
+  }
+  return value.trim() || undefined;
+}
+
+function optionalObjectId(value: unknown, field: string): string | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value !== 'string' || !mongoose.isValidObjectId(value))
+    throw new AppError(400, 'VALIDATION_ERROR', `Select a valid ${field}.`);
+  return value;
+}
+
+function requiredRouteObjectId(value: string, field: string): string {
+  if (!mongoose.isValidObjectId(value))
+    throw new AppError(404, 'STAFF_MEMBER_NOT_FOUND', `${field} not found.`);
+  return value;
+}
+
 function routeParameter(
   request: { params: Record<string, string | string[] | undefined> },
   name: string,
@@ -118,12 +192,14 @@ function organizationContext(response: {
       organizationId: string;
       campusIds?: string[];
       role?: string;
+      permissions?: readonly string[];
     };
   };
 }): {
   organizationId: string;
   campusIds?: string[];
   role?: string;
+  permissions?: readonly string[];
 } {
   const context = response.locals?.organizationContext;
   if (!context)
@@ -486,20 +562,35 @@ export function createPeopleRouter(
     requireOrganizationPermission('staff.read'),
     asyncHandler(async (request, response) => {
       const query = request.query ?? {};
-      const result = await service.listStaff(
-        organizationContext(response).organizationId,
-        {
-          status: typeof query.status === 'string' ? query.status : undefined,
-          department:
-            typeof query.department === 'string' ? query.department : undefined,
-          page: typeof query.page === 'string' ? Number(query.page) : undefined,
-          pageSize:
-            typeof query.pageSize === 'string'
-              ? Number(query.pageSize)
-              : undefined,
-        },
-      );
+      const result = await service.listStaff(organizationContext(response), {
+        status: staffStatus(query.status),
+        department: queryString(query, 'department', 100),
+        campusId: optionalObjectId(query.campusId, 'campusId'),
+        search: queryString(query, 'search', 160),
+        page: typeof query.page === 'string' ? Number(query.page) : undefined,
+        pageSize:
+          typeof query.pageSize === 'string'
+            ? Number(query.pageSize)
+            : undefined,
+      });
       response.status(200).json(result);
+    }),
+  );
+
+  router.get(
+    '/:organizationId/staff/:staffId',
+    authenticate,
+    resolveOrganization,
+    requireOrganizationPermission('staff.read'),
+    asyncHandler(async (request, response) => {
+      const staff = await service.getStaff(
+        organizationContext(response),
+        requiredRouteObjectId(
+          routeParameter(request, 'staffId'),
+          'Staff member',
+        ),
+      );
+      response.status(200).json({ staff });
     }),
   );
 
@@ -518,18 +609,19 @@ export function createPeopleRouter(
           lastName: requiredString(body, 'lastName', 2, 80),
           department: optionalString(body, 'department', 100),
           qualification: optionalString(body, 'qualification', 240),
-          status:
-            body.status === 'active' ||
-            body.status === 'on_leave' ||
-            body.status === 'inactive'
-              ? (String(body.status) as 'active' | 'on_leave' | 'inactive')
-              : undefined,
+          status: staffStatus(body.status),
           role: optionalString(body, 'role', 80),
+          designation: optionalString(body, 'designation', 100),
+          employeeCode: optionalString(body, 'employeeCode', 40),
+          qualifications: optionalStringList(body, 'qualifications', 20, 160),
+          subjects: optionalStringList(body, 'subjects', 30, 100),
+          dateOfBirth: optionalString(body, 'dateOfBirth', 10),
+          gender: optionalString(body, 'gender', 40),
           email: optionalEmail(body.email),
           phone: optionalString(body, 'phone', 40),
-          campusId:
-            typeof body.campusId === 'string' ? body.campusId : undefined,
+          campusId: optionalObjectId(body.campusId, 'campusId'),
         },
+        organizationContext(response),
       );
       response.status(201).json({ staff });
     }),
@@ -545,31 +637,66 @@ export function createPeopleRouter(
       const body = bodyObject(request.body);
       const staff = await service.updateStaff(
         organizationContext(response).organizationId,
-        routeParameter(request, 'staffId'),
+        requiredRouteObjectId(
+          routeParameter(request, 'staffId'),
+          'Staff member',
+        ),
         {
           firstName:
-            body.firstName !== undefined ? String(body.firstName) : undefined,
+            body.firstName !== undefined
+              ? requiredString(body, 'firstName', 2, 80)
+              : undefined,
           lastName:
-            body.lastName !== undefined ? String(body.lastName) : undefined,
+            body.lastName !== undefined
+              ? requiredString(body, 'lastName', 2, 80)
+              : undefined,
           department:
-            body.department !== undefined ? String(body.department) : undefined,
+            body.department !== undefined
+              ? String(optionalString(body, 'department', 100) ?? '')
+              : undefined,
           qualification:
             body.qualification !== undefined
-              ? String(body.qualification)
+              ? String(optionalString(body, 'qualification', 240) ?? '')
               : undefined,
-          role: body.role !== undefined ? String(body.role) : undefined,
-          status:
-            body.status === 'active' ||
-            body.status === 'on_leave' ||
-            body.status === 'inactive'
-              ? (String(body.status) as 'active' | 'on_leave' | 'inactive')
+          role:
+            body.role !== undefined
+              ? String(optionalString(body, 'role', 80) ?? '')
               : undefined,
+          designation:
+            body.designation !== undefined
+              ? String(optionalString(body, 'designation', 100) ?? '')
+              : undefined,
+          employeeCode:
+            body.employeeCode !== undefined
+              ? String(optionalString(body, 'employeeCode', 40) ?? '')
+              : undefined,
+          qualifications: optionalStringList(body, 'qualifications', 20, 160),
+          subjects: optionalStringList(body, 'subjects', 30, 100),
+          dateOfBirth:
+            body.dateOfBirth !== undefined
+              ? String(optionalString(body, 'dateOfBirth', 10) ?? '')
+              : undefined,
+          gender:
+            body.gender !== undefined
+              ? String(optionalString(body, 'gender', 40) ?? '')
+              : undefined,
+          status: staffStatus(body.status),
           email:
-            body.email !== undefined ? optionalEmail(body.email) : undefined,
-          phone: body.phone !== undefined ? String(body.phone) : undefined,
+            body.email !== undefined
+              ? body.email === ''
+                ? ''
+                : optionalEmail(body.email)
+              : undefined,
+          phone:
+            body.phone !== undefined
+              ? String(optionalString(body, 'phone', 40) ?? '')
+              : undefined,
           campusId:
-            typeof body.campusId === 'string' ? body.campusId : undefined,
+            body.campusId === ''
+              ? ''
+              : optionalObjectId(body.campusId, 'campusId'),
         },
+        organizationContext(response),
       );
       response.status(200).json({ staff });
     }),
@@ -582,40 +709,45 @@ export function createPeopleRouter(
     requireOrganizationPermission('admission.read'),
     asyncHandler(async (request, response) => {
       const query = request.query ?? {};
+      const context = organizationContext(response);
       const inquiries = await service.listInquiries(
-        organizationContext(response).organizationId,
+        context.organizationId,
         {
-          status:
-            typeof query.inquiryStatus === 'string'
-              ? (query.inquiryStatus as
-                  'new' | 'contacted' | 'qualified' | 'converted')
-              : undefined,
+          status: queryEnum(query, 'inquiryStatus', [
+            'new',
+            'contacted',
+            'qualified',
+            'converted',
+            'closed',
+          ]),
+          search: typeof query.search === 'string' ? query.search : undefined,
           page: typeof query.page === 'string' ? Number(query.page) : undefined,
           pageSize:
             typeof query.pageSize === 'string'
               ? Number(query.pageSize)
               : undefined,
         },
+        context,
       );
       const applications = await service.listApplications(
-        organizationContext(response).organizationId,
+        context.organizationId,
         {
-          status:
-            typeof query.applicationStatus === 'string'
-              ? (query.applicationStatus as
-                  | 'draft'
-                  | 'submitted'
-                  | 'in_review'
-                  | 'approved'
-                  | 'rejected'
-                  | 'admitted')
-              : undefined,
+          status: queryEnum(query, 'applicationStatus', [
+            'draft',
+            'submitted',
+            'in_review',
+            'approved',
+            'rejected',
+            'admitted',
+          ]),
+          search: typeof query.search === 'string' ? query.search : undefined,
           page: typeof query.page === 'string' ? Number(query.page) : undefined,
           pageSize:
             typeof query.pageSize === 'string'
               ? Number(query.pageSize)
               : undefined,
         },
+        context,
       );
       response.status(200).json({ inquiries, applications });
     }),
@@ -629,8 +761,9 @@ export function createPeopleRouter(
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
+      const context = organizationContext(response);
       const inquiry = await service.createInquiry(
-        organizationContext(response).organizationId,
+        context.organizationId,
         {
           firstName: requiredString(body, 'firstName', 2, 80),
           lastName: requiredString(body, 'lastName', 2, 80),
@@ -638,11 +771,50 @@ export function createPeopleRouter(
           phone: optionalString(body, 'phone', 40),
           source: optionalString(body, 'source', 80),
           notes: optionalString(body, 'notes', 1000),
+          gradeLevelInterest: optionalString(body, 'gradeLevelInterest', 80),
           campusId:
             typeof body.campusId === 'string' ? body.campusId : undefined,
         },
+        context,
       );
       response.status(201).json({ inquiry });
+    }),
+  );
+
+  router.patch(
+    '/:organizationId/admissions/inquiries/:inquiryId',
+    authenticate,
+    resolveOrganization,
+    requireOrganizationPermission('admission.review'),
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const body = bodyObject(request.body);
+      const status = queryEnum(body, 'status', [
+        'new',
+        'contacted',
+        'qualified',
+        'converted',
+        'closed',
+      ]);
+      if (!status)
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Select a valid inquiry status.',
+        );
+      const context = organizationContext(response);
+      const inquiry = await service.updateInquiry(
+        context.organizationId,
+        routeParameter(request, 'inquiryId'),
+        {
+          status,
+          ...(body.notes !== undefined
+            ? { notes: optionalString(body, 'notes', 1000) }
+            : {}),
+        },
+        context,
+      );
+      response.status(200).json({ inquiry });
     }),
   );
 
@@ -654,11 +826,23 @@ export function createPeopleRouter(
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
+      const context = organizationContext(response);
+      const status =
+        body.status === undefined || body.status === 'draft'
+          ? 'draft'
+          : body.status === 'submitted'
+            ? 'submitted'
+            : undefined;
+      if (!status)
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'A new application must be a draft or submitted.',
+        );
       const application = await service.createApplication(
-        organizationContext(response).organizationId,
+        context.organizationId,
         {
-          inquiryId:
-            typeof body.inquiryId === 'string' ? body.inquiryId : undefined,
+          inquiryId: optionalObjectId(body.inquiryId, 'inquiry'),
           firstName: requiredString(body, 'firstName', 2, 80),
           lastName: requiredString(body, 'lastName', 2, 80),
           email: optionalEmail(body.email),
@@ -669,25 +853,28 @@ export function createPeopleRouter(
               ? body.preferredCampusId
               : undefined,
           program: optionalString(body, 'program', 120),
-          status:
-            body.status === 'draft' ||
-            body.status === 'submitted' ||
-            body.status === 'in_review' ||
-            body.status === 'approved' ||
-            body.status === 'rejected' ||
-            body.status === 'admitted'
-              ? (String(body.status) as
-                  | 'draft'
-                  | 'submitted'
-                  | 'in_review'
-                  | 'approved'
-                  | 'rejected'
-                  | 'admitted')
-              : 'draft',
+          status,
           notes: optionalString(body, 'notes', 1200),
         },
+        context,
       );
       response.status(201).json({ application });
+    }),
+  );
+
+  router.get(
+    '/:organizationId/admissions/applications/:applicationId',
+    authenticate,
+    resolveOrganization,
+    requireOrganizationPermission('admission.read'),
+    asyncHandler(async (request, response) => {
+      const context = organizationContext(response);
+      const application = await service.getApplication(
+        context.organizationId,
+        routeParameter(request, 'applicationId'),
+        context,
+      );
+      response.status(200).json({ application });
     }),
   );
 
@@ -720,16 +907,24 @@ export function createPeopleRouter(
           'VALIDATION_ERROR',
           'Select a valid application status.',
         );
+      const context = organizationContext(response);
+      if (
+        status === 'approved' &&
+        !context.permissions?.includes('student.create')
+      )
+        throw new AppError(
+          403,
+          'PERMISSION_DENIED',
+          'You do not have permission to create the resulting student record.',
+        );
       const result = await service.reviewApplication(
-        organizationContext(response).organizationId,
+        context.organizationId,
         routeParameter(request, 'applicationId'),
         {
           status,
-          decisionReason:
-            typeof body.decisionReason === 'string'
-              ? body.decisionReason
-              : undefined,
+          decisionReason: optionalString(body, 'decisionReason', 400),
         },
+        context,
       );
       response.status(200).json(result);
     }),

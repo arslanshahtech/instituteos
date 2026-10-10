@@ -990,7 +990,10 @@ a {
 
 .table-scroll {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 
 .data-table {
@@ -1701,12 +1704,14 @@ a {
 .member-controls input,
 .member-controls select {
   min-width: 0;
-  border: 1px solid var(--color-border);
-  border-radius: 7px;
+  min-height: 40px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-ink);
   padding: 9px 11px;
   font: inherit;
+  font-size: 12px;
 }
 
 .organization-list {
@@ -1728,6 +1733,70 @@ a {
   gap: 4px;
 }
 
+.member-row {
+  align-items: center;
+}
+
+.member-identity {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.member-identity strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.member-row .member-email {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-tags {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.member-tag {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  text-transform: capitalize;
+}
+
+.member-role-tag {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-dark);
+}
+
+.member-active-tag {
+  background: var(--color-positive-soft);
+  color: var(--color-positive);
+}
+
+.member-inactive-tag {
+  background: var(--color-negative-soft);
+  color: var(--color-negative);
+}
+
 .organization-row strong {
   color: var(--color-ink);
 }
@@ -1746,14 +1815,113 @@ a {
 
 .member-controls {
   display: flex;
+  min-width: 0;
+  flex: 0 1 760px;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.member-controls select[multiple] {
-  min-width: 140px;
-  min-height: 56px;
+.member-controls select {
+  min-width: 130px;
+  max-width: 220px;
+}
+
+.campus-scope-dropdown {
+  position: relative;
+  min-width: 0;
+  flex: 0 1 180px;
+}
+
+.campus-scope-dropdown.is-open {
+  z-index: 2;
+}
+
+.campus-scope-trigger {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  padding: 0 10px;
+  color: var(--color-ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+
+.campus-scope-trigger svg {
+  flex: 0 0 auto;
+  transition: transform 120ms ease;
+}
+
+.campus-scope-dropdown.is-open .campus-scope-trigger svg {
+  transform: rotate(180deg);
+}
+
+.campus-scope-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.campus-scope-options {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  display: grid;
+  max-height: 220px;
+  gap: 2px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: 0 8px 24px rgb(20 38 54 / 14%);
+  padding: 5px;
+}
+
+.campus-scope-option {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  border-radius: 4px;
+  padding: 7px;
+  color: var(--color-ink);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.campus-scope-option:hover {
+  background: var(--color-canvas);
+}
+
+.campus-scope-option input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  accent-color: var(--color-accent);
+}
+
+.campus-scope-option span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.campus-scope-empty {
+  padding: 8px;
+  color: var(--color-muted);
+  font-size: 12px;
 }
 
 .success-note,
@@ -1802,6 +1970,17 @@ a {
   gap: 14px;
 }
 
+.staff-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: end;
+  gap: 14px;
+}
+
+.staff-details {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .student-search-field,
 .student-status-filter {
   display: grid;
@@ -1813,6 +1992,7 @@ a {
 }
 
 .student-search-field input,
+.student-search-field select,
 .student-status-filter select {
   width: 100%;
   min-width: 0;
@@ -1824,6 +2004,7 @@ a {
   color: var(--color-ink);
   font: inherit;
   font-size: 12px;
+  font-weight: 400;
 }
 
 .student-name-link {
@@ -1846,6 +2027,98 @@ a {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.admissions-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.admissions-tab {
+  min-height: 40px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 8px 14px;
+  color: var(--color-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.admissions-tab[aria-pressed='true'] {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-ink);
+}
+
+.admissions-applicant-name {
+  color: var(--color-ink);
+  font-weight: 650;
+}
+
+.inquiry-cell-content {
+  min-width: 0;
+}
+
+.inquiry-mobile-label {
+  display: none;
+}
+
+.inquiry-contact-value {
+  overflow-wrap: anywhere;
+}
+
+.admission-status-control select,
+.form-field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  padding: 9px 11px;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 12px;
+}
+
+.admission-status-control select {
+  min-height: 40px;
+}
+
+.form-field textarea {
+  resize: vertical;
+}
+
+.admission-status-control {
+  display: grid;
+  min-width: 120px;
+  gap: 4px;
+}
+
+.status-badge {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  vertical-align: middle;
+  line-height: 1.3;
+}
+
+.admissions-campus-tag {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--color-canvas);
+  padding: 5px 9px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.3;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
 }
 
 .student-detail-heading {
@@ -2025,30 +2298,6 @@ a {
     padding: 16px;
   }
 
-  .student-list-panel,
-  .student-detail-panel,
-  .student-form-panel {
-    padding: 16px;
-  }
-
-  .student-form-grid,
-  .student-details {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .student-page-actions {
-    width: 100%;
-  }
-
-  .guardian-link-controls,
-  .guardian-link-controls .form-field {
-    width: 100%;
-  }
-
-  .guardian-linked-list li {
-    align-items: flex-start;
-  }
-
   .dialog {
     width: min(520px, calc(100% - 24px));
     max-width: calc(100vw - 24px);
@@ -2070,5 +2319,330 @@ a {
   .dialog-actions > .button {
     width: 100%;
     min-height: 40px;
+  }
+}
+
+@media (max-width: 640px) {
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .main-content,
+  .page-stack,
+  .student-management-page,
+  .student-list-panel,
+  .student-detail-panel,
+  .student-form-panel {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .student-management-page {
+    width: 100%;
+  }
+
+  .member-row {
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px 0;
+  }
+
+  .member-identity {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .member-controls {
+    width: 100%;
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    gap: 9px;
+  }
+
+  .member-controls select,
+  .member-controls .campus-scope-dropdown,
+  .member-controls > .button {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .campus-scope-trigger {
+    width: 100%;
+  }
+
+  .page-heading.student-page-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .student-page-heading > div:first-child {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .student-page-heading .page-description {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .student-detail-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .student-detail-heading > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .student-page-actions {
+    width: 100%;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 9px;
+  }
+
+  .student-page-actions > .button {
+    min-width: 0;
+    max-width: 100%;
+    flex: 1 1 auto;
+    min-height: 40px;
+    padding: 8px 11px;
+    line-height: 1.35;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .student-list-panel,
+  .student-detail-panel,
+  .student-form-panel {
+    padding: 16px;
+  }
+
+  .student-form-grid,
+  .student-details {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .staff-filters,
+  .staff-details {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .student-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .student-form,
+  .form-field,
+  .form-field input,
+  .form-field select,
+  .form-field textarea,
+  .student-search-field input,
+  .student-status-filter select,
+  .admission-status-control select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .button-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 9px;
+  }
+
+  .button-row > .button {
+    width: 100%;
+    min-height: 40px;
+    white-space: normal;
+    line-height: 1.35;
+  }
+
+  .guardian-link-controls,
+  .guardian-link-controls .form-field {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .guardian-linked-list li {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 9px;
+  }
+
+  .guardian-linked-list li > div {
+    min-width: 0;
+    flex: 1 1 180px;
+    overflow-wrap: anywhere;
+  }
+
+  .guardian-linked-list li > .button {
+    flex: 0 0 auto;
+  }
+
+  .guardian-primary-option {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .admissions-tabs {
+    width: 100%;
+  }
+
+  .admissions-tab {
+    min-width: 0;
+    flex: 1 1 120px;
+    padding-inline: 10px;
+  }
+
+  .admission-status-control {
+    min-width: 110px;
+  }
+
+  .status-badge {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .pagination {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .pagination-summary {
+    flex: 1 1 100%;
+  }
+
+  .table-scroll {
+    max-width: 100%;
+    overscroll-behavior-x: contain;
+  }
+
+  .admissions-inquiry-table {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .admissions-inquiry-table .data-table {
+    display: block;
+    width: 100%;
+  }
+
+  .admissions-inquiry-table .data-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
+  }
+
+  .admissions-inquiry-table .data-table tbody {
+    display: grid;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .admissions-inquiry-table .data-table tbody tr {
+    display: grid;
+    min-width: 0;
+    gap: 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    padding: 14px;
+  }
+
+  .admissions-inquiry-table .data-table tbody td {
+    display: block;
+    min-width: 0;
+    border: 0;
+    padding: 0;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .admissions-inquiry-table .inquiry-cell-content {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+  }
+
+  .admissions-inquiry-table .inquiry-mobile-label {
+    display: block;
+    color: var(--color-muted);
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: 0.04em;
+    line-height: 1.35;
+    text-transform: uppercase;
+  }
+
+  .admissions-inquiry-table .admissions-applicant-name {
+    font-size: 15px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .admissions-inquiry-table .inquiry-contact-value {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .admissions-inquiry-table .admission-status-control {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .dialog {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+    margin: auto;
+  }
+
+  @supports (height: 100dvh) {
+    .dialog {
+      max-height: calc(100dvh - 24px);
+    }
+  }
+
+  .dialog-header,
+  .dialog-body {
+    min-width: 0;
+    padding: 16px;
+  }
+
+  .dialog-header > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .dialog-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .dialog-actions > .button {
+    width: 100%;
+    min-height: 40px;
+    white-space: normal;
+  }
+}
+
+@media (min-width: 900px) {
+  .student-details {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

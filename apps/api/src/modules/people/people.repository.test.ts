@@ -3,10 +3,12 @@ import type { ClientSession } from 'mongoose';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   GuardianModel,
+  StaffMemberModel,
   StudentGuardianLinkModel,
   StudentModel,
 } from './people.model.js';
 import { MongoPeopleRepository } from './people.repository.js';
+import { CampusModel } from '../tenancy/tenancy.model.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -44,6 +46,29 @@ describe('MongoPeopleRepository guardian operations', () => {
         term.$or.every((field) => Object.values(field)[0]?.$options === 'i'),
       ),
     ).toBe(true);
+  });
+
+  describe('MongoPeopleRepository staff operations', () => {
+    it('rejects campus assignments outside the staff organization', async () => {
+      const organizationId = new Types.ObjectId();
+      const campusId = new Types.ObjectId();
+      const exists = vi.spyOn(CampusModel, 'exists').mockResolvedValue(null);
+      const create = vi.spyOn(StaffMemberModel, 'create');
+
+      await expect(
+        new MongoPeopleRepository().createStaff(String(organizationId), {
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          campusId: String(campusId),
+        }),
+      ).rejects.toMatchObject({ code: 'CAMPUS_NOT_FOUND' });
+
+      expect(exists).toHaveBeenCalledWith({
+        _id: campusId,
+        organizationId,
+      });
+      expect(create).not.toHaveBeenCalled();
+    });
   });
 
   it('performs guardian and student reads sequentially in the link transaction', async () => {
