@@ -16,6 +16,7 @@ import type { Campus } from '../organizations/organizations-api.js';
 import { getOrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import type { OrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import { StudentForm } from './StudentForm.js';
+import { StudentGuardiansSection } from '../guardians/GuardianPages.js';
 import type { StudentInput, StudentStatus } from './students-api.js';
 import {
   useCreateStudent,
@@ -168,14 +169,24 @@ export function StudentsListPage() {
       <main className="page-stack student-management-page">
         <StudentPageHeading
           action={
-            canCreate ? (
-              <Link
-                className="button button-primary"
-                to={`/admin/organizations/${encodeURIComponent(organizationId)}/students/new`}
-              >
-                Add student
-              </Link>
-            ) : undefined
+            <>
+              {access.data?.permissions.includes('guardian.read') && (
+                <Link
+                  className="button button-secondary"
+                  to={`/admin/organizations/${encodeURIComponent(organizationId)}/guardians`}
+                >
+                  Guardian directory
+                </Link>
+              )}
+              {canCreate && (
+                <Link
+                  className="button button-primary"
+                  to={`/admin/organizations/${encodeURIComponent(organizationId)}/students/new`}
+                >
+                  Add student
+                </Link>
+              )}
+            </>
           }
           description="Search and manage students in this organization."
           organizationId={organizationId}
@@ -379,14 +390,24 @@ export function StudentDetailPage() {
     <main className="page-stack student-management-page">
       <StudentPageHeading
         action={
-          canUpdate ? (
-            <Link
-              className="button button-primary"
-              to={`/admin/organizations/${encodeURIComponent(organizationId)}/students/${encodeURIComponent(studentId)}/edit`}
-            >
-              Edit student
-            </Link>
-          ) : undefined
+          <>
+            {access.data.permissions.includes('guardian.read') && (
+              <Link
+                className="button button-secondary"
+                to={`/admin/organizations/${encodeURIComponent(organizationId)}/guardians`}
+              >
+                Guardian directory
+              </Link>
+            )}
+            {canUpdate && (
+              <Link
+                className="button button-primary"
+                to={`/admin/organizations/${encodeURIComponent(organizationId)}/students/${encodeURIComponent(studentId)}/edit`}
+              >
+                Edit student
+              </Link>
+            )}
+          </>
         }
         description="Student record and contact information."
         organizationId={organizationId}
@@ -466,6 +487,16 @@ export function StudentDetailPage() {
           )}
         </dl>
       </section>
+      {access.data.permissions.includes('guardian.read') && (
+        <StudentGuardiansSection
+          canRead
+          canUpdate={
+            canUpdate && access.data.permissions.includes('guardian.update')
+          }
+          organizationId={organizationId}
+          studentId={studentId}
+        />
+      )}
     </main>
   );
 }

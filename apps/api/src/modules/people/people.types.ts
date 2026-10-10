@@ -113,6 +113,26 @@ export interface GuardianLinkRecord {
   updatedAt: string;
 }
 
+export interface PeopleAccessContext {
+  organizationId: string;
+  campusIds?: string[];
+  role?: string;
+}
+
+export interface StudentGuardianRelation {
+  id: string;
+  relationship: GuardianRelationshipType;
+  isPrimary: boolean;
+  guardian: GuardianRecord;
+}
+
+export interface GuardianStudentRelation {
+  id: string;
+  relationship: GuardianRelationshipType;
+  isPrimary: boolean;
+  student: Pick<StudentRecord, 'id' | 'firstName' | 'lastName' | 'campusId'>;
+}
+
 export interface StaffInput {
   firstName: string;
   lastName: string;
@@ -256,7 +276,12 @@ export interface PeopleRepository {
 
   listGuardians(
     organizationId: string,
-    query?: { search?: string; page?: number; pageSize?: number },
+    query?: {
+      search?: string;
+      page?: number;
+      pageSize?: number;
+      guardianIds?: string[];
+    },
   ): Promise<QuerySummary<GuardianRecord>>;
   getGuardian(
     organizationId: string,
@@ -271,6 +296,11 @@ export interface PeopleRepository {
     guardianId: string,
     changes: Partial<GuardianInput>,
   ): Promise<GuardianRecord | null>;
+  createGuardianWithLink(
+    organizationId: string,
+    input: GuardianInput,
+    link: Omit<GuardianLinkInput, 'guardianId'>,
+  ): Promise<GuardianRecord>;
   linkGuardianToStudent(
     organizationId: string,
     input: GuardianLinkInput,
@@ -278,7 +308,14 @@ export interface PeopleRepository {
   listGuardianLinks(
     organizationId: string,
     studentId?: string,
+    guardianId?: string,
+    campusIds?: string[],
   ): Promise<GuardianLinkRecord[]>;
+  unlinkGuardianFromStudent(
+    organizationId: string,
+    studentId: string,
+    guardianId: string,
+  ): Promise<boolean>;
 
   listStaff(
     organizationId: string,
@@ -381,17 +418,37 @@ export interface PeopleServices {
   ): Promise<StudentRecord>;
 
   listGuardians(
-    organizationId: string,
+    context: PeopleAccessContext,
     input?: { search?: string; page?: number; pageSize?: number },
   ): Promise<QuerySummary<GuardianRecord>>;
   createGuardian(
     organizationId: string,
     input: GuardianInput,
+    context?: PeopleAccessContext,
+    studentId?: string,
   ): Promise<GuardianRecord>;
+  getGuardian(
+    context: PeopleAccessContext,
+    guardianId: string,
+  ): Promise<{ guardian: GuardianRecord; students: GuardianStudentRelation[] }>;
+  updateGuardian(
+    context: PeopleAccessContext,
+    guardianId: string,
+    changes: Partial<GuardianInput>,
+  ): Promise<GuardianRecord>;
+  listStudentGuardians(
+    context: PeopleAccessContext,
+    studentId: string,
+  ): Promise<StudentGuardianRelation[]>;
   linkGuardianToStudent(
-    organizationId: string,
+    context: PeopleAccessContext,
     input: GuardianLinkInput,
   ): Promise<GuardianLinkRecord>;
+  unlinkGuardianFromStudent(
+    context: PeopleAccessContext,
+    studentId: string,
+    guardianId: string,
+  ): Promise<void>;
 
   listStaff(
     organizationId: string,
@@ -410,10 +467,7 @@ export interface PeopleServices {
     changes: Partial<StaffInput>,
   ): Promise<StaffRecord>;
 
-  getInquiry(
-    organizationId: string,
-    inquiryId: string,
-  ): Promise<InquiryRecord>;
+  getInquiry(organizationId: string, inquiryId: string): Promise<InquiryRecord>;
   listInquiries(
     organizationId: string,
     input?: {

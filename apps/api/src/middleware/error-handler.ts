@@ -19,6 +19,31 @@ function isOversizedBody(error: unknown): boolean {
   );
 }
 
+function databaseErrorDetails(error: unknown): {
+  databaseCode?: number | string;
+  databaseCodeName?: string;
+  databaseErrorLabels?: string[];
+} {
+  if (typeof error !== 'object' || error === null) return {};
+  const details = error as {
+    code?: unknown;
+    codeName?: unknown;
+    errorLabels?: unknown;
+  };
+  return {
+    ...(typeof details.code === 'number' || typeof details.code === 'string'
+      ? { databaseCode: details.code }
+      : {}),
+    ...(typeof details.codeName === 'string'
+      ? { databaseCodeName: details.codeName }
+      : {}),
+    ...(Array.isArray(details.errorLabels) &&
+    details.errorLabels.every((label) => typeof label === 'string')
+      ? { databaseErrorLabels: details.errorLabels }
+      : {}),
+  };
+}
+
 export const errorHandler: ErrorRequestHandler = (
   error: unknown,
   _request,
@@ -51,6 +76,7 @@ export const errorHandler: ErrorRequestHandler = (
           normalizedError instanceof Error
             ? normalizedError.name
             : 'UnknownError',
+        ...databaseErrorDetails(normalizedError),
         code,
       }),
     );

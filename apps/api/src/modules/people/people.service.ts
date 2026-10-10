@@ -4,7 +4,9 @@ import type {
   ApplicationRecord,
   ApplicationStatus,
   GuardianInput,
+  GuardianStudentRelation,
   GuardianRecord,
+  PeopleAccessContext,
   InquiryInput,
   InquiryRecord,
   PeopleRepository,
@@ -13,6 +15,7 @@ import type {
   StaffRecord,
   StudentInput,
   StudentRecord,
+  StudentGuardianRelation,
   StudentStatus,
 } from './people.types.js';
 
@@ -177,41 +180,216 @@ export class PeopleService {
   }
 
   async listGuardians(
-    organizationId: string,
+    context: PeopleAccessContext,
     input?: { search?: string; page?: number; pageSize?: number },
   ): Promise<QuerySummary<GuardianRecord>> {
-    return this.repository.listGuardians(organizationId, input);
+    const guardianIds =
+      context.role === 'campus_admin'
+        ? Array.from(
+            new Set(
+              (
+                await this.repository.listGuardianLinks(
+                  context.organizationId,
+                  undefined,
+                  undefined,
+                  context.campusIds ?? [],
+                )
+              ).map((link) => link.guardianId),
+            ),
+          )
+        : undefined;
+    return this.repository.listGuardians(context.organizationId, {
+      ...input,
+      guardianIds,
+    });
   }
 
   async createGuardian(
     organizationId: string,
     input: GuardianInput,
+    context?: PeopleAccessContext,
+    studentId?: string,
   ): Promise<GuardianRecord> {
-    return this.repository.createGuardian(organizationId, {
+    const normalized = {
       ...input,
       firstName: normalizeName(input.firstName, 'guardian first name'),
       lastName: normalizeName(input.lastName, 'guardian last name'),
       email: normalizeOptionalEmail(input.email),
+    };
+    if (context?.role === 'campus_admin' && !studentId) {
+      throw new AppError(
+        400,
+        'STUDENT_REQUIRED',
+        'Select an assigned student for this guardian.',
+      );
+    }
+    if (!studentId)
+      return this.repository.createGuardian(organizationId, normalized);
+
+    const student = await this.repository.getStudent(organizationId, studentId);
+    if (!student)
+      throw new AppError(404, 'STUDENT_NOT_FOUND', 'Student not found.');
+    assertCampusScope(context ?? { organizationId }, student.campusId);
+    return this.repository.createGuardianWithLink(organizationId, normalized, {
+      studentId,
+      relationship: input.relationship ?? 'guardian',
+      isPrimary: false,
     });
   }
 
+  async getGuardian(
+    context: PeopleAccessContext,
+    guardianId: string,
+  ): Promise<{
+    guardian: GuardianRecord;
+    students: GuardianStudentRelation[];
+  }> {
+    const guardian = await this.repository.getGuardian(
+      context.organizationId,
+      guardianId,
+    );
+    if (!guardian)
+      throw new AppError(404, 'GUARDIAN_NOT_FOUND', 'Guardian not found.');
+    const links = await this.repository.listGuardianLinks(
+      context.organizationId,
+      undefined,
+      guardianId,
+      context.role === 'campus_admin' ? (context.campusIds ?? []) : undefined,
+    );
+    const students: GuardianStudentRelation[] = [];
+    for (const link of links) {
+      const student = await this.repository.getStudent(
+        context.organizationId,
+        link.studentId,
+      );
+      if (!student) continue;
+      students.push({
+        id: link.id,
+        relationship: link.relationship,
+        isPrimary: link.isPrimary,
+        student: {
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          campusId: student.campusId,
+        },
+      });
+    }
+    if (
+      context.role === 'campus_admin' &&
+      (context.campusIds?.length ?? 0) === 0
+    ) {
+      throw new AppError(404, 'GUARDIAN_NOT_FOUND', 'Guardian not found.');
+    }
+    if (context.role === 'campus_admin' && students.length === 0)
+      throw new AppError(404, 'GUARDIAN_NOT_FOUND', 'Guardian not found.');
+    return { guardian, students };
+  }
+
+  async updateGuardian(
+    context: PeopleAccessContext,
+    guardianId: string,
+    changes: Partial<GuardianInput>,
+  ): Promise<GuardianRecord> {
+    await this.getGuardian(context, guardianId);
+    const normalized = { ...changes };
+    if (changes.firstName !== undefined)
+      normalized.firstName = normalizeName(
+        changes.firstName,
+        'guardian first name',
+      );
+    if (changes.lastName !== undefined)
+      normalized.lastName = normalizeName(
+        changes.lastName,
+        'guardian last name',
+      );
+    if (changes.email !== undefined)
+      normalized.email = normalizeOptionalEmail(changes.email);
+    const guardian = await this.repository.updateGuardian(
+      context.organizationId,
+      guardianId,
+      normalized,
+    );
+    if (!guardian)
+      throw new AppError(404, 'GUARDIAN_NOT_FOUND', 'Guardian not found.');
+    return guardian;
+  }
+
+  async listStudentGuardians(
+    context: PeopleAccessContext,
+    studentId: string,
+  ): Promise<StudentGuardianRelation[]> {
+    const student = await this.repository.getStudent(
+      context.organizationId,
+      studentId,
+    );
+    if (!student)
+      throw new AppError(404, 'STUDENT_NOT_FOUND', 'Student not found.');
+    assertCampusScope(context, student.campusId);
+    const links = await this.repository.listGuardianLinks(
+      context.organizationId,
+      studentId,
+    );
+    const relations: StudentGuardianRelation[] = [];
+    for (const link of links) {
+      const guardian = await this.repository.getGuardian(
+        context.organizationId,
+        link.guardianId,
+      );
+      if (!guardian) continue;
+      relations.push({
+        id: link.id,
+        relationship: link.relationship,
+        isPrimary: link.isPrimary,
+        guardian,
+      });
+    }
+    return relations;
+  }
+
   async linkGuardianToStudent(
-    organizationId: string,
+    context: PeopleAccessContext,
     input: Parameters<PeopleRepository['linkGuardianToStudent']>[1],
   ) {
     const student = await this.repository.getStudent(
-      organizationId,
+      context.organizationId,
       input.studentId,
     );
     if (!student)
       throw new AppError(404, 'STUDENT_NOT_FOUND', 'Student not found.');
+    assertCampusScope(context, student.campusId);
     const guardian = await this.repository.getGuardian(
-      organizationId,
+      context.organizationId,
       input.guardianId,
     );
     if (!guardian)
       throw new AppError(404, 'GUARDIAN_NOT_FOUND', 'Guardian not found.');
-    return this.repository.linkGuardianToStudent(organizationId, input);
+    return this.repository.linkGuardianToStudent(context.organizationId, input);
+  }
+
+  async unlinkGuardianFromStudent(
+    context: PeopleAccessContext,
+    studentId: string,
+    guardianId: string,
+  ): Promise<void> {
+    const student = await this.repository.getStudent(
+      context.organizationId,
+      studentId,
+    );
+    if (!student)
+      throw new AppError(404, 'STUDENT_NOT_FOUND', 'Student not found.');
+    assertCampusScope(context, student.campusId);
+    const guardian = await this.repository.getGuardian(
+      context.organizationId,
+      guardianId,
+    );
+    if (!guardian)
+      throw new AppError(404, 'GUARDIAN_NOT_FOUND', 'Guardian not found.');
+    await this.repository.unlinkGuardianFromStudent(
+      context.organizationId,
+      studentId,
+      guardianId,
+    );
   }
 
   async listStaff(

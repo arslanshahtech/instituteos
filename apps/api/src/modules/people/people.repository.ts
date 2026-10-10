@@ -46,6 +46,10 @@ function normalizeFilterValue(value: unknown): string | undefined {
   return value.trim() || undefined;
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function convertGuardianArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((item) => String(item));
@@ -246,7 +250,12 @@ export class MongoPeopleRepository {
 
   async listGuardians(
     organizationId: string,
-    query?: { search?: string; page?: number; pageSize?: number },
+    query?: {
+      search?: string;
+      page?: number;
+      pageSize?: number;
+      guardianIds?: string[];
+    },
   ): Promise<QuerySummary<GuardianRecord>> {
     const { page, pageSize } = normalizePagination(
       query?.page,
@@ -256,12 +265,20 @@ export class MongoPeopleRepository {
     const filters: Record<string, unknown> = {
       organizationId: idObject(organizationId),
     };
+    if (query?.guardianIds) {
+      filters._id = { $in: query.guardianIds.map(idObject) };
+    }
     if (search) {
-      filters.$or = [
-        { firstName: { $regex: search, $options: 'i' } },
-        { lastName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-      ];
+      filters.$and = search.split(/\s+/).map((term) => {
+        const safeTerm = escapeRegex(term);
+        return {
+          $or: [
+            { firstName: { $regex: safeTerm, $options: 'i' } },
+            { lastName: { $regex: safeTerm, $options: 'i' } },
+            { email: { $regex: safeTerm, $options: 'i' } },
+          ],
+        };
+      });
     }
     const [items, total] = await Promise.all([
       GuardianModel.find(filters)
@@ -382,72 +399,195 @@ export class MongoPeopleRepository {
     };
   }
 
+  async createGuardianWithLink(
+    organizationId: string,
+    input: GuardianInput,
+    link: Omit<GuardianLinkInput, 'guardianId'>,
+  ): Promise<GuardianRecord> {
+    const session = await mongoose.startSession();
+    let guardianId: Types.ObjectId | undefined;
+    try {
+      await session.withTransaction(async () => {
+        const student = await StudentModel.findOne({
+          _id: idObject(link.studentId),
+          organizationId: idObject(organizationId),
+        })
+          .session(session)
+          .lean();
+        if (!student)
+          throw new AppError(404, 'STUDENT_NOT_FOUND', 'Student not found.');
+
+        const [guardian] = await GuardianModel.create(
+          [
+            {
+              organizationId: idObject(organizationId),
+              firstName: input.firstName,
+              lastName: input.lastName,
+              relationship: input.relationship ?? 'guardian',
+              phone: input.phone,
+              email: input.email,
+              communicationPreference: input.communicationPreference ?? 'email',
+              address: input.address,
+            },
+          ],
+          { session },
+        );
+        if (!guardian)
+          throw new AppError(
+            500,
+            'GUARDIAN_CREATE_FAILED',
+            'Guardian could not be created.',
+          );
+        guardianId = guardian._id;
+
+        await StudentGuardianLinkModel.create(
+          [
+            {
+              organizationId: idObject(organizationId),
+              studentId: idObject(link.studentId),
+              guardianId,
+              relationship: link.relationship,
+              isPrimary: Boolean(link.isPrimary),
+            },
+          ],
+          { session },
+        );
+        await StudentModel.updateOne(
+          {
+            _id: idObject(link.studentId),
+            organizationId: idObject(organizationId),
+          },
+          { $addToSet: { guardianIds: guardianId } },
+          { session },
+        );
+      });
+    } finally {
+      await session.endSession();
+    }
+
+    if (!guardianId)
+      throw new AppError(
+        500,
+        'GUARDIAN_CREATE_FAILED',
+        'Guardian could not be created.',
+      );
+    const guardian = await this.getGuardian(organizationId, String(guardianId));
+    if (!guardian)
+      throw new AppError(404, 'GUARDIAN_NOT_FOUND', 'Guardian not found.');
+    return guardian;
+  }
+
   async linkGuardianToStudent(
     organizationId: string,
     input: GuardianLinkInput,
   ): Promise<GuardianLinkRecord> {
-    const record = await StudentGuardianLinkModel.findOneAndUpdate(
-      {
-        organizationId: idObject(organizationId),
-        studentId: idObject(input.studentId),
-        guardianId: idObject(input.guardianId),
-      },
-      {
-        $set: {
-          relationship: input.relationship,
-          isPrimary: Boolean(input.isPrimary),
-        },
-      },
-      { new: true, upsert: true, runValidators: true },
-    ).lean();
-
-    const student = await StudentModel.findOne({
-      _id: idObject(input.studentId),
-      organizationId: idObject(organizationId),
-    }).lean();
-    if (student) {
-      const guardianIds = new Set<string>(
-        (Array.isArray(student.guardianIds)
-          ? (student.guardianIds as unknown[])
-          : []
-        ).map((id) => String(id)),
-      );
-      guardianIds.add(String(input.guardianId));
-      await StudentModel.findOneAndUpdate(
-        {
+    const session = await mongoose.startSession();
+    let record: GuardianLinkRecord | undefined;
+    try {
+      await session.withTransaction(async () => {
+        const student = await StudentModel.findOne({
           _id: idObject(input.studentId),
           organizationId: idObject(organizationId),
-        },
-        {
-          $set: {
-            guardianIds: Array.from(guardianIds).map(
-              (id) => new Types.ObjectId(id),
-            ),
+        })
+          .session(session)
+          .lean();
+        if (!student)
+          throw new AppError(404, 'STUDENT_NOT_FOUND', 'Student not found.');
+        const guardian = await GuardianModel.findOne({
+          _id: idObject(input.guardianId),
+          organizationId: idObject(organizationId),
+        })
+          .session(session)
+          .lean();
+        if (!guardian)
+          throw new AppError(404, 'GUARDIAN_NOT_FOUND', 'Guardian not found.');
+
+        const linkRecord = await StudentGuardianLinkModel.findOneAndUpdate(
+          {
+            organizationId: idObject(organizationId),
+            studentId: idObject(input.studentId),
+            guardianId: idObject(input.guardianId),
           },
-        },
-      );
+          {
+            $set: {
+              relationship: input.relationship,
+              isPrimary: Boolean(input.isPrimary),
+            },
+          },
+          {
+            new: true,
+            upsert: true,
+            runValidators: true,
+            session,
+          },
+        ).lean();
+        if (!linkRecord)
+          throw new AppError(
+            500,
+            'GUARDIAN_LINK_FAILED',
+            'Guardian relationship could not be saved.',
+          );
+
+        await StudentModel.updateOne(
+          {
+            _id: idObject(input.studentId),
+            organizationId: idObject(organizationId),
+          },
+          { $addToSet: { guardianIds: idObject(input.guardianId) } },
+          { session },
+        );
+        record = {
+          id: String(linkRecord._id),
+          organizationId: String(linkRecord.organizationId),
+          studentId: String(linkRecord.studentId),
+          guardianId: String(linkRecord.guardianId),
+          relationship:
+            linkRecord.relationship as GuardianLinkRecord['relationship'],
+          isPrimary: Boolean(linkRecord.isPrimary),
+          createdAt: new Date(linkRecord.createdAt).toISOString(),
+          updatedAt: new Date(linkRecord.updatedAt).toISOString(),
+        };
+      });
+    } finally {
+      await session.endSession();
     }
+    if (!record)
+      throw new AppError(
+        500,
+        'GUARDIAN_LINK_FAILED',
+        'Guardian relationship could not be saved.',
+      );
 
     return {
-      id: String(record._id),
-      organizationId: String(record.organizationId),
-      studentId: String(record.studentId),
-      guardianId: String(record.guardianId),
-      relationship: record.relationship as GuardianLinkRecord['relationship'],
-      isPrimary: Boolean(record.isPrimary),
-      createdAt: new Date(record.createdAt).toISOString(),
-      updatedAt: new Date(record.updatedAt).toISOString(),
+      ...record,
     };
   }
 
   async listGuardianLinks(
     organizationId: string,
     studentId?: string,
+    guardianId?: string,
+    campusIds?: string[],
   ): Promise<GuardianLinkRecord[]> {
+    if (campusIds && campusIds.length === 0) return [];
     const filters: Record<string, unknown> = {
       organizationId: idObject(organizationId),
     };
     if (studentId) filters.studentId = idObject(studentId);
+    if (guardianId) filters.guardianId = idObject(guardianId);
+    if (campusIds) {
+      const students = await StudentModel.find({
+        organizationId: idObject(organizationId),
+        campusId: { $in: campusIds.map(idObject) },
+      })
+        .select({ _id: 1 })
+        .lean();
+      if (students.length === 0) return [];
+      const scopedStudentIds = students.map((student) => String(student._id));
+      if (studentId && !scopedStudentIds.includes(studentId)) return [];
+      if (!studentId)
+        filters.studentId = { $in: students.map((student) => student._id) };
+    }
     const records = await StudentGuardianLinkModel.find(filters).lean();
     return records.map((record) => ({
       id: String(record._id),
@@ -459,6 +599,41 @@ export class MongoPeopleRepository {
       createdAt: new Date(record.createdAt).toISOString(),
       updatedAt: new Date(record.updatedAt).toISOString(),
     }));
+  }
+
+  async unlinkGuardianFromStudent(
+    organizationId: string,
+    studentId: string,
+    guardianId: string,
+  ): Promise<boolean> {
+    const session = await mongoose.startSession();
+    let removed = false;
+    try {
+      await session.withTransaction(async () => {
+        const result = await StudentGuardianLinkModel.deleteOne(
+          {
+            organizationId: idObject(organizationId),
+            studentId: idObject(studentId),
+            guardianId: idObject(guardianId),
+          },
+          { session },
+        );
+        removed = result.deletedCount > 0;
+        if (removed) {
+          await StudentModel.updateOne(
+            {
+              _id: idObject(studentId),
+              organizationId: idObject(organizationId),
+            },
+            { $pull: { guardianIds: idObject(guardianId) } },
+            { session },
+          );
+        }
+      });
+    } finally {
+      await session.endSession();
+    }
+    return removed;
   }
 
   async listStaff(
@@ -1011,8 +1186,7 @@ export class MongoPeopleRepository {
           {
             $set: {
               status: 'approved',
-              decisionReason:
-                decisionReason ?? 'Approved by admissions review',
+              decisionReason: decisionReason ?? 'Approved by admissions review',
             },
           },
           {
@@ -1034,32 +1208,19 @@ export class MongoPeopleRepository {
           application: {
             id: String(approved._id),
             organizationId: String(approved.organizationId),
-            campusId: approved.campusId
-              ? String(approved.campusId)
-              : undefined,
+            campusId: approved.campusId ? String(approved.campusId) : undefined,
             inquiryId: approved.inquiryId
               ? String(approved.inquiryId)
               : undefined,
             firstName: String(approved.firstName),
             lastName: String(approved.lastName),
-            email: approved.email
-              ? String(approved.email)
-              : undefined,
-            phone: approved.phone
-              ? String(approved.phone)
-              : undefined,
-            source: approved.source
-              ? String(approved.source)
-              : undefined,
-            program: approved.program
-              ? String(approved.program)
-              : undefined,
+            email: approved.email ? String(approved.email) : undefined,
+            phone: approved.phone ? String(approved.phone) : undefined,
+            source: approved.source ? String(approved.source) : undefined,
+            program: approved.program ? String(approved.program) : undefined,
             status:
-              (approved.status as ApplicationRecord['status']) ??
-              'approved',
-            notes: approved.notes
-              ? String(approved.notes)
-              : undefined,
+              (approved.status as ApplicationRecord['status']) ?? 'approved',
+            notes: approved.notes ? String(approved.notes) : undefined,
             decisionReason: approved.decisionReason
               ? String(approved.decisionReason)
               : undefined,
@@ -1088,8 +1249,7 @@ export class MongoPeopleRepository {
               ? String(studentDocument.gender)
               : undefined,
             status:
-              (studentDocument.status as StudentRecord['status']) ??
-              'active',
+              (studentDocument.status as StudentRecord['status']) ?? 'active',
             contactEmail: studentDocument.contactEmail
               ? String(studentDocument.contactEmail)
               : undefined,
@@ -1102,25 +1262,17 @@ export class MongoPeopleRepository {
             emergencyContact: studentDocument.emergencyContact
               ? (studentDocument.emergencyContact as StudentRecord['emergencyContact'])
               : undefined,
-            academicHistory: Array.isArray(
-              studentDocument.academicHistory,
-            )
+            academicHistory: Array.isArray(studentDocument.academicHistory)
               ? (studentDocument.academicHistory as StudentRecord['academicHistory'])
               : undefined,
             guardianIds: convertGuardianArray(studentDocument.guardianIds),
-            createdAt: new Date(
-              studentDocument.createdAt,
-            ).toISOString(),
-            updatedAt: new Date(
-              studentDocument.updatedAt,
-            ).toISOString(),
+            createdAt: new Date(studentDocument.createdAt).toISOString(),
+            updatedAt: new Date(studentDocument.updatedAt).toISOString(),
           },
 
           enrollment: {
             id: String(enrollmentDocument._id),
-            organizationId: String(
-              enrollmentDocument.organizationId,
-            ),
+            organizationId: String(enrollmentDocument.organizationId),
             studentId: String(enrollmentDocument.studentId),
             campusId: enrollmentDocument.campusId
               ? String(enrollmentDocument.campusId)
@@ -1132,24 +1284,16 @@ export class MongoPeopleRepository {
               ? String(enrollmentDocument.gradeLevel)
               : undefined,
             startDate: enrollmentDocument.startDate
-              ? new Date(
-                  enrollmentDocument.startDate,
-                ).toISOString()
+              ? new Date(enrollmentDocument.startDate).toISOString()
               : undefined,
             endDate: enrollmentDocument.endDate
-              ? new Date(
-                  enrollmentDocument.endDate,
-                ).toISOString()
+              ? new Date(enrollmentDocument.endDate).toISOString()
               : undefined,
             status:
               (enrollmentDocument.status as EnrollmentRecord['status']) ??
               'active',
-            createdAt: new Date(
-              enrollmentDocument.createdAt,
-            ).toISOString(),
-            updatedAt: new Date(
-              enrollmentDocument.updatedAt,
-            ).toISOString(),
+            createdAt: new Date(enrollmentDocument.createdAt).toISOString(),
+            updatedAt: new Date(enrollmentDocument.updatedAt).toISOString(),
           },
         };
       });

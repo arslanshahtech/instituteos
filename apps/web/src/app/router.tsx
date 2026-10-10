@@ -28,6 +28,12 @@ import {
   StudentEditPage,
   StudentsListPage,
 } from '../students/StudentPages.js';
+import {
+  GuardianCreatePage,
+  GuardianDetailPage,
+  GuardianEditPage,
+  GuardiansListPage,
+} from '../guardians/GuardianPages.js';
 import { ProtectedRoute } from '../auth/ProtectedRoute.js';
 import {
   ForgotPasswordPage,
@@ -64,6 +70,22 @@ const roleRoutes: RouteObject[] = [
       {
         path: 'organizations/:organizationId',
         element: <OrganizationAdminPage />,
+      },
+      {
+        path: 'organizations/:organizationId/guardians',
+        element: <GuardiansListPage />,
+      },
+      {
+        path: 'organizations/:organizationId/guardians/new',
+        element: <GuardianCreatePage />,
+      },
+      {
+        path: 'organizations/:organizationId/guardians/:guardianId/edit',
+        element: <GuardianEditPage />,
+      },
+      {
+        path: 'organizations/:organizationId/guardians/:guardianId',
+        element: <GuardianDetailPage />,
       },
       {
         path: 'organizations/:organizationId/students',
