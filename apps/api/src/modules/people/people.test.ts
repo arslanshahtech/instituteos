@@ -116,10 +116,17 @@ class MemoryPeopleRepository implements PeopleRepository {
 
   async listGuardians(
     organizationId: string,
-    query?: { search?: string; page?: number; pageSize?: number },
+    query?: {
+      search?: string;
+      page?: number;
+      pageSize?: number;
+      guardianIds?: string[];
+    },
   ): Promise<QuerySummary<GuardianRecord>> {
     const items = this.guardians.filter(
-      (guardian) => guardian.organizationId === organizationId,
+      (guardian) =>
+        guardian.organizationId === organizationId &&
+        (!query?.guardianIds || query.guardianIds.includes(guardian.id)),
     );
     const filtered = query?.search
       ? items.filter((guardian) =>
@@ -192,21 +199,53 @@ class MemoryPeopleRepository implements PeopleRepository {
     return next;
   }
 
+  async createGuardianWithLink(
+    organizationId: string,
+    input: GuardianInput,
+    link: Omit<GuardianLinkInput, 'guardianId'>,
+  ): Promise<GuardianRecord> {
+    const guardian = await this.createGuardian(organizationId, input);
+    await this.linkGuardianToStudent(organizationId, {
+      ...link,
+      guardianId: guardian.id,
+    });
+    return guardian;
+  }
+
   async linkGuardianToStudent(
     organizationId: string,
     input: GuardianLinkInput,
   ): Promise<GuardianLinkRecord> {
-    const record: GuardianLinkRecord = {
-      id: `link-${this.links.length + 1}`,
-      organizationId,
-      studentId: input.studentId,
-      guardianId: input.guardianId,
-      relationship: input.relationship,
-      isPrimary: Boolean(input.isPrimary),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    this.links.push(record);
+    const existing = this.links.find(
+      (link) =>
+        link.organizationId === organizationId &&
+        link.studentId === input.studentId &&
+        link.guardianId === input.guardianId,
+    );
+    const record: GuardianLinkRecord = existing
+      ? {
+          ...existing,
+          relationship: input.relationship,
+          isPrimary: Boolean(input.isPrimary),
+          updatedAt: new Date().toISOString(),
+        }
+      : {
+          id: `link-${this.links.length + 1}`,
+          organizationId,
+          studentId: input.studentId,
+          guardianId: input.guardianId,
+          relationship: input.relationship,
+          isPrimary: Boolean(input.isPrimary),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+    if (existing) {
+      this.links = this.links.map((link) =>
+        link.id === existing.id ? record : link,
+      );
+    } else {
+      this.links.push(record);
+    }
     const student = await this.getStudent(organizationId, input.studentId);
     if (student) {
       const guardianIds = new Set(student.guardianIds ?? []);
@@ -221,12 +260,44 @@ class MemoryPeopleRepository implements PeopleRepository {
   async listGuardianLinks(
     organizationId: string,
     studentId?: string,
+    guardianId?: string,
+    campusIds?: string[],
   ): Promise<GuardianLinkRecord[]> {
     return this.links.filter(
       (link) =>
         link.organizationId === organizationId &&
-        (!studentId || link.studentId === studentId),
+        (!studentId || link.studentId === studentId) &&
+        (!guardianId || link.guardianId === guardianId) &&
+        (!campusIds ||
+          campusIds.includes(
+            this.students.find((student) => student.id === link.studentId)
+              ?.campusId ?? '',
+          )),
     );
+  }
+
+  async unlinkGuardianFromStudent(
+    organizationId: string,
+    studentId: string,
+    guardianId: string,
+  ): Promise<boolean> {
+    const before = this.links.length;
+    this.links = this.links.filter(
+      (link) =>
+        link.organizationId !== organizationId ||
+        link.studentId !== studentId ||
+        link.guardianId !== guardianId,
+    );
+    const removed = this.links.length < before;
+    if (removed) {
+      const student = await this.getStudent(organizationId, studentId);
+      if (student) {
+        await this.updateStudent(organizationId, studentId, {
+          guardianIds: student.guardianIds.filter((id) => id !== guardianId),
+        });
+      }
+    }
+    return removed;
   }
 
   async listStaff(
@@ -336,13 +407,12 @@ class MemoryPeopleRepository implements PeopleRepository {
     organizationId: string,
     inquiryId: string,
   ): Promise<InquiryRecord | null> {
-  return (
-    this.inquiries.find(
-      (inquiry) =>
-        inquiry.organizationId === organizationId &&
-        inquiry.id === inquiryId,
-    ) ?? null
-   );
+    return (
+      this.inquiries.find(
+        (inquiry) =>
+          inquiry.organizationId === organizationId && inquiry.id === inquiryId,
+      ) ?? null
+    );
   }
 
   async createInquiry(
@@ -533,23 +603,261 @@ describe('people domain services', () => {
       email: 'meera@example.test',
     });
 
-    await service.linkGuardianToStudent('org-1', {
-      studentId: student.id,
-      guardianId: guardianA.id,
-      relationship: 'father',
-      isPrimary: true,
-    });
-    await service.linkGuardianToStudent('org-1', {
-      studentId: student.id,
-      guardianId: guardianB.id,
-      relationship: 'mother',
-    });
+    await service.linkGuardianToStudent(
+      { organizationId: 'org-1' },
+      {
+        studentId: student.id,
+        guardianId: guardianA.id,
+        relationship: 'father',
+        isPrimary: true,
+      },
+    );
+    await service.linkGuardianToStudent(
+      { organizationId: 'org-1' },
+      {
+        studentId: student.id,
+        guardianId: guardianB.id,
+        relationship: 'mother',
+      },
+    );
 
     const saved = await repository.getStudent('org-1', student.id);
     expect(saved?.guardianIds).toHaveLength(2);
     expect(saved?.guardianIds).toEqual(
       expect.arrayContaining([guardianA.id, guardianB.id]),
     );
+  });
+
+  it('supports guardian CRUD and linked-student discovery within one organization', async () => {
+    const repository = new MemoryPeopleRepository();
+    const service = new PeopleService(repository);
+    const firstStudent = await service.createStudent('org-1', {
+      firstName: 'Mina',
+      lastName: 'Rao',
+      campusId: 'campus-1',
+    });
+    const secondStudent = await service.createStudent('org-1', {
+      firstName: 'Arun',
+      lastName: 'Rao',
+      campusId: 'campus-1',
+    });
+    const guardian = await service.createGuardian(
+      'org-1',
+      {
+        firstName: 'Leela',
+        lastName: 'Rao',
+        relationship: 'mother',
+        email: 'leela@example.test',
+      },
+      { organizationId: 'org-1' },
+      firstStudent.id,
+    );
+
+    await service.linkGuardianToStudent(
+      { organizationId: 'org-1' },
+      {
+        studentId: secondStudent.id,
+        guardianId: guardian.id,
+        relationship: 'mother',
+        isPrimary: true,
+      },
+    );
+    const updated = await service.updateGuardian(
+      { organizationId: 'org-1' },
+      guardian.id,
+      { phone: '+1 555 0100' },
+    );
+    const detail = await service.getGuardian(
+      { organizationId: 'org-1' },
+      guardian.id,
+    );
+
+    expect(updated.phone).toBe('+1 555 0100');
+    expect(detail.students.map((relation) => relation.student.id)).toEqual(
+      expect.arrayContaining([firstStudent.id, secondStudent.id]),
+    );
+    expect(
+      await service.listStudentGuardians(
+        { organizationId: 'org-1' },
+        firstStudent.id,
+      ),
+    ).toHaveLength(1);
+
+    await service.unlinkGuardianFromStudent(
+      { organizationId: 'org-1' },
+      firstStudent.id,
+      guardian.id,
+    );
+    expect(
+      await service.listStudentGuardians(
+        { organizationId: 'org-1' },
+        firstStudent.id,
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('supports multiple links, duplicate attempts, unlinking, and re-linking', async () => {
+    const repository = new MemoryPeopleRepository();
+    const service = new PeopleService(repository);
+    const firstStudent = await service.createStudent('org-1', {
+      firstName: 'Mina',
+      lastName: 'Rao',
+    });
+    const secondStudent = await service.createStudent('org-1', {
+      firstName: 'Arun',
+      lastName: 'Rao',
+    });
+    const guardianA = await service.createGuardian('org-1', {
+      firstName: 'Leela',
+      lastName: 'Rao',
+    });
+    const guardianB = await service.createGuardian('org-1', {
+      firstName: 'Dev',
+      lastName: 'Rao',
+    });
+    const context = { organizationId: 'org-1' };
+
+    await service.linkGuardianToStudent(context, {
+      studentId: firstStudent.id,
+      guardianId: guardianA.id,
+      relationship: 'mother',
+      isPrimary: true,
+    });
+    await service.linkGuardianToStudent(context, {
+      studentId: firstStudent.id,
+      guardianId: guardianB.id,
+      relationship: 'guardian',
+    });
+    await service.linkGuardianToStudent(context, {
+      studentId: secondStudent.id,
+      guardianId: guardianA.id,
+      relationship: 'mother',
+    });
+
+    const duplicate = await service.linkGuardianToStudent(context, {
+      studentId: firstStudent.id,
+      guardianId: guardianA.id,
+      relationship: 'mother',
+      isPrimary: false,
+    });
+    expect(repository.links).toHaveLength(3);
+    expect(duplicate.isPrimary).toBe(false);
+
+    await service.unlinkGuardianFromStudent(
+      context,
+      firstStudent.id,
+      guardianA.id,
+    );
+    expect(await repository.getGuardian('org-1', guardianA.id)).not.toBeNull();
+    expect(
+      (await service.listStudentGuardians(context, firstStudent.id)).map(
+        (relation) => relation.guardian.id,
+      ),
+    ).toEqual([guardianB.id]);
+    expect(
+      (await service.listStudentGuardians(context, secondStudent.id)).map(
+        (relation) => relation.guardian.id,
+      ),
+    ).toEqual([guardianA.id]);
+    expect(
+      (await repository.getStudent('org-1', firstStudent.id))?.guardianIds,
+    ).toEqual([guardianB.id]);
+
+    await service.linkGuardianToStudent(context, {
+      studentId: firstStudent.id,
+      guardianId: guardianA.id,
+      relationship: 'mother',
+    });
+    expect(repository.links).toHaveLength(3);
+    expect(
+      (await repository.getStudent('org-1', firstStudent.id))?.guardianIds,
+    ).toEqual(expect.arrayContaining([guardianA.id, guardianB.id]));
+  });
+
+  it('prevents cross-organization and out-of-campus guardian relationships', async () => {
+    const repository = new MemoryPeopleRepository();
+    const service = new PeopleService(repository);
+    const inScopeStudent = await service.createStudent('org-1', {
+      firstName: 'Asha',
+      lastName: 'Singh',
+      campusId: 'campus-1',
+    });
+    const otherCampusStudent = await service.createStudent('org-1', {
+      firstName: 'Dev',
+      lastName: 'Singh',
+      campusId: 'campus-2',
+    });
+    const guardian = await service.createGuardian('org-1', {
+      firstName: 'Nita',
+      lastName: 'Singh',
+    });
+    const otherTenantGuardian = await service.createGuardian('org-2', {
+      firstName: 'Nita',
+      lastName: 'Singh',
+    });
+    const otherCampusGuardian = await service.createGuardian('org-1', {
+      firstName: 'Sima',
+      lastName: 'Singh',
+    });
+    const campusAdmin = {
+      organizationId: 'org-1',
+      role: 'campus_admin',
+      campusIds: ['campus-1'],
+    };
+
+    await service.linkGuardianToStudent(campusAdmin, {
+      studentId: inScopeStudent.id,
+      guardianId: guardian.id,
+      relationship: 'guardian',
+    });
+    await service.linkGuardianToStudent(
+      { organizationId: 'org-1' },
+      {
+        studentId: otherCampusStudent.id,
+        guardianId: otherCampusGuardian.id,
+        relationship: 'guardian',
+      },
+    );
+    await expect(
+      service.createGuardian(
+        'org-1',
+        { firstName: 'Una', lastName: 'Assigned' },
+        campusAdmin,
+      ),
+    ).rejects.toMatchObject({ code: 'STUDENT_REQUIRED' });
+    await expect(
+      service.createGuardian(
+        'org-1',
+        { firstName: 'Una', lastName: 'Assigned' },
+        campusAdmin,
+        otherCampusStudent.id,
+      ),
+    ).rejects.toMatchObject({ code: 'CAMPUS_FORBIDDEN' });
+    await expect(
+      service.linkGuardianToStudent(campusAdmin, {
+        studentId: otherCampusStudent.id,
+        guardianId: guardian.id,
+        relationship: 'guardian',
+      }),
+    ).rejects.toMatchObject({ code: 'CAMPUS_FORBIDDEN' });
+    await expect(
+      service.getGuardian({ organizationId: 'org-1' }, otherTenantGuardian.id),
+    ).rejects.toMatchObject({ code: 'GUARDIAN_NOT_FOUND' });
+    await expect(
+      service.linkGuardianToStudent(
+        { organizationId: 'org-1' },
+        {
+          studentId: inScopeStudent.id,
+          guardianId: otherTenantGuardian.id,
+          relationship: 'guardian',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'GUARDIAN_NOT_FOUND' });
+    expect(
+      (await service.listGuardians(campusAdmin)).items.map(
+        (record) => record.id,
+      ),
+    ).toEqual([guardian.id]);
   });
 
   it('blocks campus access when the record is outside the allowed campus scope', async () => {
@@ -585,7 +893,12 @@ describe('people domain services', () => {
       { organizationId: 'org-1', role: 'campus_admin', campusIds: [] },
       {},
     );
-    expect(result).toMatchObject({ items: [], total: 0, page: 1, pageSize: 20 });
+    expect(result).toMatchObject({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 20,
+    });
   });
 
   it('blocks campus admins from unassigned student records and campus transfers', async () => {

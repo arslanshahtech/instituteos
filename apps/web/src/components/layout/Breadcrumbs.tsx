@@ -9,6 +9,21 @@ const segmentLabels: Record<string, string> = {
   context: 'Access context',
 };
 
+function breadcrumbLabel(
+  segment: string,
+  previousSegment: string | undefined,
+  organizationId: string | undefined,
+  organizationName: string,
+): string {
+  if (segment === organizationId) return organizationName;
+  if (/^[\da-f]{24}$/i.test(segment)) {
+    if (previousSegment === 'students') return 'Student details';
+    if (previousSegment === 'guardians') return 'Guardian details';
+    return 'Record details';
+  }
+  return segmentLabels[segment] ?? segment;
+}
+
 export function Breadcrumbs({ role }: { role: RoleLayoutConfig }) {
   const location = useLocation();
   const segments = location.pathname.split('/').filter(Boolean).slice(1);
@@ -31,10 +46,12 @@ export function Breadcrumbs({ role }: { role: RoleLayoutConfig }) {
   const crumbs = [
     { label: role.workspaceTitle, to: `/${role.key}` },
     ...segments.map((segment, index) => ({
-      label:
-        segment === organizationId
-          ? organizationName
-          : (segmentLabels[segment] ?? segment),
+      label: breadcrumbLabel(
+        segment,
+        segments[index - 1],
+        organizationId,
+        organizationName,
+      ),
       to: `/${role.key}/${segments.slice(0, index + 1).join('/')}`,
     })),
   ];

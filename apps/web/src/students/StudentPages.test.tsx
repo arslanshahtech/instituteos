@@ -134,6 +134,7 @@ describe('student management pages', () => {
     expect(
       await screen.findByRole('link', { name: 'Ada Lovelace' }),
     ).toBeVisible();
+    expect(document.body).not.toHaveTextContent(studentId);
     await user.type(
       screen.getByRole('searchbox', { name: 'Search students' }),
       'Ada',
@@ -278,7 +279,10 @@ describe('student management pages', () => {
       `/admin/organizations/${organizationId}/students/${studentId}`,
     );
 
-    expect(await screen.findByText('Student details')).toBeVisible();
+    expect(
+      await screen.findByRole('heading', { name: 'Student details', level: 2 }),
+    ).toBeVisible();
+    expect(document.body).not.toHaveTextContent(studentId);
     expect(studentMocks.getStudent).toHaveBeenCalledWith(
       organizationId,
       studentId,

@@ -73,6 +73,37 @@ function optionalEmail(value: unknown): string | undefined {
   return normalized;
 }
 
+function guardianRelationship(
+  value: unknown,
+  fallback?: 'father' | 'mother' | 'guardian' | 'other',
+): 'father' | 'mother' | 'guardian' | 'other' | undefined {
+  if (value === undefined) return fallback;
+  if (
+    value === 'father' ||
+    value === 'mother' ||
+    value === 'guardian' ||
+    value === 'other'
+  )
+    return value;
+  throw new AppError(
+    400,
+    'VALIDATION_ERROR',
+    'Select a valid guardian relationship.',
+  );
+}
+
+function communicationPreference(
+  value: unknown,
+): 'sms' | 'email' | 'both' | undefined {
+  if (value === undefined) return undefined;
+  if (value === 'sms' || value === 'email' || value === 'both') return value;
+  throw new AppError(
+    400,
+    'VALIDATION_ERROR',
+    'Select a valid communication preference.',
+  );
+}
+
 function routeParameter(
   request: { params: Record<string, string | string[] | undefined> },
   name: string,
@@ -275,7 +306,7 @@ export function createPeopleRouter(
     asyncHandler(async (request, response) => {
       const query = request.query ?? {};
       const result = await service.listGuardians(
-        organizationContext(response).organizationId,
+        organizationContext(response),
         {
           search: typeof query.search === 'string' ? query.search : undefined,
           page: typeof query.page === 'string' ? Number(query.page) : undefined,
@@ -294,6 +325,16 @@ export function createPeopleRouter(
     authenticate,
     resolveOrganization,
     requireOrganizationPermission('guardian.create'),
+    (request, response, next) => {
+      const body = bodyObject(request.body);
+      if (body.studentId !== undefined)
+        return requireOrganizationPermission('student.update')(
+          request,
+          response,
+          next,
+        );
+      return next();
+    },
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
@@ -302,30 +343,116 @@ export function createPeopleRouter(
         {
           firstName: requiredString(body, 'firstName', 2, 80),
           lastName: requiredString(body, 'lastName', 2, 80),
-          relationship:
-            body.relationship === 'father' ||
-            body.relationship === 'mother' ||
-            body.relationship === 'guardian' ||
-            body.relationship === 'other'
-              ? (String(body.relationship) as
-                  'father' | 'mother' | 'guardian' | 'other')
-              : undefined,
+          relationship: guardianRelationship(body.relationship),
           phone: optionalString(body, 'phone', 40),
           email: optionalEmail(body.email),
-          communicationPreference:
-            body.communicationPreference === 'sms' ||
-            body.communicationPreference === 'email' ||
-            body.communicationPreference === 'both'
-              ? (String(body.communicationPreference) as
-                  'sms' | 'email' | 'both')
-              : undefined,
+          communicationPreference: communicationPreference(
+            body.communicationPreference,
+          ),
           address:
             typeof body.address === 'object' && body.address !== null
               ? (body.address as Record<string, unknown>)
               : undefined,
         },
+        organizationContext(response),
+        body.studentId === undefined
+          ? undefined
+          : requiredString(body, 'studentId', 12, 24),
       );
       response.status(201).json({ guardian });
+    }),
+  );
+
+  router.get(
+    '/:organizationId/guardians/:guardianId',
+    authenticate,
+    resolveOrganization,
+    requireOrganizationPermission('guardian.read'),
+    asyncHandler(async (request, response) => {
+      const result = await service.getGuardian(
+        organizationContext(response),
+        routeParameter(request, 'guardianId'),
+      );
+      response.status(200).json(result);
+    }),
+  );
+
+  router.patch(
+    '/:organizationId/guardians/:guardianId',
+    authenticate,
+    resolveOrganization,
+    requireOrganizationPermission('guardian.update'),
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const body = bodyObject(request.body);
+      const changes = {
+        firstName:
+          body.firstName !== undefined
+            ? requiredString(body, 'firstName', 2, 80)
+            : undefined,
+        lastName:
+          body.lastName !== undefined
+            ? requiredString(body, 'lastName', 2, 80)
+            : undefined,
+        relationship: guardianRelationship(body.relationship),
+        phone:
+          body.phone !== undefined
+            ? typeof body.phone === 'string'
+              ? body.phone.trim().slice(0, 40)
+              : optionalString(body, 'phone', 40)
+            : undefined,
+        email:
+          body.email !== undefined
+            ? body.email === ''
+              ? ''
+              : optionalEmail(body.email)
+            : undefined,
+        communicationPreference: communicationPreference(
+          body.communicationPreference,
+        ),
+        address:
+          body.address !== undefined && typeof body.address === 'object'
+            ? (body.address as Record<string, unknown>)
+            : undefined,
+      };
+      const guardian = await service.updateGuardian(
+        organizationContext(response),
+        routeParameter(request, 'guardianId'),
+        changes,
+      );
+      response.status(200).json({ guardian });
+    }),
+  );
+
+  router.get(
+    '/:organizationId/students/:studentId/guardians',
+    authenticate,
+    resolveOrganization,
+    requireOrganizationPermission('student.read'),
+    requireOrganizationPermission('guardian.read'),
+    asyncHandler(async (request, response) => {
+      const relations = await service.listStudentGuardians(
+        organizationContext(response),
+        routeParameter(request, 'studentId'),
+      );
+      response.status(200).json({ relations });
+    }),
+  );
+
+  router.delete(
+    '/:organizationId/students/:studentId/guardians/:guardianId',
+    authenticate,
+    resolveOrganization,
+    requireOrganizationPermission('student.update'),
+    requireOrganizationPermission('guardian.update'),
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      await service.unlinkGuardianFromStudent(
+        organizationContext(response),
+        routeParameter(request, 'studentId'),
+        routeParameter(request, 'guardianId'),
+      );
+      response.status(204).end();
     }),
   );
 
@@ -334,22 +461,17 @@ export function createPeopleRouter(
     authenticate,
     resolveOrganization,
     requireOrganizationPermission('guardian.update'),
+    requireOrganizationPermission('student.update'),
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
       const link = await service.linkGuardianToStudent(
-        organizationContext(response).organizationId,
+        organizationContext(response),
         {
           studentId: requiredString(body, 'studentId', 12, 24),
           guardianId: routeParameter(request, 'guardianId'),
           relationship:
-            body.relationship === 'father' ||
-            body.relationship === 'mother' ||
-            body.relationship === 'guardian' ||
-            body.relationship === 'other'
-              ? (String(body.relationship) as
-                  'father' | 'mother' | 'guardian' | 'other')
-              : 'guardian',
+            guardianRelationship(body.relationship, 'guardian') ?? 'guardian',
           isPrimary: body.isPrimary === true,
         },
       );
