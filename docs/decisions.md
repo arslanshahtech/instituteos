@@ -60,6 +60,14 @@ The earlier authentication-test timeouts occurred during a full test run launche
 
 The Student Management frontend uses the existing organization-scoped People endpoints for server-side search, status filtering, pagination, detail, create, and update. Organization permissions gate access and mutation actions; the backend remains authoritative. Campus Admin operations additionally use membership campus IDs: records outside assigned campuses and records without a campus are not readable or editable, and creating a student requires an assigned campus. The UI only offers campus assignments from the authenticated organization's campus listing and requires a campus choice for Campus Admins. No student-specific endpoint or client-selected organization authorization mechanism is introduced.
 
+## 2026-10-10 — Keep Phase 07 Academics scoped inside the existing tenant boundary
+
+**Status:** Accepted
+
+Academic Years, Terms, Classes, Sections, Subjects, and Teacher Assignments are owned by one organization and every read/write query includes that organization. Academics management is limited server-side to organization owners/admins, campus admins, principals/directors, and academic coordinators without expanding the Phase 00–06 permission catalog. Campus admins and memberships with campus assignments can only access classes, sections, and assignments for their assigned campuses; campus IDs are resolved to campus names by a narrow Academics endpoint. Classes require an active campus, and tenant-owned relationships are validated before writes.
+
+Teacher assignments have no timetable periods in this phase, so time-slot collision cannot be computed. To prevent overlapping assignments with the available data, a teacher may only have one subject assignment for a given class, section, and academic year. An organization-scoped unique index enforces the same invariant atomically in addition to the service conflict check. Parent records with dependent Terms, Sections, or Teacher Assignments cannot be deleted.
+
 ## 2026-10-02 — Require owner-controlled archive before organization deletion
 
 **Status:** Accepted
