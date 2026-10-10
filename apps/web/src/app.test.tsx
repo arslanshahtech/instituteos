@@ -484,7 +484,7 @@ describe('frontend application foundation', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('South Academy')).toBeInTheDocument();
     expect(screen.getByText('organization owner')).toBeInTheDocument();
-    expect(screen.getByText('teacher')).toBeInTheDocument();
+    expect(screen.getAllByText('teacher').length).toBeGreaterThan(0);
     expect(
       screen.getByRole('link', { name: 'Open North Institute' }),
     ).toHaveAttribute('href', '/admin/organizations/650000000000000000000001');
@@ -579,8 +579,11 @@ describe('frontend application foundation', () => {
     await user.click(await screen.findByRole('button', { name: 'members' }));
 
     expect(
-      await screen.findByText('owner@example.test · active'),
-    ).toBeInTheDocument();
+      (await screen.findAllByText('Institute User')).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText('owner@example.test')).toBeInTheDocument();
+    expect(screen.getByText('organization owner')).toBeInTheDocument();
+    expect(screen.getAllByText('active').length).toBeGreaterThan(0);
     await user.type(
       screen.getByRole('textbox', { name: 'Email' }),
       'teacher@example.test',
@@ -869,17 +872,20 @@ describe('frontend application foundation', () => {
     });
     renderPath('/admin/organizations/' + organizationId);
     await user.click(await screen.findByRole('button', { name: 'members' }));
-    await screen.findByText('teacher@example.test · active');
+    expect((await screen.findAllByText('Teacher')).length).toBeGreaterThan(0);
+    expect(screen.getByText('teacher@example.test')).toBeInTheDocument();
+    expect(screen.getAllByText('teacher').length).toBeGreaterThan(0);
     await user.selectOptions(
       screen.getByRole('combobox', { name: 'Role for teacher@example.test' }),
       'campus_admin',
     );
-    await user.selectOptions(
-      screen.getByRole('listbox', {
+    await user.click(
+      screen.getByRole('button', {
         name: 'Campus scope for teacher@example.test',
       }),
-      ['660000000000000000000001', '660000000000000000000002'],
     );
+    await user.click(screen.getByRole('checkbox', { name: 'Main Campus' }));
+    await user.click(screen.getByRole('checkbox', { name: 'North Campus' }));
     await user.click(screen.getByRole('button', { name: 'Save access' }));
 
     expect(organizationMocks.updateMember).toHaveBeenCalledWith(

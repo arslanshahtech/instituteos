@@ -28,6 +28,15 @@ const TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
   admitted: [],
 };
 
+function emptyPage<T>(page?: number, pageSize?: number): QuerySummary<T> {
+  return {
+    items: [],
+    total: 0,
+    page: Math.max(1, Number(page) || 1),
+    pageSize: Math.min(100, Math.max(1, Number(pageSize) || 20)),
+  };
+}
+
 function normalizeName(value: string | undefined, field: string): string {
   const trimmed = value?.trim();
   if (!trimmed || trimmed.length < 2 || trimmed.length > 80)
@@ -41,6 +50,18 @@ function normalizeOptionalEmail(value: string | undefined): string | undefined {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized))
     throw new AppError(400, 'VALIDATION_ERROR', 'Enter a valid email address.');
   return normalized;
+}
+
+function normalizeOptionalDate(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== value.slice(0, 10)
+  ) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Enter a valid birth date.');
+  }
+  return date.toISOString();
 }
 
 function normalizeStatus(
@@ -393,34 +414,86 @@ export class PeopleService {
   }
 
   async listStaff(
-    organizationId: string,
+    context: PeopleAccessContext,
     input?: {
       status?: string;
       department?: string;
+      campusId?: string;
+      search?: string;
       campusIds?: string[];
       page?: number;
       pageSize?: number;
     },
   ): Promise<QuerySummary<StaffRecord>> {
-    return this.repository.listStaff(organizationId, input);
+    if (context.role === 'campus_admin' && !context.campusIds?.length) {
+      return {
+        items: [],
+        total: 0,
+        page: Math.max(1, Number(input?.page) || 1),
+        pageSize: Math.min(100, Math.max(1, Number(input?.pageSize) || 20)),
+      };
+    }
+    if (input?.campusId) assertCampusScope(context, input.campusId);
+    const campusIds =
+      input?.campusId !== undefined
+        ? [input.campusId]
+        : context.campusIds?.length
+          ? context.campusIds
+          : input?.campusIds;
+    return this.repository.listStaff(context.organizationId, {
+      ...input,
+      campusIds,
+    });
+  }
+
+  async getStaff(
+    context: PeopleAccessContext,
+    staffId: string,
+  ): Promise<StaffRecord> {
+    const staff = await this.repository.getStaff(
+      context.organizationId,
+      staffId,
+    );
+    if (!staff)
+      throw new AppError(
+        404,
+        'STAFF_MEMBER_NOT_FOUND',
+        'Staff record not found.',
+      );
+    assertCampusScope(context, staff.campusId);
+    return staff;
   }
 
   async createStaff(
     organizationId: string,
     input: StaffInput,
-    context?: { organizationId: string; campusIds?: string[] },
+    context?: {
+      organizationId: string;
+      campusIds?: string[];
+      role?: string;
+    },
   ): Promise<StaffRecord> {
     assertCampusScope(context ?? { organizationId }, input.campusId);
+    const qualifications = input.qualifications?.map((value) => value.trim());
+    const subjects = input.subjects?.map((value) => value.trim());
     return this.repository.createStaff(organizationId, {
       ...input,
       firstName: normalizeName(input.firstName, 'first name'),
       lastName: normalizeName(input.lastName, 'last name'),
       status: normalizeStatus(
         input.status,
-        ['active', 'on_leave', 'inactive'],
+        ['active', 'on_leave', 'terminated', 'inactive'],
         'staff status',
       ) as StaffRecord['status'],
       email: normalizeOptionalEmail(input.email),
+      employeeCode: input.employeeCode?.trim() || undefined,
+      department: input.department?.trim() || undefined,
+      designation: input.designation?.trim() || input.role?.trim() || undefined,
+      role: input.role?.trim() || undefined,
+      qualification: input.qualification?.trim() || undefined,
+      qualifications: qualifications?.filter(Boolean),
+      subjects: subjects?.filter(Boolean),
+      dateOfBirth: normalizeOptionalDate(input.dateOfBirth),
     });
   }
 
@@ -428,21 +501,60 @@ export class PeopleService {
     organizationId: string,
     staffId: string,
     changes: Partial<StaffInput>,
-    context?: { organizationId: string; campusIds?: string[] },
+    context?: {
+      organizationId: string;
+      campusIds?: string[];
+      role?: string;
+    },
   ): Promise<StaffRecord> {
+    const existing = await this.repository.getStaff(organizationId, staffId);
+    if (!existing)
+      throw new AppError(
+        404,
+        'STAFF_MEMBER_NOT_FOUND',
+        'Staff record not found.',
+      );
+    const access = context ?? { organizationId };
+    assertCampusScope(access, existing.campusId);
+    if (changes.campusId !== undefined)
+      assertCampusScope(access, changes.campusId);
     if (changes.firstName)
       changes.firstName = normalizeName(changes.firstName, 'first name');
     if (changes.lastName)
       changes.lastName = normalizeName(changes.lastName, 'last name');
     if (changes.email !== undefined)
-      changes.email = normalizeOptionalEmail(changes.email);
+      changes.email = changes.email
+        ? normalizeOptionalEmail(changes.email)
+        : '';
     if (changes.status !== undefined)
       changes.status = normalizeStatus(
         changes.status,
-        ['active', 'on_leave', 'inactive'],
+        ['active', 'on_leave', 'terminated', 'inactive'],
         'staff status',
       ) as StaffRecord['status'];
-    assertCampusScope(context ?? { organizationId }, changes.campusId);
+    if (changes.employeeCode !== undefined)
+      changes.employeeCode = changes.employeeCode.trim();
+    if (changes.department !== undefined)
+      changes.department = changes.department.trim();
+    if (changes.designation !== undefined)
+      changes.designation = changes.designation.trim();
+    if (changes.role !== undefined) changes.role = changes.role.trim();
+    if (changes.qualification !== undefined)
+      changes.qualification = changes.qualification.trim();
+    if (changes.qualifications !== undefined)
+      changes.qualifications = changes.qualifications
+        .map((value) => value.trim())
+        .filter(Boolean);
+    if (changes.subjects !== undefined)
+      changes.subjects = changes.subjects
+        .map((value) => value.trim())
+        .filter(Boolean);
+    if (changes.email !== undefined)
+      changes.email = normalizeOptionalEmail(changes.email);
+    if (changes.dateOfBirth !== undefined)
+      changes.dateOfBirth = changes.dateOfBirth
+        ? normalizeOptionalDate(changes.dateOfBirth)
+        : '';
     const staff = await this.repository.updateStaff(
       organizationId,
       staffId,
@@ -473,26 +585,27 @@ export class PeopleService {
     organizationId: string,
     input?: {
       status?: InquiryRecord['status'];
-      campusIds?: string[];
       search?: string;
       page?: number;
       pageSize?: number;
     },
-    context?: { organizationId: string; campusIds?: string[] },
+    context?: { organizationId: string; campusIds?: string[]; role?: string },
   ): Promise<QuerySummary<InquiryRecord>> {
-    const campusIds = input?.campusIds?.length
-      ? input.campusIds
-      : context?.campusIds;
+    if (context?.role === 'campus_admin' && !context.campusIds?.length) {
+      return emptyPage(input?.page, input?.pageSize);
+    }
     return this.repository.listInquiries(organizationId, {
       ...input,
-      campusIds,
+      ...(context?.role === 'campus_admin'
+        ? { campusIds: context.campusIds }
+        : {}),
     });
   }
 
   async createInquiry(
     organizationId: string,
     input: InquiryInput,
-    context?: { organizationId: string; campusIds?: string[] },
+    context?: { organizationId: string; campusIds?: string[]; role?: string },
   ): Promise<InquiryRecord> {
     assertCampusScope(context ?? { organizationId }, input.campusId);
     return this.repository.createInquiry(organizationId, {
@@ -501,7 +614,7 @@ export class PeopleService {
       lastName: normalizeName(input.lastName, 'last name'),
       status: normalizeStatus(
         input.status,
-        ['new', 'contacted', 'qualified', 'converted'],
+        ['new', 'contacted', 'qualified', 'converted', 'closed'],
         'inquiry status',
       ) as InquiryRecord['status'],
       email: normalizeOptionalEmail(input.email),
@@ -512,7 +625,7 @@ export class PeopleService {
     organizationId: string,
     inquiryId: string,
     changes: Partial<InquiryInput>,
-    context?: { organizationId: string; campusIds?: string[] },
+    context?: { organizationId: string; campusIds?: string[]; role?: string },
   ): Promise<InquiryRecord> {
     if (changes.firstName)
       changes.firstName = normalizeName(changes.firstName, 'first name');
@@ -523,7 +636,7 @@ export class PeopleService {
     if (changes.status !== undefined)
       changes.status = normalizeStatus(
         changes.status,
-        ['new', 'contacted', 'qualified', 'converted'],
+        ['new', 'contacted', 'qualified', 'converted', 'closed'],
         'inquiry status',
       ) as InquiryRecord['status'];
 
@@ -552,27 +665,60 @@ export class PeopleService {
     organizationId: string,
     input?: {
       status?: ApplicationStatus;
-      campusIds?: string[];
+      search?: string;
       page?: number;
       pageSize?: number;
     },
+    context?: { organizationId: string; campusIds?: string[]; role?: string },
   ): Promise<QuerySummary<ApplicationRecord>> {
-    return this.repository.listApplications(organizationId, input);
+    if (context?.role === 'campus_admin' && !context.campusIds?.length) {
+      return emptyPage(input?.page, input?.pageSize);
+    }
+    return this.repository.listApplications(organizationId, {
+      ...input,
+      ...(context?.role === 'campus_admin'
+        ? { campusIds: context.campusIds }
+        : {}),
+    });
+  }
+
+  async getApplication(
+    organizationId: string,
+    applicationId: string,
+    context?: { organizationId: string; campusIds?: string[]; role?: string },
+  ): Promise<ApplicationRecord> {
+    const application = await this.repository.getApplication(
+      organizationId,
+      applicationId,
+    );
+    if (!application)
+      throw new AppError(
+        404,
+        'APPLICATION_NOT_FOUND',
+        'Application not found.',
+      );
+    assertCampusScope(context ?? { organizationId }, application.campusId);
+    return application;
   }
 
   async createApplication(
     organizationId: string,
     input: ApplicationInput,
-    context?: { organizationId: string; campusIds?: string[] },
+    context?: { organizationId: string; campusIds?: string[]; role?: string },
   ): Promise<ApplicationRecord> {
-    assertCampusScope(context ?? { organizationId }, input.preferredCampusId);
+    const inquiry = input.inquiryId
+      ? await this.getInquiry(organizationId, input.inquiryId, context)
+      : undefined;
+    const preferredCampusId = input.preferredCampusId ?? inquiry?.campusId;
+    assertCampusScope(context ?? { organizationId }, preferredCampusId);
     return this.repository.createApplication(organizationId, {
       ...input,
+      preferredCampusId,
       firstName: normalizeName(input.firstName, 'first name'),
       lastName: normalizeName(input.lastName, 'last name'),
       status: normalizeStatus(
         input.status,
-        ['draft', 'submitted', 'in_review', 'approved', 'rejected', 'admitted'],
+        ['draft', 'submitted'],
         'application status',
       ) as ApplicationRecord['status'],
       email: normalizeOptionalEmail(input.email),
@@ -583,6 +729,7 @@ export class PeopleService {
     organizationId: string,
     applicationId: string,
     input: { status: ApplicationStatus; decisionReason?: string },
+    context?: { organizationId: string; campusIds?: string[]; role?: string },
   ): Promise<{
     application: ApplicationRecord;
     student?: StudentRecord;
@@ -593,16 +740,11 @@ export class PeopleService {
       status: string;
     };
   }> {
-    const existing = await this.repository.getApplication(
+    const existing = await this.getApplication(
       organizationId,
       applicationId,
+      context,
     );
-    if (!existing)
-      throw new AppError(
-        404,
-        'APPLICATION_NOT_FOUND',
-        'Application not found.',
-      );
     const allowed = TRANSITIONS[existing.status] ?? [];
     if (!allowed.includes(input.status)) {
       throw new AppError(

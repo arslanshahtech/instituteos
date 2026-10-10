@@ -34,6 +34,14 @@ import {
   GuardianEditPage,
   GuardiansListPage,
 } from '../guardians/GuardianPages.js';
+import { AdmissionsListPage } from '../admissions/AdmissionsListPage.js';
+import { ApplicationReviewPage } from '../admissions/ApplicationReviewPage.js';
+import {
+  StaffCreatePage,
+  StaffDetailPage,
+  StaffEditPage,
+  StaffListPage,
+} from '../staff/StaffPages.js';
 import { ProtectedRoute } from '../auth/ProtectedRoute.js';
 import {
   ForgotPasswordPage,
@@ -72,6 +80,14 @@ const roleRoutes: RouteObject[] = [
         element: <OrganizationAdminPage />,
       },
       {
+        path: 'organizations/:organizationId/admissions',
+        element: <AdmissionsListPage />,
+      },
+      {
+        path: 'organizations/:organizationId/admissions/applications/:applicationId',
+        element: <ApplicationReviewPage />,
+      },
+      {
         path: 'organizations/:organizationId/guardians',
         element: <GuardiansListPage />,
       },
@@ -102,6 +118,22 @@ const roleRoutes: RouteObject[] = [
       {
         path: 'organizations/:organizationId/students/:studentId',
         element: <StudentDetailPage />,
+      },
+      {
+        path: 'organizations/:organizationId/staff',
+        element: <StaffListPage />,
+      },
+      {
+        path: 'organizations/:organizationId/staff/new',
+        element: <StaffCreatePage />,
+      },
+      {
+        path: 'organizations/:organizationId/staff/:staffId/edit',
+        element: <StaffEditPage />,
+      },
+      {
+        path: 'organizations/:organizationId/staff/:staffId',
+        element: <StaffDetailPage />,
       },
       { path: '*', element: <NotFoundPage /> },
     ],

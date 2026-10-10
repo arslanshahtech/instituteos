@@ -27,6 +27,7 @@ import type {
   StudentListQuery,
   StudentRecord,
 } from './people.types.js';
+import { CampusModel } from '../tenancy/tenancy.model.js';
 
 function idObject(id: string): Types.ObjectId {
   return new Types.ObjectId(id);
@@ -53,6 +54,31 @@ function escapeRegex(value: string): string {
 function convertGuardianArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((item) => String(item));
+}
+
+function studentDocumentInput(
+  organizationId: string,
+  input: StudentInput,
+  sourceApplicationId?: string,
+) {
+  return {
+    organizationId: idObject(organizationId),
+    firstName: input.firstName,
+    lastName: input.lastName,
+    preferredName: input.preferredName,
+    dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
+    gender: input.gender,
+    status: input.status ?? 'active',
+    contactEmail: input.contactEmail,
+    phone: input.phone,
+    address: input.address,
+    emergencyContact: input.emergencyContact,
+    academicHistory: input.academicHistory,
+    campusId: input.campusId ? idObject(input.campusId) : null,
+    ...(sourceApplicationId
+      ? { sourceApplicationId: idObject(sourceApplicationId) }
+      : {}),
+  };
 }
 
 export class MongoPeopleRepository {
@@ -175,22 +201,9 @@ export class MongoPeopleRepository {
     organizationId: string,
     input: StudentInput,
   ): Promise<StudentRecord> {
-    const body = {
-      organizationId: idObject(organizationId),
-      firstName: input.firstName,
-      lastName: input.lastName,
-      preferredName: input.preferredName,
-      dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
-      gender: input.gender,
-      status: input.status ?? 'active',
-      contactEmail: input.contactEmail,
-      phone: input.phone,
-      address: input.address,
-      emergencyContact: input.emergencyContact,
-      academicHistory: input.academicHistory,
-      campusId: input.campusId ? idObject(input.campusId) : null,
-    };
-    const record = await StudentModel.create(body);
+    const record = await StudentModel.create(
+      studentDocumentInput(organizationId, input),
+    );
     return this.getStudent(
       organizationId,
       String(record._id),
@@ -641,6 +654,8 @@ export class MongoPeopleRepository {
     query?: {
       status?: string;
       department?: string;
+      campusId?: string;
+      search?: string;
       campusIds?: string[];
       page?: number;
       pageSize?: number;
@@ -655,9 +670,33 @@ export class MongoPeopleRepository {
     };
     if (query?.status) filters.status = query.status;
     if (query?.department)
-      filters.department = { $regex: query.department, $options: 'i' };
+      filters.department = {
+        $regex: escapeRegex(query.department),
+        $options: 'i',
+      };
+    if (query?.campusId) filters.campusId = idObject(query.campusId);
     if (query?.campusIds && query.campusIds.length > 0) {
       filters.campusId = { $in: query.campusIds.map((id) => idObject(id)) };
+    }
+    const search = normalizeFilterValue(query?.search);
+    if (search) {
+      const fields = [
+        'firstName',
+        'lastName',
+        'email',
+        'employeeCode',
+        'department',
+        'designation',
+        'role',
+      ];
+      filters.$and = search
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((term) => ({
+          $or: fields.map((field) => ({
+            [field]: { $regex: escapeRegex(term), $options: 'i' },
+          })),
+        }));
     }
     const [items, total] = await Promise.all([
       StaffMemberModel.find(filters)
@@ -674,10 +713,28 @@ export class MongoPeopleRepository {
         campusId: record.campusId ? String(record.campusId) : undefined,
         firstName: String(record.firstName),
         lastName: String(record.lastName),
+        employeeCode: record.employeeCode
+          ? String(record.employeeCode)
+          : undefined,
         department: record.department ? String(record.department) : undefined,
+        designation: record.designation
+          ? String(record.designation)
+          : record.role
+            ? String(record.role)
+            : undefined,
         qualification: record.qualification
           ? String(record.qualification)
           : undefined,
+        qualifications: Array.isArray(record.qualifications)
+          ? record.qualifications.map(String)
+          : undefined,
+        subjects: Array.isArray(record.subjects)
+          ? record.subjects.map(String)
+          : undefined,
+        dateOfBirth: record.dateOfBirth
+          ? new Date(record.dateOfBirth).toISOString()
+          : undefined,
+        gender: record.gender ? String(record.gender) : undefined,
         status: (record.status as StaffRecord['status']) ?? 'active',
         role: record.role ? String(record.role) : undefined,
         email: record.email ? String(record.email) : undefined,
@@ -706,10 +763,28 @@ export class MongoPeopleRepository {
       campusId: record.campusId ? String(record.campusId) : undefined,
       firstName: String(record.firstName),
       lastName: String(record.lastName),
+      employeeCode: record.employeeCode
+        ? String(record.employeeCode)
+        : undefined,
       department: record.department ? String(record.department) : undefined,
+      designation: record.designation
+        ? String(record.designation)
+        : record.role
+          ? String(record.role)
+          : undefined,
       qualification: record.qualification
         ? String(record.qualification)
         : undefined,
+      qualifications: Array.isArray(record.qualifications)
+        ? record.qualifications.map(String)
+        : undefined,
+      subjects: Array.isArray(record.subjects)
+        ? record.subjects.map(String)
+        : undefined,
+      dateOfBirth: record.dateOfBirth
+        ? new Date(record.dateOfBirth).toISOString()
+        : undefined,
+      gender: record.gender ? String(record.gender) : undefined,
       status: (record.status as StaffRecord['status']) ?? 'active',
       role: record.role ? String(record.role) : undefined,
       email: record.email ? String(record.email) : undefined,
@@ -723,15 +798,30 @@ export class MongoPeopleRepository {
     organizationId: string,
     input: StaffInput,
   ): Promise<StaffRecord> {
+    if (
+      input.campusId &&
+      !(await CampusModel.exists({
+        _id: idObject(input.campusId),
+        organizationId: idObject(organizationId),
+      }))
+    ) {
+      throw new AppError(404, 'CAMPUS_NOT_FOUND', 'Campus not found.');
+    }
     const record = await StaffMemberModel.create({
       organizationId: idObject(organizationId),
       campusId: input.campusId ? idObject(input.campusId) : null,
       firstName: input.firstName,
       lastName: input.lastName,
+      employeeCode: input.employeeCode,
       department: input.department,
+      designation: input.designation ?? input.role,
       qualification: input.qualification,
+      qualifications: input.qualifications,
+      subjects: input.subjects,
+      dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
+      gender: input.gender,
       status: input.status ?? 'active',
-      role: input.role,
+      role: input.role ?? input.designation,
       email: input.email,
       phone: input.phone,
     });
@@ -747,8 +837,24 @@ export class MongoPeopleRepository {
     changes: Partial<StaffInput>,
   ): Promise<StaffRecord | null> {
     const update: Record<string, unknown> = { ...changes };
-    if (changes.campusId !== undefined)
+    if (changes.campusId !== undefined) {
+      if (
+        changes.campusId &&
+        !(await CampusModel.exists({
+          _id: idObject(changes.campusId),
+          organizationId: idObject(organizationId),
+        }))
+      ) {
+        throw new AppError(404, 'CAMPUS_NOT_FOUND', 'Campus not found.');
+      }
       update.campusId = changes.campusId ? idObject(changes.campusId) : null;
+    }
+    if (changes.dateOfBirth !== undefined)
+      update.dateOfBirth = changes.dateOfBirth
+        ? new Date(changes.dateOfBirth)
+        : null;
+    if (changes.designation !== undefined)
+      update.role = changes.role ?? changes.designation;
     const record = await StaffMemberModel.findOneAndUpdate(
       { _id: idObject(staffId), organizationId: idObject(organizationId) },
       { $set: update },
@@ -761,10 +867,28 @@ export class MongoPeopleRepository {
       campusId: record.campusId ? String(record.campusId) : undefined,
       firstName: String(record.firstName),
       lastName: String(record.lastName),
+      employeeCode: record.employeeCode
+        ? String(record.employeeCode)
+        : undefined,
       department: record.department ? String(record.department) : undefined,
+      designation: record.designation
+        ? String(record.designation)
+        : record.role
+          ? String(record.role)
+          : undefined,
       qualification: record.qualification
         ? String(record.qualification)
         : undefined,
+      qualifications: Array.isArray(record.qualifications)
+        ? record.qualifications.map(String)
+        : undefined,
+      subjects: Array.isArray(record.subjects)
+        ? record.subjects.map(String)
+        : undefined,
+      dateOfBirth: record.dateOfBirth
+        ? new Date(record.dateOfBirth).toISOString()
+        : undefined,
+      gender: record.gender ? String(record.gender) : undefined,
       status: (record.status as StaffRecord['status']) ?? 'active',
       role: record.role ? String(record.role) : undefined,
       email: record.email ? String(record.email) : undefined,
@@ -793,6 +917,9 @@ export class MongoPeopleRepository {
       phone: record.phone ? String(record.phone) : undefined,
       source: record.source ? String(record.source) : undefined,
       status: (record.status as InquiryRecord['status']) ?? 'new',
+      gradeLevelInterest: record.gradeLevelInterest
+        ? String(record.gradeLevelInterest)
+        : undefined,
       notes: record.notes ? String(record.notes) : undefined,
       createdAt: new Date(record.createdAt).toISOString(),
       updatedAt: new Date(record.updatedAt).toISOString(),
@@ -818,11 +945,17 @@ export class MongoPeopleRepository {
     };
     if (query?.status) filters.status = query.status;
     if (query?.search) {
-      filters.$or = [
-        { firstName: { $regex: query.search, $options: 'i' } },
-        { lastName: { $regex: query.search, $options: 'i' } },
-        { email: { $regex: query.search, $options: 'i' } },
-      ];
+      const terms = query.search.trim().split(/\s+/).filter(Boolean);
+      filters.$and = terms.map((term) => {
+        const safeTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return {
+          $or: [
+            { firstName: { $regex: safeTerm, $options: 'i' } },
+            { lastName: { $regex: safeTerm, $options: 'i' } },
+            { email: { $regex: safeTerm, $options: 'i' } },
+          ],
+        };
+      });
     }
     if (query?.campusIds && query.campusIds.length > 0) {
       filters.campusId = { $in: query.campusIds.map((id) => idObject(id)) };
@@ -846,6 +979,9 @@ export class MongoPeopleRepository {
         phone: record.phone ? String(record.phone) : undefined,
         source: record.source ? String(record.source) : undefined,
         status: (record.status as InquiryRecord['status']) ?? 'new',
+        gradeLevelInterest: record.gradeLevelInterest
+          ? String(record.gradeLevelInterest)
+          : undefined,
         notes: record.notes ? String(record.notes) : undefined,
         createdAt: new Date(record.createdAt).toISOString(),
         updatedAt: new Date(record.updatedAt).toISOString(),
@@ -869,6 +1005,7 @@ export class MongoPeopleRepository {
       phone: input.phone,
       source: input.source,
       status: input.status ?? 'new',
+      gradeLevelInterest: input.gradeLevelInterest,
       notes: input.notes,
     });
     return {
@@ -881,6 +1018,9 @@ export class MongoPeopleRepository {
       phone: record.phone ? String(record.phone) : undefined,
       source: record.source ? String(record.source) : undefined,
       status: (record.status as InquiryRecord['status']) ?? 'new',
+      gradeLevelInterest: record.gradeLevelInterest
+        ? String(record.gradeLevelInterest)
+        : undefined,
       notes: record.notes ? String(record.notes) : undefined,
       createdAt: new Date(record.createdAt).toISOString(),
       updatedAt: new Date(record.updatedAt).toISOString(),
@@ -911,6 +1051,9 @@ export class MongoPeopleRepository {
       phone: record.phone ? String(record.phone) : undefined,
       source: record.source ? String(record.source) : undefined,
       status: (record.status as InquiryRecord['status']) ?? 'new',
+      gradeLevelInterest: record.gradeLevelInterest
+        ? String(record.gradeLevelInterest)
+        : undefined,
       notes: record.notes ? String(record.notes) : undefined,
       createdAt: new Date(record.createdAt).toISOString(),
       updatedAt: new Date(record.updatedAt).toISOString(),
@@ -922,6 +1065,7 @@ export class MongoPeopleRepository {
     query?: {
       status?: ApplicationStatus;
       campusIds?: string[];
+      search?: string;
       page?: number;
       pageSize?: number;
     },
@@ -934,6 +1078,20 @@ export class MongoPeopleRepository {
       organizationId: idObject(organizationId),
     };
     if (query?.status) filters.status = query.status;
+    if (query?.search) {
+      const terms = query.search.trim().split(/\s+/).filter(Boolean);
+      filters.$and = terms.map((term) => {
+        const safeTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return {
+          $or: [
+            { firstName: { $regex: safeTerm, $options: 'i' } },
+            { lastName: { $regex: safeTerm, $options: 'i' } },
+            { email: { $regex: safeTerm, $options: 'i' } },
+            { program: { $regex: safeTerm, $options: 'i' } },
+          ],
+        };
+      });
+    }
     if (query?.campusIds && query.campusIds.length > 0) {
       filters.campusId = { $in: query.campusIds.map((id) => idObject(id)) };
     }
@@ -945,6 +1103,20 @@ export class MongoPeopleRepository {
         .lean(),
       AdmissionApplicationModel.countDocuments(filters),
     ]);
+    const convertedStudents = items.length
+      ? await StudentModel.find({
+          organizationId: idObject(organizationId),
+          sourceApplicationId: { $in: items.map((record) => record._id) },
+        })
+          .select({ _id: 1, sourceApplicationId: 1 })
+          .lean()
+      : [];
+    const studentIdsByApplication = new Map(
+      convertedStudents.map((student) => [
+        String(student.sourceApplicationId),
+        String(student._id),
+      ]),
+    );
     return {
       items: items.map((record) => ({
         id: String(record._id),
@@ -958,6 +1130,7 @@ export class MongoPeopleRepository {
         source: record.source ? String(record.source) : undefined,
         program: record.program ? String(record.program) : undefined,
         status: (record.status as ApplicationRecord['status']) ?? 'draft',
+        convertedStudentId: studentIdsByApplication.get(String(record._id)),
         notes: record.notes ? String(record.notes) : undefined,
         decisionReason: record.decisionReason
           ? String(record.decisionReason)
@@ -980,6 +1153,12 @@ export class MongoPeopleRepository {
       organizationId: idObject(organizationId),
     }).lean();
     if (!record) return null;
+    const convertedStudent = await StudentModel.findOne({
+      organizationId: idObject(organizationId),
+      sourceApplicationId: idObject(applicationId),
+    })
+      .select({ _id: 1 })
+      .lean();
     return {
       id: String(record._id),
       organizationId: String(record.organizationId),
@@ -992,6 +1171,9 @@ export class MongoPeopleRepository {
       source: record.source ? String(record.source) : undefined,
       program: record.program ? String(record.program) : undefined,
       status: (record.status as ApplicationRecord['status']) ?? 'draft',
+      convertedStudentId: convertedStudent
+        ? String(convertedStudent._id)
+        : undefined,
       notes: record.notes ? String(record.notes) : undefined,
       decisionReason: record.decisionReason
         ? String(record.decisionReason)
@@ -1130,19 +1312,24 @@ export class MongoPeopleRepository {
         if (!studentDocument) {
           const [createdStudent] = await StudentModel.create(
             [
-              {
-                organizationId: idObject(organizationId),
-                campusId: application.campusId
-                  ? idObject(String(application.campusId))
-                  : null,
-                sourceApplicationId: idObject(applicationId),
-                firstName: application.firstName,
-                lastName: application.lastName,
-                status: 'active',
-                contactEmail: application.email,
-                phone: application.phone,
-                guardianIds: [],
-              },
+              studentDocumentInput(
+                organizationId,
+                {
+                  firstName: String(application.firstName),
+                  lastName: String(application.lastName),
+                  status: 'active',
+                  contactEmail: application.email
+                    ? String(application.email)
+                    : undefined,
+                  phone: application.phone
+                    ? String(application.phone)
+                    : undefined,
+                  campusId: application.campusId
+                    ? String(application.campusId)
+                    : undefined,
+                },
+                applicationId,
+              ),
             ],
             { session },
           );
@@ -1169,7 +1356,9 @@ export class MongoPeopleRepository {
                   : null,
                 sourceApplicationId: idObject(applicationId),
                 status: 'active',
-                gradeLevel: 'New admission',
+                gradeLevel: application.program
+                  ? String(application.program)
+                  : 'New admission',
               },
             ],
             { session },
