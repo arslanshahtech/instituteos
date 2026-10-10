@@ -7,6 +7,7 @@ import {
   platformOrganizationRouter,
 } from '../../modules/organizations/organizations.routes.js';
 import { peopleRouter } from '../../modules/people/people.routes.js';
+import { academicsRouter } from '../../modules/academics/academics.routes.js';
 
 export const v1Router = Router();
 
@@ -19,4 +20,5 @@ v1Router.use('/auth', authRouter);
 v1Router.use('/organizations', tenancyRouter);
 v1Router.use('/organizations', organizationRouter);
 v1Router.use('/organizations', peopleRouter);
+v1Router.use('/organizations', academicsRouter);
 v1Router.use('/platform/organizations', platformOrganizationRouter);
