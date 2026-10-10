@@ -68,6 +68,12 @@ Academic Years, Terms, Classes, Sections, Subjects, and Teacher Assignments are 
 
 Teacher assignments have no timetable periods in this phase, so time-slot collision cannot be computed. To prevent overlapping assignments with the available data, a teacher may only have one subject assignment for a given class, section, and academic year. An organization-scoped unique index enforces the same invariant atomically in addition to the service conflict check. Parent records with dependent Terms, Sections, or Teacher Assignments cannot be deleted.
 
+## 2026-10-10 — Keep student class placement owned by Attendance in Phase 08
+
+**Status:** Accepted
+
+The existing People enrollment records do not identify an academic year, class, or section. Attendance therefore owns a student-to-class/section placement record keyed uniquely by organization, student, and academic year rather than expanding the Phase 00–06 People schemas. Attendance marking requires an active student enrollment at the selected campus, an active academic year containing the attendance date, and a placement in the selected section. Bulk submissions must cover the complete active section roster. Student and staff records remain tenant-scoped, and campus-assigned memberships are restricted to their assigned campuses. Timetable-based attendance checks and automated enrollment-to-class placement remain deferred.
+
 ## 2026-10-02 — Require owner-controlled archive before organization deletion
 
 **Status:** Accepted

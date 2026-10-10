@@ -10,6 +10,7 @@ import {
   UserPlus,
   GraduationCap,
   CalendarDays,
+  ClipboardCheck,
 } from 'lucide-react';
 import {
   Link,
@@ -183,6 +184,17 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
               >
                 <CalendarDays size={18} aria-hidden="true" />
                 <span>Academics</span>
+              </NavLink>
+
+              <NavLink
+                className={({ isActive }) =>
+                  `navigation-link${isActive ? ' navigation-link-active' : ''}`
+                }
+                onClick={() => setMobileNavOpen(false)}
+                to={`/admin/organizations/${organizationId}/attendance`}
+              >
+                <ClipboardCheck size={18} aria-hidden="true" />
+                <span>Attendance</span>
               </NavLink>
             </>
           )}
