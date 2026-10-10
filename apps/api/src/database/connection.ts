@@ -7,6 +7,11 @@ import {
   OrganizationInvitationModel,
   PlatformRoleGrantModel,
 } from '../modules/tenancy/tenancy.model.js';
+import {
+  StaffAttendanceModel,
+  StudentAttendanceModel,
+  StudentSectionPlacementModel,
+} from '../modules/attendance/attendance.model.js';
 
 let tenancyModelsInitialized = false;
 
@@ -27,6 +32,9 @@ export async function connectDatabase(
       CampusModel.init(),
       OrganizationInvitationModel.init(),
       OrganizationAuditEventModel.init(),
+      StudentAttendanceModel.init(),
+      StaffAttendanceModel.init(),
+      StudentSectionPlacementModel.init(),
     ]);
     tenancyModelsInitialized = true;
   } catch (error) {

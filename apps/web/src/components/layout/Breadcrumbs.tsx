@@ -7,6 +7,7 @@ const segmentLabels: Record<string, string> = {
   foundations: 'UI foundations',
   organizations: 'Organizations',
   context: 'Access context',
+  attendance: 'Attendance',
 };
 
 function breadcrumbLabel(
