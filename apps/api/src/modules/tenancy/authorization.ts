@@ -29,6 +29,9 @@ export const ORGANIZATION_PERMISSIONS = [
   'admission.create',
   'admission.review',
 
+  'examination.read',
+  'examination.write',
+
   'finance.read',
 ] as const;
 
@@ -68,6 +71,9 @@ const rolePermissions: Record<
     'admission.create',
     'admission.review',
 
+    'examination.read',
+    'examination.write',
+
     'finance.read',
   ],
 
@@ -100,6 +106,9 @@ const rolePermissions: Record<
     'admission.create',
     'admission.review',
 
+    'examination.read',
+    'examination.write',
+
     'finance.read',
   ],
 
@@ -124,6 +133,9 @@ const rolePermissions: Record<
     'admission.read',
     'admission.create',
     'admission.review',
+
+    'examination.read',
+    'examination.write',
   ],
 
   principal_director: [
@@ -159,6 +171,9 @@ const rolePermissions: Record<
     'staff.read',
 
     'admission.read',
+
+    'examination.read',
+    'examination.write',
   ],
 
   teacher: [
