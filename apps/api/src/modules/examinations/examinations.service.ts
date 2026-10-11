@@ -3,7 +3,6 @@ import { AppError } from '../../errors/app-error.js';
 import type {
   ExamInput,
   ExamMarkInput,
-  ExamRecord,
   ExamScheduleInput,
   ExaminationsContext,
   ExaminationsRepository,

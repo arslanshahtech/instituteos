@@ -12,6 +12,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
+  ReceiptText,
 } from 'lucide-react';
 import {
   Link,
@@ -34,7 +35,12 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { organizationId } = useParams();
+  const organizationPath = (section: string) =>
+    `/admin/organizations/${organizationId}/${section}`;
   const auth = useAuth();
+  const closeMobileNav = () => {
+    if (mobileNavOpen) setMobileNavOpen(false);
+  };
   const signOut = async () => {
     setSignOutError(false);
     try {
@@ -47,8 +53,8 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
   const changeRole = (key: string) => navigate(`/${key}`);
 
   useEffect(() => {
-    setMobileNavOpen(false);
-  }, [location.pathname]);
+    if (mobileNavOpen) setMobileNavOpen(false);
+  }, [location.pathname, mobileNavOpen]);
 
   useEffect(() => {
     if (!mobileNavOpen) return;
@@ -68,7 +74,7 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
         aria-label="Close navigation"
         className="sidebar-overlay"
         hidden={!mobileNavOpen}
-        onClick={() => setMobileNavOpen(false)}
+        onClick={closeMobileNav}
         tabIndex={mobileNavOpen ? 0 : -1}
         type="button"
       />
@@ -98,7 +104,7 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
               `navigation-link${isActive && location.pathname === `/${role.key}` ? ' navigation-link-active' : ''}`
             }
             end
-            onClick={() => setMobileNavOpen(false)}
+            onClick={closeMobileNav}
             to={`/${role.key}`}
           >
             <LayoutDashboard size={18} aria-hidden="true" />
@@ -108,7 +114,7 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
             className={({ isActive }) =>
               `navigation-link${isActive ? ' navigation-link-active' : ''}`
             }
-            onClick={() => setMobileNavOpen(false)}
+            onClick={closeMobileNav}
             to={`/${role.key}/foundations`}
           >
             <BookOpenText size={18} aria-hidden="true" />
@@ -119,7 +125,7 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
               className={({ isActive }) =>
                 `navigation-link${isActive ? ' navigation-link-active' : ''}`
               }
-              onClick={() => setMobileNavOpen(false)}
+              onClick={closeMobileNav}
               to="/admin/organizations"
             >
               <LayoutDashboard size={18} aria-hidden="true" />
@@ -136,8 +142,8 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                 className={({ isActive }) =>
                   `navigation-link${isActive ? ' navigation-link-active' : ''}`
                 }
-                onClick={() => setMobileNavOpen(false)}
-                to={`/admin/organizations/${organizationId }}/students`}
+                onClick={closeMobileNav}
+                to={organizationPath('students')}
               >
                 <Users size={18} aria-hidden="true" />
                 <span>Students</span>
@@ -147,8 +153,8 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                 className={({ isActive }) =>
                   `navigation-link${isActive ? ' navigation-link-active' : ''}`
                 }
-                onClick={() => setMobileNavOpen(false)}
-                to={`/admin/organizations/${organizationId}/guardians`}
+                onClick={closeMobileNav}
+                to={organizationPath('guardians')}
               >
                 <UserCheck size={18} aria-hidden="true" />
                 <span>Guardians</span>
@@ -158,8 +164,8 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                 className={({ isActive }) =>
                   `navigation-link${isActive ? ' navigation-link-active' : ''}`
                 }
-                onClick={() => setMobileNavOpen(false)}
-                to={`/admin/organizations/${organizationId}/admissions`}
+                onClick={closeMobileNav}
+                to={organizationPath('admissions')}
               >
                 <UserPlus size={18} aria-hidden="true" />
                 <span>Admissions</span>
@@ -169,8 +175,8 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                 className={({ isActive }) =>
                   `navigation-link${isActive ? ' navigation-link-active' : ''}`
                 }
-                onClick={() => setMobileNavOpen(false)}
-                to={`/admin/organizations/${organizationId}/staff`}
+                onClick={closeMobileNav}
+                to={organizationPath('staff')}
               >
                 <GraduationCap size={18} aria-hidden="true" />
                 <span>Staff & Teachers</span>
@@ -180,8 +186,8 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                 className={({ isActive }) =>
                   `navigation-link${isActive ? ' navigation-link-active' : ''}`
                 }
-                onClick={() => setMobileNavOpen(false)}
-                to={`/admin/organizations/${organizationId}/academics`}
+                onClick={closeMobileNav}
+                to={organizationPath('academics')}
               >
                 <CalendarDays size={18} aria-hidden="true" />
                 <span>Academics</span>
@@ -191,8 +197,8 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                 className={({ isActive }) =>
                   `navigation-link${isActive ? ' navigation-link-active' : ''}`
                 }
-                onClick={() => setMobileNavOpen(false)}
-                to={`/admin/organizations/${organizationId}/attendance`}
+                onClick={closeMobileNav}
+                to={organizationPath('attendance')}
               >
                 <ClipboardCheck size={18} aria-hidden="true" />
                 <span>Attendance</span>
@@ -202,11 +208,22 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                 className={({ isActive }) =>
                   `navigation-link${isActive ? ' navigation-link-active' : ''}`
                 }
-                onClick={() => setMobileNavOpen(false)}
-                to={`/admin/organizations/${organizationId}/examinations`}
+                onClick={closeMobileNav}
+                to={organizationPath('examinations')}
               >
                 <ClipboardList size={18} aria-hidden="true" />
                 <span>Examinations</span>
+              </NavLink>
+
+              <NavLink
+                className={({ isActive }) =>
+                  `navigation-link${isActive ? ' navigation-link-active' : ''}`
+                }
+                onClick={closeMobileNav}
+                to={organizationPath('finance')}
+              >
+                <ReceiptText size={18} aria-hidden="true" />
+                <span>Finance</span>
               </NavLink>
             </>
           )}
