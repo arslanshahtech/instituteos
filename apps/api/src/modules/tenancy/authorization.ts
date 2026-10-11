@@ -33,6 +33,7 @@ export const ORGANIZATION_PERMISSIONS = [
   'examination.write',
 
   'finance.read',
+  'finance.write',
 ] as const;
 
 export type OrganizationPermission =
@@ -75,6 +76,7 @@ const rolePermissions: Record<
     'examination.write',
 
     'finance.read',
+    'finance.write',
   ],
 
   organization_admin: [
@@ -110,6 +112,7 @@ const rolePermissions: Record<
     'examination.write',
 
     'finance.read',
+    'finance.write',
   ],
 
   campus_admin: [
@@ -136,6 +139,9 @@ const rolePermissions: Record<
 
     'examination.read',
     'examination.write',
+
+    'finance.read',
+    'finance.write',
   ],
 
   principal_director: [
@@ -157,6 +163,9 @@ const rolePermissions: Record<
     'admission.read',
     'admission.create',
     'admission.review',
+
+    'finance.read',
+    'finance.write',
   ],
 
   academic_coordinator: [
@@ -185,6 +194,7 @@ const rolePermissions: Record<
   accountant_finance_officer: [
     'organization.read',
     'finance.read',
+    'finance.write',
   ],
 
   admissions_reception: [
