@@ -11,6 +11,7 @@ import {
   GraduationCap,
   CalendarDays,
   ClipboardCheck,
+  ClipboardList,
 } from 'lucide-react';
 import {
   Link,
@@ -89,7 +90,7 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
         <div className="sidebar-label">Workspace</div>
         <nav
           aria-label="Main navigation"
-          className="primary-navigation"
+          className="primary-navigation sidebar-navigation-scroll"
           id="main-navigation"
         >
           <NavLink
@@ -195,6 +196,17 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
               >
                 <ClipboardCheck size={18} aria-hidden="true" />
                 <span>Attendance</span>
+              </NavLink>
+
+              <NavLink
+                className={({ isActive }) =>
+                  `navigation-link${isActive ? ' navigation-link-active' : ''}`
+                }
+                onClick={() => setMobileNavOpen(false)}
+                to={`/admin/organizations/${organizationId}/examinations`}
+              >
+                <ClipboardList size={18} aria-hidden="true" />
+                <span>Examinations</span>
               </NavLink>
             </>
           )}

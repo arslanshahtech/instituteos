@@ -201,6 +201,10 @@ a {
 
 .attendance-filters select,
 .attendance-filters input,
+.examinations-filters select,
+.examinations-filter-row select,
+.examinations-report-select select,
+.examinations-report-select input,
 .attendance-person select,
 .attendance-person input,
 .attendance-placement select {
@@ -220,6 +224,795 @@ a {
 .attendance-filters select:focus,
 .attendance-filters input:focus {
   border-color: var(--color-accent);
+}
+
+.examinations-page {
+  position: relative;
+  z-index: 0;
+  display: grid;
+  min-width: 0;
+  gap: 1rem;
+  isolation: isolate;
+}
+
+.examinations-page-heading {
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+  margin: 0.5rem 0 0;
+  background: var(--color-canvas);
+}
+
+.examinations-page-heading > div {
+  min-width: 0;
+}
+
+.examinations-page-heading h1 {
+  overflow-wrap: anywhere;
+}
+
+.examinations-mobile-tab-switcher {
+  display: none;
+  min-width: 0;
+}
+
+.examinations-mobile-tab-switcher select {
+  width: 100%;
+  min-width: 0;
+  height: 2.5rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0.375rem;
+  background-color: var(--color-surface);
+  padding: 0.5rem 2.5rem 0.5rem 0.75rem;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.examinations-panel,
+.examinations-grid,
+.examinations-card {
+  min-width: 0;
+}
+
+.examinations-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.examinations-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
+  align-items: start;
+  gap: 1rem;
+}
+
+.examinations-grid-scales {
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+}
+
+.examinations-card {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: 1rem;
+  box-shadow: var(--shadow-panel);
+}
+
+.examinations-card h2,
+.examinations-card h3 {
+  margin: 0;
+}
+
+.examinations-card h2 {
+  font-size: 1.05rem;
+}
+
+.examinations-subheading {
+  margin: 0.75rem 0 0;
+  border-top: 1px solid var(--color-border);
+  padding-top: 1rem;
+  font-size: 0.95rem;
+}
+
+.examinations-form,
+.examinations-filters,
+.examinations-filter-row,
+.examinations-report-select {
+  display: grid;
+  min-width: 0;
+  gap: 0.75rem;
+}
+
+.examinations-card > label,
+.examinations-form label,
+.examinations-filters label,
+.examinations-filter-row label,
+.examinations-report-select label {
+  display: grid;
+  min-width: 0;
+  gap: 0.375rem;
+  color: #34485a;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.examinations-page select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%23687789' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  text-overflow: ellipsis;
+}
+
+.examinations-form input,
+.examinations-form select,
+.examinations-form textarea,
+.examinations-card > label select,
+.examinations-filters select,
+.examinations-filter-row select,
+.examinations-report-select input,
+.examinations-report-select select,
+.examinations-mark-input input,
+.examinations-remark-input input {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0.375rem;
+  background-color: #fff;
+  padding: 0.5rem 0.65rem;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
+.examinations-form input:focus,
+.examinations-form select:focus,
+.examinations-form textarea:focus,
+.examinations-page select:focus,
+.examinations-mark-input input:focus,
+.examinations-remark-input input:focus {
+  border-color: var(--color-accent);
+}
+
+.examinations-form small,
+.examinations-form > small {
+  color: var(--color-negative);
+  font-size: 0.75rem;
+}
+
+.examinations-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.examinations-form-row-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.examinations-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.examinations-filter-row,
+.examinations-report-select {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.examinations-filters {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.examinations-grade-editor {
+  display: grid;
+  min-width: 0;
+  gap: 0.75rem;
+}
+
+.examinations-grade-editor-heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.examinations-grade-editor-heading h3,
+.examinations-grade-editor-heading p {
+  margin: 0;
+}
+
+.examinations-grade-editor-heading h3 {
+  font-size: 0.9rem;
+}
+
+.examinations-grade-editor-heading p,
+.examinations-helper-text {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.examinations-grade-editor-heading p {
+  margin-top: 0.25rem;
+}
+
+.examinations-add-band {
+  display: inline-flex !important;
+  min-width: max-content;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  line-height: 1;
+  white-space: nowrap !important;
+}
+
+.examinations-grade-table-wrap,
+.examinations-report-table-wrap {
+  width: 100%;
+  min-width: 0;
+}
+
+.examinations-grade-table,
+.examinations-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.examinations-grade-table th,
+.examinations-report-table th,
+.examinations-report-table td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.65rem 0.55rem;
+  vertical-align: middle;
+}
+
+.examinations-grade-table th,
+.examinations-report-table thead th {
+  color: var(--color-muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.examinations-grade-table td {
+  padding: 0.4rem 0.35rem;
+}
+
+.examinations-grade-table td input {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0.375rem;
+  padding: 0.4rem 0.5rem;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 0.84rem;
+}
+
+.examinations-grade-table td input:focus {
+  border-color: var(--color-accent);
+}
+
+.examinations-grade-row-action {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.examinations-grade-row-action .button {
+  padding-inline: 0.4rem;
+}
+
+.examinations-helper-text {
+  margin: 0;
+}
+
+.examinations-validation-hint {
+  color: var(--color-muted);
+  font-size: 0.76rem;
+}
+
+.examinations-record-list,
+.report-result-list {
+  display: grid;
+  min-width: 0;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.examinations-record-list li,
+.report-result {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.8rem;
+}
+
+.examinations-record-list li > div:first-child,
+.report-result > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.examinations-record-list li span,
+.report-result span {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+
+.examinations-filter-toolbar {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #f8fafb;
+  padding: 1rem;
+}
+
+.examinations-mark-list {
+  display: grid;
+  min-width: 0;
+}
+
+.examinations-mark-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(90px, 125px) auto minmax(140px, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.75rem 0;
+}
+
+.examinations-mark-row:last-child {
+  border-bottom: 0;
+}
+
+.examinations-mark-student {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.examinations-mark-student > span:first-child {
+  color: var(--color-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.examinations-mark-student strong {
+  overflow-wrap: anywhere;
+}
+
+.examinations-mark-input,
+.examinations-remark-input {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--color-muted);
+  font-size: 0.72rem;
+}
+
+.examinations-mark-input input,
+.examinations-remark-input input {
+  height: 38px;
+}
+
+.examinations-absent {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.examinations-grade-pill,
+.examinations-active-badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--color-accent-soft);
+  padding: 0.2rem 0.55rem;
+  color: var(--color-accent-dark) !important;
+  font-size: 0.72rem !important;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.examinations-active-badge {
+  margin-left: 0.35rem;
+  background: var(--color-positive-soft);
+  color: var(--color-positive) !important;
+}
+
+.examinations-readonly-note,
+.examinations-form-error {
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.9rem;
+  font-size: 0.875rem;
+}
+
+.examinations-readonly-note {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-dark);
+}
+
+.examinations-form-error {
+  border: 1px solid #f2c6c4;
+  background: var(--color-negative-soft);
+  color: var(--color-negative);
+}
+
+.report-card header,
+.report-summary,
+.report-result-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.report-card header > div:first-child {
+  min-width: 0;
+}
+
+.report-card header h2,
+.report-card header p {
+  margin: 0.2rem 0;
+}
+
+.report-grade {
+  display: grid;
+  justify-items: end;
+  gap: 0.2rem;
+  color: var(--color-accent-dark);
+}
+
+.report-grade strong {
+  font-size: 2rem;
+}
+
+.report-grade span,
+.report-summary span {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+
+.report-summary {
+  justify-content: flex-start;
+  gap: 2rem;
+  border-block: 1px solid var(--color-border);
+  padding: 0.85rem 0;
+}
+
+.examinations-report-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.examinations-summary-badge {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: #f8fafb;
+  padding: 0.25rem 0.65rem;
+  color: var(--color-ink);
+  font-size: 0.78rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.examinations-report-table {
+  table-layout: fixed;
+}
+
+.examinations-report-table th:first-child {
+  width: 24%;
+}
+
+.examinations-report-table td,
+.examinations-report-table th[scope='row'] {
+  color: var(--color-ink);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.examinations-report-table th[scope='row'] {
+  font-weight: 650;
+}
+
+.examinations-report-table tr:last-child > * {
+  border-bottom: 0;
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  .examinations-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .examinations-grid,
+  .examinations-grid-scales {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .examinations-card {
+    width: 100%;
+    padding: 0.9rem;
+  }
+
+  .examinations-record-list li {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .examinations-record-list li > div:first-child {
+    flex: 1 1 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .examinations-record-list li > .examinations-actions {
+    width: 100%;
+  }
+
+  .examinations-mark-row {
+    grid-template-columns: minmax(0, 1fr) minmax(100px, 0.55fr);
+    gap: 0.65rem;
+  }
+
+  .examinations-mark-student,
+  .examinations-remark-input {
+    grid-column: 1 / -1;
+  }
+
+  .examinations-mark-row > .button {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 640px) {
+  .examinations-page > .attendance-tabs {
+    display: none;
+  }
+
+  .examinations-mobile-tab-switcher {
+    display: block;
+    width: 100%;
+  }
+
+  .examinations-filter-toolbar {
+    padding: 0.8rem;
+  }
+
+  .examinations-filters,
+  .examinations-filter-row,
+  .examinations-report-select {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+  }
+
+  .examinations-page select {
+    min-width: 0;
+    height: 40px;
+  }
+
+  .examinations-actions {
+    width: 100%;
+  }
+
+  .examinations-actions > .button {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .examinations-form-row-three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .report-card header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .examinations-report-badges {
+    justify-content: flex-start;
+  }
+
+  .report-summary {
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+  }
+
+  .examinations-grade-editor-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .examinations-grade-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .examinations-grade-table,
+  .examinations-grade-table tbody,
+  .examinations-grade-table tr,
+  .examinations-grade-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .examinations-grade-table tbody {
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .examinations-grade-table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 0.6rem;
+  }
+
+  .examinations-grade-table td {
+    min-width: 0;
+    padding: 0;
+  }
+
+  .examinations-grade-table td::before {
+    display: block;
+    margin-bottom: 0.3rem;
+    color: var(--color-muted);
+    content: attr(data-label);
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  .examinations-grade-row-action {
+    grid-column: 1 / -1;
+  }
+
+  .examinations-grade-row-action::before {
+    display: none !important;
+  }
+
+  .examinations-grade-row-action .button {
+    width: 100%;
+  }
+
+  .examinations-report-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .examinations-report-table,
+  .examinations-report-table tbody,
+  .examinations-report-table tr,
+  .examinations-report-table th,
+  .examinations-report-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .examinations-report-table tbody {
+    display: grid;
+    gap: 0.65rem;
+  }
+
+  .examinations-report-table tr {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem;
+  }
+
+  .examinations-report-table th:first-child {
+    width: 100%;
+  }
+
+  .examinations-report-table th,
+  .examinations-report-table td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.8rem;
+    border-bottom: 1px solid var(--color-border);
+    padding: 0.45rem 0;
+    text-align: right;
+  }
+
+  .examinations-report-table th[scope='row'] {
+    text-align: left;
+  }
+
+  .examinations-report-table td::before {
+    flex: 0 0 auto;
+    color: var(--color-muted);
+    content: attr(data-label);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: left;
+  }
+
+  .examinations-report-table th[scope='row']::before {
+    flex: 0 0 auto;
+    color: var(--color-muted);
+    content: attr(data-label);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .examinations-report-table tr:last-child > * {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .examinations-report-table tr > *:last-child {
+    border-bottom: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .examinations-filters,
+  .examinations-filter-row,
+  .examinations-report-select {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .examinations-mark-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .examinations-mark-student,
+  .examinations-remark-input {
+    grid-column: auto;
+  }
+
+  .examinations-absent {
+    min-height: 40px;
+  }
+}
+
+.report-summary > div,
+.report-result-score {
+  display: grid;
+  gap: 0.25rem;
 }
 
 .attendance-setup-notice .state-empty {
@@ -549,8 +1342,10 @@ a {
   z-index: 30;
   inset: 0 auto 0 0;
   display: flex;
+  max-height: 100vh;
   width: 258px;
   flex-direction: column;
+  overflow-y: auto;
   border-right: 1px solid rgb(255 255 255 / 7%);
   background: var(--color-sidebar);
   color: #fff;
@@ -609,8 +1404,17 @@ a {
 
 .primary-navigation {
   display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
   gap: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 0 12px;
+}
+
+.sidebar-navigation-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 30%) transparent;
 }
 
 .navigation-link {
@@ -689,7 +1493,7 @@ a {
   justify-content: space-between;
   gap: 16px;
   border-bottom: 1px solid var(--color-border);
-  background: rgb(255 255 255 / 96%);
+  background: var(--color-surface);
   padding: 0 34px;
 }
 

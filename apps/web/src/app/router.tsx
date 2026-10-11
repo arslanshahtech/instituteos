@@ -38,6 +38,7 @@ import { AdmissionsListPage } from '../admissions/AdmissionsListPage.js';
 import { ApplicationReviewPage } from '../admissions/ApplicationReviewPage.js';
 import { AcademicsDashboard } from '../academics/AcademicsDashboard.js';
 import { AttendanceDashboard } from '../attendance/AttendanceDashboard.js';
+import { ExaminationDashboard } from '../examinations/ExaminationDashboard.js';
 import {
   StaffCreatePage,
   StaffDetailPage,
@@ -92,6 +93,10 @@ const roleRoutes: RouteObject[] = [
       {
         path: 'organizations/:organizationId/attendance',
         element: <AttendanceDashboard />,
+      },
+      {
+        path: 'organizations/:organizationId/examinations',
+        element: <ExaminationDashboard />,
       },
       {
         path: 'organizations/:organizationId/admissions/applications/:applicationId',
