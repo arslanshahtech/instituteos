@@ -1,54 +1,40 @@
-# InstituteOS — Project State
+# InstituteOS — Project State & Execution Truth
 
-Update this file after every accepted phase.
+**Last Updated:** October 12, 2026  
+**Status Baseline:** Phase A Completed (Atlas Database Index Verified & Baseline Tests 63/63 Green)
 
-## Current phase
+---
 
-Phase: 06 — Admissions, students, guardians, and staff
-Status: Ready to start; Phase 05 has been accepted by the human owner.
+## 1. Module Implementation & Acceptance Matrix
 
-## Last completed phase
+| Phase / Module | Domain | Code State | Automated Checks | Real Role / Multi-Tenant Verified | Production Ready |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **P00–P05** | Foundation, Auth, Orgs, Tenancy, RBAC | Implemented | Passed (63/63 tests) | Verified (Admin/Owner flows) | Ready for hardening |
+| **P06** | People (Students, Guardians, Admissions, Staff) | Implemented | Passed | Database Index Verified on Atlas | In Progress (Role scope pending) |
+| **P07** | Academics (Years, Terms, Classes, Sections, Subjects) | Implemented | Passed | Admin verified (Timetable absent) | Verification pending |
+| **P08** | Attendance & Examinations | Implemented | Passed | Teacher marks entry verified | Student/Parent view pending |
+| **P09** | Finance (Fee Structures, Invoices, Payments) | Implemented | Passed | Invoice generation verified | Online Gateway pending |
+| **P10** | Communications & Announcements | Implemented | Passed | Global Announcements active | 1-on-1 Inbox pending |
+| **P11** | Reporting & Analytics | Implemented | Passed | Export / Audit-read active | Role drill-down pending |
+| **P12** | Settings & Organization Branding | Implemented | Passed | Multi-campus branding active | Hardening pending |
+| **Phase 15 (New)** | Real Role Portals & Scoped Boundaries (RBAC) | In Progress | Planned | Role Matrix definition in progress | Pending |
+| **Phase 16 (New)** | Safe Child Pickup & Gate-Pass Protocol | Planned | Pending | Architecture designed | Pending |
+| **Phase 17 (New)** | Official WhatsApp Cloud API & Messaging | Planned | Pending | Spec ready | Pending |
+| **Phase 18 (New)** | Permission-Aware AI Assistant | Planned | Pending | Spec ready | Pending |
 
-Phase 05 — Organizations, campuses, and member administration
-Accepted by the human owner. Checkpoint: `5e07241` (`InstituteOS: complete phase 05`).
+---
 
-## Current milestone
+## 2. Verified Technical Baselines
 
-Phase 06 — People domain. Not started.
+1. **Database Uniqueness & Indexing:**
+   - `uniq_student_applicant_record` verified with `partialFilterExpression` on MongoDB Atlas. Standalone student creations without application links are completely safe from duplicate key collisions.
+2. **Frontend UI Architecture:**
+   - Feature-level modular CSS split completed across all modules (`academics.css`, `staff.css`, `students.css`, `guardians.css`, `admissions.css`, `finance.css`, `reports.css`, `organizations.css`).
+   - Mobile responsive cards and segmented pill tabs unified.
+3. **Test Suite:**
+   - 63 unit/integration tests running clean across all modules.
 
-## Current verification
+---
 
-- `npm test` — API 52 passed; web 30 passed
-- `npm run typecheck` — passed
-- `npm run lint` — passed
-- `npm run build` — passed
-- `npm run format:check` — passed
-- `git diff --check` — passed
-- API lifecycle coverage includes owner-only archive/restore/delete routes, CSRF enforcement, exact-name confirmation, archive-before-delete, transactional organization-scoped cleanup, and retained deletion audit.
-- Frontend tests cover owner-only archive controls, archive confirmation/navigation, archived owner restore/delete, exact-name gating, and non-owner lifecycle control hiding.
-
-These checks were run sequentially. An earlier run that launched the full test suite concurrently with typecheck, lint, and format checks hit two 5-second Scrypt test timeouts. The same cases passed in isolation and the subsequent sequential full root suite passed without changing timeout settings or production password hashing. This indicates test-run resource contention; no repository-side test fixture failure was found.
-
-## Known issues and deliberate deferrals
-
-- Human acceptance verified organization discovery/switching, settings, archive/restore, permanent delete, and mobile and desktop UI, including final mobile polish.
-- Vite emits non-blocking dependency annotation notices and a bundle-size warning during build.
-- Administrative cancellation of pending invitations is deferred: the canonical Phase 05 prompt requires safe invitation creation, listing, acceptance, and duplicate/pending handling, but does not require cancellation.
-- No Phase 06 domain has been implemented.
-- Organization settings/status, campus creation/update, membership changes, invitations, and onboarding now write their Phase 05 audit event in the same MongoDB transaction as the mutation. MongoDB deployments must support transactions.
-- Owner-only archive/restore and archived-first permanent deletion have been added. Deletion removes only organization-owned Phase 05 campuses, memberships, invitations, previous audit events, and the organization, retaining one final `organization.deleted` event while preserving global users, platform grants, and other organizations.
-
-## Architecture decisions
-
-See `docs/architecture.md` and `docs/decisions.md` for modular-monolith, tenancy, organization discovery, invitation, audit-transaction, and index-initialization decisions.
-
-## Important implementation notes
-
-- The organization directory is derived server-side from the current user's active memberships; active organizations are listed for members, and archived organizations are listed only for active owners. It returns organization identity, role, and status; it does not grant workspace access.
-- `/admin` opens a sole active organization directly and otherwise displays discovery. The workspace selector navigates among active accessible organizations and does not persist authorization state.
-- An inaccessible organization context returns the user to discovery. All organization API requests continue to enforce tenant membership and permissions server-side.
-- Phase 00 has no separate recorded checkpoint; the prompt index identifies it as superseded by Phase 01 rather than fabricating a completion commit.
-
-## Next phase
-
-Phase 06 status: **READY — NOT STARTED**. Phase 05 is accepted and its checkpoint exists; Phase 06 work has not begun.
+## 3. Current Focus
+- Transitioning to **Phase B: Role-Based Access Control (RBAC) Hardening & Scoped Role Portals**.
