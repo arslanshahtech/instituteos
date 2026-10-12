@@ -42,6 +42,7 @@ import { ExaminationDashboard } from '../examinations/ExaminationDashboard.js';
 import { FinanceDashboard } from '../finance/FinanceDashboard.js';
 import { CommunicationsDashboard } from '../communications/CommunicationsDashboard.js';
 import { ReportsDashboard } from '../reporting/ReportsDashboard.js';
+import { SettingsPage } from '../settings/SettingsPage.js';
 import {
   StaffCreatePage,
   StaffDetailPage,
@@ -112,6 +113,10 @@ const roleRoutes: RouteObject[] = [
       {
         path: 'organizations/:organizationId/reports',
         element: <ReportsDashboard />,
+      },
+      {
+        path: 'organizations/:organizationId/settings',
+        element: <SettingsPage />,
       },
       {
         path: 'organizations/:organizationId/admissions/applications/:applicationId',
