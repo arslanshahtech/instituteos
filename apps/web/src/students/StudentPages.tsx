@@ -17,6 +17,7 @@ import { getOrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import type { OrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import { StudentForm } from './StudentForm.js';
 import { StudentGuardiansSection } from '../guardians/GuardianPages.js';
+import { ChildPickupPanel } from './ChildPickupPanel.js';
 import type { StudentInput, StudentStatus } from './students-api.js';
 import {
   useCreateStudent,
@@ -487,6 +488,7 @@ export function StudentDetailPage() {
           )}
         </dl>
       </section>
+
       {access.data.permissions.includes('guardian.read') && (
         <StudentGuardiansSection
           canRead
@@ -497,6 +499,13 @@ export function StudentDetailPage() {
           studentId={studentId}
         />
       )}
+
+      {/* Phase C: Child Pickup & Gate-Pass Protocol UI */}
+      <ChildPickupPanel
+        organizationId={organizationId}
+        studentId={studentId}
+        userRole={access.data.role}
+      />
     </main>
   );
 }
