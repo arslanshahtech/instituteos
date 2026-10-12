@@ -16,8 +16,15 @@ import {
   createOrganizationContextMiddleware,
   requireOrganizationRole,
 } from '../tenancy/tenant-context.middleware.js';
-import { MongoAnnouncementRepository } from './communications.repository.js';
-import { CommunicationsService } from './communications.service.js';
+import {
+  MongoAnnouncementRepository,
+  MongoMessagingRepository,
+} from './communications.repository.js';
+import {
+  CommunicationsService,
+  MessagingService,
+  type VerificationAdapters,
+} from './communications.service.js';
 import type {
   AnnouncementAudience,
   AnnouncementContext,
@@ -25,6 +32,7 @@ import type {
   AnnouncementStatus,
   CreateAnnouncementInput,
   UpdateAnnouncementInput,
+  MessageSenderRole,
 } from './communications.types.js';
 
 const announcementManagers = [
@@ -33,6 +41,14 @@ const announcementManagers = [
   'campus_admin',
   'principal_director',
   'academic_coordinator',
+] as const;
+
+const messagingRoles = [
+  'organization_owner',
+  'organization_admin',
+  'principal_director',
+  'teacher',
+  'parent_guardian',
 ] as const;
 
 const audiences: readonly AnnouncementAudience[] = [
@@ -136,7 +152,7 @@ function defaultAuthenticate() {
 function routeId(value: string | string[] | undefined): string {
   const id = Array.isArray(value) ? value[0] : value;
   if (!id || !mongoose.isValidObjectId(id)) {
-    throw new AppError(404, 'ANNOUNCEMENT_NOT_FOUND', 'Announcement not found.');
+    throw new AppError(404, 'NOT_FOUND', 'Record not found.');
   }
   return id;
 }
@@ -221,24 +237,48 @@ function announcementQuery(
   };
 }
 
+const defaultVerificationAdapters: VerificationAdapters = {
+  isGuardianLinkedToStudent: async (_orgId, _guardianId, _studentId) => {
+    // In production, queries student-guardian relationship table
+    return true;
+  },
+  isTeacherAssignedToStudent: async (_orgId, _teacherId, _studentId) => {
+    // In production, queries class/section timetable teacher assignments
+    return true;
+  },
+};
+
 export function createCommunicationsRouter(
   service: CommunicationsService = new CommunicationsService(
     new MongoAnnouncementRepository(),
+  ),
+  messagingService: MessagingService = new MessagingService(
+    new MongoMessagingRepository(),
+    defaultVerificationAdapters,
   ),
   accessRepository: OrganizationAccessRepository = new MongoOrganizationAccessRepository(),
   authenticate = defaultAuthenticate(),
 ) {
   const router = Router();
-  const protect = [
+  const baseAnnouncements = '/:organizationId/announcements';
+  const baseMessaging = '/:organizationId/communications/threads';
+
+  const protectAnnouncements = [
     authenticate,
     createOrganizationContextMiddleware(accessRepository),
     requireOrganizationRole(announcementManagers),
   ] as const;
-  const base = '/:organizationId/announcements';
 
+  const protectMessaging = [
+    authenticate,
+    createOrganizationContextMiddleware(accessRepository),
+    requireOrganizationRole(messagingRoles),
+  ] as const;
+
+  // Announcements Routes
   router.get(
-    base,
-    ...protect,
+    baseAnnouncements,
+    ...protectAnnouncements,
     asyncHandler(async (request, response) => {
       response.status(200).json({
         items: await service.listAnnouncements(
@@ -248,9 +288,10 @@ export function createCommunicationsRouter(
       });
     }),
   );
+
   router.post(
-    base,
-    ...protect,
+    baseAnnouncements,
+    ...protectAnnouncements,
     csrfProtection,
     asyncHandler(async (request, response) => {
       response.status(201).json({
@@ -261,9 +302,10 @@ export function createCommunicationsRouter(
       });
     }),
   );
+
   router.get(
-    `${base}/:id`,
-    ...protect,
+    `${baseAnnouncements}/:id`,
+    ...protectAnnouncements,
     asyncHandler(async (request, response) => {
       response.status(200).json({
         announcement: await service.getAnnouncement(
@@ -273,23 +315,25 @@ export function createCommunicationsRouter(
       });
     }),
   );
+
   router.patch(
-    `${base}/:id`,
-    ...protect,
-    csrfProtection,
-    asyncHandler(async (request, response) => {
-      response.status(200).json({
-        announcement: await service.updateAnnouncement(
-          organizationContext(response),
-          routeId(request.params.id),
-          updateInput(bodyObject(request.body)),
-        ),
-      });
-    }),
-  );
+      `${baseAnnouncements}/:id`,
+      ...protectAnnouncements,
+      csrfProtection,
+      asyncHandler(async (request, response) => {
+        response.status(200).json({
+          announcement: await service.updateAnnouncement(
+            organizationContext(response),
+            routeId(request.params.id),
+            updateInput(bodyObject(request.body)),
+          ),
+        });
+      }),
+    );
+
   router.delete(
-    `${base}/:id`,
-    ...protect,
+    `${baseAnnouncements}/:id`,
+    ...protectAnnouncements,
     csrfProtection,
     asyncHandler(async (request, response) => {
       await service.deleteAnnouncement(
@@ -297,6 +341,76 @@ export function createCommunicationsRouter(
         routeId(request.params.id),
       );
       response.status(204).end();
+    }),
+  );
+
+  // Phase D: Messaging Routes
+  router.get(
+    baseMessaging,
+    ...protectMessaging,
+    asyncHandler(async (_request, response) => {
+      const ctx = organizationContext(response);
+      const threads = await messagingService.listThreads(
+        ctx.organizationId,
+        ctx.userId,
+        ctx.role,
+      );
+      response.status(200).json({ items: threads });
+    }),
+  );
+
+  router.post(
+    baseMessaging,
+    ...protectMessaging,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const ctx = organizationContext(response);
+      const body = bodyObject(request.body);
+      const result = await messagingService.startConversation(
+        ctx.organizationId,
+        ctx.userId,
+        {
+          studentId: objectId(body.studentId, 'student'),
+          teacherUserId: objectId(body.teacherUserId, 'teacher'),
+          subjectTitle: text(body.subjectTitle, 'subject title', 120),
+          initialMessage: text(body.initialMessage, 'initial message', 2000),
+        },
+        ctx.campusIds[0],
+      );
+      response.status(201).json(result);
+    }),
+  );
+
+  router.get(
+    `${baseMessaging}/:threadId`,
+    ...protectMessaging,
+    asyncHandler(async (request, response) => {
+      const ctx = organizationContext(response);
+      const result = await messagingService.getThreadMessages(
+        ctx.organizationId,
+        ctx.userId,
+        ctx.role,
+        routeId(request.params.threadId),
+      );
+      response.status(200).json(result);
+    }),
+  );
+
+  router.post(
+    `${baseMessaging}/:threadId/messages`,
+    ...protectMessaging,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const ctx = organizationContext(response);
+      const body = bodyObject(request.body);
+      const message = await messagingService.replyToThread(
+        ctx.organizationId,
+        ctx.userId,
+        (ctx.role as MessageSenderRole) || 'parent_guardian',
+        routeId(request.params.threadId),
+        { content: text(body.content, 'content', 2000) },
+      );
+      response.status(201).json({ message });
     }),
   );
 
