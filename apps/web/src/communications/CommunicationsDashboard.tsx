@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Megaphone, Pin, Plus, Trash2 } from 'lucide-react';
+import { Megaphone, MessageSquare, Pin, Plus, Trash2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { listAcademicCampuses } from '../academics/academics-api.js';
+import { useAuth } from '../auth/AuthProvider.js';
 import { Button } from '../components/ui/Button.js';
 import { Dialog } from '../components/ui/Dialog.js';
 import {
@@ -31,6 +32,7 @@ import {
   useDeleteAnnouncement,
   useUpdateAnnouncement,
 } from './communications-api.js';
+import { ParentTeacherInbox } from './ParentTeacherInbox.js';
 
 const managerRoles = [
   'organization_owner',
@@ -38,6 +40,14 @@ const managerRoles = [
   'campus_admin',
   'principal_director',
   'academic_coordinator',
+];
+
+const messagingRoles = [
+  'organization_owner',
+  'organization_admin',
+  'principal_director',
+  'teacher',
+  'parent_guardian',
 ];
 
 const audienceLabels: Record<AnnouncementAudience, string> = {
@@ -98,8 +108,19 @@ function announcementDraft(item: Announcement): AnnouncementDraft {
 
 export function CommunicationsDashboard() {
   const { organizationId = '' } = useParams();
+  const { user } = useAuth();
   const access = useOrganizationAccess(organizationId);
-  const canManage = managerRoles.includes(access.data?.role ?? '');
+
+  const currentRole = access.data?.role ?? '';
+  const currentUserId = user?.id ?? '';
+
+  const canManageAnnouncements = managerRoles.includes(currentRole);
+  const canAccessMessaging = messagingRoles.includes(currentRole);
+
+  const [activeTab, setActiveTab] = useState<'announcements' | 'messaging'>(
+    canManageAnnouncements ? 'announcements' : 'messaging',
+  );
+
   const [audienceFilter, setAudienceFilter] = useState<AnnouncementAudience | ''>('');
   const [statusFilter, setStatusFilter] = useState<AnnouncementStatus | ''>('');
   const [campusFilter, setCampusFilter] = useState('');
@@ -115,19 +136,19 @@ export function CommunicationsDashboard() {
 
   const announcements = useAnnouncements(
     organizationId,
-    Boolean(access.data && canManage),
+    Boolean(access.data && canManageAnnouncements),
     filters,
   );
   const campuses = useQuery({
     queryKey: ['academics', organizationId, 'campuses'],
     queryFn: () => listAcademicCampuses(organizationId),
-    enabled: Boolean(access.data && canManage),
+    enabled: Boolean(access.data && canManageAnnouncements),
     retry: false,
   });
   const members = useQuery({
     queryKey: ['organization-members', organizationId],
     queryFn: () => getMembers(organizationId),
-    enabled: Boolean(access.data && canManage),
+    enabled: Boolean(access.data && canManageAnnouncements),
     retry: false,
   });
 
@@ -245,30 +266,13 @@ export function CommunicationsDashboard() {
       />
     );
   }
-  if (!canManage) return <PermissionDeniedState />;
+
+  if (!canManageAnnouncements && !canAccessMessaging) {
+    return <PermissionDeniedState />;
+  }
 
   const queryError =
     announcements.error ?? campuses.error ?? members.error ?? null;
-  if (queryError) {
-    return (
-      <ErrorState
-        title="Communications could not be loaded"
-        description={apiMessage(queryError)}
-        onRetry={() => {
-          void announcements.refetch();
-          void campuses.refetch();
-          void members.refetch();
-        }}
-      />
-    );
-  }
-  if (
-    announcements.isPending ||
-    campuses.isPending ||
-    members.isPending
-  ) {
-    return <LoadingState message="Loading announcements..." />;
-  }
 
   const items = announcements.data?.items ?? [];
   const saving = create.isPending || update.isPending;
@@ -283,177 +287,259 @@ export function CommunicationsDashboard() {
           </p>
           <h1>Communications</h1>
           <p className="page-description">
-            Keep your community informed with clear, timely announcements.
+            School-wide announcements and scoped, private parent-teacher messaging.
           </p>
         </div>
-        <Button onClick={openCreate} type="button" variant="primary">
-          <Plus size={17} aria-hidden="true" />
-          Create announcement
-        </Button>
+
+        {activeTab === 'announcements' && canManageAnnouncements && (
+          <Button onClick={openCreate} type="button" variant="primary">
+            <Plus size={17} aria-hidden="true" />
+            Create announcement
+          </Button>
+        )}
       </header>
 
-      <section
-        className="communications-section"
-        aria-label="Announcements"
+      {/* Workspace Tabs */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '1rem',
+          borderBottom: '1px solid #e2e8f0',
+          marginBottom: '1.5rem',
+        }}
       >
-        <div className="communications-section-heading">
-          <div>
-            <h2>Announcement feed</h2>
-            <p>Published notices, drafts, and archived announcements.</p>
-          </div>
-          <span className="communications-count">
-            {items.length} {items.length === 1 ? 'announcement' : 'announcements'}
-          </span>
-        </div>
-
-        <div className="communications-filters">
-          <label className="communications-field">
-            <span>Target audience</span>
-            <select
-              value={audienceFilter}
-              onChange={(event) =>
-                setAudienceFilter(
-                  event.target.value as AnnouncementAudience | '',
-                )
-              }
-            >
-              <option value="">All audiences</option>
-              {(Object.keys(audienceLabels) as AnnouncementAudience[]).map(
-                (audience) => (
-                  <option key={audience} value={audience}>
-                    {audienceLabels[audience]}
-                  </option>
-                ),
-              )}
-            </select>
-          </label>
-          <label className="communications-field">
-            <span>Status</span>
-            <select
-              value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(
-                  event.target.value as AnnouncementStatus | '',
-                )
-              }
-            >
-              <option value="">All statuses</option>
-              {(Object.keys(statusLabels) as AnnouncementStatus[]).map(
-                (status) => (
-                  <option key={status} value={status}>
-                    {statusLabels[status]}
-                  </option>
-                ),
-              )}
-            </select>
-          </label>
-          <label className="communications-field">
-            <span>Campus</span>
-            <select
-              value={campusFilter}
-              onChange={(event) => setCampusFilter(event.target.value)}
-            >
-              <option value="">All campuses</option>
-              {availableCampuses.map((campus) => (
-                <option key={campus.id} value={campus.id}>
-                  {campus.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        {announcements.isFetching && (
-          <p className="communications-refresh" role="status">
-            Updating announcements…
-          </p>
+        {canManageAnnouncements && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('announcements')}
+            style={{
+              padding: '0.75rem 0.25rem',
+              border: 'none',
+              background: 'none',
+              borderBottom: activeTab === 'announcements' ? '2px solid #2563eb' : '2px solid transparent',
+              color: activeTab === 'announcements' ? '#2563eb' : '#64748b',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <Megaphone size={16} />
+            Announcements
+          </button>
         )}
 
-        {items.length === 0 ? (
-          <EmptyState
-            title="No announcements found"
-            description="Create an announcement or adjust the selected filters."
-            action={
-              <Button onClick={openCreate} type="button" variant="secondary">
-                <Plus size={16} aria-hidden="true" />
-                Create announcement
-              </Button>
-            }
-          />
-        ) : (
-          <div className="communications-grid">
-            {items.map((item) => (
-              <article className="announcement-card" key={item.id}>
-                <div className="announcement-card-heading">
-                  <div className="announcement-badges">
-                    {item.isPinned && (
-                      <span className="announcement-badge announcement-pin">
-                        <Pin size={13} aria-hidden="true" />
-                        Pinned
-                      </span>
+        {canAccessMessaging && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('messaging')}
+            style={{
+              padding: '0.75rem 0.25rem',
+              border: 'none',
+              background: 'none',
+              borderBottom: activeTab === 'messaging' ? '2px solid #2563eb' : '2px solid transparent',
+              color: activeTab === 'messaging' ? '#2563eb' : '#64748b',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <MessageSquare size={16} />
+            Parent-Teacher Messages
+          </button>
+        )}
+      </div>
+
+      {activeTab === 'messaging' ? (
+        <ParentTeacherInbox
+          organizationId={organizationId}
+          currentUserId={currentUserId}
+          userRole={currentRole}
+        />
+      ) : (
+        <>
+          {queryError ? (
+            <ErrorState
+              title="Communications could not be loaded"
+              description={apiMessage(queryError)}
+              onRetry={() => {
+                void announcements.refetch();
+                void campuses.refetch();
+                void members.refetch();
+              }}
+            />
+          ) : announcements.isPending || campuses.isPending || members.isPending ? (
+            <LoadingState message="Loading announcements..." />
+          ) : (
+            <section
+              className="communications-section"
+              aria-label="Announcements"
+            >
+              <div className="communications-section-heading">
+                <div>
+                  <h2>Announcement feed</h2>
+                  <p>Published notices, drafts, and archived announcements.</p>
+                </div>
+                <span className="communications-count">
+                  {items.length} {items.length === 1 ? 'announcement' : 'announcements'}
+                </span>
+              </div>
+
+              <div className="communications-filters">
+                <label className="communications-field">
+                  <span>Target audience</span>
+                  <select
+                    value={audienceFilter}
+                    onChange={(event) =>
+                      setAudienceFilter(
+                        event.target.value as AnnouncementAudience | '',
+                      )
+                    }
+                  >
+                    <option value="">All audiences</option>
+                    {(Object.keys(audienceLabels) as AnnouncementAudience[]).map(
+                      (audience) => (
+                        <option key={audience} value={audience}>
+                          {audienceLabels[audience]}
+                        </option>
+                      ),
                     )}
-                    <span className="announcement-badge announcement-audience">
-                      {audienceLabels[item.targetAudience]}
-                    </span>
-                    <span
-                      className={`announcement-badge announcement-status announcement-status-${item.status}`}
-                    >
-                      {statusLabels[item.status]}
-                    </span>
-                  </div>
-                  <h3>{item.title}</h3>
-                </div>
-                <p className="announcement-content">{item.content}</p>
-                <dl className="announcement-meta">
-                  <div>
-                    <dt>Publish date</dt>
-                    <dd>{formatDate(item.publishDate)}</dd>
-                  </div>
-                  <div>
-                    <dt>Author</dt>
-                    <dd>
-                      {memberByUserId.get(item.authorId) ??
-                        `Member ${shortId(item.authorId)}`}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Campus</dt>
-                    <dd>
-                      {item.campusId
-                        ? campusList.find(
-                            (campus) => campus.id === item.campusId,
-                          )?.name ?? 'Assigned campus'
-                        : 'Organization-wide'}
-                    </dd>
-                  </div>
-                </dl>
-                <div className="announcement-actions">
-                  <Button
-                    onClick={() => openEdit(item)}
-                    type="button"
-                    variant="secondary"
+                  </select>
+                </label>
+                <label className="communications-field">
+                  <span>Status</span>
+                  <select
+                    value={statusFilter}
+                    onChange={(event) =>
+                      setStatusFilter(
+                        event.target.value as AnnouncementStatus | '',
+                      )
+                    }
                   >
-                    Edit
-                  </Button>
-                  <Button
-                    aria-label={`Delete ${item.title}`}
-                    onClick={() => {
-                      setDeleteTarget(item);
-                      setDeleteError('');
-                    }}
-                    type="button"
-                    variant="danger"
+                    <option value="">All statuses</option>
+                    {(Object.keys(statusLabels) as AnnouncementStatus[]).map(
+                      (status) => (
+                        <option key={status} value={status}>
+                          {statusLabels[status]}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </label>
+                <label className="communications-field">
+                  <span>Campus</span>
+                  <select
+                    value={campusFilter}
+                    onChange={(event) => setCampusFilter(event.target.value)}
                   >
-                    <Trash2 size={15} aria-hidden="true" />
-                    Delete
-                  </Button>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+                    <option value="">All campuses</option>
+                    {availableCampuses.map((campus) => (
+                      <option key={campus.id} value={campus.id}>
+                        {campus.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
 
+              {announcements.isFetching && (
+                <p className="communications-refresh" role="status">
+                  Updating announcements…
+                </p>
+              )}
+
+              {items.length === 0 ? (
+                <EmptyState
+                  title="No announcements found"
+                  description="Create an announcement or adjust the selected filters."
+                  action={
+                    <Button onClick={openCreate} type="button" variant="secondary">
+                      <Plus size={16} aria-hidden="true" />
+                      Create announcement
+                    </Button>
+                  }
+                />
+              ) : (
+                <div className="communications-grid">
+                  {items.map((item) => (
+                    <article className="announcement-card" key={item.id}>
+                      <div className="announcement-card-heading">
+                        <div className="announcement-badges">
+                          {item.isPinned && (
+                            <span className="announcement-badge announcement-pin">
+                              <Pin size={13} aria-hidden="true" />
+                              Pinned
+                            </span>
+                          )}
+                          <span className="announcement-badge announcement-audience">
+                            {audienceLabels[item.targetAudience]}
+                          </span>
+                          <span
+                            className={`announcement-badge announcement-status announcement-status-${item.status}`}
+                          >
+                            {statusLabels[item.status]}
+                          </span>
+                        </div>
+                        <h3>{item.title}</h3>
+                      </div>
+                      <p className="announcement-content">{item.content}</p>
+                      <dl className="announcement-meta">
+                        <div>
+                          <dt>Publish date</dt>
+                          <dd>{formatDate(item.publishDate)}</dd>
+                        </div>
+                        <div>
+                          <dt>Author</dt>
+                          <dd>
+                            {memberByUserId.get(item.authorId) ??
+                              `Member ${shortId(item.authorId)}`}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Campus</dt>
+                          <dd>
+                            {item.campusId
+                              ? campusList.find(
+                                  (campus) => campus.id === item.campusId,
+                                )?.name ?? 'Assigned campus'
+                              : 'Organization-wide'}
+                          </dd>
+                        </div>
+                      </dl>
+                      <div className="announcement-actions">
+                        <Button
+                          onClick={() => openEdit(item)}
+                          type="button"
+                          variant="secondary"
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          aria-label={`Delete ${item.title}`}
+                          onClick={() => {
+                            setDeleteTarget(item);
+                            setDeleteError('');
+                          }}
+                          type="button"
+                          variant="danger"
+                        >
+                          <Trash2 size={15} aria-hidden="true" />
+                          Delete
+                        </Button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+        </>
+      )}
+
+      {/* Create / Edit Announcement Modal */}
       <Dialog
         open={formOpen}
         title={editing ? 'Edit announcement' : 'Create announcement'}
@@ -602,6 +688,7 @@ export function CommunicationsDashboard() {
         </form>
       </Dialog>
 
+      {/* Delete Confirmation Modal */}
       <Dialog
         open={Boolean(deleteTarget)}
         title="Delete announcement?"
