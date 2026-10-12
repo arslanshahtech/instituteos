@@ -13,6 +13,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   ReceiptText,
+  Megaphone,
 } from 'lucide-react';
 import {
   Link,
@@ -53,8 +54,8 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
   const changeRole = (key: string) => navigate(`/${key}`);
 
   useEffect(() => {
-    if (mobileNavOpen) setMobileNavOpen(false);
-  }, [location.pathname, mobileNavOpen]);
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!mobileNavOpen) return;
@@ -225,6 +226,17 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                 <ReceiptText size={18} aria-hidden="true" />
                 <span>Finance</span>
               </NavLink>
+
+              <NavLink
+                className={({ isActive }) =>
+                  `navigation-link${isActive ? ' navigation-link-active' : ''}`
+                }
+                onClick={closeMobileNav}
+                to={`/admin/organizations/${organizationId}/communications`}
+              >
+                <Megaphone size={18} aria-hidden="true" />
+                <span>Communications</span>
+              </NavLink>
             </>
           )}
         </nav>
@@ -278,7 +290,10 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
               aria-expanded={mobileNavOpen}
               aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
               className="mobile-menu-button button button-quiet button-icon"
-              onClick={() => setMobileNavOpen((open) => !open)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setMobileNavOpen((open) => !open);
+              }}
               type="button"
             >
               {mobileNavOpen ? (

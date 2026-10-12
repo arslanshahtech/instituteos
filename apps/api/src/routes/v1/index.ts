@@ -11,6 +11,7 @@ import { academicsRouter } from '../../modules/academics/academics.routes.js';
 import { attendanceRouter } from '../../modules/attendance/attendance.routes.js';
 import { examinationsRouter } from '../../modules/examinations/examinations.routes.js';
 import { financeRouter } from '../../modules/finance/finance.routes.js';
+import { communicationsRouter } from '../../modules/communications/communications.routes.js';
 
 export const v1Router = Router();
 
@@ -27,4 +28,5 @@ v1Router.use('/organizations', academicsRouter);
 v1Router.use('/organizations', attendanceRouter);
 v1Router.use('/organizations', examinationsRouter);
 v1Router.use('/organizations', financeRouter);
+v1Router.use('/organizations', communicationsRouter);
 v1Router.use('/platform/organizations', platformOrganizationRouter);
