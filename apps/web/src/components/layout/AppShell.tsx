@@ -15,6 +15,7 @@ import {
   ReceiptText,
   Megaphone,
   BarChart3,
+  SlidersHorizontal,
 } from 'lucide-react';
 import {
   Link,
@@ -248,6 +249,17 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
               >
                 <Megaphone size={18} aria-hidden="true" />
                 <span>Communications</span>
+              </NavLink>
+
+              <NavLink
+                className={({ isActive }) =>
+                  `navigation-link${isActive ? ' navigation-link-active' : ''}`
+                }
+                onClick={closeMobileNav}
+                to={`/admin/organizations/${organizationId}/settings`}
+              >
+                <SlidersHorizontal size={18} aria-hidden="true" />
+                <span>Settings</span>
               </NavLink>
             </>
           )}

@@ -13,6 +13,7 @@ import { examinationsRouter } from '../../modules/examinations/examinations.rout
 import { financeRouter } from '../../modules/finance/finance.routes.js';
 import { communicationsRouter } from '../../modules/communications/communications.routes.js';
 import { reportingRouter } from '../../modules/reporting/reporting.routes.js';
+import { settingsRouter } from '../../modules/settings/settings.routes.js';
 
 export const v1Router = Router();
 
@@ -31,4 +32,5 @@ v1Router.use('/organizations', examinationsRouter);
 v1Router.use('/organizations', financeRouter);
 v1Router.use('/organizations', communicationsRouter);
 v1Router.use('/organizations', reportingRouter);
+v1Router.use('/organizations', settingsRouter);
 v1Router.use('/platform/organizations', platformOrganizationRouter);
