@@ -239,6 +239,17 @@ export function createPeopleRouter(
     resolveOrganization,
     requireOrganizationPermission('student.read'),
     asyncHandler(async (request, response) => {
+      const context = organizationContext(response);
+
+      // Parent role cannot fetch arbitrary student directory listings
+      if (context.role === 'parent_guardian') {
+        throw new AppError(
+          403,
+          'PERMISSION_DENIED',
+          'Parents may only view profiles of their linked children.',
+        );
+      }
+
       const body = request.query ?? {};
       const search = typeof body.search === 'string' ? body.search : undefined;
       const status = typeof body.status === 'string' ? body.status : undefined;
@@ -246,7 +257,7 @@ export function createPeopleRouter(
         typeof body.page === 'string' ? Number(body.page) : undefined;
       const pageSize =
         typeof body.pageSize === 'string' ? Number(body.pageSize) : undefined;
-      const result = await service.listStudents(organizationContext(response), {
+      const result = await service.listStudents(context, {
         search,
         status: status as 'active' | 'inactive' | 'withdrawn' | undefined,
         page,
@@ -308,10 +319,34 @@ export function createPeopleRouter(
     resolveOrganization,
     requireOrganizationPermission('student.read'),
     asyncHandler(async (request, response) => {
+      const context = organizationContext(response);
+      const studentId = routeParameter(request, 'studentId');
+
+      // Parent Scoping Guard: Enforce linked child verification
+      if (context.role === 'parent_guardian') {
+        const relations = await service.listStudentGuardians(context, studentId);
+        const userEmail = response.locals?.session?.email?.toLowerCase();
+        const userPhone = response.locals?.session?.phone;
+
+        const isLinked = relations.some(
+          (rel) =>
+            (userEmail && rel.guardian?.email?.toLowerCase() === userEmail) ||
+            (userPhone && rel.guardian?.phone === userPhone),
+        );
+
+        if (!isLinked) {
+          throw new AppError(
+            403,
+            'PERMISSION_DENIED',
+            'You are not authorized to view this student profile.',
+          );
+        }
+      }
+
       const student = await service.getStudent(
-        organizationContext(response).organizationId,
-        routeParameter(request, 'studentId'),
-        organizationContext(response),
+        context.organizationId,
+        studentId,
+        context,
       );
       response.status(200).json({ student });
     }),
