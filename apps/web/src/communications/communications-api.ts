@@ -139,3 +139,135 @@ export function useDeleteAnnouncement(organizationId: string) {
     onSuccess: invalidate,
   });
 }
+
+// ==========================================
+// Phase D: Direct Messaging Types & Hooks
+// ==========================================
+
+export type ThreadStatus = 'active' | 'closed' | 'archived';
+export type MessageSenderRole = 'parent_guardian' | 'teacher' | 'admin';
+
+export interface ConversationThread {
+  id: string;
+  organizationId: string;
+  campusId?: string;
+  studentId: string;
+  teacherUserId: string;
+  guardianUserId: string;
+  subjectTitle: string;
+  status: ThreadStatus;
+  lastMessageAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DirectMessage {
+  id: string;
+  organizationId: string;
+  threadId: string;
+  senderUserId: string;
+  senderRole: MessageSenderRole;
+  content: string;
+  readAt?: string;
+  createdAt: string;
+}
+
+export interface StartConversationInput {
+  studentId: string;
+  teacherUserId: string;
+  subjectTitle: string;
+  initialMessage: string;
+}
+
+const messagingThreadsPath = (organizationId: string) =>
+  `/organizations/${encodeURIComponent(organizationId)}/communications/threads`;
+
+export function listThreads(organizationId: string) {
+  return apiRequest<{ items: ConversationThread[] }>(
+    messagingThreadsPath(organizationId),
+  );
+}
+
+export function getThreadMessages(organizationId: string, threadId: string) {
+  return apiRequest<{ thread: ConversationThread; messages: DirectMessage[] }>(
+    `${messagingThreadsPath(organizationId)}/${encodeURIComponent(threadId)}`,
+  );
+}
+
+export function startConversation(
+  organizationId: string,
+  input: StartConversationInput,
+) {
+  return apiRequest<{ thread: ConversationThread; message: DirectMessage }>(
+    messagingThreadsPath(organizationId),
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+}
+
+export function sendReply(
+  organizationId: string,
+  threadId: string,
+  content: string,
+) {
+  return apiRequest<{ message: DirectMessage }>(
+    `${messagingThreadsPath(organizationId)}/${encodeURIComponent(threadId)}/messages`,
+    { method: 'POST', body: JSON.stringify({ content }) },
+  );
+}
+
+export const messagingQueryKey = (organizationId: string) =>
+  ['messaging-threads', organizationId] as const;
+
+export const threadDetailQueryKey = (organizationId: string, threadId: string) =>
+  ['messaging-thread', organizationId, threadId] as const;
+
+export function useThreads(organizationId: string, enabled = true) {
+  return useQuery({
+    queryKey: messagingQueryKey(organizationId),
+    queryFn: () => listThreads(organizationId),
+    enabled: Boolean(organizationId) && enabled,
+    retry: false,
+  });
+}
+
+export function useThreadDetail(
+  organizationId: string,
+  threadId: string | null,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: threadDetailQueryKey(organizationId, threadId ?? ''),
+    queryFn: () => getThreadMessages(organizationId, threadId as string),
+    enabled: Boolean(organizationId && threadId) && enabled,
+    retry: false,
+  });
+}
+
+export function useStartConversation(organizationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: StartConversationInput) =>
+      startConversation(organizationId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: messagingQueryKey(organizationId),
+      });
+    },
+  });
+}
+
+export function useSendReply(organizationId: string, threadId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (content: string) =>
+      sendReply(organizationId, threadId, content),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: threadDetailQueryKey(organizationId, threadId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: messagingQueryKey(organizationId),
+      });
+    },
+  });
+}
