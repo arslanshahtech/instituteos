@@ -588,11 +588,6 @@ export function OrganizationAdminPage() {
                       </option>
                     ))}
                 </select>
-                <ChevronDown
-                  className="select-chevron"
-                  size={14}
-                  aria-hidden="true"
-                />
               </div>
             </label>
           )}

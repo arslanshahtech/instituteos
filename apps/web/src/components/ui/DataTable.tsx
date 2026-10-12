@@ -48,6 +48,7 @@ export function DataTable<T>({
                 {columns.map((column) => (
                   <td
                     key={column.header}
+                    data-label={column.header}
                     className={
                       column.align ? `align-${column.align}` : undefined
                     }

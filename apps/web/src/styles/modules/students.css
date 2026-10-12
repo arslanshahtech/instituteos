@@ -1,0 +1,304 @@
+/* ========================================================
+   Student & Student Management Base Styles
+   ======================================================== */
+.students-page,
+.student-management-page {
+  width: 100%;
+  max-width: 1120px;
+  min-width: 0;
+  overflow-x: clip;
+  margin: 0 auto;
+}
+
+.student-page-heading {
+  align-items: center;
+}
+
+.student-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.student-list-panel,
+.student-detail-panel,
+.student-form-panel {
+  min-width: 0;
+  overflow-x: hidden;
+  padding: 20px;
+}
+
+.student-list-panel {
+  display: grid;
+  gap: 16px;
+}
+
+/* Filters & Search */
+.student-filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(160px, 220px);
+  align-items: end;
+  gap: 14px;
+}
+
+.student-search-field,
+.student-status-filter {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  color: #34485a;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.student-search-field select,
+.student-status-filter select {
+  width: 100%;
+  min-width: 0;
+}
+
+.student-search-field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  border: 1px solid var(--color-border-strong, #cbd5e1);
+  border-radius: var(--radius-sm, 6px);
+  background: #fff;
+  padding: 9px 12px;
+  color: var(--color-ink, #0f172a);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.student-name-link {
+  color: #0f766e;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.student-name-link:hover {
+  color: var(--color-accent, #0d9488);
+  text-decoration: underline;
+}
+
+/* Detail & Form Layout */
+.student-form {
+  display: grid;
+  gap: 20px;
+}
+
+.student-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.student-detail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  padding-bottom: 14px;
+}
+
+.student-detail-heading h2 {
+  margin: 0;
+  color: var(--color-ink, #0f172a);
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.student-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 28px;
+  margin: 0;
+  padding-top: 20px;
+}
+
+.student-details > div {
+  min-width: 0;
+}
+
+.student-details dt {
+  color: var(--color-muted, #64748b);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.student-details dd {
+  margin: 6px 0 0;
+  color: var(--color-ink, #0f172a);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 900px) {
+  .student-details {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .student-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ========================================================
+   Premium Mobile Stacked Cards Layout (max-width: 640px)
+   ======================================================== */
+@media (max-width: 640px) {
+  .student-management-page,
+  .student-list-panel,
+  .student-detail-panel,
+  .student-form-panel,
+  .student-form {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .student-list-panel,
+  .student-detail-panel,
+  .student-form-panel {
+    padding: 16px;
+  }
+
+  .page-heading.student-page-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .student-page-heading > div:first-child {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .student-page-actions {
+    width: 100%;
+    align-items: stretch;
+    gap: 9px;
+  }
+
+  .student-page-actions > .button {
+    flex: 1 1 auto;
+    min-height: 40px;
+    padding: 8px 12px;
+    text-align: center;
+  }
+
+  .student-form-grid,
+  .student-details,
+  .student-filters {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .student-search-field input,
+  .student-status-filter select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* --- Standalone Mobile Cards --- */
+  .student-management-page .data-table tr,
+  .students-page .data-table tr {
+    display: block;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 1.125rem 1.25rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+  }
+
+  /* Stacked Row Layout (Label Upar, Value Niche) */
+  .student-management-page .data-table td,
+  .students-page .data-table td {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.25rem !important;
+    padding: 0.625rem 0 !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    text-align: left !important;
+  }
+
+  .student-management-page .data-table td:last-child,
+  .students-page .data-table td:last-child {
+    border-bottom: none !important;
+  }
+
+  /* Labels (Student, Email, Campus, Status) */
+  .student-management-page .data-table td [data-cell-label],
+  .students-page .data-table td [data-cell-label],
+  .student-management-page .data-table td::before,
+  .students-page .data-table td::before,
+  .student-management-page .data-table td > span:first-child:not(:only-child),
+  .students-page .data-table td > span:first-child:not(:only-child) {
+    font-size: 0.6875rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+    color: #64748b !important;
+    line-height: 1.2 !important;
+    margin-bottom: 0.15rem !important;
+  }
+
+  /* Values */
+  .student-management-page .data-table td > span:last-child,
+  .students-page .data-table td > span:last-child,
+  .student-management-page .data-table td > div,
+  .students-page .data-table td > div {
+    font-size: 0.9375rem !important;
+    color: #0f172a !important;
+    font-weight: 500 !important;
+    word-break: break-word !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Student Name Highlight */
+  .student-management-page .data-table td:first-child .student-name-link,
+  .students-page .data-table td:first-child .student-name-link {
+    font-size: 1.0625rem !important;
+    font-weight: 650 !important;
+    color: #0f766e !important;
+  }
+
+  /* Status Badge Styling */
+  .student-management-page .data-table td [class*="status"],
+  .students-page .data-table td [class*="status"] {
+    display: inline-flex !important;
+    align-items: center !important;
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    border-radius: 2px !important;
+    margin-top: 0.2rem !important;
+    background: #dcfce7 !important;
+    color: #15803d !important;
+    border: 1px solid #bbf7d0 !important;
+  }
+
+  /* Action Buttons Bar */
+  .student-management-page .data-table td:has(button),
+  .students-page .data-table td:has(button) {
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 0.625rem !important;
+    margin-top: 0.5rem !important;
+    padding-top: 0.625rem !important;
+    border-top: 1px dashed #e2e8f0 !important;
+  }
+
+  .student-management-page .data-table td:has(button) [data-cell-label],
+  .students-page .data-table td:has(button)::before {
+    display: none !important;
+  }
+}

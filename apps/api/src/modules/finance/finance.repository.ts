@@ -30,25 +30,6 @@ const iso = (value: Date | string) => new Date(value).toISOString();
 const randomNumber = (prefix: string) =>
   `${prefix}-${randomUUID().replaceAll('-', '').slice(0, 16).toUpperCase()}`;
 
-function isTransactionUnsupported(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false;
-  const candidate = error as {
-    code?: number;
-    codeName?: string;
-    message?: string;
-  };
-  const message = candidate.message ?? '';
-  return (
-    (candidate.code === 20 &&
-      /transaction numbers are only allowed|transactions? (?:are )?not supported/i.test(
-        message,
-      )) ||
-    /transaction numbers are only allowed on a replica set member or mongos|transactions? are not supported by this deployment|topology does not support sessions|sessions are not supported by this deployment/i.test(
-      message,
-    )
-  );
-}
-
 function feeStructureRecord(record: Record<string, unknown>): FeeStructureRecord {
   const heads = record.feeHeads as Array<Record<string, unknown>>;
   return {
