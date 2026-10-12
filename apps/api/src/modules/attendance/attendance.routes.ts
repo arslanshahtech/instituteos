@@ -24,12 +24,23 @@ import type {
   StudentAttendanceStatus,
 } from './attendance.types.js';
 
-const attendanceManagers = [
+// Managers allowed to manage placements and staff attendance
+const staffAttendanceManagers = [
   'organization_owner',
   'organization_admin',
   'campus_admin',
   'principal_director',
   'academic_coordinator',
+] as const;
+
+// Roles allowed to take and view student roll-calls (Teachers included)
+const studentAttendanceRoles = [
+  'organization_owner',
+  'organization_admin',
+  'campus_admin',
+  'principal_director',
+  'academic_coordinator',
+  'teacher',
 ] as const;
 
 function bodyObject(value: unknown): Record<string, unknown> {
@@ -130,16 +141,26 @@ export function createAttendanceRouter(
   const router = Router();
   const resolveOrganization =
     createOrganizationContextMiddleware(accessRepository);
-  const protect = [
+
+  // Student Attendance: Accessible by Admins and Teachers
+  const protectStudentAttendance = [
     authenticate,
     resolveOrganization,
-    requireOrganizationRole(attendanceManagers),
+    requireOrganizationRole(studentAttendanceRoles),
   ] as const;
+
+  // Management & Staff Attendance: Accessible only by Admin/Managers
+  const protectStaffAttendance = [
+    authenticate,
+    resolveOrganization,
+    requireOrganizationRole(staffAttendanceManagers),
+  ] as const;
+
   const base = '/:organizationId';
 
   router.get(
     `${base}/attendance/students/roster`,
-    ...protect,
+    ...protectStudentAttendance,
     asyncHandler(async (request, response) => {
       const query = request.query as Record<string, unknown>;
       const roster = await service.listStudentRoster(
@@ -155,9 +176,10 @@ export function createAttendanceRouter(
       response.status(200).json({ items: roster });
     }),
   );
+
   router.get(
     `${base}/attendance/students/eligible`,
-    ...protect,
+    ...protectStudentAttendance,
     asyncHandler(async (request, response) => {
       const query = request.query as Record<string, unknown>;
       const items = await service.listEligibleStudents(
@@ -168,9 +190,11 @@ export function createAttendanceRouter(
       response.status(200).json({ items });
     }),
   );
+
+  // Student placement into classes/sections remains a manager action
   router.post(
     `${base}/attendance/students/placements`,
-    ...protect,
+    ...protectStaffAttendance,
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
@@ -187,9 +211,10 @@ export function createAttendanceRouter(
       response.status(201).json({ placement });
     }),
   );
+
   router.put(
     `${base}/attendance/students/bulk`,
-    ...protect,
+    ...protectStudentAttendance,
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
@@ -232,9 +257,10 @@ export function createAttendanceRouter(
       response.status(200).json({ items: attendance });
     }),
   );
+
   router.get(
     `${base}/attendance/students`,
-    ...protect,
+    ...protectStudentAttendance,
     asyncHandler(async (request, response) => {
       const query = request.query as Record<string, unknown>;
       const items = await service.listStudentAttendance(
@@ -263,9 +289,11 @@ export function createAttendanceRouter(
       response.status(200).json({ items });
     }),
   );
+
+  // Staff Attendance stays protected for managers only
   router.post(
     `${base}/attendance/staff`,
-    ...protect,
+    ...protectStaffAttendance,
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
@@ -291,9 +319,10 @@ export function createAttendanceRouter(
       response.status(200).json({ attendance: record });
     }),
   );
+
   router.get(
     `${base}/attendance/staff`,
-    ...protect,
+    ...protectStaffAttendance,
     asyncHandler(async (request, response) => {
       const query = request.query as Record<string, unknown>;
       const items = await service.listStaffAttendance(

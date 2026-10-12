@@ -15,6 +15,7 @@ import type { OrganizationAccessRepository } from '../tenancy/tenancy.types.js';
 import {
   createOrganizationContextMiddleware,
   requireOrganizationPermission,
+  requireOrganizationRole,
 } from '../tenancy/tenant-context.middleware.js';
 import { MongoExaminationsRepository } from './examinations.repository.js';
 import { ExaminationsService } from './examinations.service.js';
@@ -26,6 +27,15 @@ import type {
   GradeBreakdown,
   GradingScaleInput,
 } from './examinations.types.js';
+
+// Roles permitted to create, delete or alter exam setups and grading scales
+const examManagementRoles = [
+  'organization_owner',
+  'organization_admin',
+  'campus_admin',
+  'principal_director',
+  'academic_coordinator',
+] as const;
 
 function bodyObject(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value))
@@ -256,16 +266,29 @@ export function createExaminationsRouter(
   const router = Router();
   const resolveOrganization =
     createOrganizationContextMiddleware(accessRepository);
+
+  // Read: Accessible to anyone with examination.read (Teachers, Admins, etc.)
   const read = [
     authenticate,
     resolveOrganization,
     requireOrganizationPermission('examination.read'),
   ] as const;
-  const write = [
+
+  // Structural Exam / Scale Management: Strict roles only (Admins/Managers)
+  const manageExams = [
+    authenticate,
+    resolveOrganization,
+    requireOrganizationPermission('examination.write'),
+    requireOrganizationRole(examManagementRoles),
+  ] as const;
+
+  // Marks Entry: Teachers and Admins can save marks
+  const enterMarks = [
     authenticate,
     resolveOrganization,
     requireOrganizationPermission('examination.write'),
   ] as const;
+
   const base = '/:organizationId/examinations';
 
   router.get(
@@ -282,9 +305,11 @@ export function createExaminationsRouter(
       });
     }),
   );
+
+  // Creating exams is restricted to managers
   router.post(
     base,
-    ...write,
+    ...manageExams,
     csrfProtection,
     asyncHandler(async (request, response) => {
       response.status(201).json({
@@ -295,9 +320,10 @@ export function createExaminationsRouter(
       });
     }),
   );
+
   router.patch(
     `${base}/:examId`,
-    ...write,
+    ...manageExams,
     csrfProtection,
     asyncHandler(async (request, response) => {
       response.status(200).json({
@@ -309,9 +335,10 @@ export function createExaminationsRouter(
       });
     }),
   );
+
   router.delete(
     `${base}/:examId`,
-    ...write,
+    ...manageExams,
     csrfProtection,
     asyncHandler(async (request, response) => {
       await service.deleteExam(
@@ -321,6 +348,7 @@ export function createExaminationsRouter(
       response.status(204).end();
     }),
   );
+
   router.get(
     `${base}/:examId/schedules`,
     ...read,
@@ -333,9 +361,10 @@ export function createExaminationsRouter(
       });
     }),
   );
+
   router.post(
     `${base}/:examId/schedules`,
-    ...write,
+    ...manageExams,
     csrfProtection,
     asyncHandler(async (request, response) => {
       response.status(201).json({
@@ -347,9 +376,10 @@ export function createExaminationsRouter(
       });
     }),
   );
+
   router.patch(
     `${base}/schedules/:scheduleId`,
-    ...write,
+    ...manageExams,
     csrfProtection,
     asyncHandler(async (request, response) => {
       response.status(200).json({
@@ -361,9 +391,10 @@ export function createExaminationsRouter(
       });
     }),
   );
+
   router.delete(
     `${base}/schedules/:scheduleId`,
-    ...write,
+    ...manageExams,
     csrfProtection,
     asyncHandler(async (request, response) => {
       await service.deleteSchedule(
@@ -373,6 +404,7 @@ export function createExaminationsRouter(
       response.status(204).end();
     }),
   );
+
   router.get(
     `${base}/grading-scales`,
     ...read,
@@ -382,9 +414,10 @@ export function createExaminationsRouter(
       });
     }),
   );
+
   router.post(
     `${base}/grading-scales`,
-    ...write,
+    ...manageExams,
     csrfProtection,
     asyncHandler(async (request, response) => {
       response.status(201).json({
@@ -395,9 +428,10 @@ export function createExaminationsRouter(
       });
     }),
   );
+
   router.patch(
     `${base}/grading-scales/:scaleId`,
-    ...write,
+    ...manageExams,
     csrfProtection,
     asyncHandler(async (request, response) => {
       response.status(200).json({
@@ -409,9 +443,10 @@ export function createExaminationsRouter(
       });
     }),
   );
+
   router.delete(
     `${base}/grading-scales/:scaleId`,
-    ...write,
+    ...manageExams,
     csrfProtection,
     asyncHandler(async (request, response) => {
       await service.deleteGradingScale(
@@ -421,6 +456,7 @@ export function createExaminationsRouter(
       response.status(204).end();
     }),
   );
+
   router.get(
     `${base}/schedules/:scheduleId/marks`,
     ...read,
@@ -435,9 +471,11 @@ export function createExaminationsRouter(
       });
     }),
   );
+
+  // Teachers and authorized staff can record/update marks
   router.put(
     `${base}/schedules/:scheduleId/marks`,
-    ...write,
+    ...enterMarks,
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
@@ -450,6 +488,7 @@ export function createExaminationsRouter(
       });
     }),
   );
+
   router.get(
     `${base}/:examId/students/:studentId/report`,
     ...read,
