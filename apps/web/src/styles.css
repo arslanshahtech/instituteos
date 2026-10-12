@@ -4311,3 +4311,354 @@ a {
     overflow-x: hidden;
   }
 }
+
+.communications-page {
+  display: grid;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  gap: 22px;
+  overflow-x: hidden;
+}
+
+.communications-heading {
+  align-items: center;
+  margin-bottom: 0;
+}
+
+.communications-heading .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.communications-heading > .button {
+  min-height: 40px;
+}
+
+.communications-section {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  padding: 20px;
+}
+
+.communications-section-heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.communications-section-heading h2 {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.communications-section-heading p {
+  margin: 5px 0 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.communications-count {
+  flex: 0 0 auto;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.communications-filters {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.communications-field {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  color: #34485a;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.communications-field input,
+.communications-field select,
+.communications-field textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background-color: #fff;
+  padding: 8px 11px;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.communications-field textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.communications-field input:focus,
+.communications-field select:focus,
+.communications-field textarea:focus {
+  outline: 2px solid #3a7d72;
+  outline-offset: 1px;
+}
+
+.communications-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  gap: 14px;
+}
+
+.announcement-card {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  padding: 16px;
+  overflow-wrap: anywhere;
+}
+
+.announcement-card-heading {
+  min-width: 0;
+}
+
+.announcement-card-heading h3 {
+  margin: 10px 0 0;
+  color: var(--color-ink);
+  font-size: 16px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.announcement-badges {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.announcement-badge {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  background: #edf2f3;
+  padding: 3px 8px;
+  color: #425564;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.announcement-pin {
+  background: #f7f0df;
+  color: #795913;
+}
+
+.announcement-status-published {
+  background: #e8f4ec;
+  color: #27613c;
+}
+
+.announcement-status-draft {
+  background: #f1f2f4;
+  color: #5c6671;
+}
+
+.announcement-status-archived {
+  background: #f7eaea;
+  color: #803f3f;
+}
+
+.announcement-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 12px 0 16px;
+  color: #465868;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.announcement-meta {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  border-top: 1px solid var(--color-border);
+  padding: 13px 0 0;
+}
+
+.announcement-meta > div {
+  min-width: 0;
+}
+
+.announcement-meta > div:last-child {
+  grid-column: 1 / -1;
+}
+
+.announcement-meta dt {
+  margin-bottom: 4px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.announcement-meta dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.announcement-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.announcement-actions > .button {
+  min-height: 40px;
+}
+
+.communications-refresh {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.communications-form {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+}
+
+.communications-form-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.communications-checkbox {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 9px;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.communications-checkbox input {
+  width: 18px;
+  height: 18px;
+  accent-color: #3a7d72;
+}
+
+.communications-form-error {
+  margin: 0;
+  border: 1px solid #e5bebe;
+  border-radius: var(--radius-sm);
+  background: #fff5f5;
+  padding: 10px 12px;
+  color: #8a3030;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.communications-form .dialog-actions,
+.communications-page > dialog .dialog-actions {
+  margin-top: 2px;
+}
+
+.communications-form .dialog-actions > .button,
+.communications-page > dialog .dialog-actions > .button {
+  min-height: 40px;
+}
+
+@media (max-width: 768px) {
+  .communications-filters,
+  .communications-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .communications-filters {
+    gap: 9px;
+  }
+
+  .communications-section {
+    padding: 16px;
+    overflow-x: hidden;
+  }
+}
+
+@media (max-width: 640px) {
+  .communications-heading {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .communications-heading button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .communications-section-heading {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .communications-count {
+    align-self: flex-start;
+  }
+
+  .communications-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .announcement-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .announcement-actions > .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .communications-page .state-empty {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 1rem;
+  }
+}
