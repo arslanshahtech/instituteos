@@ -14,6 +14,7 @@ import {
   ClipboardList,
   ReceiptText,
   Megaphone,
+  BarChart3,
 } from 'lucide-react';
 import {
   Link,
@@ -225,6 +226,17 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
               >
                 <ReceiptText size={18} aria-hidden="true" />
                 <span>Finance</span>
+              </NavLink>
+
+              <NavLink
+                className={({ isActive }) =>
+                  `navigation-link${isActive ? ' navigation-link-active' : ''}`
+                }
+                onClick={closeMobileNav}
+                to={organizationPath('reports')}
+              >
+                <BarChart3 size={18} aria-hidden="true" />
+                <span>Reports &amp; Audit</span>
               </NavLink>
 
               <NavLink
