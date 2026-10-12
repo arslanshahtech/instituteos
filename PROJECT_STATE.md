@@ -1,7 +1,7 @@
 # InstituteOS — Project State & Execution Truth
 
 **Last Updated:** October 12, 2026  
-**Status Baseline:** Phase A Completed (Atlas Database Index Verified & Baseline Tests 63/63 Green)
+**Status Baseline:** Phase A, Phase B, and Phase C Completed (Full-Stack Verified & All Tests Green)
 
 ---
 
@@ -9,17 +9,17 @@
 
 | Phase / Module | Domain | Code State | Automated Checks | Real Role / Multi-Tenant Verified | Production Ready |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **P00–P05** | Foundation, Auth, Orgs, Tenancy, RBAC | Implemented | Passed (63/63 tests) | Verified (Admin/Owner flows) | Ready for hardening |
-| **P06** | People (Students, Guardians, Admissions, Staff) | Implemented | Passed | Database Index Verified on Atlas | In Progress (Role scope pending) |
-| **P07** | Academics (Years, Terms, Classes, Sections, Subjects) | Implemented | Passed | Admin verified (Timetable absent) | Verification pending |
-| **P08** | Attendance & Examinations | Implemented | Passed | Teacher marks entry verified | Student/Parent view pending |
+| **P00–P05** | Foundation, Auth, Orgs, Tenancy, RBAC | Implemented | Passed | Verified (Admin/Owner flows) | Hardened |
+| **P06** | People (Students, Guardians, Admissions, Staff) | Implemented | Passed (Web 7/7) | Verified (Parent directory listing blocked; linked-child verified) | Ready |
+| **P07** | Academics (Years, Terms, Classes, Sections, Subjects) | Implemented | Passed | Admin verified | Verified |
+| **P08** | Attendance & Examinations | Implemented | Passed | Scoped (Teacher roster & marks entry unblocked; admin exam configs restricted) | Ready |
 | **P09** | Finance (Fee Structures, Invoices, Payments) | Implemented | Passed | Invoice generation verified | Online Gateway pending |
-| **P10** | Communications & Announcements | Implemented | Passed | Global Announcements active | 1-on-1 Inbox pending |
+| **P10** | Communications & Announcements | Implemented | Passed | Global Announcements active | 1-on-1 Inbox planned (Phase D) |
 | **P11** | Reporting & Analytics | Implemented | Passed | Export / Audit-read active | Role drill-down pending |
-| **P12** | Settings & Organization Branding | Implemented | Passed | Multi-campus branding active | Hardening pending |
-| **Phase 15 (New)** | Real Role Portals & Scoped Boundaries (RBAC) | In Progress | Planned | Role Matrix definition in progress | Pending |
-| **Phase 16 (New)** | Safe Child Pickup & Gate-Pass Protocol | Planned | Pending | Architecture designed | Pending |
-| **Phase 17 (New)** | Official WhatsApp Cloud API & Messaging | Planned | Pending | Spec ready | Pending |
+| **P12** | Settings & Organization Branding | Implemented | Passed | Multi-campus branding active | Hardened |
+| **Phase 15 (Phase B)** | Real Role Portals & Scoped Boundaries (RBAC / BOLA) | Implemented | Passed (Clean typecheck) | Teacher and Parent object-level boundaries enforced | Hardened |
+| **Phase 16 (Phase C)** | Safe Child Pickup & Digital Gate-Pass Protocol | Implemented | Passed (Backend 4/4, Web 7/7) | Digital pass generation, verify & release, audit logs verified | Complete |
+| **Phase 17 (Phase D)** | Privacy-Preserving Parent-Teacher Messaging | In Progress | Planned | Spec & Contracts in progress | In Progress |
 | **Phase 18 (New)** | Permission-Aware AI Assistant | Planned | Pending | Spec ready | Pending |
 
 ---
@@ -27,14 +27,19 @@
 ## 2. Verified Technical Baselines
 
 1. **Database Uniqueness & Indexing:**
-   - `uniq_student_applicant_record` verified with `partialFilterExpression` on MongoDB Atlas. Standalone student creations without application links are completely safe from duplicate key collisions.
-2. **Frontend UI Architecture:**
-   - Feature-level modular CSS split completed across all modules (`academics.css`, `staff.css`, `students.css`, `guardians.css`, `admissions.css`, `finance.css`, `reports.css`, `organizations.css`).
-   - Mobile responsive cards and segmented pill tabs unified.
-3. **Test Suite:**
-   - 63 unit/integration tests running clean across all modules.
+   - `uniq_student_applicant_record` verified with `partialFilterExpression` on MongoDB Atlas.
+   - Pickup collections indexed: `AuthorizedPickupPerson` ({ organizationId: 1, studentId: 1, status: 1 }), `PickupPass` ({ organizationId: 1, passCode: 1, status: 1 }), and `PickupLog` ({ organizationId: 1, studentId: 1, releasedAt: -1 }).
+2. **Object-Level Security & Scoping (BOLA / IDOR Hardening):**
+   - **Teachers:** Scoped strictly to student attendance and examination marks rosters for assigned sections. Structural exam modifications, exam deletion, and staff attendance are restricted.
+   - **Parents:** Global student directory access blocked. Student profile lookup strictly enforces verified guardian-student relationship link.
+3. **Frontend UI Architecture:**
+   - Modular CSS split maintained across all workspaces.
+   - `ChildPickupPanel` integrated into `StudentDetailPage` with support for pass generation, single-use PIN displays, and staff release verification.
+4. **Test Suite:**
+   - Backend pickup test suite: `pickup.service.test.ts` (4/4 passed).
+   - Frontend web test suite: `StudentPages.test.tsx` (7/7 passed), overall web tests green.
 
 ---
 
 ## 3. Current Focus
-- Transitioning to **Phase B: Role-Based Access Control (RBAC) Hardening & Scoped Role Portals**.
+- Active development on **Phase D: Privacy-Preserving Parent-Teacher Messaging (School-Owned Inbox, Anti-BOLA Scoping, Teacher Privacy Safeguards)**.
