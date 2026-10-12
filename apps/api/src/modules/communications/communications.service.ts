@@ -7,6 +7,12 @@ import type {
   AnnouncementRepository,
   CreateAnnouncementInput,
   UpdateAnnouncementInput,
+  ConversationThread,
+  DirectMessage,
+  CreateThreadInput,
+  SendMessageInput,
+  MessageSenderRole,
+  MessagingRepository,
 } from './communications.types.js';
 
 const audiences = ['all', 'staff', 'students', 'guardians'] as const;
@@ -289,5 +295,173 @@ export class CommunicationsService {
     if (!(await this.repository.deleteAnnouncement(context.organizationId, id))) {
       throw new AppError(404, 'ANNOUNCEMENT_NOT_FOUND', 'Announcement not found.');
     }
+  }
+}
+
+// ==========================================
+// Phase D: Messaging Verification Service
+// ==========================================
+
+export interface VerificationAdapters {
+  isGuardianLinkedToStudent: (
+    organizationId: string,
+    guardianUserId: string,
+    studentId: string,
+  ) => Promise<boolean>;
+  isTeacherAssignedToStudent: (
+    organizationId: string,
+    teacherUserId: string,
+    studentId: string,
+  ) => Promise<boolean>;
+}
+
+export class MessagingService {
+  constructor(
+    private readonly repository: MessagingRepository,
+    private readonly verifier: VerificationAdapters,
+  ) {}
+
+  async startConversation(
+    organizationId: string,
+    guardianUserId: string,
+    input: CreateThreadInput,
+    campusId?: string,
+  ): Promise<{ thread: ConversationThread; message: DirectMessage }> {
+    const studentId = objectId(input.studentId, 'student');
+    const teacherUserId = objectId(input.teacherUserId, 'teacher');
+
+    if (!input.subjectTitle?.trim() || input.subjectTitle.trim().length > 120) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Enter a valid conversation subject.');
+    }
+    if (!input.initialMessage?.trim() || input.initialMessage.trim().length > 2000) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Enter a valid message.');
+    }
+
+    // 1. Anti-BOLA check: Verify guardian is linked to this student
+    const isGuardianLinked = await this.verifier.isGuardianLinkedToStudent(
+      organizationId,
+      guardianUserId,
+      studentId,
+    );
+    if (!isGuardianLinked) {
+      throw new AppError(
+        403,
+        'GUARDIAN_NOT_LINKED',
+        'You can only initiate conversations regarding your linked children.',
+      );
+    }
+
+    // 2. Anti-BOLA check: Verify teacher teaches this student's class/section
+    const isTeacherAssigned = await this.verifier.isTeacherAssignedToStudent(
+      organizationId,
+      teacherUserId,
+      studentId,
+    );
+    if (!isTeacherAssigned) {
+      throw new AppError(
+        403,
+        'TEACHER_NOT_ASSIGNED',
+        'Selected teacher is not assigned to this student.',
+      );
+    }
+
+    // 3. Create conversation thread
+    const thread = await this.repository.createThread(
+      organizationId,
+      guardianUserId,
+      {
+        studentId,
+        teacherUserId,
+        subjectTitle: input.subjectTitle.trim(),
+        initialMessage: input.initialMessage.trim(),
+      },
+      campusId,
+    );
+
+    // 4. Create initial direct message
+    const message = await this.repository.addMessage(
+      organizationId,
+      thread.id,
+      guardianUserId,
+      'parent_guardian',
+      input.initialMessage.trim(),
+    );
+
+    return { thread, message };
+  }
+
+  async listThreads(
+    organizationId: string,
+    userId: string,
+    role: string,
+  ): Promise<ConversationThread[]> {
+    return this.repository.listThreadsForUser(organizationId, userId, role);
+  }
+
+  async getThreadMessages(
+    organizationId: string,
+    userId: string,
+    role: string,
+    threadId: string,
+  ): Promise<{ thread: ConversationThread; messages: DirectMessage[] }> {
+    const thread = await this.repository.findThreadById(organizationId, threadId);
+    if (!thread) {
+      throw new AppError(404, 'THREAD_NOT_FOUND', 'Conversation thread not found.');
+    }
+
+    // Tenant and participation scoping check
+    const isParticipant =
+      thread.guardianUserId === userId ||
+      thread.teacherUserId === userId ||
+      ['organization_owner', 'organization_admin', 'principal_director'].includes(role);
+
+    if (!isParticipant) {
+      throw new AppError(403, 'FORBIDDEN', 'Access to this conversation is denied.');
+    }
+
+    const messages = await this.repository.listMessages(organizationId, threadId);
+
+    // Mark as read for this participant
+    await this.repository.markMessagesRead(organizationId, threadId, userId);
+
+    return { thread, messages };
+  }
+
+  async replyToThread(
+    organizationId: string,
+    userId: string,
+    role: MessageSenderRole,
+    threadId: string,
+    input: SendMessageInput,
+  ): Promise<DirectMessage> {
+    if (!input.content?.trim() || input.content.trim().length > 2000) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Enter a valid message.');
+    }
+
+    const thread = await this.repository.findThreadById(organizationId, threadId);
+    if (!thread) {
+      throw new AppError(404, 'THREAD_NOT_FOUND', 'Conversation thread not found.');
+    }
+
+    if (thread.status !== 'active') {
+      throw new AppError(400, 'THREAD_CLOSED', 'This conversation thread is closed.');
+    }
+
+    const isParticipant =
+      thread.guardianUserId === userId ||
+      thread.teacherUserId === userId ||
+      ['organization_owner', 'organization_admin'].includes(role);
+
+    if (!isParticipant) {
+      throw new AppError(403, 'FORBIDDEN', 'You cannot send messages to this thread.');
+    }
+
+    return this.repository.addMessage(
+      organizationId,
+      threadId,
+      userId,
+      role,
+      input.content.trim(),
+    );
   }
 }
