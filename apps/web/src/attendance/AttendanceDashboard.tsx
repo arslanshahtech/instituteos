@@ -69,6 +69,20 @@ function personName(person: {
     : `${person.firstName} ${person.lastName}`;
 }
 
+function hasSameValues<T extends string>(
+  current: Record<string, T>,
+  next: Record<string, T>,
+) {
+  const currentKeys = Object.keys(current);
+  const nextKeys = Object.keys(next);
+  return (
+    currentKeys.length === nextKeys.length &&
+    nextKeys.every(
+      (key) => Object.hasOwn(current, key) && current[key] === next[key],
+    )
+  );
+}
+
 export function AttendanceDashboard() {
   const { organizationId = '' } = useParams();
   const access = useOrganizationAccess(organizationId);
@@ -149,20 +163,26 @@ export function AttendanceDashboard() {
     attendanceDate,
     Boolean(access.data && canManage && view === 'staff'),
   );
-  const staff = staffQuery.data?.items ?? [];
-  const staffMarks = staffAttendance.data?.items ?? [];
-  const roster = rosterQuery.data?.items ?? [];
+  const staffItems = staffQuery.data?.items;
+  const staffMarkItems = staffAttendance.data?.items;
+  const rosterItems = rosterQuery.data?.items;
+  const staff = useMemo(() => staffItems ?? [], [staffItems]);
+  const staffMarks = useMemo(() => staffMarkItems ?? [], [staffMarkItems]);
+  const roster = useMemo(() => rosterItems ?? [], [rosterItems]);
 
   useEffect(() => {
-    setStudentStatusesById(
+    const nextStatuses: Record<string, StudentAttendanceStatus | ''> =
       Object.fromEntries(
         roster.map((student) => [student.id, student.status ?? '']),
-      ),
+      );
+    const nextRemarks = Object.fromEntries(
+      roster.map((student) => [student.id, student.remarks ?? '']),
     );
-    setStudentRemarksById(
-      Object.fromEntries(
-        roster.map((student) => [student.id, student.remarks ?? '']),
-      ),
+    setStudentStatusesById((current) =>
+      hasSameValues(current, nextStatuses) ? current : nextStatuses,
+    );
+    setStudentRemarksById((current) =>
+      hasSameValues(current, nextRemarks) ? current : nextRemarks,
     );
   }, [roster]);
 
@@ -170,13 +190,15 @@ export function AttendanceDashboard() {
     const current = new Map(
       staffMarks.map((record) => [record.staffId, record.status]),
     );
-    setStaffStatusesById(
+    const nextStatuses: Record<string, StaffAttendanceStatus | ''> =
       Object.fromEntries(
         staff.map((person: StaffRecord) => [
           person.id,
           current.get(person.id) ?? '',
         ]),
-      ),
+      );
+    setStaffStatusesById((previous) =>
+      hasSameValues(previous, nextStatuses) ? previous : nextStatuses,
     );
   }, [staff, staffMarks]);
 
@@ -466,19 +488,36 @@ export function AttendanceDashboard() {
             ) : (
               <>
                 <div className="attendance-summary" aria-live="polite">
-                  <strong>{roster.length} students</strong>
-                  <span>
-                    {attendancePercent === null
-                      ? `${markedCount} marked`
-                      : `${attendancePercent}% present or late among marked, excluding excused`}
-                  </span>
+                  <div
+                    aria-label="Roll-call progress"
+                    className="attendance-summary-counts"
+                    role="group"
+                  >
+                    <span className="attendance-badge attendance-badge-neutral">
+                      Total: {roster.length}
+                    </span>
+                    <span className="attendance-badge attendance-badge-neutral">
+                      Marked: {markedCount}
+                    </span>
+                  </div>
+                  {attendancePercent !== null && (
+                    <span className="attendance-summary-rate">
+                      {attendancePercent}% present or late among marked,
+                      excluding excused
+                    </span>
+                  )}
                   <div
                     aria-label="Attendance totals"
                     className="attendance-breakdown"
+                    role="group"
                   >
                     {studentStatuses.map((status) => (
-                      <span key={status}>
-                        {status}: {statusCounts[status]}
+                      <span
+                        className={`attendance-badge attendance-badge-${status}`}
+                        key={status}
+                      >
+                        {status.charAt(0).toUpperCase() + status.slice(1)}:{' '}
+                        {statusCounts[status]}
                       </span>
                     ))}
                   </div>

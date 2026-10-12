@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   BookOpenText,
-  ChevronDown,
   LayoutDashboard,
   Menu,
   X,
@@ -292,11 +291,6 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                 </option>
               ))}
             </select>
-            <ChevronDown
-              className="select-chevron"
-              size={15}
-              aria-hidden="true"
-            />
           </div>
         </div>
 
@@ -355,11 +349,6 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                   </option>
                 ))}
               </select>
-              <ChevronDown
-                className="select-chevron"
-                size={15}
-                aria-hidden="true"
-              />
             </div>
           </div>
           {signOutError && (

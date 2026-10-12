@@ -1,0 +1,193 @@
+/* ========================================================
+   Guardians Base Styles
+   ======================================================== */
+.guardians-page {
+  width: 100%;
+  max-width: 1120px;
+  min-width: 0;
+  overflow-x: clip;
+  margin: 0 auto;
+}
+
+/* Linked Guardians List */
+.guardian-linked-list {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guardian-linked-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  padding-top: 12px;
+}
+
+.guardian-linked-list li > div,
+.guardian-linked-list li > span {
+  display: grid;
+  gap: 4px;
+}
+
+.guardian-linked-list span {
+  color: var(--color-muted, #64748b);
+  font-size: 12px;
+}
+
+/* Link Form Controls */
+.guardian-link-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.guardian-link-controls .form-field {
+  width: min(100%, 240px);
+}
+
+.guardian-primary-option {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  color: #34485a;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.guardian-primary-option input {
+  width: 16px;
+  height: 16px;
+}
+
+/* ========================================================
+   Premium Mobile Stacked Cards Layout (max-width: 640px)
+   ======================================================== */
+@media (max-width: 640px) {
+  /* Controls Stacking */
+  .guardian-link-controls,
+  .guardian-link-controls .form-field,
+  .guardian-primary-option {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .guardian-primary-option {
+    flex-wrap: wrap;
+  }
+
+  /* Linked Guardians List Mobile Refinement */
+  .guardian-linked-list li {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid var(--color-border, #e2e8f0);
+  }
+
+  .guardian-linked-list li > div {
+    min-width: 0;
+    flex: 1 1 180px;
+    overflow-wrap: anywhere;
+  }
+
+  .guardian-linked-list li > .button {
+    flex: 0 0 auto;
+  }
+
+  /* --- Standalone Mobile Table Cards --- */
+  .guardians-page .data-table tr {
+    display: block;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 1.125rem 1.25rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+  }
+
+  /* Stacked Row Layout (Label Upar, Value Niche) */
+  .guardians-page .data-table td {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.25rem !important;
+    padding: 0.625rem 0 !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    text-align: left !important;
+  }
+
+  .guardians-page .data-table td:last-child {
+    border-bottom: none !important;
+  }
+
+  /* Labels (Guardian, Relationship, Email, Phone) */
+  .guardians-page .data-table td [data-cell-label],
+  .guardians-page .data-table td::before,
+  .guardians-page .data-table td > span:first-child:not(:only-child) {
+    font-size: 0.6875rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+    color: #64748b !important;
+    line-height: 1.2 !important;
+    margin-bottom: 0.15rem !important;
+  }
+
+  /* Values */
+  .guardians-page .data-table td > span:last-child,
+  .guardians-page .data-table td > div {
+    font-size: 0.9375rem !important;
+    color: #0f172a !important;
+    font-weight: 500 !important;
+    word-break: break-word !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Guardian Name Highlight */
+  .guardians-page .data-table td:first-child > span:last-child,
+  .guardians-page .data-table td:first-child a {
+    font-size: 1.0625rem !important;
+    font-weight: 650 !important;
+    color: #0f766e !important;
+    text-decoration: none;
+  }
+
+  /* Relationship Tag / Badge */
+  .guardians-page .data-table td:nth-child(2) > span:last-child {
+    display: inline-flex !important;
+    align-items: center !important;
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    padding: 0.2rem 0.625rem !important;
+    border-radius: 9999px !important;
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+    border: 1px solid #e2e8f0 !important;
+    text-transform: capitalize;
+  }
+
+  /* Action Buttons Bar */
+  .guardians-page .data-table td:has(button) {
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 0.625rem !important;
+    margin-top: 0.5rem !important;
+    padding-top: 0.625rem !important;
+    border-top: 1px dashed #e2e8f0 !important;
+  }
+
+  .guardians-page .data-table td:has(button) [data-cell-label],
+  .guardians-page .data-table td:has(button)::before {
+    display: none !important;
+  }
+}

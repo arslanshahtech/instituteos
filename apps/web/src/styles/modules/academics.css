@@ -1,0 +1,196 @@
+.academics-page {
+  min-width: 0;
+}
+
+/* Base Desktop Tabs */
+.academics-tabs {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.academics-tab {
+  flex: 0 0 auto;
+  padding: 0.75rem 1rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--color-muted);
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.academics-tab:hover {
+  color: var(--color-text);
+}
+
+.academics-tab-active {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-accent-dark);
+  font-weight: 650;
+}
+
+.academics-panel-heading,
+.academics-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.academics-panel-heading {
+  margin-bottom: 1rem;
+}
+
+.academics-panel-heading h2,
+.academics-panel-heading p {
+  margin: 0;
+}
+
+.academics-panel-heading p {
+  margin-top: 0.25rem;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.academics-row-actions {
+  justify-content: flex-end;
+}
+
+/* ========================================================
+   Academics Mobile Media Query (max-width: 640px)
+   ======================================================== */
+@media (max-width: 640px) {
+  /* 1. Header Layout */
+  .academics-page > .page-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .academics-page > .page-heading > .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* 2. Horizontal Scrollable Tabs */
+  .academics-tabs {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0.375rem;
+    padding: 0.25rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+  }
+
+  .academics-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .academics-tab {
+    flex-shrink: 0;
+    padding: 0.5rem 0.875rem;
+    border-radius: 6px;
+    border-bottom: none;
+    font-size: 0.8125rem;
+  }
+
+  .academics-tab-active {
+    background: #ffffff;
+    color: var(--color-accent-dark);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+
+  .academics-panel-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  /* 3. Mobile Card Layout */
+  .academics-page .data-table tr {
+    display: block;
+    background: #ffffff;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+
+  .academics-page .data-table td {
+    display: grid !important;
+    grid-template-columns: 100px 1fr !important;
+    column-gap: 0.75rem !important;
+    align-items: baseline !important;
+    padding: 0.45rem 0 !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    text-align: left !important;
+  }
+
+  .academics-page .data-table td [data-cell-label],
+  .academics-page .data-table td::before {
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.025em !important;
+    color: var(--color-muted) !important;
+  }
+
+  .academics-page .data-table td > span,
+  .academics-page .data-table td > div {
+    font-size: 0.875rem !important;
+    color: var(--color-text) !important;
+    word-break: break-word !important;
+  }
+
+  /* 4. Actions Row & Buttons (Hide 'ACTIONS' Label) */
+  .academics-page .data-table td:last-child {
+    display: flex !important;
+    grid-column: 1 / -1 !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 0.625rem !important;
+    border-bottom: none !important;
+    margin-top: 0.625rem !important;
+    padding-top: 0.625rem !important;
+    border-top: 1px dashed var(--color-border) !important;
+  }
+
+  .academics-page .data-table td:last-child [data-cell-label],
+  .academics-page .data-table td:last-child::before {
+    display: none !important;
+  }
+
+  .academics-page .data-table td:last-child button,
+  .academics-page .data-table td:last-child a {
+    font-size: 0.8125rem !important;
+    font-weight: 500 !important;
+    padding: 0.35rem 0.875rem !important;
+    border-radius: 6px !important;
+    background: #ffffff !important;
+    color: #334155 !important;
+    border: 1px solid #cbd5e1 !important;
+    cursor: pointer !important;
+  }
+
+  .academics-page .data-table td:last-child button:last-child,
+  .academics-page .data-table td:last-child a:last-child {
+    color: #dc2626 !important;
+    border-color: #fecaca !important;
+    background: #fff5f5 !important;
+  }
+
+  .academics-row-actions {
+    flex-wrap: wrap;
+  }
+}
