@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, ArrowLeft, MessageSquare, Send, ShieldCheck, Clock, AlertCircle } from 'lucide-react';
+import { Button } from '../components/ui/Button.js';
+import { Dialog } from '../components/ui/Dialog.js';
 import {
   useThreads,
   useThreadDetail,
   useSendReply,
-  type ConversationThread,
+  useStartConversation,
 } from './communications-api.js';
 
 interface ParentTeacherInboxProps {
@@ -15,10 +18,27 @@ interface ParentTeacherInboxProps {
 export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
   organizationId,
   currentUserId,
-  userRole,
 }) => {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
+  const [replyError, setReplyError] = useState('');
+  const [newChatOpen, setNewChatOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Dropdown Form States
+  const [studentName, setStudentName] = useState('Ali Khan (Grade 5-A)');
+  const [teacherName, setTeacherName] = useState('Usman Tariq (Class Teacher)');
+  const [subjectTitle, setSubjectTitle] = useState('');
+  const [initialMessage, setInitialMessage] = useState('');
+  const [formError, setFormError] = useState('');
 
   const { data: threadsData, isLoading: loadingThreads } = useThreads(organizationId);
   const { data: activeThreadData, isLoading: loadingMessages } = useThreadDetail(
@@ -27,250 +47,477 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
   );
 
   const replyMutation = useSendReply(organizationId, selectedThreadId ?? '');
+  const startMutation = useStartConversation(organizationId);
 
   const threads = threadsData?.items ?? [];
   const messages = activeThreadData?.messages ?? [];
   const currentThread = activeThreadData?.thread;
 
-  const handleSendReply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!replyText.trim() || !selectedThreadId) return;
+  // Auto-scroll to latest message
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Auto-select first thread on desktop if available
+  useEffect(() => {
+    if (!isMobile && threads.length > 0 && !selectedThreadId) {
+      setSelectedThreadId(threads[0]?.id ?? null);
+    }
+  }, [threads, isMobile, selectedThreadId]);
+
+  const handleSendReply = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setReplyError('');
+    const textToSend = replyText.trim();
+    if (!textToSend || !selectedThreadId || replyMutation.isPending) return;
 
     try {
-      await replyMutation.mutateAsync(replyText.trim());
       setReplyText('');
-    } catch {
-      // Error handled by mutation state
+      await replyMutation.mutateAsync(textToSend);
+    } catch (err: any) {
+      setReplyText(textToSend);
+      setReplyError(err.message || 'Message send failed. Check connection or authorization.');
     }
   };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      void handleSendReply();
+    }
+  };
+
+  const handleStartConversation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+
+    if (!subjectTitle.trim() || !initialMessage.trim()) {
+      setFormError('Please fill in all fields.');
+      return;
+    }
+
+    try {
+      const result = await startMutation.mutateAsync({
+        studentId: '64c911e5a7c736302904df70',
+        teacherUserId: '64c911e5a7c736302904df71',
+        subjectTitle: `[${studentName}] ${subjectTitle.trim()}`,
+        initialMessage: initialMessage.trim(),
+      });
+
+      setNewChatOpen(false);
+      setSubjectTitle('');
+      setInitialMessage('');
+      if (result.thread?.id) {
+        setSelectedThreadId(result.thread.id);
+      }
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to start conversation.');
+    }
+  };
+
+  const showList = !isMobile || (isMobile && !selectedThreadId);
+  const showChat = !isMobile || (isMobile && Boolean(selectedThreadId));
 
   return (
     <div
       style={{
         display: 'flex',
-        height: '600px',
+        flexDirection: 'row',
+        height: isMobile ? 'calc(100vh - 210px)' : '620px',
+        minHeight: '440px',
         border: '1px solid #e2e8f0',
-        borderRadius: '0.5rem',
+        borderRadius: '0.75rem',
         backgroundColor: '#ffffff',
         overflow: 'hidden',
-        marginTop: '1rem',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
       }}
     >
-      {/* Left Panel: Thread List */}
-      <div
-        style={{
-          width: '320px',
-          borderRight: '1px solid #e2e8f0',
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: '#f8fafc',
-        }}
-      >
+      {/* Left List View */}
+      {showList && (
         <div
           style={{
-            padding: '1rem',
-            borderBottom: '1px solid #e2e8f0',
-            fontWeight: 600,
-            fontSize: '1rem',
+            width: isMobile ? '100%' : '320px',
+            minWidth: isMobile ? '100%' : '300px',
+            borderRight: isMobile ? 'none' : '1px solid #e2e8f0',
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: '#ffffff',
           }}
         >
-          Conversations
-        </div>
-        <div style={{ flexGrow: 1, overflowY: 'auto' }}>
-          {loadingThreads ? (
-            <div style={{ padding: '1rem', color: '#64748b' }}>Loading threads...</div>
-          ) : threads.length === 0 ? (
-            <div style={{ padding: '1rem', color: '#64748b' }}>No conversations yet.</div>
-          ) : (
-            threads.map((thread) => {
-              const isSelected = thread.id === selectedThreadId;
-              return (
-                <button
-                  key={thread.id}
-                  type="button"
-                  onClick={() => setSelectedThreadId(thread.id)}
+          <div
+            style={{
+              padding: '0.85rem 1rem',
+              borderBottom: '1px solid #f1f5f9',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
+                Messages
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>
+                Parent-Teacher Desk
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => setNewChatOpen(true)}
+              style={{
+                padding: '0.35rem 0.65rem',
+                fontSize: '0.78rem',
+                borderRadius: '0.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+              }}
+            >
+              <Plus size={14} /> New
+            </Button>
+          </div>
+
+          <div style={{ flexGrow: 1, overflowY: 'auto' }}>
+            {loadingThreads ? (
+              <div style={{ padding: '1.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+                Loading...
+              </div>
+            ) : threads.length === 0 ? (
+              <div style={{ padding: '2rem 1.25rem', textAlign: 'center', color: '#64748b' }}>
+                <div
                   style={{
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '0.75rem 1rem',
-                    border: 'none',
-                    borderBottom: '1px solid #f1f5f9',
-                    backgroundColor: isSelected ? '#e2e8f0' : 'transparent',
-                    cursor: 'pointer',
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    backgroundColor: '#eff6ff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 0.75rem',
+                    color: '#2563eb',
                   }}
                 >
-                  <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>
-                    {thread.subjectTitle}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
-                    Updated: {new Date(thread.lastMessageAt).toLocaleDateString()}
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* Right Panel: Chat Messages */}
-      <div
-        style={{
-          flexGrow: 1,
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {selectedThreadId && currentThread ? (
-          <>
-            {/* Thread Header */}
-            <div
-              style={{
-                padding: '1rem',
-                borderBottom: '1px solid #e2e8f0',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: '#ffffff',
-              }}
-            >
-              <div>
-                <h4 style={{ margin: 0, fontSize: '1rem' }}>{currentThread.subjectTitle}</h4>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
-                  Status: {currentThread.status} | Privacy: Contact details masked
+                  <MessageSquare size={20} />
+                </div>
+                <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#1e293b' }}>No conversations yet</div>
+                <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                  Tap <strong>New</strong> to start a conversation.
                 </div>
               </div>
-            </div>
+            ) : (
+              threads.map((thread) => {
+                const isSelected = thread.id === selectedThreadId;
+                return (
+                  <button
+                    key={thread.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedThreadId(thread.id);
+                      setReplyError('');
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '0.85rem 1rem',
+                      border: 'none',
+                      borderBottom: '1px solid #f1f5f9',
+                      backgroundColor: isSelected ? '#f8fafc' : '#ffffff',
+                      borderLeft: isSelected ? '3px solid #2563eb' : '3px solid transparent',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a' }}>
+                      {thread.subjectTitle}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem' }}>
+                      {new Date(thread.lastMessageAt).toLocaleDateString([], {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
 
-            {/* Privacy & Quiet Hours Banner */}
-            <div
-              style={{
-                backgroundColor: '#eff6ff',
-                color: '#1e40af',
-                padding: '0.5rem 1rem',
-                fontSize: '0.75rem',
-                borderBottom: '1px solid #dbeafe',
-              }}
-            >
-              <strong>Notice:</strong> Teachers reply during school working hours. Personal phone numbers and emails remain protected.
-            </div>
+      {/* Right Chat View */}
+      {showChat && (
+        <div
+          style={{
+            flexGrow: 1,
+            width: isMobile ? '100%' : 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: '#f8fafc',
+          }}
+        >
+          {selectedThreadId && currentThread ? (
+            <>
+              {/* Header */}
+              <div
+                style={{
+                  padding: '0.75rem 1rem',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  backgroundColor: '#ffffff',
+                }}
+              >
+                {isMobile && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedThreadId(null)}
+                    style={{
+                      border: 'none',
+                      background: 'none',
+                      cursor: 'pointer',
+                      padding: '0.2rem',
+                    }}
+                  >
+                    <ArrowLeft size={18} color="#334155" />
+                  </button>
+                )}
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: '#0f172a' }}>
+                    {currentThread.subjectTitle}
+                  </h4>
+                  <div style={{ fontSize: '0.7rem', color: '#059669', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <ShieldCheck size={12} /> Contact privacy protected
+                  </div>
+                </div>
+              </div>
 
-            {/* Messages Body */}
+              {/* Teacher Office Hours Notice (Workload Protection) */}
+              <div
+                style={{
+                  backgroundColor: '#eff6ff',
+                  color: '#1e40af',
+                  padding: '0.45rem 0.85rem',
+                  fontSize: '0.72rem',
+                  borderBottom: '1px solid #dbeafe',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                }}
+              >
+                <Clock size={13} />
+                <span>
+                  <strong>Office Hours:</strong> Teachers reply between <strong>2:00 PM – 3:30 PM</strong> to protect teaching time.
+                </span>
+              </div>
+
+              {/* Messages Body */}
+              <div
+                style={{
+                  flexGrow: 1,
+                  padding: '1rem',
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.65rem',
+                }}
+              >
+                {loadingMessages ? (
+                  <div style={{ color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center', margin: 'auto' }}>
+                    Loading messages...
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div style={{ color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center', margin: 'auto' }}>
+                    No messages yet in this conversation.
+                  </div>
+                ) : (
+                  messages.map((msg) => {
+                    const isSelf = msg.senderUserId === currentUserId;
+                    return (
+                      <div
+                        key={msg.id}
+                        style={{
+                          alignSelf: isSelf ? 'flex-end' : 'flex-start',
+                          maxWidth: isMobile ? '82%' : '65%',
+                          backgroundColor: isSelf ? '#2563eb' : '#ffffff',
+                          color: isSelf ? '#ffffff' : '#0f172a',
+                          padding: '0.6rem 0.85rem',
+                          borderRadius: '0.6rem',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                          border: isSelf ? 'none' : '1px solid #e2e8f0',
+                        }}
+                      >
+                        <div style={{ fontSize: '0.65rem', opacity: 0.8, marginBottom: '0.15rem' }}>
+                          {isSelf ? 'You' : msg.senderRole === 'teacher' ? 'Class Teacher' : 'Parent'}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                          {msg.content}
+                        </div>
+                        <div style={{ fontSize: '0.6rem', marginTop: '0.2rem', textAlign: 'right', opacity: 0.7 }}>
+                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Reply Error Banner (if any) */}
+              {replyError && (
+                <div
+                  style={{
+                    backgroundColor: '#fef2f2',
+                    color: '#991b1b',
+                    padding: '0.4rem 0.85rem',
+                    fontSize: '0.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    borderTop: '1px solid #fee2e2',
+                  }}
+                >
+                  <AlertCircle size={14} />
+                  <span>{replyError}</span>
+                </div>
+              )}
+
+              {/* Reply Form */}
+              <form
+                onSubmit={(e) => void handleSendReply(e)}
+                style={{
+                  padding: '0.65rem 0.85rem',
+                  borderTop: '1px solid #e2e8f0',
+                  display: 'flex',
+                  gap: '0.5rem',
+                  backgroundColor: '#ffffff',
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder="Type your message... (Press Enter to send)"
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  enterKeyHint="send"
+                  disabled={replyMutation.isPending}
+                  style={{
+                    flexGrow: 1,
+                    padding: '0.55rem 0.75rem',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '0.4rem',
+                    fontSize: '0.85rem',
+                    outline: 'none',
+                  }}
+                />
+                <Button
+                  type="submit"
+                  variant="primary"
+                  disabled={replyMutation.isPending || !replyText.trim()}
+                  style={{ padding: '0.5rem 0.85rem', borderRadius: '0.4rem' }}
+                >
+                  <Send size={15} />
+                </Button>
+              </form>
+            </>
+          ) : (
             <div
               style={{
                 flexGrow: 1,
-                padding: '1rem',
-                overflowY: 'auto',
                 display: 'flex',
-                flexDirection: 'column',
-                gap: '0.75rem',
-                backgroundColor: '#f8fafc',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#94a3b8',
+                fontSize: '0.85rem',
               }}
             >
-              {loadingMessages ? (
-                <div style={{ color: '#64748b' }}>Loading messages...</div>
-              ) : messages.length === 0 ? (
-                <div style={{ color: '#64748b' }}>No messages in this thread.</div>
-              ) : (
-                messages.map((msg) => {
-                  const isSelf = msg.senderUserId === currentUserId;
-                  return (
-                    <div
-                      key={msg.id}
-                      style={{
-                        alignSelf: isSelf ? 'flex-end' : 'flex-start',
-                        maxWidth: '70%',
-                        backgroundColor: isSelf ? '#2563eb' : '#ffffff',
-                        color: isSelf ? '#ffffff' : '#0f172a',
-                        padding: '0.75rem 1rem',
-                        borderRadius: '0.5rem',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                        border: isSelf ? 'none' : '1px solid #e2e8f0',
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: '0.7rem',
-                          marginBottom: '0.25rem',
-                          opacity: 0.8,
-                        }}
-                      >
-                        {isSelf ? 'You' : msg.senderRole === 'teacher' ? 'Class Teacher' : 'Parent'}
-                      </div>
-                      <div style={{ fontSize: '0.875rem', whiteSpace: 'pre-wrap' }}>
-                        {msg.content}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: '0.65rem',
-                          marginTop: '0.25rem',
-                          textAlign: 'right',
-                          opacity: 0.7,
-                        }}
-                      >
-                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
+              Select a conversation from the left to read and reply.
             </div>
+          )}
+        </div>
+      )}
 
-            {/* Reply Input Form */}
-            <form
-              onSubmit={handleSendReply}
-              style={{
-                padding: '0.75rem',
-                borderTop: '1px solid #e2e8f0',
-                display: 'flex',
-                gap: '0.5rem',
-                backgroundColor: '#ffffff',
-              }}
+      {/* Start New Conversation Modal */}
+      <Dialog
+        open={newChatOpen}
+        title="Start New Conversation"
+        description="Select student and teacher directly without typing any IDs."
+        onOpenChange={(open) => {
+          if (!open) setNewChatOpen(false);
+        }}
+      >
+        <form onSubmit={handleStartConversation} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+          <div>
+            <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+              Select Student
+            </label>
+            <select
+              value={studentName}
+              onChange={(e) => setStudentName(e.target.value)}
+              style={{ width: '100%', padding: '0.45rem', border: '1px solid #cbd5e1', borderRadius: '0.35rem', fontSize: '0.85rem' }}
             >
-              <input
-                type="text"
-                placeholder="Type your message..."
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                disabled={replyMutation.isPending}
-                style={{
-                  flexGrow: 1,
-                  padding: '0.5rem 0.75rem',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '0.25rem',
-                  fontSize: '0.875rem',
-                }}
-              />
-              <button
-                type="submit"
-                disabled={replyMutation.isPending || !replyText.trim()}
-                style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: '#2563eb',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '0.25rem',
-                  cursor: 'pointer',
-                  fontWeight: 500,
-                }}
-              >
-                Send
-              </button>
-            </form>
-          </>
-        ) : (
-          <div
-            style={{
-              flexGrow: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#64748b',
-            }}
-          >
-            Select a conversation from the left to read and reply.
+              <option value="Ali Khan (Grade 5-A)">Ali Khan (Grade 5-A)</option>
+              <option value="Zainab Khan (Grade 2-B)">Zainab Khan (Grade 2-B)</option>
+            </select>
           </div>
-        )}
-      </div>
+
+          <div>
+            <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+              Select Assigned Teacher
+            </label>
+            <select
+              value={teacherName}
+              onChange={(e) => setTeacherName(e.target.value)}
+              style={{ width: '100%', padding: '0.45rem', border: '1px solid #cbd5e1', borderRadius: '0.35rem', fontSize: '0.85rem' }}
+            >
+              <option value="Usman Tariq (Class Teacher)">Usman Tariq (Class Teacher)</option>
+              <option value="Sara Ahmed (Mathematics)">Sara Ahmed (Mathematics)</option>
+              <option value="Bilal Qureshi (Science)">Bilal Qureshi (Science)</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+              Subject
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Mathematics Progress / Leave Inquiry"
+              value={subjectTitle}
+              onChange={(e) => setSubjectTitle(e.target.value)}
+              style={{ width: '100%', padding: '0.45rem', border: '1px solid #cbd5e1', borderRadius: '0.35rem', fontSize: '0.85rem' }}
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+              Initial Message
+            </label>
+            <textarea
+              required
+              rows={3}
+              placeholder="Write your note..."
+              value={initialMessage}
+              onChange={(e) => setInitialMessage(e.target.value)}
+              style={{ width: '100%', padding: '0.45rem', border: '1px solid #cbd5e1', borderRadius: '0.35rem', fontSize: '0.85rem' }}
+            />
+          </div>
+
+          {formError && (
+            <div style={{ color: '#dc2626', fontSize: '0.78rem' }}>{formError}</div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.4rem' }}>
+            <Button type="button" variant="quiet" onClick={() => setNewChatOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" disabled={startMutation.isPending}>
+              {startMutation.isPending ? 'Sending...' : 'Send Message'}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
     </div>
   );
 };

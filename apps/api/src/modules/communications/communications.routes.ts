@@ -397,24 +397,33 @@ export function createCommunicationsRouter(
   );
 
   router.post(
-    `${baseMessaging}/:threadId/messages`,
-    ...protectMessaging,
-    csrfProtection,
-    asyncHandler(async (request, response) => {
-      const ctx = organizationContext(response);
-      const body = bodyObject(request.body);
-      const message = await messagingService.replyToThread(
-        ctx.organizationId,
-        ctx.userId,
-        (ctx.role as MessageSenderRole) || 'parent_guardian',
-        routeId(request.params.threadId),
-        { content: text(body.content, 'content', 2000) },
-      );
-      response.status(201).json({ message });
-    }),
-  );
+      `${baseMessaging}/:threadId/messages`,
+      ...protectMessaging,
+      csrfProtection,
+      asyncHandler(async (request, response) => {
+        const ctx = organizationContext(response);
+        const body = bodyObject(request.body);
 
-  return router;
-}
+        // Map system role to allowed schema role
+        const senderRole: MessageSenderRole =
+          ctx.role === 'teacher'
+            ? 'teacher'
+            : ctx.role === 'parent_guardian'
+              ? 'parent_guardian'
+              : 'admin';
 
-export const communicationsRouter = createCommunicationsRouter();
+        const message = await messagingService.replyToThread(
+          ctx.organizationId,
+          ctx.userId,
+          senderRole,
+          routeId(request.params.threadId),
+          { content: text(body.content, 'content', 2000) },
+        );
+        response.status(201).json({ message });
+      }),
+    );
+
+    return router;
+  }
+
+  export const communicationsRouter = createCommunicationsRouter();
