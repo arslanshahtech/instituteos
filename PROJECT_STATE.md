@@ -43,3 +43,8 @@
 
 ## 3. Current Focus
 - Active development on **Phase D: Privacy-Preserving Parent-Teacher Messaging (School-Owned Inbox, Anti-BOLA Scoping, Teacher Privacy Safeguards)**.
+### Milestone Update: Phase D Completed
+- Parent-Teacher scoped messaging fully functional with anti-BOLA security.
+- Fixed role mapping mismatch for organization_admin and participants.
+- Responsive mobile UI (WhatsApp style) and teacher office-hours guard active.
+
