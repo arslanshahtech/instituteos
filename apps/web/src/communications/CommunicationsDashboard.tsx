@@ -303,9 +303,12 @@ export function CommunicationsDashboard() {
       <div
         style={{
           display: 'flex',
-          gap: '1rem',
+          gap: '0.5rem',
           borderBottom: '1px solid #e2e8f0',
-          marginBottom: '1.5rem',
+          marginBottom: '1rem',
+          overflowX: 'auto',
+          whiteSpace: 'nowrap',
+          paddingBottom: '0.25rem',
         }}
       >
         {canManageAnnouncements && (
@@ -313,19 +316,20 @@ export function CommunicationsDashboard() {
             type="button"
             onClick={() => setActiveTab('announcements')}
             style={{
-              padding: '0.75rem 0.25rem',
+              padding: '0.5rem 0.85rem',
               border: 'none',
-              background: 'none',
-              borderBottom: activeTab === 'announcements' ? '2px solid #2563eb' : '2px solid transparent',
-              color: activeTab === 'announcements' ? '#2563eb' : '#64748b',
+              borderRadius: '0.375rem',
+              background: activeTab === 'announcements' ? '#2563eb' : 'transparent',
+              color: activeTab === 'announcements' ? '#ffffff' : '#64748b',
               fontWeight: 600,
+              fontSize: '0.85rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
+              gap: '0.4rem',
             }}
           >
-            <Megaphone size={16} />
+            <Megaphone size={15} />
             Announcements
           </button>
         )}
@@ -335,19 +339,20 @@ export function CommunicationsDashboard() {
             type="button"
             onClick={() => setActiveTab('messaging')}
             style={{
-              padding: '0.75rem 0.25rem',
+              padding: '0.5rem 0.85rem',
               border: 'none',
-              background: 'none',
-              borderBottom: activeTab === 'messaging' ? '2px solid #2563eb' : '2px solid transparent',
-              color: activeTab === 'messaging' ? '#2563eb' : '#64748b',
+              borderRadius: '0.375rem',
+              background: activeTab === 'messaging' ? '#2563eb' : 'transparent',
+              color: activeTab === 'messaging' ? '#ffffff' : '#64748b',
               fontWeight: 600,
+              fontSize: '0.85rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem',
+              gap: '0.4rem',
             }}
           >
-            <MessageSquare size={16} />
+            <MessageSquare size={15} />
             Parent-Teacher Messages
           </button>
         )}
