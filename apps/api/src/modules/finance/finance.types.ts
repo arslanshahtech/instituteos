@@ -1,6 +1,7 @@
 export type InvoiceStatus = 'unpaid' | 'partial' | 'paid' | 'overdue';
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'card' | 'online';
-
+export type ConcessionType = 'sibling' | 'staff_child' | 'scholarship' | 'need_based' | 'special';
+export type DiscountType = 'percentage' | 'fixed';
 export interface FinanceContext {
   organizationId: string;
   campusIds: string[];
@@ -43,6 +44,7 @@ export interface StudentInvoiceRecord {
   invoiceNumber: string;
   studentId: string;
   studentName: string;
+  guardianPhone?: string;
   feeStructureId: string;
   feeStructureName: string;
   classId: string;
@@ -55,6 +57,27 @@ export interface StudentInvoiceRecord {
   paidAmount: number;
   status: InvoiceStatus;
   issueDate: string;
+  createdAt: string;
+  updatedAt: string;
+  arrearsAmount?: number;
+  currentAmount?: number;
+  discountAmount?: number;
+  discountReason?: string;
+}
+
+export interface FeeConcessionInput {
+  studentId: string;
+  academicYearId?: string;
+  concessionType: ConcessionType;
+  discountType: DiscountType;
+  discountValue: number;
+  reason?: string;
+  isActive?: boolean;
+}
+
+export interface FeeConcessionRecord extends FeeConcessionInput {
+  id: string;
+  organizationId: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -74,6 +97,13 @@ export interface PaymentReceiptRecord extends PaymentInput {
   recordedBy: string;
   organizationId: string;
   createdAt: string;
+}
+
+export interface PaymentNotificationPayload {
+  recipientPhone: string;
+  recipientName: string;
+  messageText: string;
+  whatsAppUrl: string;
 }
 
 export interface BulkInvoiceInput {
@@ -137,5 +167,75 @@ export interface FinanceRepository {
   ): Promise<{
     receipt: PaymentReceiptRecord;
     invoice: StudentInvoiceRecord;
+    notification?: PaymentNotificationPayload;
   } | null>;
+
+  getStudentFeeLedger(
+    organizationId: string,
+    studentId: string,
+  ): Promise<StudentLedgerSummary | null>;
+
+  listActiveStudentConcessions(
+    organizationId: string,
+    studentIds: string[],
+    academicYearId?: string,
+  ): Promise<FeeConcessionRecord[]>;
+
+  saveFeeConcession(
+    organizationId: string,
+    input: FeeConcessionInput,
+    id?: string,
+  ): Promise<FeeConcessionRecord>;
+
+  deleteFeeConcession(
+    organizationId: string,
+    id: string,
+  ): Promise<boolean>;
+
+  requestInvoiceDeleteOtp(
+    organizationId: string,
+    invoice: StudentInvoiceRecord,
+    requestedByUserId: string,
+    ownerPhone?: string,
+  ): Promise<InvoiceDeleteOtpChallenge>;
+
+  deleteInvoice(
+    organizationId: string,
+    invoiceId: string,
+  ): Promise<boolean>;
+
+  setInvoiceDiscount(
+    organizationId: string,
+    invoiceId: string,
+    applyDiscount: boolean,
+  ): Promise<StudentInvoiceRecord | null>;
+}
+
+export interface InvoiceDeleteOtpChallenge {
+  invoiceId: string;
+  invoiceNumber: string;
+  paidAmount: number;
+  ownerEmail?: string;
+  ownerPhone?: string;
+  whatsAppAlertUrl?: string;
+  expiresInMinutes: number;
+  devOtpPreview?: string;
+}
+export interface StudentLedgerEntry {
+  date: string;
+  type: 'invoice' | 'payment';
+  referenceNumber: string;
+  description: string;
+  debit: number;   // Fee charge hui
+  credit: number;  // Payment aayi
+  balance: number; // Running balance
+}
+
+export interface StudentLedgerSummary {
+  studentId: string;
+  studentName: string;
+  totalBilled: number;
+  totalPaid: number;
+  outstandingBalance: number;
+  entries: StudentLedgerEntry[];
 }

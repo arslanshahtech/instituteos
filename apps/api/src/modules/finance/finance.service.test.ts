@@ -130,6 +130,13 @@ function repository(
         },
       }),
     ),
+  getStudentFeeLedger: vi.fn().mockResolvedValue(null),
+    listActiveStudentConcessions: vi.fn().mockResolvedValue([]),
+    saveFeeConcession: vi.fn(),
+    deleteFeeConcession: vi.fn().mockResolvedValue(true),
+    requestInvoiceDeleteOtp: vi.fn(),
+    deleteInvoice: vi.fn().mockResolvedValue(true),
+    setInvoiceDiscount: vi.fn(),
     ...overrides,
   };
 }

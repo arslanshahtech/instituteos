@@ -8,6 +8,9 @@ import type {
   InvoiceQuery,
   InvoiceStatus,
   PaymentInput,
+  FeeConcessionInput,
+  ConcessionType,
+  DiscountType,
 } from './finance.types.js';
 import { StudentSectionPlacementModel } from '../attendance/attendance.model.js';
 import { StudentModel } from '../people/people.model.js';
@@ -19,6 +22,8 @@ const paymentMethods = [
   'online',
 ] as const;
 const invoiceStatuses = ['unpaid', 'partial', 'paid', 'overdue'] as const;
+const concessionTypes = ['sibling', 'staff_child', 'scholarship', 'need_based', 'special'] as const;
+const discountTypes = ['percentage', 'fixed'] as const;
 
 function objectId(value: string, field: string): string {
   if (!mongoose.isValidObjectId(value)) {
@@ -154,6 +159,37 @@ function normalizeInvoiceQuery(query: InvoiceQuery): InvoiceQuery {
     );
   }
   return { ...query, dateFrom, dateTo };
+}
+
+function validateConcessionInput(input: FeeConcessionInput): FeeConcessionInput {
+  const studentId = objectId(input.studentId, 'student');
+  const academicYearId = input.academicYearId ? objectId(input.academicYearId, 'academic year') : undefined;
+
+  if (!concessionTypes.includes(input.concessionType as ConcessionType)) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid concession type.');
+  }
+
+  if (!discountTypes.includes(input.discountType as DiscountType)) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid discount type (percentage or fixed).');
+  }
+
+  if (input.discountType === 'percentage') {
+    if (!Number.isFinite(input.discountValue) || input.discountValue <= 0 || input.discountValue > 100) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Percentage discount must be between 1 and 100.');
+    }
+  } else {
+    moneyCents(input.discountValue, 'discount value');
+  }
+
+  return {
+    studentId,
+    academicYearId,
+    concessionType: input.concessionType,
+    discountType: input.discountType,
+    discountValue: input.discountValue,
+    reason: input.reason?.trim() ? input.reason.trim().slice(0, 160) : undefined,
+    isActive: typeof input.isActive === 'boolean' ? input.isActive : true,
+  };
 }
 
 export class FinanceService {
@@ -398,5 +434,171 @@ export class FinanceService {
       );
     }
     return result;
+  }
+
+  async getStudentFeeLedger(context: FinanceContext, rawStudentId: string) {
+    const studentId = objectId(rawStudentId, 'student');
+    const ledger = await this.repository.getStudentFeeLedger(
+      context.organizationId,
+      studentId,
+    );
+    if (!ledger) {
+      throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Student record not found.');
+    }
+    return ledger;
+  }
+
+  async listStudentConcessions(
+    context: FinanceContext,
+    rawStudentId: string,
+    rawAcademicYearId?: string,
+  ) {
+    const studentId = objectId(rawStudentId, 'student');
+    const academicYearId = rawAcademicYearId ? objectId(rawAcademicYearId, 'academic year') : undefined;
+    return this.repository.listActiveStudentConcessions(
+      context.organizationId,
+      [studentId],
+      academicYearId,
+    );
+  }
+
+  async saveFeeConcession(
+    context: FinanceContext,
+    raw: FeeConcessionInput,
+    id?: string,
+  ) {
+    const concessionId = id ? objectId(id, 'concession') : undefined;
+    const input = validateConcessionInput(raw);
+    return this.repository.saveFeeConcession(
+      context.organizationId,
+      input,
+      concessionId,
+    );
+  }
+
+  private static deleteOtpStore = new Map<
+    string,
+    { otp: string; expiresAt: number }
+  >();
+
+  async deleteFeeConcession(context: FinanceContext, rawId: string) {
+    const id = objectId(rawId, 'concession');
+    const deleted = await this.repository.deleteFeeConcession(
+      context.organizationId,
+      id,
+    );
+    if (!deleted) {
+      throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Fee concession not found.');
+    }
+    return { success: true };
+  }
+
+  async requestInvoiceDeleteOtp(context: FinanceContext, rawInvoiceId: string, ownerPhone?: string) {
+    const invoiceId = objectId(rawInvoiceId, 'invoice');
+    const invoice = await this.repository.getInvoice(
+      context.organizationId,
+      invoiceId,
+      scopedCampusIds(context),
+    );
+    if (!invoice) {
+      throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Invoice not found.');
+    }
+    assertCampus(context, invoice.campusId);
+
+    const challenge = await this.repository.requestInvoiceDeleteOtp(
+      context.organizationId,
+      invoice,
+      context.userId,
+      ownerPhone,
+    );
+
+    if (challenge.devOtpPreview) {
+      FinanceService.deleteOtpStore.set(
+        `${context.organizationId}:${invoiceId}`,
+        {
+          otp: challenge.devOtpPreview,
+          expiresAt: Date.now() + challenge.expiresInMinutes * 60 * 1000,
+        },
+      );
+    }
+
+    return challenge;
+  }
+
+  async deleteInvoice(
+    context: FinanceContext,
+    rawInvoiceId: string,
+    otpCode?: string,
+  ) {
+    const invoiceId = objectId(rawInvoiceId, 'invoice');
+    const invoice = await this.repository.getInvoice(
+      context.organizationId,
+      invoiceId,
+      scopedCampusIds(context),
+    );
+    if (!invoice) {
+      throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Invoice not found.');
+    }
+    assertCampus(context, invoice.campusId);
+
+    if (invoice.paidAmount > 0) {
+      const key = `${context.organizationId}:${invoiceId}`;
+      const record = FinanceService.deleteOtpStore.get(key);
+      const cleanOtp = otpCode?.trim();
+
+      if (!cleanOtp) {
+        throw new AppError(
+          403,
+          'OWNER_OTP_REQUIRED',
+          'This invoice has recorded payments. Owner approval OTP is required to delete it.',
+        );
+      }
+
+      if (!record || Date.now() > record.expiresAt || record.otp !== cleanOtp) {
+        throw new AppError(
+          403,
+          'INVALID_DELETE_OTP',
+          'Invalid or expired Owner OTP. Please request a new OTP from the institute owner.',
+        );
+      }
+
+      FinanceService.deleteOtpStore.delete(key);
+    }
+
+    const deleted = await this.repository.deleteInvoice(
+      context.organizationId,
+      invoiceId,
+    );
+    if (!deleted) {
+      throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Invoice not found.');
+    }
+    return { success: true };
+  }
+
+  async setInvoiceDiscount(
+    context: FinanceContext,
+    rawInvoiceId: string,
+    applyDiscount: boolean,
+  ) {
+    const invoiceId = objectId(rawInvoiceId, 'invoice');
+    const invoice = await this.repository.getInvoice(
+      context.organizationId,
+      invoiceId,
+      scopedCampusIds(context),
+    );
+    if (!invoice) {
+      throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Invoice not found.');
+    }
+    assertCampus(context, invoice.campusId);
+
+    const updated = await this.repository.setInvoiceDiscount(
+      context.organizationId,
+      invoiceId,
+      applyDiscount,
+    );
+    if (!updated) {
+      throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Invoice not found.');
+    }
+    return updated;
   }
 }

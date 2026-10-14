@@ -21,17 +21,23 @@ import { useToast } from '../components/ui/ToastProvider.js';
 import type {
   FeeHead,
   FeeStructure,
+  InvoiceDeleteOtpChallenge,
   InvoiceStatus,
   PaymentMethod,
   StudentInvoice,
 } from './finance-api.js';
 import {
   useDeleteFeeStructure,
+  useDeleteInvoice,
   useFinanceWorkspace,
   useGenerateInvoices,
   useRecordInvoicePayment,
+  useRequestInvoiceDeleteOtp,
   useSaveFeeStructure,
+  useSetInvoiceDiscount,
 } from './finance-queries.js';
+import { StudentFeeLedgerModal } from './StudentFeeLedgerModal.js';
+import { StudentConcessionModal } from './StudentConcessionModal.js';
 
 const tabs = ['Invoices & billing', 'Bulk generate', 'Fee structures'] as const;
 type Tab = (typeof tabs)[number];
@@ -83,6 +89,121 @@ function initialFeeHeads(): FeeHeadDraft[] {
   return [{ title: 'Tuition', amount: '', isOptional: false }];
 }
 
+function handlePrintReceipt(invoice: StudentInvoice, classNameText: string) {
+  const remaining = Math.max(0, invoice.totalAmount - invoice.paidAmount);
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <title>Fee Receipt - ${invoice.invoiceNumber}</title>
+      <style>
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { padding: 30px; margin: 0; background: #ffffff; color: #0f172a; }
+        .receipt-card { border: 2px solid #0f172a; border-radius: 8px; padding: 24px; max-width: 520px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px; }
+        .header h2 { margin: 0; font-size: 20px; color: #0f172a; }
+        .badge { padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+        .badge.paid { background: #dcfce7; color: #166534; }
+        .badge.partial { background: #fef3c7; color: #854d0e; }
+        .badge.unpaid { background: #fee2e2; color: #991b1b; }
+        .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; margin-bottom: 20px; }
+        .meta-grid div strong { color: #64748b; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        td { padding: 10px 0; }
+        .row-total { border-top: 1px solid #e2e8f0; }
+        .row-paid { color: #15803d; }
+        .row-balance { border-top: 2px dashed #94a3b8; font-size: 16px; font-weight: bold; color: #b91c1c; }
+        .text-right { text-align: right; }
+        .footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #64748b; }
+      </style>
+    </head>
+    <body>
+      <div class="receipt-card">
+        <div class="header">
+          <h2>InstituteOS Fee Receipt</h2>
+          <span class="badge ${invoice.status}">${invoice.status}</span>
+        </div>
+        <div class="meta-grid">
+          <div><strong>Invoice:</strong> ${invoice.invoiceNumber}</div>
+          <div><strong>Student:</strong> ${invoice.studentName}</div>
+          <div><strong>Class:</strong> ${classNameText}</div>
+          <div><strong>Billing Cycle:</strong> ${invoice.billingCycle}</div>
+          <div><strong>Due Date:</strong> ${new Date(invoice.dueDate).toLocaleDateString()}</div>
+        </div>
+        <table>
+          ${
+            invoice.discountAmount && invoice.discountAmount > 0
+              ? `
+          <tr class="row-total">
+            <td>Current Fee:</td>
+            <td class="text-right">Rs. ${Number(invoice.currentAmount ?? invoice.totalAmount).toFixed(2)}</td>
+          </tr>
+          <tr style="color: #16a34a;">
+            <td>Concession (${invoice.discountReason || 'Discount'}):</td>
+            <td class="text-right"><strong>- Rs. ${Number(invoice.discountAmount).toFixed(2)}</strong></td>
+          </tr>`
+              : ''
+          }
+          ${
+            invoice.arrearsAmount && invoice.arrearsAmount > 0
+              ? `
+          <tr style="color: #d97706;">
+            <td>Previous Arrears:</td>
+            <td class="text-right">+ Rs. ${Number(invoice.arrearsAmount).toFixed(2)}</td>
+          </tr>`
+              : ''
+          }
+          <tr class="row-total">
+            <td>Net Total Payable:</td>
+            <td class="text-right"><strong>Rs. ${Number(invoice.totalAmount).toFixed(2)}</strong></td>
+          </tr>
+          <tr class="row-paid">
+            <td>Paid Amount:</td>
+            <td class="text-right"><strong>Rs. ${Number(invoice.paidAmount).toFixed(2)}</strong></td>
+          </tr>
+          <tr class="row-balance">
+            <td>Remaining Balance (Baqaya):</td>
+            <td class="text-right">Rs. ${remaining.toFixed(2)}</td>
+          </tr>
+        </table>
+        <div class="footer">
+          Computer generated official fee receipt. Valid without signature.
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow?.document;
+  if (!doc) {
+    document.body.removeChild(iframe);
+    return;
+  }
+
+  doc.open();
+  doc.write(htmlContent);
+  doc.close();
+
+  iframe.contentWindow?.focus();
+  setTimeout(() => {
+    iframe.contentWindow?.print();
+    setTimeout(() => {
+      document.body.removeChild(iframe);
+    }, 1000);
+  }, 250);
+}
+
 export function FinanceDashboard() {
   const { organizationId = '' } = useParams();
   const access = useOrganizationAccess(organizationId);
@@ -122,11 +243,22 @@ export function FinanceDashboard() {
   const deleteStructure = useDeleteFeeStructure(organizationId);
   const generateInvoices = useGenerateInvoices(organizationId);
   const recordPayment = useRecordInvoicePayment(organizationId);
+  const requestDeleteOtp = useRequestInvoiceDeleteOtp(organizationId);
+  const deleteInvoiceMutation = useDeleteInvoice(organizationId);
+  const setInvoiceDiscountMutation = useSetInvoiceDiscount(organizationId);
   const toast = useToast();
+
+  const [deletingInvoice, setDeletingInvoice] = useState<StudentInvoice | null>(null);
+  const [deleteOtpChallenge, setDeleteOtpChallenge] =
+    useState<InvoiceDeleteOtpChallenge | null>(null);
+  const [deleteOtpInput, setDeleteOtpInput] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   const [academicYearId, setAcademicYearId] = useState('');
   const [bulkClassId, setBulkClassId] = useState('');
   const [feeStructureId, setFeeStructureId] = useState('');
+  const [ledgerStudent, setLedgerStudent] = useState<{ id: string; name: string } | null>(null);
+  const [concessionStudent, setConcessionStudent] = useState<{ id: string; name: string } | null>(null);
   const [dueDate, setDueDate] = useState('');
   const [billingCycle, setBillingCycle] = useState('');
   const [generationSummary, setGenerationSummary] = useState('');
@@ -137,6 +269,9 @@ export function FinanceDashboard() {
   const [structureClassId, setStructureClassId] = useState('');
   const [feeHeads, setFeeHeads] = useState<FeeHeadDraft[]>(initialFeeHeads);
   const [paymentInvoice, setPaymentInvoice] = useState<StudentInvoice | null>(
+    null,
+  );
+  const [receiptInvoice, setReceiptInvoice] = useState<StudentInvoice | null>(
     null,
   );
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -159,6 +294,87 @@ export function FinanceDashboard() {
     setPaymentAmount(amountText(invoice.totalAmount - invoice.paidAmount));
     setPaymentDate(today());
     setFormError('');
+  }
+
+  async function handleToggleInvoiceDiscount(
+    invoice: StudentInvoice,
+    applyDiscount: boolean,
+  ) {
+    try {
+      await setInvoiceDiscountMutation.mutateAsync({
+        invoiceId: invoice.id,
+        applyDiscount,
+      });
+      toast.showToast(
+        applyDiscount
+          ? `Concession applied to ${invoice.invoiceNumber}.`
+          : `Concession removed from ${invoice.invoiceNumber}.`,
+      );
+    } catch (error) {
+      setFormError(apiMessage(error));
+    }
+  }
+
+  async function initiateDeleteInvoice(invoice: StudentInvoice) {
+    setDeleteError('');
+    setDeleteOtpInput('');
+    setDeleteOtpChallenge(null);
+
+    // Agar Unpaid hai (Paid === 0), toh direct confirmation se delete kar dein
+    if (invoice.paidAmount <= 0) {
+      if (
+        !window.confirm(
+          `Delete unpaid invoice ${invoice.invoiceNumber} (${invoice.studentName})?`,
+        )
+      ) {
+        return;
+      }
+      try {
+        await deleteInvoiceMutation.mutateAsync({ invoiceId: invoice.id });
+        toast.showToast(`Invoice ${invoice.invoiceNumber} deleted.`);
+      } catch (error) {
+        setFormError(apiMessage(error));
+      }
+      return;
+    }
+
+    // Agar Paid ya Partial hai, toh Owner OTP Security Dialog kholein
+    setDeletingInvoice(invoice);
+  }
+
+  async function handleSendOwnerOtp() {
+    if (!deletingInvoice) return;
+    setDeleteError('');
+    try {
+      const challenge = await requestDeleteOtp.mutateAsync(deletingInvoice.id);
+      setDeleteOtpChallenge(challenge);
+      toast.showToast('Security alert & OTP generated for Institute Owner.');
+      if (challenge.whatsAppAlertUrl) {
+        window.open(challenge.whatsAppAlertUrl, '_blank', 'noopener,noreferrer');
+      }
+    } catch (error) {
+      setDeleteError(apiMessage(error));
+    }
+  }
+
+  async function handleConfirmProtectedDelete(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!deletingInvoice) return;
+    setDeleteError('');
+    try {
+      await deleteInvoiceMutation.mutateAsync({
+        invoiceId: deletingInvoice.id,
+        otpCode: deleteOtpInput.trim(),
+      });
+      toast.showToast(
+        `Invoice ${deletingInvoice.invoiceNumber} and its receipts deleted after Owner approval.`,
+      );
+      setDeletingInvoice(null);
+      setDeleteOtpChallenge(null);
+      setDeleteOtpInput('');
+    } catch (error) {
+      setDeleteError(apiMessage(error));
+    }
   }
 
   async function submitGeneration(event: FormEvent<HTMLFormElement>) {
@@ -276,6 +492,10 @@ export function FinanceDashboard() {
       setPaymentAmount('');
       setTransactionReference('');
       toast.showToast(`Payment recorded · receipt ${result.receipt.receiptNumber}.`);
+
+      if (result.notification?.whatsAppUrl) {
+        window.open(result.notification.whatsAppUrl, '_blank', 'noopener,noreferrer');
+      }
     } catch (error) {
       setFormError(apiMessage(error));
     }
@@ -497,14 +717,65 @@ export function FinanceDashboard() {
                 {
                   header: 'Total / paid',
                   align: 'right',
-                  render: (row) => (
-                    <div>
-                      <strong>{amountText(row.totalAmount)}</strong>
-                      <span className="finance-cell-secondary">
-                        Paid {amountText(row.paidAmount)}
-                      </span>
-                    </div>
-                  ),
+                  render: (row) => {
+                    const remaining = Math.max(0, row.totalAmount - row.paidAmount);
+                    const hasDiscount = Boolean(row.discountAmount && row.discountAmount > 0);
+                    const baseFee =
+                      row.currentAmount && row.currentAmount > 0
+                        ? row.currentAmount
+                        : row.totalAmount + (row.discountAmount ?? 0);
+                    return (
+                      <div>
+                        {hasDiscount ? (
+                          <>
+                            <span
+                              className="finance-cell-secondary"
+                              style={{ textDecoration: 'line-through', opacity: 0.75 }}
+                            >
+                              Fee: {amountText(baseFee)}
+                            </span>
+                            <span
+                              className="finance-cell-secondary"
+                              style={{ color: '#16a34a', fontWeight: 600 }}
+                              title={row.discountReason || 'Concession applied'}
+                            >
+                              Discount: -{amountText(row.discountAmount ?? 0)}
+                            </span>
+                          </>
+                        ) : null}
+                        <strong>Net: {amountText(row.totalAmount)}</strong>
+                        <span className="finance-cell-secondary">
+                          Paid {amountText(row.paidAmount)}
+                          {remaining > 0 ? ` · Due ${amountText(remaining)}` : ''}
+                        </span>
+                        {canWrite && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleInvoiceDiscount(row, !hasDiscount)}
+                            disabled={setInvoiceDiscountMutation.isPending}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              marginTop: '0.2rem',
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              color: hasDiscount ? '#d97706' : '#2563eb',
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                            }}
+                            title={
+                              hasDiscount
+                                ? 'Remove discount from this specific invoice only'
+                                : 'Apply student active concession to this invoice'
+                            }
+                          >
+                            {hasDiscount ? 'Remove discount here' : 'Apply discount here'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  },
                 },
                 {
                   header: 'Status',
@@ -519,12 +790,58 @@ export function FinanceDashboard() {
                 {
                   header: 'Action',
                   render: (row) => (
-                    <Button
-                      disabled={!canWrite || row.status === 'paid'}
-                      onClick={() => openPayment(row)}
-                    >
-                      Record payment
-                    </Button>
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <Button
+                        disabled={!canWrite || row.status === 'paid'}
+                        onClick={() => openPayment(row)}
+                      >
+                        Record payment
+                      </Button>
+                      <Button
+                        variant="quiet"
+                        onClick={() => setReceiptInvoice(row)}
+                      >
+                        Receipt
+                      </Button>
+                      <Button
+                        variant="quiet"
+                        onClick={() =>
+                          setLedgerStudent({
+                            id: row.studentId,
+                            name: row.studentName,
+                          })
+                        }
+                      >
+                        Ledger
+                      </Button>
+                      {canWrite && (
+                        <>
+                          <Button
+                            variant="quiet"
+                            onClick={() =>
+                              setConcessionStudent({
+                                id: row.studentId,
+                                name: row.studentName,
+                              })
+                            }
+                            title="Manage student fee concessions and scholarships"
+                          >
+                            Discount
+                          </Button>
+                          <Button
+                            variant="danger"
+                            onClick={() => void initiateDeleteInvoice(row)}
+                            title={
+                              row.paidAmount > 0
+                                ? 'Requires Institute Owner OTP approval'
+                                : 'Delete unpaid invoice'
+                            }
+                          >
+                            Delete
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   ),
                 },
               ]}
@@ -567,13 +884,45 @@ export function FinanceDashboard() {
                       <dd>{amountText(invoice.paidAmount)}</dd>
                     </div>
                   </dl>
-                  <Button
-                    className="finance-card-payment-button"
-                    disabled={!canWrite || invoice.status === 'paid'}
-                    onClick={() => openPayment(invoice)}
-                  >
-                    Record Payment
-                  </Button>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                    <Button
+                      className="finance-card-payment-button"
+                      disabled={!canWrite || invoice.status === 'paid'}
+                      onClick={() => openPayment(invoice)}
+                    >
+                      Record Payment
+                    </Button>
+                    <Button
+                      variant="quiet"
+                      onClick={() => setReceiptInvoice(invoice)}
+                    >
+                      Receipt
+                    </Button>
+                    <Button
+                      variant="quiet"
+                      onClick={() =>
+                        setLedgerStudent({
+                          id: invoice.studentId,
+                          name: invoice.studentName,
+                        })
+                      }
+                    >
+                      Ledger
+                    </Button>
+                    {canWrite && (
+                      <Button
+                        variant="quiet"
+                        onClick={() =>
+                          setConcessionStudent({
+                            id: invoice.studentId,
+                            name: invoice.studentName,
+                          })
+                        }
+                      >
+                        Discount
+                      </Button>
+                    )}
+                  </div>
                 </article>
               ))
             ) : (
@@ -969,6 +1318,7 @@ export function FinanceDashboard() {
         </div>
       )}
 
+      {/* Record Payment Dialog */}
       <Dialog
         open={Boolean(paymentInvoice)}
         title="Record invoice payment"
@@ -1048,6 +1398,273 @@ export function FinanceDashboard() {
               </Button>
             </div>
           </form>
+        )}
+      </Dialog>
+
+      {/* Printable Receipt & Proof Dialog */}
+      <Dialog
+        open={Boolean(receiptInvoice)}
+        title="Student Fee Receipt"
+        description={
+          receiptInvoice
+            ? `Official payment slip for ${receiptInvoice.studentName} (${receiptInvoice.invoiceNumber})`
+            : undefined
+        }
+        onOpenChange={(open) => {
+          if (!open) setReceiptInvoice(null);
+        }}
+      >
+        {receiptInvoice && (
+          <div className="finance-receipt-dialog">
+            <div className="finance-receipt-card" id="printable-fee-receipt">
+              <div className="finance-receipt-header">
+                <h3>InstituteOS Fee Receipt</h3>
+                <span className="finance-receipt-tag">
+                  {statusLabels[receiptInvoice.status]}
+                </span>
+              </div>
+              <hr style={{ margin: '0.75rem 0', opacity: 0.2 }} />
+              <div className="finance-receipt-meta">
+                <div>
+                  <strong>Invoice:</strong> {receiptInvoice.invoiceNumber}
+                </div>
+                <div>
+                  <strong>Student:</strong> {receiptInvoice.studentName}
+                </div>
+                <div>
+                  <strong>Class:</strong> {className(receiptInvoice.classId, classes)}
+                </div>
+                <div>
+                  <strong>Cycle:</strong> {receiptInvoice.billingCycle}
+                </div>
+                <div>
+                  <strong>Due Date:</strong> {new Date(receiptInvoice.dueDate).toLocaleDateString()}
+                </div>
+              </div>
+              <hr style={{ margin: '0.75rem 0', opacity: 0.2 }} />
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '0.5rem' }}>
+                <tbody>
+                  {receiptInvoice.discountAmount && receiptInvoice.discountAmount > 0 ? (
+                    <>
+                      <tr>
+                        <td style={{ padding: '0.35rem 0', color: '#64748b' }}>Base Fee:</td>
+                        <td style={{ textAlign: 'right', color: '#64748b' }}>
+                          Rs. {amountText(receiptInvoice.currentAmount ?? receiptInvoice.totalAmount)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '0.35rem 0', color: '#16a34a' }}>
+                          Discount ({receiptInvoice.discountReason || 'Concession'}):
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#16a34a' }}>
+                          - Rs. {amountText(receiptInvoice.discountAmount)}
+                        </td>
+                      </tr>
+                    </>
+                  ) : null}
+                  <tr>
+                    <td style={{ padding: '0.35rem 0' }}>Net Total Billed:</td>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
+                      Rs. {amountText(receiptInvoice.totalAmount)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '0.35rem 0', color: '#10b981' }}>Paid Amount:</td>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#10b981' }}>
+                      Rs. {amountText(receiptInvoice.paidAmount)}
+                    </td>
+                  </tr>
+                  <tr style={{ borderTop: '1px dashed #cbd5e1' }}>
+                    <td style={{ padding: '0.5rem 0', fontWeight: 'bold', color: '#dc2626' }}>
+                      Remaining Balance (Baqaya):
+                    </td>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '1.1rem', color: '#dc2626' }}>
+                      Rs. {amountText(receiptInvoice.totalAmount - receiptInvoice.paidAmount)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div style={{ marginTop: '1.5rem', fontSize: '0.8rem', color: '#64748b', textAlign: 'center' }}>
+                Computer generated fee slip. Valid without manual signature.
+              </div>
+            </div>
+
+            <div className="finance-form-actions" style={{ marginTop: '1.25rem' }}>
+              <Button
+                variant="primary"
+                onClick={() =>
+                  handlePrintReceipt(
+                    receiptInvoice,
+                    className(receiptInvoice.classId, classes),
+                  )
+                }
+              >
+                Print Receipt
+              </Button>
+              <Button
+                onClick={() => setReceiptInvoice(null)}
+                type="button"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
+      {/* Student Fee Ledger Modal */}
+      {ledgerStudent && (
+        <StudentFeeLedgerModal
+          organizationId={organizationId}
+          studentId={ledgerStudent.id}
+          studentName={ledgerStudent.name}
+          isOpen={Boolean(ledgerStudent)}
+          onClose={() => setLedgerStudent(null)}
+        />
+      )}
+
+      {/* Student Fee Concession / Discount Modal */}
+      {concessionStudent && (
+        <StudentConcessionModal
+          organizationId={organizationId}
+          studentId={concessionStudent.id}
+          studentName={concessionStudent.name}
+          isOpen={Boolean(concessionStudent)}
+          onClose={() => setConcessionStudent(null)}
+        />
+      )}
+
+      {/* Owner OTP Anti-Fraud Invoice Deletion Dialog */}
+      <Dialog
+        open={Boolean(deletingInvoice)}
+        title="🚨 Owner Security Approval Required"
+        description={
+          deletingInvoice
+            ? `Invoice ${deletingInvoice.invoiceNumber} (${deletingInvoice.studentName}) has Rs. ${amountText(deletingInvoice.paidAmount)} in collected payments.`
+            : undefined
+        }
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeletingInvoice(null);
+            setDeleteOtpChallenge(null);
+            setDeleteOtpInput('');
+            setDeleteError('');
+          }
+        }}
+      >
+        {deletingInvoice && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div
+              style={{
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '10px',
+                padding: '0.9rem 1rem',
+                color: '#991b1b',
+                fontSize: '0.85rem',
+                lineHeight: 1.5,
+              }}
+            >
+              <strong>Anti-Fraud Protection Active:</strong> Paid or partially paid
+              invoices cannot be deleted by staff alone. An alert with the collected
+              amount (<strong>Rs. {amountText(deletingInvoice.paidAmount)}</strong>)
+              will be sent to the Institute Owner. The Owner should only share the OTP
+              if this is a verified test or mistake entry.
+            </div>
+
+            {!deleteOtpChallenge ? (
+              <div className="finance-form-actions">
+                <Button
+                  variant="primary"
+                  disabled={requestDeleteOtp.isPending}
+                  onClick={() => void handleSendOwnerOtp()}
+                  type="button"
+                >
+                  {requestDeleteOtp.isPending
+                    ? 'Sending Alert to Owner…'
+                    : 'Send Fraud Alert & OTP to Owner'}
+                </Button>
+                <Button
+                  onClick={() => setDeletingInvoice(null)}
+                  type="button"
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <form
+                className="finance-dialog-form"
+                onSubmit={handleConfirmProtectedDelete}
+              >
+                {deleteOtpChallenge.devOtpPreview && (
+                  <div
+                    style={{
+                      background: '#eff6ff',
+                      border: '1px dashed #60a5fa',
+                      borderRadius: '8px',
+                      padding: '0.65rem 0.85rem',
+                      fontSize: '0.82rem',
+                      color: '#1e3a8a',
+                    }}
+                  >
+                    <strong>Owner / Dev Preview OTP:</strong>{' '}
+                    <code style={{ fontSize: '1rem', fontWeight: 700 }}>
+                      {deleteOtpChallenge.devOtpPreview}
+                    </code>{' '}
+                    <span style={{ opacity: 0.8 }}>
+                      (Also opened in WhatsApp Alert & API console)
+                    </span>
+                  </div>
+                )}
+
+                <FinanceField label="Enter 6-Digit Owner Approval OTP">
+                  <input
+                    autoFocus
+                    maxLength={6}
+                    placeholder="e.g. 482910"
+                    required
+                    value={deleteOtpInput}
+                    onChange={(event) => setDeleteOtpInput(event.target.value)}
+                  />
+                </FinanceField>
+
+                {deleteError && (
+                  <p className="finance-form-error" role="alert">
+                    {deleteError}
+                  </p>
+                )}
+
+                <div className="finance-form-actions">
+                  <Button
+                    variant="danger"
+                    disabled={
+                      deleteInvoiceMutation.isPending ||
+                      deleteOtpInput.trim().length < 6
+                    }
+                    type="submit"
+                  >
+                    {deleteInvoiceMutation.isPending
+                      ? 'Verifying & Deleting…'
+                      : 'Verify OTP & Delete Invoice'}
+                  </Button>
+                  <Button
+                    onClick={() => void handleSendOwnerOtp()}
+                    disabled={requestDeleteOtp.isPending}
+                    type="button"
+                    variant="quiet"
+                  >
+                    Resend OTP
+                  </Button>
+                  <Button
+                    onClick={() => setDeletingInvoice(null)}
+                    type="button"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
         )}
       </Dialog>
     </main>
