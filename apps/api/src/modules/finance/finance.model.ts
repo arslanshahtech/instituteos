@@ -74,6 +74,10 @@ const studentInvoiceSchema = new Schema(
     billingCycle: { type: String, required: true, trim: true, maxlength: 60 },
     dueDate: { type: Date, required: true },
     totalAmount: { type: Schema.Types.Decimal128, required: true, min: 0 },
+    currentAmount: { type: Schema.Types.Decimal128, default: '0.00', min: 0 },
+    discountAmount: { type: Schema.Types.Decimal128, default: '0.00', min: 0 },
+    discountReason: { type: String, trim: true, maxlength: 120 },
+    arrearsAmount: { type: Schema.Types.Decimal128, default: '0.00', min: 0 },
     paidAmount: {
       type: Schema.Types.Decimal128,
       required: true,
@@ -152,6 +156,60 @@ paymentReceiptSchema.index(
 );
 paymentReceiptSchema.index({ organizationId: 1, invoiceId: 1, paymentDate: 1 });
 
+const feeConcessionSchema = new Schema(
+  {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: true,
+      index: true,
+    },
+    studentId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Student',
+      required: true,
+      index: true,
+    },
+    academicYearId: {
+      type: Schema.Types.ObjectId,
+      ref: 'AcademicYear',
+    },
+    concessionType: {
+      type: String,
+      enum: ['sibling', 'staff_child', 'scholarship', 'need_based', 'special'],
+      required: true,
+      default: 'special',
+    },
+    discountType: {
+      type: String,
+      enum: ['percentage', 'fixed'],
+      required: true,
+      default: 'fixed',
+    },
+    discountValue: {
+      type: Schema.Types.Decimal128,
+      required: true,
+      min: 0,
+    },
+    reason: {
+      type: String,
+      trim: true,
+      maxlength: 160,
+    },
+    isActive: {
+      type: Boolean,
+      required: true,
+      default: true,
+    },
+  },
+  { timestamps: true, versionKey: false },
+);
+
+feeConcessionSchema.index(
+  { organizationId: 1, studentId: 1, isActive: 1 },
+  { name: 'idx_student_active_concessions' },
+);
+
 export const FeeStructureModel =
   mongoose.models.FeeStructure ??
   mongoose.model('FeeStructure', feeStructureSchema);
@@ -161,3 +219,6 @@ export const StudentInvoiceModel =
 export const PaymentReceiptModel =
   mongoose.models.PaymentReceipt ??
   mongoose.model('PaymentReceipt', paymentReceiptSchema);
+export const FeeConcessionModel =
+  mongoose.models.FeeConcession ??
+  mongoose.model('FeeConcession', feeConcessionSchema);

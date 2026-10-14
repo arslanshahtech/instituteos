@@ -25,6 +25,9 @@ import type {
   InvoiceStatus,
   PaymentInput,
   PaymentMethod,
+  FeeConcessionInput,
+  ConcessionType,
+  DiscountType,
 } from './finance.types.js';
 
 function bodyObject(value: unknown): Record<string, unknown> {
@@ -164,6 +167,35 @@ function paymentInput(body: Record<string, unknown>): PaymentInput {
   };
 }
 
+function feeConcessionInput(body: Record<string, unknown>): FeeConcessionInput {
+  const concessionType = text(body.concessionType, 'concession type', 40);
+  const discountType = text(body.discountType, 'discount type', 20);
+
+  if (
+    concessionType !== 'sibling' &&
+    concessionType !== 'staff_child' &&
+    concessionType !== 'scholarship' &&
+    concessionType !== 'need_based' &&
+    concessionType !== 'special'
+  ) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid concession type.');
+  }
+
+  if (discountType !== 'percentage' && discountType !== 'fixed') {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid discount type.');
+  }
+
+  return {
+    studentId: objectId(body.studentId, 'student'),
+    academicYearId: body.academicYearId ? objectId(body.academicYearId, 'academic year') : undefined,
+    concessionType: concessionType as ConcessionType,
+    discountType: discountType as DiscountType,
+    discountValue: amount(body.discountValue, 'discount value'),
+    reason: optionalText(body.reason, 'reason', 160),
+    isActive: typeof body.isActive === 'boolean' ? body.isActive : true,
+  };
+}
+
 function defaultAuthenticate() {
   const authService = new AuthService(
     new MongoAuthRepository(),
@@ -287,6 +319,122 @@ export function createFinanceRouter(
           paymentInput(bodyObject(request.body)),
         ),
       );
+    }),
+  );
+
+  router.get(
+    `${base}/students/:studentId/ledger`,
+    ...read,
+    asyncHandler(async (request, response) => {
+      const studentId = objectId(request.params.studentId, 'student');
+      response.status(200).json(
+        await service.getStudentFeeLedger(
+          organizationContext(response),
+          studentId,
+        ),
+      );
+    }),
+  );
+  
+  router.get(
+    `${base}/students/:studentId/concessions`,
+    ...read,
+    asyncHandler(async (request, response) => {
+      const studentId = objectId(request.params.studentId, 'student');
+      const academicYearId = queryId(request.query.academicYearId, 'academic year');
+      response.status(200).json({
+        items: await service.listStudentConcessions(
+          organizationContext(response),
+          studentId,
+          academicYearId,
+        ),
+      });
+    }),
+  );
+
+  router.post(
+    `${base}/concessions`,
+    ...write,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const input = feeConcessionInput(bodyObject(request.body));
+      const concessionId = request.body && typeof request.body === 'object' && 'id' in request.body
+        ? optionalText((request.body as Record<string, unknown>).id, 'concession id', 24)
+        : undefined;
+
+      response.status(201).json({
+        concession: await service.saveFeeConcession(
+          organizationContext(response),
+          input,
+          concessionId,
+        ),
+      });
+    }),
+  );
+
+  router.delete(
+    `${base}/concessions/:concessionId`,
+    ...write,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const concessionId = objectId(request.params.concessionId, 'concession');
+      await service.deleteFeeConcession(organizationContext(response), concessionId);
+      response.status(204).end();
+    }),
+  );
+
+  router.post(
+    `${base}/invoices/:invoiceId/delete-otp`,
+    ...write,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const invoiceId = objectId(request.params.invoiceId, 'invoice');
+      response.status(200).json(
+        await service.requestInvoiceDeleteOtp(
+          organizationContext(response),
+          invoiceId,
+        ),
+      );
+    }),
+  );
+
+  router.delete(
+    `${base}/invoices/:invoiceId`,
+    ...write,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const invoiceId = objectId(request.params.invoiceId, 'invoice');
+      const otpCode = optionalText(request.query.otp, 'OTP code', 12);
+      await service.deleteInvoice(
+        organizationContext(response),
+        invoiceId,
+        otpCode,
+      );
+      response.status(204).end();
+    }),
+  );
+
+  router.patch(
+    `${base}/invoices/:invoiceId/discount`,
+    ...write,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const invoiceId = objectId(request.params.invoiceId, 'invoice');
+      const body = bodyObject(request.body);
+      if (typeof body.applyDiscount !== 'boolean') {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Specify whether to apply or remove the discount.',
+        );
+      }
+      response.status(200).json({
+        invoice: await service.setInvoiceDiscount(
+          organizationContext(response),
+          invoiceId,
+          body.applyDiscount,
+        ),
+      });
     }),
   );
 
