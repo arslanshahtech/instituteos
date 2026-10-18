@@ -30,6 +30,7 @@ import { ApiError } from '../../api/client.js';
 import {
   WorkspaceMetricCard,
   WorkspacePageHeading,
+  WorkspaceQuickAction,
 } from '../../components/ui/WorkspacePrimitives.js';
 import { listApplications } from '../../admissions/admissions-api.js';
 import type { ApplicationRecord } from '../../admissions/admissions-api.js';
@@ -676,67 +677,6 @@ export function OrganizationAdminPage() {
         eyebrow={`Organization workspace · ${access.data.role.replaceAll('_', ' ')}`}
         title="Institute Overview"
         description={`${dashboard.data?.organization.name ?? 'Your college'} · Welcome back, ${auth.user?.displayName ?? 'there'}.`}
-        aside={
-          tab === 'overview' ? (
-            <div
-              aria-label="College quick actions"
-              className="organization-heading-actions organization-dashboard-actions reference-quick-actions"
-              role="group"
-            >
-              {(
-                [
-                  {
-                    label: 'Add Student',
-                    to: `${organizationPath}/students/new`,
-                    permission: 'student.create',
-                    icon: UserPlus,
-                  },
-                  {
-                    label: 'Collect Fee',
-                    to: `${organizationPath}/finance`,
-                    permission: 'finance.write',
-                    icon: WalletCards,
-                  },
-                  {
-                    label: 'Mark Attendance',
-                    to: `${organizationPath}/attendance`,
-                    permission: 'attendance.write',
-                    icon: CalendarCheck,
-                  },
-                  {
-                    label: 'Generate Report',
-                    to: `${organizationPath}/reports`,
-                    permission: 'reporting.read',
-                    icon: BarChart3,
-                  },
-                ] as const
-              ).map((action) => {
-                const Icon = action.icon;
-                const permitted = access.data.permissions.includes(
-                  action.permission,
-                );
-                return permitted ? (
-                  <Link
-                    className="organization-dashboard-action reference-quick-action"
-                    key={action.label}
-                    to={action.to}
-                  >
-                    <Icon size={15} aria-hidden="true" /> {action.label}
-                  </Link>
-                ) : (
-                  <span
-                    aria-disabled="true"
-                    className="organization-dashboard-action reference-quick-action is-unavailable"
-                    key={action.label}
-                    title={`Your current role does not have permission to: ${action.label.toLowerCase()}.`}
-                  >
-                    <Icon size={15} aria-hidden="true" /> {action.label}
-                  </span>
-                );
-              })}
-            </div>
-          ) : undefined
-        }
       >
         {accessibleOrganizations.data?.organizations.some(
           (organization) => organization.id === organizationId,
@@ -769,6 +709,59 @@ export function OrganizationAdminPage() {
           </label>
         )}
       </WorkspacePageHeading>
+      {tab === 'overview' && (
+        <nav
+          aria-label="College quick actions"
+          className="reference-quick-actions"
+        >
+          {(
+            [
+              {
+                label: 'Add Student',
+                to: `${organizationPath}/students/new`,
+                permission: 'student.create',
+                icon: UserPlus,
+              },
+              {
+                label: 'Collect Fee',
+                to: `${organizationPath}/finance`,
+                permission: 'finance.write',
+                icon: WalletCards,
+              },
+              {
+                label: 'Mark Attendance',
+                to: `${organizationPath}/attendance`,
+                permission: 'attendance.write',
+                icon: CalendarCheck,
+              },
+              {
+                label: 'Generate Report',
+                to: `${organizationPath}/reports`,
+                permission: 'reporting.read',
+                icon: BarChart3,
+              },
+            ] as const
+          ).map((action) => {
+            const Icon = action.icon;
+            const permitted = access.data.permissions.includes(
+              action.permission,
+            );
+            return permitted ? (
+              <WorkspaceQuickAction key={action.label} {...action} />
+            ) : (
+              <span
+                aria-disabled="true"
+                className="organization-dashboard-action reference-quick-action is-unavailable"
+                key={action.label}
+                title={`Your current role does not have permission to: ${action.label.toLowerCase()}.`}
+              >
+                <Icon size={14} aria-hidden="true" />
+                {action.label}
+              </span>
+            );
+          })}
+        </nav>
+      )}
       {tab !== 'overview' && (
         <>
           <label className="organization-section-selector">
@@ -1040,7 +1033,6 @@ function OverviewPanel({
               ? 'Overdue: ' + formatPKR(totals.finance.totalOverdue)
               : 'Dues load from college finance records',
             icon: WalletCards,
-            className: 'admin-metric-card',
           },
           {
             label: 'Today’s attendance',
