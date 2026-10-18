@@ -15,12 +15,14 @@ export function WorkspacePageHeading({
   title,
   description,
   aside,
+  children,
   className = '',
 }: {
   eyebrow: string;
   title: string;
   description: string;
   aside?: ReactNode;
+  children?: ReactNode;
   className?: string;
 }) {
   return (
@@ -31,6 +33,7 @@ export function WorkspacePageHeading({
         <p className="eyebrow">{eyebrow}</p>
         <h1>{title}</h1>
         <p className="page-description">{description}</p>
+        {children}
       </div>
       {aside}
     </section>
@@ -40,7 +43,9 @@ export function WorkspacePageHeading({
 export function WorkspaceMetricCard({ metric }: { metric: WorkspaceMetric }) {
   const Icon = metric.icon;
   return (
-    <article className={`reference-metric-card ${metric.className ?? ''}`.trim()}>
+    <article
+      className={`reference-metric-card ${metric.className ?? ''}`.trim()}
+    >
       <div className="reference-metric-icon">
         <Icon size={15} aria-hidden="true" />
       </div>

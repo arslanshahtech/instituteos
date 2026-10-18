@@ -27,7 +27,10 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { ApiError } from '../../api/client.js';
-import { WorkspaceMetricCard } from '../../components/ui/WorkspacePrimitives.js';
+import {
+  WorkspaceMetricCard,
+  WorkspacePageHeading,
+} from '../../components/ui/WorkspacePrimitives.js';
 import { listApplications } from '../../admissions/admissions-api.js';
 import type { ApplicationRecord } from '../../admissions/admissions-api.js';
 import { listStudentAttendance } from '../../attendance/attendance-api.js';
@@ -668,107 +671,104 @@ export function OrganizationAdminPage() {
 
   return (
     <main className="page-stack organization-admin-page">
-      <section className="page-heading organization-heading reference-dashboard-heading">
-        <div>
-          <p className="eyebrow">
-            Organization workspace · {access.data.role.replaceAll('_', ' ')}
-          </p>
-          <h1>Institute Overview</h1>
-          <p className="page-description organization-user-meta">
-            {dashboard.data?.organization.name ?? 'Your college'} · Welcome
-            back, {auth.user?.displayName ?? 'there'}.
-          </p>
-          {accessibleOrganizations.data?.organizations.some(
-            (organization) => organization.id === organizationId,
-          ) && (
-            <label
-              className="organization-switcher"
-              htmlFor="organization-switcher"
+      <WorkspacePageHeading
+        className="organization-heading"
+        eyebrow={`Organization workspace · ${access.data.role.replaceAll('_', ' ')}`}
+        title="Institute Overview"
+        description={`${dashboard.data?.organization.name ?? 'Your college'} · Welcome back, ${auth.user?.displayName ?? 'there'}.`}
+        aside={
+          tab === 'overview' ? (
+            <div
+              aria-label="College quick actions"
+              className="organization-heading-actions organization-dashboard-actions reference-quick-actions"
+              role="group"
             >
-              <span>Current organization</span>
-              <div className="organization-switcher-control">
-                <select
-                  id="organization-switcher"
-                  aria-label="Current organization"
-                  value={organizationId}
-                  onChange={(event) =>
-                    navigate(
-                      `/admin/organizations/${encodeURIComponent(event.target.value)}`,
-                    )
-                  }
-                >
-                  {accessibleOrganizations.data.organizations
-                    .filter((organization) => organization.status === 'active')
-                    .map((organization) => (
-                      <option key={organization.id} value={organization.id}>
-                        {organization.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-            </label>
-          )}
-        </div>
-        {tab === 'overview' && (
-          <div
-            aria-label="College quick actions"
-            className="organization-heading-actions organization-dashboard-actions reference-quick-actions"
-            role="group"
+              {(
+                [
+                  {
+                    label: 'Add Student',
+                    to: `${organizationPath}/students/new`,
+                    permission: 'student.create',
+                    icon: UserPlus,
+                  },
+                  {
+                    label: 'Collect Fee',
+                    to: `${organizationPath}/finance`,
+                    permission: 'finance.write',
+                    icon: WalletCards,
+                  },
+                  {
+                    label: 'Mark Attendance',
+                    to: `${organizationPath}/attendance`,
+                    permission: 'attendance.write',
+                    icon: CalendarCheck,
+                  },
+                  {
+                    label: 'Generate Report',
+                    to: `${organizationPath}/reports`,
+                    permission: 'reporting.read',
+                    icon: BarChart3,
+                  },
+                ] as const
+              ).map((action) => {
+                const Icon = action.icon;
+                const permitted = access.data.permissions.includes(
+                  action.permission,
+                );
+                return permitted ? (
+                  <Link
+                    className="organization-dashboard-action reference-quick-action"
+                    key={action.label}
+                    to={action.to}
+                  >
+                    <Icon size={15} aria-hidden="true" /> {action.label}
+                  </Link>
+                ) : (
+                  <span
+                    aria-disabled="true"
+                    className="organization-dashboard-action reference-quick-action is-unavailable"
+                    key={action.label}
+                    title={`Your current role does not have permission to: ${action.label.toLowerCase()}.`}
+                  >
+                    <Icon size={15} aria-hidden="true" /> {action.label}
+                  </span>
+                );
+              })}
+            </div>
+          ) : undefined
+        }
+      >
+        {accessibleOrganizations.data?.organizations.some(
+          (organization) => organization.id === organizationId,
+        ) && (
+          <label
+            className="organization-switcher"
+            htmlFor="organization-switcher"
           >
-            {(
-              [
-                {
-                  label: 'Add Student',
-                  to: `${organizationPath}/students/new`,
-                  permission: 'student.create',
-                  icon: UserPlus,
-                },
-                {
-                  label: 'Collect Fee',
-                  to: `${organizationPath}/finance`,
-                  permission: 'finance.write',
-                  icon: WalletCards,
-                },
-                {
-                  label: 'Mark Attendance',
-                  to: `${organizationPath}/attendance`,
-                  permission: 'attendance.write',
-                  icon: CalendarCheck,
-                },
-                {
-                  label: 'Generate Report',
-                  to: `${organizationPath}/reports`,
-                  permission: 'reporting.read',
-                  icon: BarChart3,
-                },
-              ] as const
-            ).map((action) => {
-              const Icon = action.icon;
-              const permitted = access.data.permissions.includes(
-                action.permission,
-              );
-              return permitted ? (
-                <Link
-                  className="organization-dashboard-action reference-quick-action"
-                  key={action.label}
-                  to={action.to}
-                >
-                  <Icon size={15} aria-hidden="true" /> {action.label}
-                </Link>
-              ) : (
-                <span
-                  aria-disabled="true"
-                  className="organization-dashboard-action reference-quick-action is-unavailable"
-                  key={action.label}
-                  title={`Your current role does not have permission to: ${action.label.toLowerCase()}.`}
-                >
-                  <Icon size={15} aria-hidden="true" /> {action.label}
-                </span>
-              );
-            })}
-          </div>
+            <span>Current organization</span>
+            <div className="organization-switcher-control">
+              <select
+                id="organization-switcher"
+                aria-label="Current organization"
+                value={organizationId}
+                onChange={(event) =>
+                  navigate(
+                    `/admin/organizations/${encodeURIComponent(event.target.value)}`,
+                  )
+                }
+              >
+                {accessibleOrganizations.data.organizations
+                  .filter((organization) => organization.status === 'active')
+                  .map((organization) => (
+                    <option key={organization.id} value={organization.id}>
+                      {organization.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          </label>
         )}
-      </section>
+      </WorkspacePageHeading>
       {tab !== 'overview' && (
         <>
           <label className="organization-section-selector">
@@ -1000,27 +1000,34 @@ function OverviewPanel({
         {[
           {
             label: 'Active students',
-            value: totals ? totals.activeStudentCount.toLocaleString('en-PK') : '—',
+            value: totals
+              ? totals.activeStudentCount.toLocaleString('en-PK')
+              : '—',
             detail: 'Currently enrolled learners',
             icon: Users,
           },
           {
             label: 'Staff & teachers',
-            value: totals ? totals.activeStaffCount.toLocaleString('en-PK') : '—',
+            value: totals
+              ? totals.activeStaffCount.toLocaleString('en-PK')
+              : '—',
             detail: 'Active college staff',
             icon: GraduationCap,
           },
           {
             label: 'Guardians',
-            value: guardians.data ? guardians.data.total.toLocaleString('en-PK') : '—',
+            value: guardians.data
+              ? guardians.data.total.toLocaleString('en-PK')
+              : '—',
             detail: 'Guardian records in your college',
             icon: UserCheck,
           },
           {
             label: 'Monthly collection',
-            value: monthlyCollections.isPending || monthlyCollections.isError
-              ? '—'
-              : formatPKR(monthlyCollectionTotal),
+            value:
+              monthlyCollections.isPending || monthlyCollections.isError
+                ? '—'
+                : formatPKR(monthlyCollectionTotal),
             detail: monthlyCollections.isError
               ? 'Monthly receipts unavailable'
               : `${collectionRange.dateFrom} to ${collectionRange.dateTo}`,
@@ -1037,11 +1044,13 @@ function OverviewPanel({
           },
           {
             label: 'Today’s attendance',
-            value: typeof totals?.attendance.todayAttendanceRate === 'number'
-              ? String(totals.attendance.todayAttendanceRate) + '%'
-              : '—',
+            value:
+              typeof totals?.attendance.todayAttendanceRate === 'number'
+                ? String(totals.attendance.todayAttendanceRate) + '%'
+                : '—',
             detail: totals
-              ? String(totals.attendance.recordsCount.toLocaleString('en-PK')) + ' attendance records'
+              ? String(totals.attendance.recordsCount.toLocaleString('en-PK')) +
+                ' attendance records'
               : 'Attendance summary',
             icon: CalendarCheck,
           },
