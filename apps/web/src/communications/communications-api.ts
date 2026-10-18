@@ -1,15 +1,7 @@
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../api/client.js';
 
-export type AnnouncementAudience =
-  | 'all'
-  | 'staff'
-  | 'students'
-  | 'guardians';
+export type AnnouncementAudience = 'all' | 'staff' | 'students' | 'guardians';
 export type AnnouncementStatus = 'draft' | 'published' | 'archived';
 
 export interface Announcement {
@@ -50,8 +42,8 @@ export function listAnnouncements(
   filters: AnnouncementFilters = {},
 ) {
   const query = new URLSearchParams(
-    Object.entries(filters).filter(
-      (entry): entry is [string, string] => Boolean(entry[1]),
+    Object.entries(filters).filter((entry): entry is [string, string] =>
+      Boolean(entry[1]),
     ),
   );
   return apiRequest<{ items: Announcement[] }>(
@@ -179,8 +171,25 @@ export interface StartConversationInput {
   initialMessage: string;
 }
 
+export interface ParentMessagingContact {
+  studentId: string;
+  studentName: string;
+  className: string;
+  sectionName: string;
+  teachers: Array<{ userId: string; displayName: string }>;
+}
+
 const messagingThreadsPath = (organizationId: string) =>
   `/organizations/${encodeURIComponent(organizationId)}/communications/threads`;
+
+const messagingContactsPath = (organizationId: string) =>
+  `/organizations/${encodeURIComponent(organizationId)}/communications/contacts`;
+
+export function listParentMessagingContacts(organizationId: string) {
+  return apiRequest<{ items: ParentMessagingContact[] }>(
+    messagingContactsPath(organizationId),
+  );
+}
 
 export function listThreads(organizationId: string) {
   return apiRequest<{ items: ConversationThread[] }>(
@@ -218,8 +227,22 @@ export function sendReply(
 export const messagingQueryKey = (organizationId: string) =>
   ['messaging-threads', organizationId] as const;
 
-export const threadDetailQueryKey = (organizationId: string, threadId: string) =>
-  ['messaging-thread', organizationId, threadId] as const;
+export const threadDetailQueryKey = (
+  organizationId: string,
+  threadId: string,
+) => ['messaging-thread', organizationId, threadId] as const;
+
+export const messagingContactsQueryKey = (organizationId: string) =>
+  ['messaging-contacts', organizationId] as const;
+
+export function useMessagingContacts(organizationId: string, enabled = true) {
+  return useQuery({
+    queryKey: messagingContactsQueryKey(organizationId),
+    queryFn: () => listParentMessagingContacts(organizationId),
+    enabled: Boolean(organizationId) && enabled,
+    retry: false,
+  });
+}
 
 export function useThreads(organizationId: string, enabled = true) {
   return useQuery({

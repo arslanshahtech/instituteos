@@ -1,4 +1,4 @@
-export type StudentAttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
+export type StudentAttendanceStatus = 'present' | 'absent' | 'leave';
 export type StaffAttendanceStatus =
   'present' | 'absent' | 'half-day' | 'on-leave';
 
@@ -6,6 +6,19 @@ export interface AttendanceContext {
   organizationId: string;
   campusIds: string[];
   role: string;
+  userId?: string;
+}
+
+export interface TeacherAttendanceAssignment {
+  id: string;
+  classId: string;
+  className: string;
+  sectionId: string;
+  sectionName: string;
+  academicYearId: string;
+  academicYearName: string;
+  campusId: string;
+  campusName: string;
 }
 
 export interface StudentRosterMember {
@@ -13,6 +26,8 @@ export interface StudentRosterMember {
   firstName: string;
   lastName: string;
   preferredName?: string;
+  contactEmail?: string;
+  phone?: string;
   status?: StudentAttendanceStatus;
   remarks?: string;
 }
@@ -97,6 +112,15 @@ export interface StudentPlacementRecord extends StudentPlacementInput {
 }
 
 export interface AttendanceRepository {
+  listTeacherAssignmentsForUser(
+    organizationId: string,
+    userId: string,
+  ): Promise<TeacherAttendanceAssignment[]>;
+  isTeacherAssignedToSection(
+    organizationId: string,
+    userId: string,
+    input: { classId: string; sectionId: string; academicYearId: string },
+  ): Promise<boolean>;
   getClassCampus(
     organizationId: string,
     classId: string,

@@ -1,6 +1,18 @@
 import { apiRequest } from '../api/client.js';
 
-export type StudentAttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
+export interface TeacherAttendanceAssignment {
+  id: string;
+  classId: string;
+  className: string;
+  sectionId: string;
+  sectionName: string;
+  academicYearId: string;
+  academicYearName: string;
+  campusId: string;
+  campusName: string;
+}
+
+export type StudentAttendanceStatus = 'present' | 'absent' | 'leave';
 export type StaffAttendanceStatus =
   'present' | 'absent' | 'half-day' | 'on-leave';
 
@@ -12,6 +24,8 @@ export interface AttendancePerson {
 }
 
 export interface StudentRosterMember extends AttendancePerson {
+  contactEmail?: string;
+  phone?: string;
   status?: StudentAttendanceStatus;
   remarks?: string;
 }
@@ -39,6 +53,12 @@ export interface StaffAttendanceRecord {
 
 const organizationPath = (organizationId: string) =>
   `/organizations/${encodeURIComponent(organizationId)}`;
+
+export function listTeacherAttendanceAssignments(organizationId: string) {
+  return apiRequest<{ items: TeacherAttendanceAssignment[] }>(
+    `${organizationPath(organizationId)}/attendance/teacher-assignments`,
+  );
+}
 
 function queryString(values: Record<string, string>) {
   return new URLSearchParams(values).toString();

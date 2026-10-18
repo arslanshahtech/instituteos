@@ -92,6 +92,7 @@ export interface GuardianRecord {
   email?: string;
   communicationPreference?: 'sms' | 'email' | 'both';
   address?: AddressInput;
+  studentCount?: number;
   createdAt: string;
   updatedAt: string;
 }

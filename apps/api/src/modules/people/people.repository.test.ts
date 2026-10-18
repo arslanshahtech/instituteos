@@ -48,6 +48,51 @@ describe('MongoPeopleRepository guardian operations', () => {
     ).toBe(true);
   });
 
+  it('returns live linked-child counts for the current guardian page', async () => {
+    const organizationId = new Types.ObjectId();
+    const guardianId = new Types.ObjectId();
+    const guardian = {
+      _id: guardianId,
+      organizationId,
+      firstName: 'Ayesha',
+      lastName: 'Khan',
+      relationship: 'mother',
+      phone: '03001234567',
+      email: 'ayesha@example.test',
+      communicationPreference: 'both',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    };
+
+    vi.spyOn(GuardianModel, 'find').mockReturnValue({
+      sort: vi.fn().mockReturnThis(),
+      skip: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue([guardian]),
+    } as never);
+    vi.spyOn(GuardianModel, 'countDocuments').mockResolvedValue(1);
+    const aggregate = vi
+      .spyOn(StudentGuardianLinkModel, 'aggregate')
+      .mockResolvedValue([{ _id: guardianId, count: 2 }] as never);
+
+    const result = await new MongoPeopleRepository().listGuardians(
+      String(organizationId),
+      { page: 1, pageSize: 20 },
+    );
+
+    expect(result.items[0]?.studentCount).toBe(2);
+    expect(aggregate).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          $match: expect.objectContaining({
+            organizationId,
+            guardianId: { $in: [guardianId] },
+          }),
+        }),
+      ]),
+    );
+  });
+
   describe('MongoPeopleRepository staff operations', () => {
     it('rejects campus assignments outside the staff organization', async () => {
       const organizationId = new Types.ObjectId();

@@ -10,6 +10,9 @@ import { PLATFORM_ROLES } from './authorization.js';
 const organizationSchema = new Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 160 },
+    subdomain: { type: String, lowercase: true, trim: true, maxlength: 63 },
+    plan: { type: String, enum: ['Starter', 'Growth', 'Enterprise'] },
+    trialEndsAt: { type: Date, default: null },
     status: {
       type: String,
       enum: ['active', 'suspended', 'archived'] satisfies OrganizationStatus[],
@@ -35,6 +38,15 @@ const organizationSchema = new Schema(
     ownerMutationRevision: { type: Number, default: 0, select: false },
   },
   { timestamps: true, versionKey: false },
+);
+
+organizationSchema.index(
+  { subdomain: 1 },
+  {
+    unique: true,
+    name: 'uniq_organization_subdomain',
+    partialFilterExpression: { subdomain: { $type: 'string' } },
+  },
 );
 
 const membershipSchema = new Schema(

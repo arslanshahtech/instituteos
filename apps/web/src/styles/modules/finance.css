@@ -151,8 +151,12 @@
   border-radius: 14px;
   background: #ffffff;
   padding: 18px 20px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.02);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.04),
+    0 2px 4px -2px rgba(0, 0, 0, 0.02);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .finance-invoice-card-header {
@@ -240,7 +244,9 @@
   color: #ffffff;
   border: 1px solid #0d9488;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease;
 }
 
 .finance-card-payment-button:hover {
@@ -440,7 +446,9 @@
 .finance-fee-head-row {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr) minmax(130px, 0.45fr) minmax(130px, 0.45fr) auto;
+  grid-template-columns:
+    minmax(0, 1fr) minmax(130px, 0.45fr) minmax(130px, 0.45fr)
+    auto;
   align-items: end;
   gap: 12px;
   border-bottom: 1px solid var(--color-border, #e2e8f0);
@@ -642,7 +650,9 @@
   flex-direction: column;
   background: #ffffff;
   border-radius: 16px;
-  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(226, 232, 240, 0.8);
+  box-shadow:
+    0 25px 50px -12px rgba(15, 23, 42, 0.25),
+    0 0 0 1px rgba(226, 232, 240, 0.8);
   width: 100%;
   max-width: 1140px;
   height: 88vh;
@@ -775,12 +785,12 @@
 }
 
 .finance-metric-card.billed {
-  border-left: 4px solid #3b82f6;
+  border-left: 4px solid #0a0a0a;
 }
 
 .finance-metric-card.paid {
-  border-left: 4px solid #10b981;
-  background: #f0fdf4;
+  border-left: 4px solid #0a0a0a;
+  background: #f8fafc;
 }
 
 .finance-metric-card.balance {
@@ -1065,7 +1075,9 @@
   flex-direction: column;
   background: #ffffff;
   border-radius: 16px;
-  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(226, 232, 240, 0.8);
+  box-shadow:
+    0 25px 50px -12px rgba(15, 23, 42, 0.25),
+    0 0 0 1px rgba(226, 232, 240, 0.8);
   width: 100%;
   max-width: 740px;
   max-height: 90vh;
@@ -1175,5 +1187,133 @@
 
   .finance-concession-mobile-view {
     display: flex;
+  }
+}
+
+/* Bring the live finance workspace closer to the approved compact card/table style. */
+.finance-page {
+  gap: 14px;
+}
+
+.finance-tabs {
+  gap: 4px;
+  border-bottom-color: #e5e1d9;
+}
+
+.finance-tab {
+  min-height: 36px;
+  padding: 8px 12px;
+  font-size: 11px;
+}
+
+.finance-tab-active {
+  border-bottom-color: #252932;
+}
+
+.finance-section {
+  border-color: #e5e1d9;
+  border-radius: 9px;
+  padding: 16px;
+  box-shadow: none;
+}
+
+.finance-section-heading {
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.finance-section-heading h2,
+.finance-structure-item-heading h3,
+.finance-fee-heads-heading h3 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.finance-filter-grid,
+.finance-form-grid {
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.finance-field {
+  color: #454951;
+  font-size: 11px;
+}
+
+.finance-field input,
+.finance-field select,
+.finance-field textarea {
+  border-radius: 7px;
+}
+
+.finance-field input:focus {
+  outline-color: #292d35;
+}
+
+.finance-invoice-card {
+  border-color: #e5e1d9;
+  border-left: 1px solid #e5e1d9;
+  border-radius: 9px;
+  padding: 13px;
+  box-shadow: none;
+}
+
+.finance-invoice-card:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+.finance-invoice-card-details {
+  border-color: #efede8;
+  border-radius: 7px;
+  background: #f8f7f4;
+  padding: 10px;
+}
+
+.finance-card-payment-button,
+.finance-form-actions .finance-generate-button {
+  min-height: 32px;
+  height: auto;
+  border: 1px solid #252932;
+  border-radius: 999px;
+  background: #252932;
+  padding: 7px 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.finance-card-payment-button:hover,
+.finance-form-actions .finance-generate-button:hover {
+  background: #11141a;
+  border-color: #11141a;
+}
+
+.finance-status {
+  padding: 3px 8px;
+  font-size: 10px;
+}
+
+.finance-structure-item {
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+@media (max-width: 720px) {
+  .finance-page {
+    gap: 11px;
+  }
+
+  .finance-section {
+    padding: 12px;
+  }
+
+  .finance-section-heading {
+    align-items: flex-start;
+  }
+
+  .finance-filter-grid,
+  .finance-form-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

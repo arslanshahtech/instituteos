@@ -22,6 +22,8 @@ const context: AttendanceContext = {
 
 function repository(overrides: Partial<AttendanceRepository> = {}) {
   return {
+    listTeacherAssignmentsForUser: vi.fn().mockResolvedValue([]),
+    isTeacherAssignedToSection: vi.fn().mockResolvedValue(true),
     getClassCampus: vi.fn().mockResolvedValue(campusId),
     validateSection: vi.fn().mockResolvedValue(true),
     listEligibleStudents: vi.fn().mockResolvedValue([]),
@@ -55,6 +57,80 @@ const baseBulkInput: StudentAttendanceBulkInput = {
 };
 
 describe('AttendanceService', () => {
+  it('accepts Leave as a valid student attendance status', async () => {
+    const repo = repository();
+    const service = new AttendanceService(repo);
+
+    await service.saveStudentAttendance(context, {
+      ...baseBulkInput,
+      records: [
+        { studentId, status: 'leave' },
+        { studentId: anotherStudentId, status: 'present' },
+      ],
+    });
+
+    expect(repo.saveStudentAttendance).toHaveBeenCalledWith(
+      organizationId,
+      expect.objectContaining({
+        records: [
+          { studentId, status: 'leave' },
+          { studentId: anotherStudentId, status: 'present' },
+        ],
+      }),
+    );
+  });
+
+  it('lets a teacher take attendance only for an assigned section', async () => {
+    const repo = repository({
+      isTeacherAssignedToSection: vi.fn().mockResolvedValue(true),
+    });
+    const service = new AttendanceService(repo);
+    const teacherContext: AttendanceContext = {
+      ...context,
+      role: 'teacher',
+      userId: '650000000000000000000008',
+    };
+
+    await service.listStudentRoster(teacherContext, {
+      classId,
+      sectionId,
+      academicYearId,
+      campusId,
+      date: '2026-10-12',
+    });
+
+    expect(repo.isTeacherAssignedToSection).toHaveBeenCalledWith(
+      organizationId,
+      teacherContext.userId,
+      { classId, sectionId, academicYearId },
+    );
+    expect(repo.listStudentRoster).toHaveBeenCalled();
+  });
+
+  it('blocks a teacher from reading another section', async () => {
+    const repo = repository({
+      isTeacherAssignedToSection: vi.fn().mockResolvedValue(false),
+    });
+    const service = new AttendanceService(repo);
+    const teacherContext: AttendanceContext = {
+      ...context,
+      role: 'teacher',
+      userId: '650000000000000000000008',
+    };
+
+    await expect(
+      service.listStudentRoster(teacherContext, {
+        classId,
+        sectionId,
+        academicYearId,
+        campusId,
+        date: '2026-10-12',
+      }),
+    ).rejects.toMatchObject({ code: 'TEACHER_ASSIGNMENT_REQUIRED' });
+
+    expect(repo.listStudentRoster).not.toHaveBeenCalled();
+  });
+
   it('rejects dates outside the active academic year', async () => {
     const repo = repository({
       validateAcademicYear: vi.fn().mockResolvedValue(false),

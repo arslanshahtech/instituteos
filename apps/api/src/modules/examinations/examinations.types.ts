@@ -4,6 +4,7 @@ export interface ExaminationsContext {
   organizationId: string;
   campusIds: string[];
   role: string;
+  userId?: string;
 }
 
 export interface ExamInput {
@@ -103,6 +104,16 @@ export interface StudentExamReport {
 }
 
 export interface ExaminationsRepository {
+  isTeacherAssignedToSection(
+    organizationId: string,
+    userId: string,
+    input: {
+      classId: string;
+      sectionId: string;
+      academicYearId: string;
+      subjectId: string;
+    },
+  ): Promise<boolean>;
   validateCampus(organizationId: string, campusId: string): Promise<boolean>;
   validateAcademicYear(organizationId: string, id: string): Promise<boolean>;
   validateTerm(

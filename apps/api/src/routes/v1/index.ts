@@ -6,15 +6,21 @@ import {
   organizationRouter,
   platformOrganizationRouter,
 } from '../../modules/organizations/organizations.routes.js';
+import {
+  platformDemoRequestRouter,
+  publicDemoRequestRouter,
+} from '../../modules/organizations/demo-requests.routes.js';
 import { peopleRouter } from '../../modules/people/people.routes.js';
 import { academicsRouter } from '../../modules/academics/academics.routes.js';
 import { attendanceRouter } from '../../modules/attendance/attendance.routes.js';
 import { examinationsRouter } from '../../modules/examinations/examinations.routes.js';
+import { homeworkRouter } from '../../modules/homework/homework.routes.js';
 import { financeRouter } from '../../modules/finance/finance.routes.js';
 import { communicationsRouter } from '../../modules/communications/communications.routes.js';
 import { reportingRouter } from '../../modules/reporting/reporting.routes.js';
 import { settingsRouter } from '../../modules/settings/settings.routes.js';
 import { pickupRouter } from '../../modules/pickup/pickup.routes.js';
+import { portalRouter } from '../../modules/portal/portal.routes.js';
 
 export const v1Router = Router();
 
@@ -24,15 +30,19 @@ v1Router.get('/', (_request, response) => {
 
 v1Router.use(systemRouter);
 v1Router.use('/auth', authRouter);
+v1Router.use('/public/demo-requests', publicDemoRequestRouter);
+v1Router.use('/platform/demo-requests', platformDemoRequestRouter);
 v1Router.use('/organizations', tenancyRouter);
 v1Router.use('/organizations', organizationRouter);
 v1Router.use('/organizations', peopleRouter);
 v1Router.use('/organizations', academicsRouter);
 v1Router.use('/organizations', attendanceRouter);
 v1Router.use('/organizations', examinationsRouter);
+v1Router.use('/organizations', homeworkRouter);
 v1Router.use('/organizations', financeRouter);
 v1Router.use('/organizations', communicationsRouter);
 v1Router.use('/organizations', reportingRouter);
 v1Router.use('/organizations', settingsRouter);
 v1Router.use('/organizations', pickupRouter);
+v1Router.use('/organizations', portalRouter);
 v1Router.use('/platform/organizations', platformOrganizationRouter);

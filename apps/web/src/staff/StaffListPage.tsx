@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { DataTable } from '../components/ui/DataTable.js';
 import { Pagination } from '../components/ui/Pagination.js';
 import { ErrorState, LoadingState } from '../components/ui/States.js';
 import {
@@ -152,58 +151,93 @@ export function StaffListPage() {
               />
             ) : (
               <>
-                <DataTable
-                  caption="Staff and teachers"
-                  columns={[
-                    {
-                      header: 'Staff member',
-                      render: (person) => (
+                {staff.data.items.length === 0 ? (
+                  <section className="staff-empty-grid">
+                    <div className="staff-empty-mark" aria-hidden="true">
+                      S
+                    </div>
+                    <h2>
+                      {search || department || status || campusId
+                        ? 'No staff match these filters'
+                        : 'No staff records yet'}
+                    </h2>
+                    <p>
+                      {search || department || status || campusId
+                        ? 'Try changing or clearing your search and filters.'
+                        : 'Create the first staff record for this organization.'}
+                    </p>
+                    {canCreate &&
+                      !search &&
+                      !department &&
+                      !status &&
+                      !campusId && (
                         <Link
-                          className="student-name-link"
-                          to={`/admin/organizations/${encodeURIComponent(organizationId)}/staff/${encodeURIComponent(person.id)}`}
+                          className="button button-primary"
+                          to={`/admin/organizations/${encodeURIComponent(organizationId)}/staff/new`}
                         >
-                          {person.firstName} {person.lastName}
+                          Add first staff member
                         </Link>
-                      ),
-                    },
-                    {
-                      header: 'Role / department',
-                      render: (person) => (
-                        <span>
-                          {person.designation ?? person.role ?? '—'}
-                          {person.department ? ` · ${person.department}` : ''}
-                        </span>
-                      ),
-                    },
-                    {
-                      header: 'Contact',
-                      render: (person) => person.email || person.phone || '—',
-                    },
-                    {
-                      header: 'Campus',
-                      render: (person) =>
-                        campusName(person.campusId, campusesData),
-                    },
-                    {
-                      header: 'Status',
-                      render: (person) => (
-                        <StaffStatusBadge status={person.status} />
-                      ),
-                    },
-                  ]}
-                  emptyDescription={
-                    search || department || status || campusId
-                      ? 'Try changing or clearing your search and filters.'
-                      : 'Create the first staff record for this organization.'
-                  }
-                  emptyTitle={
-                    search || department || status || campusId
-                      ? 'No staff match these filters'
-                      : 'No staff records yet'
-                  }
-                  rowKey={(person) => person.id}
-                  rows={staff.data.items}
-                />
+                      )}
+                  </section>
+                ) : (
+                  <div
+                    className="reference-staff-grid"
+                    aria-label="Staff and teachers"
+                  >
+                    {staff.data.items.map((person) => {
+                      const name =
+                        `${person.firstName} ${person.lastName}`.trim();
+                      const profilePath = `/admin/organizations/${encodeURIComponent(organizationId)}/staff/${encodeURIComponent(person.id)}`;
+                      return (
+                        <article
+                          className="reference-staff-card"
+                          key={person.id}
+                        >
+                          <span
+                            className="reference-staff-avatar"
+                            aria-hidden="true"
+                          >
+                            {`${person.firstName?.[0] ?? ''}${person.lastName?.[0] ?? ''}`.toUpperCase() ||
+                              'S'}
+                          </span>
+                          <div className="reference-staff-copy">
+                            <strong>
+                              <Link
+                                className="staff-profile-name"
+                                to={profilePath}
+                              >
+                                {name}
+                              </Link>
+                            </strong>
+                            <small>
+                              {person.designation ??
+                                person.role ??
+                                'Staff member'}
+                            </small>
+                            <span>
+                              {person.department || 'Department not set'}
+                            </span>
+                            <span>
+                              {campusName(person.campusId, campusesData)}
+                            </span>
+                            <span>
+                              {person.phone ||
+                                person.email ||
+                                'Contact not provided'}
+                            </span>
+                            <StaffStatusBadge status={person.status} />
+                          </div>
+                          <Link
+                            className="reference-outline-button"
+                            to={profilePath}
+                          >
+                            View profile
+                          </Link>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
                 <Pagination
                   currentPage={staff.data.page}
                   onPageChange={setPage}

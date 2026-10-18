@@ -7,47 +7,64 @@
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
-  color: #172536;
-  background: #f3f6f8;
+  color: #0f172a;
+  background: #f8fafc;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-optical-sizing: auto;
-  --color-ink: #172536;
-  --color-muted: #687789;
-  --color-subtle: #8a98a7;
-  --color-border: #dfe5ea;
-  --color-border-strong: #cbd5dd;
-  --color-canvas: #f3f6f8;
-  --color-surface: #fff;
-  --color-sidebar: #172636;
-  --color-sidebar-muted: #a8b6c4;
-  --color-accent: #176b70;
-  --color-accent-dark: #10575c;
-  --color-accent-soft: #e8f3f2;
-  --color-positive: #237652;
-  --color-positive-soft: #e9f5ee;
-  --color-negative: #ad3d41;
-  --color-negative-soft: #fff0ef;
-  --shadow-panel: 0 1px 2px rgb(21 38 54 / 4%);
-  --radius-sm: 5px;
-  --radius-md: 8px;
+
+  /* InstituteOS — black, white and slate product theme */
+  --color-ink: #0f172a;
+  --color-muted: #64748b;
+  --color-subtle: #94a3b8;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+  --color-canvas: #f8fafc;
+  --color-surface: #ffffff;
+  --color-sidebar: #ffffff;
+  --color-sidebar-muted: #64748b;
+  --color-accent: #0a0a0a;
+  --color-accent-dark: #000000;
+  --color-accent-soft: #f8fafc;
+  --color-positive: #0f172a;
+  --color-positive-soft: #f8fafc;
+  --color-negative: #b91c1c;
+  --color-negative-soft: #fef2f2;
+  --color-warning: #92400e;
+  --color-warning-soft: #fffbeb;
+  --color-info: #0f172a;
+  --color-info-soft: #f8fafc;
+  --shadow-panel: 0 1px 2px rgb(0 0 0 / 3%), 0 5px 18px rgb(0 0 0 / 2%);
+  --shadow-popover: 0 14px 38px rgb(0 0 0 / 10%);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --motion-fast: 140ms;
+  --motion-base: 220ms;
+  --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  background: var(--color-canvas);
 }
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -62,8 +79,13 @@ a {
 }
 
 :focus-visible {
-  outline: 3px solid #62b8bc;
-  outline-offset: 2px;
+  outline: 2px solid #111111;
+  outline-offset: 3px;
+}
+
+::selection {
+  background: #111111;
+  color: #ffffff;
 }
 
 .visually-hidden {
@@ -74,4 +96,17 @@ a {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   clip-path: inset(50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

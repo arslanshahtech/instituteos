@@ -2,7 +2,8 @@ import { apiRequest } from '../api/client.js';
 
 export type InvoiceStatus = 'unpaid' | 'partial' | 'paid' | 'overdue';
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'card' | 'online';
-export type ConcessionType = 'sibling' | 'staff_child' | 'scholarship' | 'need_based' | 'special';
+export type ConcessionType =
+  'sibling' | 'staff_child' | 'scholarship' | 'need_based' | 'special';
 export type DiscountType = 'percentage' | 'fixed';
 
 export interface FeeConcession {
@@ -149,12 +150,28 @@ export function listInvoices(
   filters: InvoiceFilters = {},
 ) {
   const query = new URLSearchParams(
-    Object.entries(filters).filter(
-      (entry): entry is [string, string] => Boolean(entry[1]),
+    Object.entries(filters).filter((entry): entry is [string, string] =>
+      Boolean(entry[1]),
     ),
   );
   return apiRequest<{ items: StudentInvoice[] }>(
     `${financePath(organizationId)}/invoices${query.size ? `?${query}` : ''}`,
+  );
+}
+
+export interface DailyCollectionRecord {
+  date: string;
+  amountCollected: number;
+  paymentCount: number;
+}
+
+export function listDailyCollections(
+  organizationId: string,
+  input: { dateFrom: string; dateTo: string },
+) {
+  const query = new URLSearchParams(input);
+  return apiRequest<{ items: DailyCollectionRecord[] }>(
+    `${financePath(organizationId)}/collections/daily?${query}`,
   );
 }
 
@@ -207,10 +224,7 @@ export function recordInvoicePayment(
   );
 }
 
-export function getStudentFeeLedger(
-  organizationId: string,
-  studentId: string,
-) {
+export function getStudentFeeLedger(organizationId: string, studentId: string) {
   return apiRequest<StudentLedgerSummary>(
     `${financePath(organizationId)}/students/${encodeURIComponent(studentId)}/ledger`,
   );

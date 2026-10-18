@@ -301,9 +301,27 @@ export class MongoPeopleRepository {
         .lean(),
       GuardianModel.countDocuments(filters),
     ]);
+    const studentCounts = items.length
+      ? await StudentGuardianLinkModel.aggregate<{
+          _id: Types.ObjectId;
+          count: number;
+        }>([
+          {
+            $match: {
+              organizationId: idObject(organizationId),
+              guardianId: { $in: items.map((record) => record._id) },
+            },
+          },
+          { $group: { _id: '$guardianId', count: { $sum: 1 } } },
+        ])
+      : [];
+    const studentCountByGuardian = new Map(
+      studentCounts.map((entry) => [String(entry._id), entry.count]),
+    );
     return {
       items: items.map((record) => ({
         id: String(record._id),
+        studentCount: studentCountByGuardian.get(String(record._id)) ?? 0,
         organizationId: String(record.organizationId),
         firstName: String(record.firstName),
         lastName: String(record.lastName),

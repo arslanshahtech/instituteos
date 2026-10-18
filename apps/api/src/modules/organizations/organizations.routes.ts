@@ -1,10 +1,11 @@
+import { randomBytes } from 'node:crypto';
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import mongoose from 'mongoose';
 import { AppError } from '../../errors/app-error.js';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { env } from '../../config/env.js';
-import { AuthService } from '../auth/auth.service.js';
+import { AuthService, hashOpaqueToken } from '../auth/auth.service.js';
 import { authEmailDelivery } from '../auth/auth.email.js';
 import { MongoAuthRepository } from '../auth/auth.repository.js';
 import {
@@ -26,6 +27,14 @@ import { MongoOrganizationAccessRepository } from '../tenancy/tenancy.repository
 import type { OrganizationAccessRepository } from '../tenancy/tenancy.types.js';
 import { MongoOrganizationRepository } from './organizations.repository.js';
 import { OrganizationService } from './organizations.service.js';
+import { AuthUserModel } from '../auth/auth.model.js';
+import {
+  MembershipModel,
+  OrganizationAuditEventModel,
+  OrganizationInvitationModel,
+  OrganizationModel,
+} from '../tenancy/tenancy.model.js';
+import { StudentModel } from '../people/people.model.js';
 import type {
   AddressInput,
   CampusInput,
@@ -630,6 +639,184 @@ export function createPlatformOrganizationRouter(
   authenticate = defaultAuthenticate(),
 ) {
   const router = Router();
+  router.get(
+    '/',
+    authenticate,
+    requirePlatformRole(accessRepository, 'platform_super_admin'),
+    asyncHandler(async (_request, response) => {
+      const organizations = await OrganizationModel.find({})
+        .select(
+          '_id name subdomain plan trialEndsAt status contactEmail createdAt',
+        )
+        .sort({ createdAt: -1 })
+        .limit(500)
+        .lean();
+      const organizationIds = organizations.map(
+        (organization) => organization._id,
+      );
+      const memberships = organizationIds.length
+        ? await MembershipModel.find({
+            organizationId: { $in: organizationIds },
+            role: 'organization_owner',
+            status: 'active',
+          })
+            .select('organizationId userId')
+            .lean()
+        : [];
+      const userIds = [
+        ...new Set(memberships.map((membership) => String(membership.userId))),
+      ];
+      const users = userIds.length
+        ? await AuthUserModel.find({ _id: { $in: userIds } })
+            .select('_id email')
+            .lean()
+        : [];
+      const emailByUserId = new Map(
+        users.map((user) => [String(user._id), user.email]),
+      );
+      const ownerEmailByOrganizationId = new Map(
+        memberships.map((membership) => [
+          String(membership.organizationId),
+          emailByUserId.get(String(membership.userId)) ?? null,
+        ]),
+      );
+      const studentCounts = organizationIds.length
+        ? await StudentModel.aggregate([
+            { $match: { organizationId: { $in: organizationIds } } },
+            { $group: { _id: '$organizationId', count: { $sum: 1 } } },
+          ])
+        : [];
+      const studentCountByOrganizationId = new Map(
+        studentCounts.map((item) => [String(item._id), item.count as number]),
+      );
+      const monthlyPrice: Record<string, number> = {
+        Starter: 49,
+        Growth: 149,
+        Enterprise: 399,
+      };
+      response.status(200).json({
+        organizations: organizations.map((organization) => ({
+          id: String(organization._id),
+          name: organization.name,
+          subdomain: organization.subdomain ?? null,
+          adminEmail:
+            ownerEmailByOrganizationId.get(String(organization._id)) ??
+            organization.contactEmail ??
+            null,
+          studentCount:
+            studentCountByOrganizationId.get(String(organization._id)) ?? 0,
+          plan: organization.plan ?? null,
+          mrr: organization.plan
+            ? (monthlyPrice[String(organization.plan)] ?? 0)
+            : 0,
+          trialEndsAt: organization.trialEndsAt ?? null,
+          status: organization.status,
+          createdAt: organization.createdAt,
+        })),
+      });
+    }),
+  );
+  router.post(
+    '/',
+    authenticate,
+    requirePlatformRole(accessRepository, 'platform_super_admin'),
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const body = bodyObject(request.body);
+      const name = requiredString(body.name, 'organization name', 2, 160);
+      const adminEmail = email(body.adminEmail);
+      const subdomain = requiredString(
+        body.subdomain,
+        'subdomain',
+        3,
+        63,
+      ).toLowerCase();
+      if (!/^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])$/.test(subdomain))
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Use a subdomain with lowercase letters, numbers and internal hyphens.',
+        );
+      const plan = String(body.plan ?? '');
+      if (!['Starter', 'Growth', 'Enterprise'].includes(plan))
+        throw new AppError(400, 'VALIDATION_ERROR', 'Choose a valid plan.');
+      const duplicate = await OrganizationModel.exists({ subdomain });
+      if (duplicate)
+        throw new AppError(
+          409,
+          'ORGANIZATION_CONFLICT',
+          'That subdomain is already in use.',
+        );
+      const actor = currentUser(response);
+      const now = new Date();
+      const trialEndsAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+      const organization = await OrganizationModel.create({
+        name,
+        subdomain,
+        plan,
+        status: 'active',
+        trialEndsAt,
+        contactEmail: adminEmail,
+        createdByUserId: actor.id,
+      });
+      const token = randomBytes(32).toString('base64url');
+      let invitationId: string | null = null;
+      let auditEventId: string | null = null;
+      try {
+        const invitation = await OrganizationInvitationModel.create({
+          organizationId: organization._id,
+          email: adminEmail,
+          role: 'organization_owner',
+          campusIds: [],
+          invitedByUserId: actor.id,
+          tokenHash: hashOpaqueToken(token),
+          expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+          status: 'pending',
+        });
+        invitationId = String(invitation._id);
+        const auditEvent = await OrganizationAuditEventModel.create({
+          organizationId: organization._id,
+          actorUserId: actor.id,
+          action: 'platform.organization.provisioned',
+          details: { subdomain, plan, adminEmail, trialEndsAt },
+        });
+        auditEventId = String(auditEvent._id);
+        const delivered = await authEmailDelivery.sendInvitation(
+          adminEmail,
+          token,
+          name,
+        );
+        if (!delivered)
+          throw new AppError(
+            503,
+            'INVITATION_DELIVERY_UNAVAILABLE',
+            'The organization was not created because the owner invitation could not be delivered.',
+          );
+      } catch (error) {
+        if (invitationId)
+          await OrganizationInvitationModel.deleteOne({ _id: invitationId });
+        if (auditEventId)
+          await OrganizationAuditEventModel.deleteOne({ _id: auditEventId });
+        await OrganizationModel.deleteOne({ _id: organization._id });
+        throw error;
+      }
+      response.status(201).json({
+        organization: {
+          id: String(organization._id),
+          name: organization.name,
+          subdomain: organization.subdomain,
+          adminEmail,
+          studentCount: 0,
+          plan: organization.plan,
+          mrr: 0,
+          trialEndsAt: organization.trialEndsAt,
+          status: organization.status,
+          createdAt: organization.createdAt,
+        },
+        ownerInvitationSent: true,
+      });
+    }),
+  );
   router.patch(
     '/:organizationId/status',
     authenticate,

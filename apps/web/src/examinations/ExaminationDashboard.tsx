@@ -506,7 +506,7 @@ export function ExaminationDashboard() {
     );
 
   return (
-    <main className="examinations-page">
+    <main className="examinations-page reference-live-module">
       <header className="page-heading examinations-page-heading">
         <div>
           <h1>Examinations & assessment</h1>

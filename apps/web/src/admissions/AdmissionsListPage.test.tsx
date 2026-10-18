@@ -134,7 +134,6 @@ describe('Admissions list page', () => {
     const user = userEvent.setup();
     renderAdmissionsPage();
     await screen.findByText('Nora Ali');
-    await user.click(screen.getByRole('button', { name: 'Add inquiry' }));
     await user.type(screen.getByLabelText('Applicant first name'), 'Rina');
     await user.type(screen.getByLabelText('Applicant last name'), 'Patel');
     await user.click(screen.getByRole('button', { name: 'Create inquiry' }));
@@ -152,7 +151,6 @@ describe('Admissions list page', () => {
     const user = userEvent.setup();
     renderAdmissionsPage();
     await screen.findByText('Nora Ali');
-    await user.click(screen.getByRole('button', { name: 'Add inquiry' }));
     await user.click(screen.getByRole('button', { name: 'Create inquiry' }));
 
     expect(

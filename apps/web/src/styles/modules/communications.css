@@ -351,3 +351,95 @@
     padding: 1rem;
   }
 }
+
+/* Align the live inbox/chat surface with the reference's warm, compact UI. */
+.communications-page {
+  gap: 14px;
+}
+
+.communications-section {
+  gap: 12px;
+  border-radius: 9px;
+  background: #fff;
+  padding: 16px;
+}
+
+.communications-section-heading h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.communications-field {
+  color: #454951;
+  font-size: 11px;
+}
+
+.communications-field input,
+.communications-field textarea {
+  border-radius: 7px;
+}
+
+.communications-field input:focus,
+.communications-field textarea:focus {
+  outline-color: #292d35;
+}
+
+.communications-grid {
+  gap: 10px;
+}
+
+.announcement-card {
+  border-radius: 9px;
+  padding: 13px;
+  box-shadow: none;
+}
+
+.announcement-card-heading h3 {
+  font-size: 14px;
+}
+
+.announcement-content {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.announcement-actions > .button {
+  min-height: 32px;
+}
+
+.communications-page .parent-teacher-inbox {
+  border-color: #e5e1d9 !important;
+  border-radius: 9px !important;
+  box-shadow: none !important;
+}
+
+.parent-teacher-inbox [style*='background-color: rgb(37, 99, 235)'] {
+  background-color: #292d35 !important;
+}
+
+.parent-teacher-inbox [style*='border-left: 3px solid rgb(37, 99, 235)'] {
+  border-left-color: #292d35 !important;
+}
+
+.parent-teacher-inbox [style*='background-color: rgb(239, 246, 255)'] {
+  background-color: #f5f4f0 !important;
+}
+
+.parent-teacher-inbox [style*='color: rgb(37, 99, 235)'] {
+  color: #454951 !important;
+}
+
+.parent-teacher-inbox [style*='color: rgb(30, 64, 175)'] {
+  color: #292d35 !important;
+}
+
+@media (max-width: 768px) {
+  .communications-section {
+    padding: 12px;
+  }
+
+  .parent-teacher-inbox {
+    min-height: 360px !important;
+  }
+}

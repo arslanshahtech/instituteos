@@ -1,5 +1,5 @@
 export interface RoleLayoutConfig {
-  key: 'platform' | 'admin' | 'teacher' | 'student' | 'parent';
+  key: 'platform' | 'admin' | 'teacher' | 'accountant' | 'student' | 'parent';
   label: string;
   workspaceTitle: string;
   description: string;
@@ -10,32 +10,39 @@ export const roleLayouts = [
     key: 'platform',
     label: 'Platform admin',
     workspaceTitle: 'Platform workspace',
-    description: 'A shared foundation for operating the InstituteOS platform.',
+    description: 'Manage the InstituteOS platform and its organizations.',
   },
   {
     key: 'admin',
-    label: 'Organization admin',
+    label: 'College admin',
     workspaceTitle: 'Organization workspace',
     description:
-      'A flexible workspace foundation for an education organization.',
+      'A clear view of your college operations and what needs attention.',
   },
   {
     key: 'teacher',
     label: 'Teacher',
     workspaceTitle: 'Teaching workspace',
-    description: 'A focused workspace foundation for teaching teams.',
+    description:
+      'Your assigned classes, attendance and academic tasks in one place.',
+  },
+  {
+    key: 'accountant',
+    label: 'Accountant',
+    workspaceTitle: 'Finance workspace',
+    description: 'Fee collection, outstanding dues and payment records.',
   },
   {
     key: 'student',
     label: 'Student',
     workspaceTitle: 'Student workspace',
-    description: 'A clear workspace foundation for learners.',
+    description: 'A clear view of your academic information.',
   },
   {
     key: 'parent',
     label: 'Parent / guardian',
     workspaceTitle: 'Family workspace',
-    description: 'A connected workspace foundation for families.',
+    description: 'Your child’s fees, attendance, results and college messages.',
   },
 ] as const satisfies readonly RoleLayoutConfig[];
 

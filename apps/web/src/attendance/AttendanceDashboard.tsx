@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui/Button.js';
 import {
   EmptyState,
@@ -17,10 +17,11 @@ import type {
   AcademicSection,
   AcademicYear,
 } from '../academics/academics-api.js';
-import type {
-  StaffAttendanceStatus,
-  StudentAttendanceStatus,
-  StudentRosterMember,
+import {
+  listTeacherAttendanceAssignments,
+  type StaffAttendanceStatus,
+  type StudentAttendanceStatus,
+  type StudentRosterMember,
 } from './attendance-api.js';
 import {
   useAttendanceRoster,
@@ -42,8 +43,7 @@ const managerRoles = [
 const studentStatuses: StudentAttendanceStatus[] = [
   'present',
   'absent',
-  'late',
-  'excused',
+  'leave',
 ];
 const staffStatuses: StaffAttendanceStatus[] = [
   'present',
@@ -85,18 +85,38 @@ function hasSameValues<T extends string>(
 
 export function AttendanceDashboard() {
   const { organizationId = '' } = useParams();
+  const [searchParams] = useSearchParams();
   const access = useOrganizationAccess(organizationId);
+  const isTeacher = access.data?.role === 'teacher';
   const canManage = managerRoles.includes(access.data?.role ?? '');
+  const canTakeAttendance = canManage || isTeacher;
   const workspace = useAcademicsWorkspace(
     organizationId,
     Boolean(access.data && canManage),
   );
+  const teacherAssignmentsQuery = useQuery({
+    queryKey: ['attendance', organizationId, 'teacher-assignments'],
+    queryFn: () => listTeacherAttendanceAssignments(organizationId),
+    enabled: Boolean(access.data && isTeacher),
+    retry: false,
+  });
+  const teacherAssignments = teacherAssignmentsQuery.data?.items ?? [];
   const [view, setView] = useState<'students' | 'staff'>('students');
-  const [selectedCampusId, setSelectedCampusId] = useState('');
-  const [selectedYearId, setSelectedYearId] = useState('');
-  const [selectedClassId, setSelectedClassId] = useState('');
-  const [selectedSectionId, setSelectedSectionId] = useState('');
-  const [attendanceDate, setAttendanceDate] = useState(today);
+  const [selectedCampusId, setSelectedCampusId] = useState(
+    () => searchParams.get('campusId') ?? '',
+  );
+  const [selectedYearId, setSelectedYearId] = useState(
+    () => searchParams.get('academicYearId') ?? '',
+  );
+  const [selectedClassId, setSelectedClassId] = useState(
+    () => searchParams.get('classId') ?? '',
+  );
+  const [selectedSectionId, setSelectedSectionId] = useState(
+    () => searchParams.get('sectionId') ?? '',
+  );
+  const [attendanceDate, setAttendanceDate] = useState(
+    () => searchParams.get('date') ?? today(),
+  );
   const [studentStatusesById, setStudentStatusesById] = useState<
     Record<string, StudentAttendanceStatus | ''>
   >({});
@@ -111,20 +131,82 @@ export function AttendanceDashboard() {
   const place = usePlaceStudent(organizationId);
   const staffSave = useSaveStaffAttendance(organizationId);
 
-  const campuses = workspace.campuses.data?.campuses ?? [];
-  const years = (workspace.years.data?.items ?? []).filter(
-    (year: AcademicYear) => year.status === 'active',
-  );
+  const campuses = isTeacher
+    ? [
+        ...new Map(
+          teacherAssignments.map((item) => [
+            item.campusId,
+            { id: item.campusId, name: item.campusName },
+          ]),
+        ).values(),
+      ]
+    : (workspace.campuses.data?.campuses ?? []);
   const campusId = selectedCampusId || campuses[0]?.id || '';
+  const years = isTeacher
+    ? [
+        ...new Map(
+          teacherAssignments
+            .filter((item) => item.campusId === campusId)
+            .map((item) => [
+              item.academicYearId,
+              {
+                id: item.academicYearId,
+                name: item.academicYearName,
+                status: 'active' as const,
+              },
+            ]),
+        ).values(),
+      ]
+    : (workspace.years.data?.items ?? []).filter(
+        (year: AcademicYear) => year.status === 'active',
+      );
   const academicYearId = selectedYearId || years[0]?.id || '';
-  const classes = (workspace.classes.data?.items ?? []).filter(
-    (item: AcademicClass) => item.campusId === campusId,
-  );
-  const sections = (workspace.sections.data?.items ?? []).filter(
-    (item: AcademicSection) =>
-      item.classId === (selectedClassId || classes[0]?.id),
-  );
+  const classes = isTeacher
+    ? [
+        ...new Map(
+          teacherAssignments
+            .filter(
+              (item) =>
+                item.campusId === campusId &&
+                item.academicYearId === academicYearId,
+            )
+            .map((item) => [
+              item.classId,
+              {
+                id: item.classId,
+                name: item.className,
+                campusId: item.campusId,
+              },
+            ]),
+        ).values(),
+      ]
+    : (workspace.classes.data?.items ?? []).filter(
+        (item: AcademicClass) => item.campusId === campusId,
+      );
   const classId = selectedClassId || classes[0]?.id || '';
+  const sections = isTeacher
+    ? [
+        ...new Map(
+          teacherAssignments
+            .filter(
+              (item) =>
+                item.campusId === campusId &&
+                item.academicYearId === academicYearId &&
+                item.classId === classId,
+            )
+            .map((item) => [
+              item.sectionId,
+              {
+                id: item.sectionId,
+                name: item.sectionName,
+                classId: item.classId,
+              },
+            ]),
+        ).values(),
+      ]
+    : (workspace.sections.data?.items ?? []).filter(
+        (item: AcademicSection) => item.classId === classId,
+      );
   const sectionId = selectedSectionId || sections[0]?.id || '';
   const rosterQuery = useAttendanceRoster(
     organizationId,
@@ -135,7 +217,12 @@ export function AttendanceDashboard() {
       sectionId,
       date: attendanceDate,
     },
-    Boolean(access.data && canManage && view === 'students'),
+    Boolean(
+      access.data &&
+      canTakeAttendance &&
+      view === 'students' &&
+      (!isTeacher || teacherAssignmentsQuery.isSuccess),
+    ),
   );
   const eligible = useEligibleStudents(
     organizationId,
@@ -203,16 +290,12 @@ export function AttendanceDashboard() {
   }, [staff, staffMarks]);
 
   const attendancePercent = useMemo(() => {
-    const applicable = roster.filter(
-      (person) =>
-        studentStatusesById[person.id] !== '' &&
-        studentStatusesById[person.id] !== 'excused',
+    const applicable = roster.filter((person) =>
+      Boolean(studentStatusesById[person.id]),
     );
     if (applicable.length === 0) return null;
     const present = applicable.filter(
-      (person) =>
-        studentStatusesById[person.id] === 'present' ||
-        studentStatusesById[person.id] === 'late',
+      (person) => studentStatusesById[person.id] === 'present',
     ).length;
     return Math.round((present / applicable.length) * 100);
   }, [roster, studentStatusesById]);
@@ -261,7 +344,7 @@ export function AttendanceDashboard() {
       />
     );
   }
-  if (!canManage) return <PermissionDeniedState />;
+  if (!canManage && !isTeacher) return <PermissionDeniedState />;
 
   const filters = (
     <div
@@ -272,6 +355,7 @@ export function AttendanceDashboard() {
         <select
           onChange={(event) => {
             setSelectedCampusId(event.target.value);
+            setSelectedYearId('');
             setSelectedClassId('');
             setSelectedSectionId('');
           }}
@@ -298,7 +382,11 @@ export function AttendanceDashboard() {
           <label>
             Academic year
             <select
-              onChange={(event) => setSelectedYearId(event.target.value)}
+              onChange={(event) => {
+                setSelectedYearId(event.target.value);
+                setSelectedClassId('');
+                setSelectedSectionId('');
+              }}
               value={academicYearId}
             >
               <option value="">Select academic year</option>
@@ -346,7 +434,7 @@ export function AttendanceDashboard() {
   );
 
   return (
-    <main className="page-stack attendance-page">
+    <main className="page-stack attendance-page reference-attendance-page">
       <section className="page-heading attendance-page-heading">
         <div>
           <h1>
@@ -360,27 +448,29 @@ export function AttendanceDashboard() {
         </div>
       </section>
 
-      <nav
-        aria-label="Attendance type"
-        className="academics-tabs attendance-tabs"
-      >
-        <button
-          aria-current={view === 'students' ? 'page' : undefined}
-          className={`academics-tab${view === 'students' ? ' academics-tab-active' : ''}`}
-          onClick={() => setView('students')}
-          type="button"
+      {!isTeacher && (
+        <nav
+          aria-label="Attendance type"
+          className="academics-tabs attendance-tabs"
         >
-          Student attendance
-        </button>
-        <button
-          aria-current={view === 'staff' ? 'page' : undefined}
-          className={`academics-tab${view === 'staff' ? ' academics-tab-active' : ''}`}
-          onClick={() => setView('staff')}
-          type="button"
-        >
-          Staff attendance
-        </button>
-      </nav>
+          <button
+            aria-current={view === 'students' ? 'page' : undefined}
+            className={`academics-tab${view === 'students' ? ' academics-tab-active' : ''}`}
+            onClick={() => setView('students')}
+            type="button"
+          >
+            Student attendance
+          </button>
+          <button
+            aria-current={view === 'staff' ? 'page' : undefined}
+            className={`academics-tab${view === 'staff' ? ' academics-tab-active' : ''}`}
+            onClick={() => setView('staff')}
+            type="button"
+          >
+            Staff attendance
+          </button>
+        </nav>
+      )}
 
       <section className="panel attendance-panel">
         <div className="attendance-filter-toolbar">{filters}</div>
@@ -444,15 +534,30 @@ export function AttendanceDashboard() {
               </form>
             ) : null}
 
-            {workspace.years.isPending ||
-            workspace.classes.isPending ||
-            workspace.sections.isPending ||
-            workspace.campuses.isPending ? (
+            {isTeacher && teacherAssignmentsQuery.isPending ? (
+              <LoadingState message="Loading your assigned classes..." />
+            ) : isTeacher && teacherAssignmentsQuery.isError ? (
+              <ErrorState
+                title="Assigned classes unavailable"
+                description={apiMessage(teacherAssignmentsQuery.error)}
+                onRetry={() => void teacherAssignmentsQuery.refetch()}
+              />
+            ) : isTeacher && teacherAssignments.length === 0 ? (
+              <EmptyState
+                title="No active class assignments"
+                description="Your account has no assigned teaching sections for an active academic year. Ask the administrator to link your staff email and assign your classes."
+              />
+            ) : !isTeacher &&
+              (workspace.years.isPending ||
+                workspace.classes.isPending ||
+                workspace.sections.isPending ||
+                workspace.campuses.isPending) ? (
               <LoadingState message="Loading academic setup..." />
-            ) : workspace.years.isError ||
-              workspace.classes.isError ||
-              workspace.sections.isError ||
-              workspace.campuses.isError ? (
+            ) : !isTeacher &&
+              (workspace.years.isError ||
+                workspace.classes.isError ||
+                workspace.sections.isError ||
+                workspace.campuses.isError) ? (
               <ErrorState
                 title="Academic setup unavailable"
                 description="Check that campuses, active academic years, classes, and sections are configured."
@@ -502,8 +607,7 @@ export function AttendanceDashboard() {
                   </div>
                   {attendancePercent !== null && (
                     <span className="attendance-summary-rate">
-                      {attendancePercent}% present or late among marked,
-                      excluding excused
+                      {attendancePercent}% present among marked
                     </span>
                   )}
                   <div
@@ -528,39 +632,50 @@ export function AttendanceDashboard() {
                       <div className="attendance-person-name">
                         <strong>{personName(student)}</strong>
                       </div>
-                      <label>
-                        Status
-                        <select
-                          onChange={(event) =>
-                            setStudentStatusesById((current) => ({
-                              ...current,
-                              [student.id]: event.target.value as
-                                StudentAttendanceStatus | '',
-                            }))
-                          }
-                          value={studentStatusesById[student.id] ?? ''}
-                        >
-                          <option value="">Choose status</option>
-                          {studentStatuses.map((status) => (
-                            <option key={status} value={status}>
-                              {status}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label>
-                        Remarks
-                        <input
-                          maxLength={500}
-                          onChange={(event) =>
-                            setStudentRemarksById((current) => ({
-                              ...current,
-                              [student.id]: event.target.value,
-                            }))
-                          }
-                          value={studentRemarksById[student.id] ?? ''}
-                        />
-                      </label>
+                      <div
+                        aria-label={`${personName(student)} attendance status`}
+                        className="attendance-status-choices"
+                        role="group"
+                      >
+                        {studentStatuses.map((status) => (
+                          <button
+                            aria-pressed={
+                              studentStatusesById[student.id] === status
+                            }
+                            className={`attendance-status-choice attendance-status-choice-${status} reference-attendance-option${studentStatusesById[student.id] === status ? ` is-active is-${status}` : ''}`}
+                            key={status}
+                            onClick={() =>
+                              setStudentStatusesById((current) => ({
+                                ...current,
+                                [student.id]: status,
+                              }))
+                            }
+                            type="button"
+                          >
+                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                      <details className="attendance-remark-details">
+                        <summary>
+                          {studentRemarksById[student.id]?.trim()
+                            ? 'Edit note'
+                            : 'Add note'}
+                        </summary>
+                        <label>
+                          Remarks
+                          <input
+                            maxLength={500}
+                            onChange={(event) =>
+                              setStudentRemarksById((current) => ({
+                                ...current,
+                                [student.id]: event.target.value,
+                              }))
+                            }
+                            value={studentRemarksById[student.id] ?? ''}
+                          />
+                        </label>
+                      </details>
                     </article>
                   ))}
                 </div>
@@ -594,8 +709,8 @@ export function AttendanceDashboard() {
                     variant="primary"
                   >
                     {attendance.isPending
-                      ? 'Saving attendance…'
-                      : 'Save attendance'}
+                      ? 'Marking attendance…'
+                      : 'Mark attendance'}
                   </Button>
                 </div>
               </>

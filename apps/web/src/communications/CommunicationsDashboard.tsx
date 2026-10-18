@@ -14,10 +14,7 @@ import {
   PermissionDeniedState,
 } from '../components/ui/States.js';
 import { useToast } from '../components/ui/ToastProvider.js';
-import {
-  apiMessage,
-  useOrganizationAccess,
-} from '../staff/StaffPageShared.js';
+import { apiMessage, useOrganizationAccess } from '../staff/StaffPageShared.js';
 import { getMembers } from '../organizations/organizations-api.js';
 import type { OrganizationMember } from '../organizations/organizations-api.js';
 import type {
@@ -121,7 +118,9 @@ export function CommunicationsDashboard() {
     canManageAnnouncements ? 'announcements' : 'messaging',
   );
 
-  const [audienceFilter, setAudienceFilter] = useState<AnnouncementAudience | ''>('');
+  const [audienceFilter, setAudienceFilter] = useState<
+    AnnouncementAudience | ''
+  >('');
   const [statusFilter, setStatusFilter] = useState<AnnouncementStatus | ''>('');
   const [campusFilter, setCampusFilter] = useState('');
 
@@ -170,9 +169,7 @@ export function CommunicationsDashboard() {
     access.data?.role === 'campus_admin' ||
     Boolean(access.data?.campusIds.length);
   const availableCampuses = campusRestricted
-    ? campusList.filter((campus) =>
-        access.data?.campusIds.includes(campus.id),
-      )
+    ? campusList.filter((campus) => access.data?.campusIds.includes(campus.id))
     : campusList;
   const memberList = members.data?.members ?? [];
   const memberByUserId = new Map(
@@ -278,7 +275,7 @@ export function CommunicationsDashboard() {
   const saving = create.isPending || update.isPending;
 
   return (
-    <main className="communications-page">
+    <main className="communications-page reference-live-module">
       <header className="page-heading communications-heading">
         <div className="communications-heading-text">
           <p className="eyebrow">
@@ -287,7 +284,8 @@ export function CommunicationsDashboard() {
           </p>
           <h1>Communications</h1>
           <p className="page-description">
-            School-wide announcements and scoped, private parent-teacher messaging.
+            School-wide announcements and scoped, private parent-teacher
+            messaging.
           </p>
         </div>
 
@@ -319,7 +317,8 @@ export function CommunicationsDashboard() {
               padding: '0.5rem 0.85rem',
               border: 'none',
               borderRadius: '0.375rem',
-              background: activeTab === 'announcements' ? '#2563eb' : 'transparent',
+              background:
+                activeTab === 'announcements' ? '#2563eb' : 'transparent',
               color: activeTab === 'announcements' ? '#ffffff' : '#64748b',
               fontWeight: 600,
               fontSize: '0.85rem',
@@ -376,7 +375,9 @@ export function CommunicationsDashboard() {
                 void members.refetch();
               }}
             />
-          ) : announcements.isPending || campuses.isPending || members.isPending ? (
+          ) : announcements.isPending ||
+            campuses.isPending ||
+            members.isPending ? (
             <LoadingState message="Loading announcements..." />
           ) : (
             <section
@@ -389,7 +390,8 @@ export function CommunicationsDashboard() {
                   <p>Published notices, drafts, and archived announcements.</p>
                 </div>
                 <span className="communications-count">
-                  {items.length} {items.length === 1 ? 'announcement' : 'announcements'}
+                  {items.length}{' '}
+                  {items.length === 1 ? 'announcement' : 'announcements'}
                 </span>
               </div>
 
@@ -405,13 +407,13 @@ export function CommunicationsDashboard() {
                     }
                   >
                     <option value="">All audiences</option>
-                    {(Object.keys(audienceLabels) as AnnouncementAudience[]).map(
-                      (audience) => (
-                        <option key={audience} value={audience}>
-                          {audienceLabels[audience]}
-                        </option>
-                      ),
-                    )}
+                    {(
+                      Object.keys(audienceLabels) as AnnouncementAudience[]
+                    ).map((audience) => (
+                      <option key={audience} value={audience}>
+                        {audienceLabels[audience]}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label className="communications-field">
@@ -461,7 +463,11 @@ export function CommunicationsDashboard() {
                   title="No announcements found"
                   description="Create an announcement or adjust the selected filters."
                   action={
-                    <Button onClick={openCreate} type="button" variant="secondary">
+                    <Button
+                      onClick={openCreate}
+                      type="button"
+                      variant="secondary"
+                    >
                       <Plus size={16} aria-hidden="true" />
                       Create announcement
                     </Button>
@@ -507,9 +513,9 @@ export function CommunicationsDashboard() {
                           <dt>Campus</dt>
                           <dd>
                             {item.campusId
-                              ? campusList.find(
+                              ? (campusList.find(
                                   (campus) => campus.id === item.campusId,
-                                )?.name ?? 'Assigned campus'
+                                )?.name ?? 'Assigned campus')
                               : 'Organization-wide'}
                           </dd>
                         </div>

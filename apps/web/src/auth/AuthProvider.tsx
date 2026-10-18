@@ -82,6 +82,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
         return registerRequest(input);
       },
       async logout() {
+        // Cancel an in-flight session bootstrap so it cannot restore stale
+        // authenticated data after the logout request has completed.
+        await queryClient.cancelQueries({ queryKey: CURRENT_USER_KEY });
         await logoutRequest();
         queryClient.setQueryData(CURRENT_USER_KEY, null);
       },

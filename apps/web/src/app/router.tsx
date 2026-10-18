@@ -6,15 +6,24 @@ import {
 import type { RouteObject } from 'react-router-dom';
 import { RouteErrorPage } from '../components/ui/RouteErrorPage.js';
 import {
+  AccountantLayout,
   AdminLayout,
   ParentLayout,
   PlatformLayout,
   StudentLayout,
   TeacherLayout,
 } from '../layouts/RoleLayouts.js';
+import {
+  ParentPortalPage,
+  StudentPortalPage,
+} from '../pages/ParentPortalPage.js';
 import { FoundationsPage } from '../pages/FoundationsPage.js';
 import { NotFoundPage } from '../pages/NotFoundPage.js';
 import { OverviewPage } from '../pages/OverviewPage.js';
+import { LandingPage } from '../pages/LandingPage.js';
+import { PlatformOverviewPage } from '../pages/PlatformOverviewPage.js';
+import { WorkspaceRedirectPage } from '../pages/WorkspaceRedirectPage.js';
+import { RoleDemoModulePage } from '../pages/RoleDemoModulePage.js';
 import { OrganizationContextPage } from '../pages/OrganizationContextPage.js';
 import {
   AcceptOrganizationInvitationPage,
@@ -38,8 +47,11 @@ import { AdmissionsListPage } from '../admissions/AdmissionsListPage.js';
 import { ApplicationReviewPage } from '../admissions/ApplicationReviewPage.js';
 import { AcademicsDashboard } from '../academics/AcademicsDashboard.js';
 import { AttendanceDashboard } from '../attendance/AttendanceDashboard.js';
+import { TeacherStudentsPage } from '../attendance/TeacherStudentsPage.js';
 import { ExaminationDashboard } from '../examinations/ExaminationDashboard.js';
+import { HomeworkTestsPage } from '../homework/HomeworkTestsPage.js';
 import { FinanceDashboard } from '../finance/FinanceDashboard.js';
+import { FeeConcessionsPage } from '../finance/FeeConcessionsPage.js';
 import { CommunicationsDashboard } from '../communications/CommunicationsDashboard.js';
 import { ReportsDashboard } from '../reporting/ReportsDashboard.js';
 import { SettingsPage } from '../settings/SettingsPage.js';
@@ -65,7 +77,7 @@ const roleRoutes: RouteObject[] = [
     element: <PlatformLayout />,
     errorElement: <RouteErrorPage />,
     children: [
-      { index: true, element: <OverviewPage /> },
+      { index: true, element: <PlatformOverviewPage /> },
       { path: 'foundations', element: <FoundationsPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
@@ -81,6 +93,11 @@ const roleRoutes: RouteObject[] = [
       {
         path: 'organizations/onboarding',
         element: <OrganizationOnboardingPage />,
+      },
+      { path: 'organizations/preview', element: <OverviewPage /> },
+      {
+        path: 'organizations/preview/:previewModule',
+        element: <RoleDemoModulePage />,
       },
       {
         path: 'organizations/:organizationId',
@@ -103,8 +120,16 @@ const roleRoutes: RouteObject[] = [
         element: <ExaminationDashboard />,
       },
       {
+        path: 'organizations/:organizationId/homework-tests',
+        element: <HomeworkTestsPage />,
+      },
+      {
         path: 'organizations/:organizationId/finance',
         element: <FinanceDashboard />,
+      },
+      {
+        path: 'organizations/:organizationId/concessions',
+        element: <FeeConcessionsPage />,
       },
       {
         path: 'organizations/:organizationId/communications',
@@ -180,6 +205,60 @@ const roleRoutes: RouteObject[] = [
     children: [
       { index: true, element: <OverviewPage /> },
       { path: 'foundations', element: <FoundationsPage /> },
+      { path: 'organizations/preview', element: <OverviewPage /> },
+      {
+        path: 'organizations/preview/:previewModule',
+        element: <RoleDemoModulePage />,
+      },
+      { path: 'organizations/:organizationId', element: <OverviewPage /> },
+      {
+        path: 'organizations/:organizationId/students',
+        element: <TeacherStudentsPage />,
+      },
+      {
+        path: 'organizations/:organizationId/attendance',
+        element: <AttendanceDashboard />,
+      },
+      {
+        path: 'organizations/:organizationId/examinations',
+        element: <ExaminationDashboard />,
+      },
+      {
+        path: 'organizations/:organizationId/homework-tests',
+        element: <HomeworkTestsPage />,
+      },
+      {
+        path: 'organizations/:organizationId/communications',
+        element: <CommunicationsDashboard />,
+      },
+      { path: '*', element: <NotFoundPage /> },
+    ],
+  },
+  {
+    path: '/accountant',
+    element: <AccountantLayout />,
+    errorElement: <RouteErrorPage />,
+    children: [
+      { index: true, element: <OverviewPage /> },
+      { path: 'foundations', element: <FoundationsPage /> },
+      { path: 'organizations/preview', element: <OverviewPage /> },
+      {
+        path: 'organizations/preview/:previewModule',
+        element: <RoleDemoModulePage />,
+      },
+      { path: 'organizations/:organizationId', element: <OverviewPage /> },
+      {
+        path: 'organizations/:organizationId/finance',
+        element: <FinanceDashboard />,
+      },
+      {
+        path: 'organizations/:organizationId/concessions',
+        element: <FeeConcessionsPage />,
+      },
+      {
+        path: 'organizations/:organizationId/reports',
+        element: <ReportsDashboard />,
+      },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
@@ -190,6 +269,16 @@ const roleRoutes: RouteObject[] = [
     children: [
       { index: true, element: <OverviewPage /> },
       { path: 'foundations', element: <FoundationsPage /> },
+      { path: 'organizations/preview', element: <OverviewPage /> },
+      {
+        path: 'organizations/preview/:previewModule',
+        element: <RoleDemoModulePage />,
+      },
+      { path: 'organizations/:organizationId', element: <StudentPortalPage /> },
+      {
+        path: 'organizations/:organizationId/:section',
+        element: <StudentPortalPage />,
+      },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
@@ -200,13 +289,23 @@ const roleRoutes: RouteObject[] = [
     children: [
       { index: true, element: <OverviewPage /> },
       { path: 'foundations', element: <FoundationsPage /> },
+      { path: 'organizations/preview', element: <OverviewPage /> },
+      {
+        path: 'organizations/preview/:previewModule',
+        element: <RoleDemoModulePage />,
+      },
+      { path: 'organizations/:organizationId', element: <ParentPortalPage /> },
+      {
+        path: 'organizations/:organizationId/:section',
+        element: <ParentPortalPage />,
+      },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
 ];
 
 const routes: RouteObject[] = [
-  { path: '/', element: <Navigate to="/platform" replace /> },
+  { path: '/', element: <LandingPage /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegistrationPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
@@ -217,6 +316,16 @@ const routes: RouteObject[] = [
     element: <ProtectedRoute />,
     children: [
       ...roleRoutes,
+      { path: '/dashboard', element: <WorkspaceRedirectPage /> },
+      {
+        path: '/super-admin',
+        element: <PlatformLayout />,
+        errorElement: <RouteErrorPage />,
+        children: [
+          { index: true, element: <PlatformOverviewPage /> },
+          { path: '*', element: <NotFoundPage /> },
+        ],
+      },
       {
         path: '/invitations/accept',
         element: <AcceptOrganizationInvitationPage />,
@@ -229,7 +338,7 @@ const routes: RouteObject[] = [
       },
     ],
   },
-  { path: '*', element: <Navigate to="/platform" replace /> },
+  { path: '*', element: <Navigate to="/dashboard" replace /> },
 ];
 
 export function createAppRouter(options?: { initialEntries: string[] }) {

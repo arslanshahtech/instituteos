@@ -171,14 +171,6 @@ export function StudentsListPage() {
         <StudentPageHeading
           action={
             <>
-              {access.data?.permissions.includes('guardian.read') && (
-                <Link
-                  className="button button-secondary"
-                  to={`/admin/organizations/${encodeURIComponent(organizationId)}/guardians`}
-                >
-                  Guardian directory
-                </Link>
-              )}
               {canCreate && (
                 <Link
                   className="button button-primary"
@@ -232,57 +224,85 @@ export function StudentsListPage() {
             />
           ) : (
             <>
-              <DataTable
-                caption="Students"
-                columns={[
-                  {
-                    header: 'Student',
-                    render: (student) => (
+              {students.data.items.length === 0 ? (
+                <DataTable
+                  caption="Students"
+                  columns={[
+                    {
+                      header: 'Student',
+                      render: (student) => (
+                        <Link
+                          className="student-name-link"
+                          to={`/admin/organizations/${encodeURIComponent(organizationId)}/students/${encodeURIComponent(student.id)}`}
+                        >
+                          {student.firstName} {student.lastName}
+                        </Link>
+                      ),
+                    },
+                  ]}
+                  emptyDescription={
+                    search || status
+                      ? 'Try changing or clearing your search and filters.'
+                      : 'Create the first student record for this organization.'
+                  }
+                  emptyTitle={
+                    search || status
+                      ? 'No students match these filters'
+                      : 'No students yet'
+                  }
+                  rowKey={(student) => student.id}
+                  rows={students.data.items}
+                />
+              ) : (
+                <div className="reference-student-grid student-live-grid">
+                  {students.data.items.map((student) => {
+                    const initials =
+                      (
+                        student.firstName.trim().charAt(0) || 'S'
+                      ).toUpperCase() +
+                      (student.lastName.trim().charAt(0) || '').toUpperCase();
+                    return (
                       <Link
-                        className="student-name-link"
+                        aria-label={`${student.firstName} ${student.lastName}`}
+                        className="reference-student-card student-live-card"
+                        key={student.id}
                         to={`/admin/organizations/${encodeURIComponent(organizationId)}/students/${encodeURIComponent(student.id)}`}
                       >
-                        {student.firstName} {student.lastName}
+                        <span className="reference-student-card-top">
+                          <span
+                            className="reference-student-avatar"
+                            aria-hidden="true"
+                          >
+                            {initials}
+                          </span>
+                          <span
+                            className={`reference-status ${student.status === 'active' ? 'reference-status-approved' : 'reference-status-pending'}`}
+                          >
+                            {student.status}
+                          </span>
+                        </span>
+                        <strong>
+                          {student.firstName} {student.lastName}
+                        </strong>
+                        <small>
+                          <StudentCampusName
+                            campusId={student.campusId}
+                            campuses={campuses.data?.campuses ?? []}
+                          />
+                        </small>
+                        <span className="reference-student-card-bottom">
+                          <span>
+                            {student.guardianIds.length} linked guardian
+                            {student.guardianIds.length === 1 ? '' : 's'}
+                          </span>
+                          <span>{student.phone || 'Phone not provided'}</span>
+                          <b>{student.contactEmail || 'Email not provided'}</b>
+                        </span>
                       </Link>
-                    ),
-                  },
-                  {
-                    header: 'Email',
-                    render: (student) => student.contactEmail || '—',
-                  },
-                  {
-                    header: 'Campus',
-                    render: (student) => (
-                      <StudentCampusName
-                        campusId={student.campusId}
-                        campuses={campuses.data?.campuses ?? []}
-                      />
-                    ),
-                  },
-                  {
-                    header: 'Status',
-                    render: (student) => (
-                      <span
-                        className={`status-badge ${student.status === 'active' ? 'status-positive' : 'status-negative'}`}
-                      >
-                        {student.status}
-                      </span>
-                    ),
-                  },
-                ]}
-                emptyDescription={
-                  search || status
-                    ? 'Try changing or clearing your search and filters.'
-                    : 'Create the first student record for this organization.'
-                }
-                emptyTitle={
-                  search || status
-                    ? 'No students match these filters'
-                    : 'No students yet'
-                }
-                rowKey={(student) => student.id}
-                rows={students.data.items}
-              />
+                    );
+                  })}
+                </div>
+              )}
               <Pagination
                 currentPage={students.data.page}
                 onPageChange={setPage}

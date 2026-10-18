@@ -8,9 +8,28 @@ import {
 } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
-import { ChevronDown } from 'lucide-react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import {
+  ArrowUpRight,
+  BarChart3,
+  CalendarCheck,
+  ChevronDown,
+  GraduationCap,
+  ReceiptText,
+  UserCheck,
+  UserPlus,
+  Users,
+  WalletCards,
+} from 'lucide-react';
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import { ApiError } from '../../api/client.js';
+import { listApplications } from '../../admissions/admissions-api.js';
+import type { ApplicationRecord } from '../../admissions/admissions-api.js';
+import { listStudentAttendance } from '../../attendance/attendance-api.js';
 import { useAuth } from '../../auth/AuthProvider.js';
 import { Button } from '../../components/ui/Button.js';
 import { Dialog } from '../../components/ui/Dialog.js';
@@ -39,6 +58,11 @@ import {
   updateOrganization,
 } from '../../organizations/organizations-api.js';
 import { getOrganizationAccessContext } from '../../tenancy/tenancy-api.js';
+import { listGuardians } from '../../guardians/guardians-api.js';
+import { listDailyCollections } from '../../finance/finance-api.js';
+import type { GuardianListResponse } from '../../guardians/guardians-api.js';
+import { useOrganizationSummary } from '../../reporting/reporting-api.js';
+import type { OrganizationSummary } from '../../reporting/reporting-api.js';
 import type {
   AccessibleOrganization,
   Campus,
@@ -443,13 +467,28 @@ export function OrganizationOnboardingPage() {
 type AdminTab =
   'overview' | 'settings' | 'campuses' | 'members' | 'invitations';
 
+function parseAdminTab(value: string | null): AdminTab {
+  return value === 'settings' ||
+    value === 'campuses' ||
+    value === 'members' ||
+    value === 'invitations'
+    ? value
+    : 'overview';
+}
+
 export function OrganizationAdminPage() {
   const { organizationId = '' } = useParams();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const auth = useAuth();
-  const [tab, setTab] = useState<AdminTab>('overview');
+  const [tab, setTab] = useState<AdminTab>(() =>
+    parseAdminTab(searchParams.get('tab')),
+  );
   const [notice, setNotice] = useState('');
+  useEffect(() => {
+    setTab(parseAdminTab(searchParams.get('tab')));
+  }, [searchParams]);
   const access = useQuery({
     queryKey: ['organization-context', organizationId],
     queryFn: () => getOrganizationAccessContext(organizationId),
@@ -466,6 +505,81 @@ export function OrganizationAdminPage() {
     queryKey: ['organization-dashboard', organizationId],
     queryFn: () => getOrganizationDashboard(organizationId),
     enabled: Boolean(organizationId && access.data),
+    retry: false,
+  });
+  const summary = useOrganizationSummary(
+    organizationId,
+    undefined,
+    Boolean(organizationId && access.data && tab === 'overview'),
+  );
+  const guardians = useQuery({
+    queryKey: ['organization-guardian-count', organizationId],
+    queryFn: () => listGuardians(organizationId, { page: 1, pageSize: 1 }),
+    enabled: Boolean(
+      organizationId &&
+      access.data?.permissions.includes('guardian.read') &&
+      tab === 'overview',
+    ),
+    retry: false,
+  });
+  const collectionRange = useMemo(() => {
+    const now = new Date();
+    const key = (date: Date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { dateFrom: key(monthStart), dateTo: key(now) };
+  }, []);
+  const monthlyCollections = useQuery({
+    queryKey: [
+      'organization-dashboard-monthly-collections',
+      organizationId,
+      collectionRange.dateFrom,
+      collectionRange.dateTo,
+    ],
+    queryFn: () => listDailyCollections(organizationId, collectionRange),
+    enabled: Boolean(
+      organizationId &&
+      access.data?.permissions.includes('finance.read') &&
+      tab === 'overview',
+    ),
+    retry: false,
+  });
+  const attendanceRange = useMemo(() => {
+    const dateTo = new Date();
+    const dateFrom = new Date(dateTo);
+    dateFrom.setDate(dateTo.getDate() - 6);
+    const toKey = (date: Date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return { dateFrom: toKey(dateFrom), dateTo: toKey(dateTo) };
+  }, []);
+  const recentAdmissions = useQuery({
+    queryKey: ['organization-dashboard-recent-admissions', organizationId],
+    queryFn: () =>
+      listApplications(organizationId, {
+        search: '',
+        page: 1,
+        pageSize: 3,
+      }),
+    enabled: Boolean(
+      organizationId &&
+      access.data?.permissions.includes('admission.read') &&
+      tab === 'overview',
+    ),
+    retry: false,
+  });
+  const weeklyAttendance = useQuery({
+    queryKey: [
+      'organization-dashboard-weekly-attendance',
+      organizationId,
+      attendanceRange.dateFrom,
+      attendanceRange.dateTo,
+    ],
+    queryFn: () => listStudentAttendance(organizationId, attendanceRange),
+    enabled: Boolean(
+      organizationId &&
+      access.data?.permissions.includes('attendance.read') &&
+      tab === 'overview',
+    ),
     retry: false,
   });
   const campuses = useQuery({
@@ -529,6 +643,7 @@ export function OrganizationAdminPage() {
     access.data?.permissions.includes('member.read') ?? false;
   const canInvite = access.data?.permissions.includes('member.invite') ?? false;
   const canAssignOwner = access.data?.role === 'organization_owner';
+  const organizationPath = `/admin/organizations/${encodeURIComponent(organizationId)}`;
 
   useEffect(() => {
     const accessUnavailable =
@@ -552,14 +667,15 @@ export function OrganizationAdminPage() {
 
   return (
     <main className="page-stack organization-admin-page">
-      <section className="page-heading organization-heading">
+      <section className="page-heading organization-heading reference-dashboard-heading">
         <div>
           <p className="eyebrow">
             Organization workspace · {access.data.role.replaceAll('_', ' ')}
           </p>
-          <h1>{dashboard.data?.organization.name ?? 'Organization'}</h1>
+          <h1>Institute Overview</h1>
           <p className="page-description organization-user-meta">
-            Signed in as {auth.user?.displayName ?? 'current user'}.
+            {dashboard.data?.organization.name ?? 'Your college'} · Welcome
+            back, {auth.user?.displayName ?? 'there'}.
           </p>
           {accessibleOrganizations.data?.organizations.some(
             (organization) => organization.id === organizationId,
@@ -592,72 +708,119 @@ export function OrganizationAdminPage() {
             </label>
           )}
         </div>
-        <div className="organization-heading-actions">
-          <Link
-            className="button button-secondary"
-            to="/admin/organizations/onboarding"
+        {tab === 'overview' && (
+          <div
+            aria-label="College quick actions"
+            className="organization-heading-actions organization-dashboard-actions reference-quick-actions"
+            role="group"
           >
-            Add organization
-          </Link>
-        </div>
+            {access.data.permissions.includes('student.create') && (
+              <Link
+                className="organization-dashboard-action reference-quick-action"
+                to={`${organizationPath}/students/new`}
+              >
+                <UserPlus size={15} aria-hidden="true" /> Add Student
+              </Link>
+            )}
+            {access.data.permissions.includes('finance.write') && (
+              <Link
+                className="organization-dashboard-action reference-quick-action"
+                to={`${organizationPath}/finance`}
+              >
+                <WalletCards size={15} aria-hidden="true" /> Collect Fee
+              </Link>
+            )}
+            {access.data.permissions.includes('attendance.write') && (
+              <Link
+                className="organization-dashboard-action reference-quick-action"
+                to={`${organizationPath}/attendance`}
+              >
+                <CalendarCheck size={15} aria-hidden="true" /> Mark Attendance
+              </Link>
+            )}
+            {access.data.permissions.includes('reporting.read') && (
+              <Link
+                className="organization-dashboard-action reference-quick-action"
+                to={`${organizationPath}/reports`}
+              >
+                <BarChart3 size={15} aria-hidden="true" /> Generate Report
+              </Link>
+            )}
+          </div>
+        )}
       </section>
-      <label className="organization-section-selector">
-        <span>Organization section</span>
-        <select
-          aria-label="Organization section"
-          value={tab}
-          onChange={(event) => {
-            setTab(event.target.value as AdminTab);
-            setNotice('');
-          }}
-        >
-          {(
-            [
-              'overview',
-              'settings',
-              'campuses',
-              'members',
-              'invitations',
-            ] as const
-          ).map((item) => (
-            <option key={item} value={item}>
-              {item[0]!.toUpperCase() + item.slice(1)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <nav
-        className="organization-tabs"
-        aria-label="Organization administration"
-      >
-        {(
-          [
-            'overview',
-            'settings',
-            'campuses',
-            'members',
-            'invitations',
-          ] as const
-        ).map((item) => (
-          <button
-            key={item}
-            type="button"
-            aria-current={tab === item ? 'page' : undefined}
-            onClick={() => {
-              setTab(item);
-              setNotice('');
-            }}
+      {tab !== 'overview' && (
+        <>
+          <label className="organization-section-selector">
+            <span>Organization section</span>
+            <select
+              aria-label="Organization section"
+              value={tab}
+              onChange={(event) => {
+                setTab(event.target.value as AdminTab);
+                setNotice('');
+              }}
+            >
+              {(
+                [
+                  'overview',
+                  'settings',
+                  'campuses',
+                  'members',
+                  'invitations',
+                ] as const
+              ).map((item) => (
+                <option key={item} value={item}>
+                  {item[0]!.toUpperCase() + item.slice(1)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <nav
+            className="organization-tabs"
+            aria-label="Organization administration"
           >
-            {item}
-          </button>
-        ))}
-      </nav>
+            {(
+              [
+                'overview',
+                'settings',
+                'campuses',
+                'members',
+                'invitations',
+              ] as const
+            ).map((item) => (
+              <button
+                key={item}
+                type="button"
+                aria-current={tab === item ? 'page' : undefined}
+                onClick={() => {
+                  setTab(item);
+                  setNotice('');
+                }}
+              >
+                {item}
+              </button>
+            ))}
+          </nav>
+        </>
+      )}
       {notice && (
         <p role="status" className="success-note">
           {notice}
         </p>
       )}
-      {tab === 'overview' && <OverviewPanel dashboard={dashboard} />}
+      {tab === 'overview' && (
+        <OverviewPanel
+          dashboard={dashboard}
+          summary={summary}
+          guardians={guardians}
+          recentAdmissions={recentAdmissions}
+          weeklyAttendance={weeklyAttendance}
+          attendanceRange={attendanceRange}
+          monthlyCollections={monthlyCollections}
+          collectionRange={collectionRange}
+        />
+      )}
       {tab === 'settings' && (
         <SettingsPanel
           organizationId={organizationId}
@@ -697,45 +860,345 @@ export function OrganizationAdminPage() {
   );
 }
 
+function formatPKR(value: string | number | undefined): string {
+  if (value === undefined || value === null || value === '') return '—';
+  const amount = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(amount)) return '—';
+  return `Rs ${new Intl.NumberFormat('en-PK', { maximumFractionDigits: 0 }).format(amount)}`;
+}
+
+function getWeekDays(endDate: string) {
+  const anchor = new Date(`${endDate}T12:00:00`);
+  const days: Array<{ key: string; label: string; fullLabel: string }> = [];
+  for (let daysBack = 6; daysBack >= 0; daysBack -= 1) {
+    const date = new Date(anchor);
+    date.setDate(anchor.getDate() - daysBack);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    days.push({
+      key,
+      label: date.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1),
+      fullLabel: date.toLocaleDateString('en-PK', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'short',
+      }),
+    });
+  }
+  return days;
+}
+
+function formatDateShort(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? 'Date unavailable'
+    : date.toLocaleDateString('en-PK', { day: 'numeric', month: 'short' });
+}
+
+function formatApplicationStatus(value: ApplicationRecord['status']) {
+  const labels: Record<ApplicationRecord['status'], string> = {
+    draft: 'Draft',
+    submitted: 'Pending',
+    in_review: 'In review',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    admitted: 'Enrolled',
+  };
+  return labels[value];
+}
+
 function OverviewPanel({
   dashboard,
+  summary,
+  guardians,
+  recentAdmissions,
+  weeklyAttendance,
+  attendanceRange,
+  monthlyCollections,
+  collectionRange,
 }: {
   dashboard: UseQueryResult<OrganizationDashboard>;
+  summary: UseQueryResult<{ summary: OrganizationSummary }>;
+  guardians: UseQueryResult<GuardianListResponse>;
+  recentAdmissions: UseQueryResult<
+    Awaited<ReturnType<typeof listApplications>>
+  >;
+  weeklyAttendance: UseQueryResult<
+    Awaited<ReturnType<typeof listStudentAttendance>>
+  >;
+  attendanceRange: { dateFrom: string; dateTo: string };
+  monthlyCollections: UseQueryResult<
+    Awaited<ReturnType<typeof listDailyCollections>>
+  >;
+  collectionRange: { dateFrom: string; dateTo: string };
 }) {
   const data = dashboard.data;
   if (dashboard.isPending)
-    return <LoadingState message="Loading organization data…" />;
+    return <LoadingState message="Loading college overview…" />;
   if (dashboard.isError || !data)
     return (
       <ErrorState
-        title="Dashboard unavailable"
-        description="Organization information could not be loaded."
+        title="College overview unavailable"
+        description="Your college information could not be loaded."
         onRetry={() => void dashboard.refetch()}
       />
     );
+
+  const totals = summary.data?.summary;
+  const monthlyCollectionTotal = (monthlyCollections.data?.items ?? []).reduce(
+    (sum, item) => sum + item.amountCollected,
+    0,
+  );
+  const weekDays = getWeekDays(attendanceRange.dateTo);
+  const attendanceItems = weeklyAttendance.data?.items ?? [];
+  const dailyAttendance = weekDays.map((day) => {
+    const records = attendanceItems.filter(
+      (record) => record.date.slice(0, 10) === day.key,
+    );
+    const attended = records.filter(
+      (record) => record.status === 'present',
+    ).length;
+    return {
+      ...day,
+      rate: records.length ? Math.round((attended / records.length) * 100) : 0,
+      count: records.length,
+    };
+  });
+  const recordedDays = dailyAttendance.filter((day) => day.count > 0);
+  const weeklyRate = recordedDays.length
+    ? Math.round(
+        recordedDays.reduce((sum, day) => sum + day.rate, 0) /
+          recordedDays.length,
+      )
+    : null;
+
   return (
     <section
-      className="organization-overview"
-      aria-label="Organization overview"
+      className="organization-overview admin-dashboard reference-dashboard-preview"
+      aria-label="College overview"
     >
-      <div className="organization-facts">
-        <article>
-          <span>Active campuses</span>
-          <strong>{data.counts.campuses}</strong>
+      <div className="admin-metrics-grid reference-metrics-grid">
+        <article className="admin-metric-card reference-metric-card">
+          <div className="admin-metric-heading">
+            <span>Active students</span>
+            <span className="admin-metric-icon reference-metric-icon">
+              <Users size={18} aria-hidden="true" />
+            </span>
+          </div>
+          <strong>
+            {totals ? totals.activeStudentCount.toLocaleString('en-PK') : '—'}
+          </strong>
+          <p>Currently enrolled learners</p>
         </article>
-        <article>
-          <span>Active members</span>
-          <strong>{data.counts.members}</strong>
+        <article className="admin-metric-card reference-metric-card">
+          <div className="admin-metric-heading">
+            <span>Staff &amp; teachers</span>
+            <span className="admin-metric-icon reference-metric-icon">
+              <GraduationCap size={18} aria-hidden="true" />
+            </span>
+          </div>
+          <strong>
+            {totals ? totals.activeStaffCount.toLocaleString('en-PK') : '—'}
+          </strong>
+          <p>Active college staff</p>
         </article>
-        <article>
-          <span>Setup</span>
-          <strong>{data.setupComplete ? 'Ready' : 'Add a campus'}</strong>
+        <article className="admin-metric-card reference-metric-card">
+          <div className="admin-metric-heading">
+            <span>Guardians</span>
+            <span className="admin-metric-icon reference-metric-icon">
+              <UserCheck size={18} aria-hidden="true" />
+            </span>
+          </div>
+          <strong>
+            {guardians.data
+              ? guardians.data.total.toLocaleString('en-PK')
+              : '—'}
+          </strong>
+          <p>Guardian records in your college</p>
+        </article>
+        <article className="admin-metric-card reference-metric-card">
+          <div className="admin-metric-heading">
+            <span>Monthly collection</span>
+            <span className="admin-metric-icon reference-metric-icon">
+              <ReceiptText size={18} aria-hidden="true" />
+            </span>
+          </div>
+          <strong>
+            {monthlyCollections.isPending || monthlyCollections.isError
+              ? '—'
+              : formatPKR(monthlyCollectionTotal)}
+          </strong>
+          <p>
+            {monthlyCollections.isError
+              ? 'Monthly receipts unavailable'
+              : `${collectionRange.dateFrom} to ${collectionRange.dateTo}`}
+          </p>
+        </article>
+        <article className="admin-metric-card reference-metric-card">
+          <div className="admin-metric-heading">
+            <span>Outstanding dues</span>
+            <span className="admin-metric-icon admin-metric-icon-warning reference-metric-icon">
+              <WalletCards size={18} aria-hidden="true" />
+            </span>
+          </div>
+          <strong>{formatPKR(totals?.finance.totalPending)}</strong>
+          <p>
+            {totals
+              ? 'Overdue: ' + formatPKR(totals.finance.totalOverdue)
+              : 'Dues load from college finance records'}
+          </p>
+        </article>
+        <article className="admin-metric-card reference-metric-card">
+          <div className="admin-metric-heading">
+            <span>Today’s attendance</span>
+            <span className="admin-metric-icon reference-metric-icon">
+              <CalendarCheck size={18} aria-hidden="true" />
+            </span>
+          </div>
+          <strong>
+            {typeof totals?.attendance.todayAttendanceRate === 'number'
+              ? String(totals.attendance.todayAttendanceRate) + '%'
+              : '—'}
+          </strong>
+          <p>
+            {totals
+              ? String(totals.attendance.recordsCount.toLocaleString('en-PK')) +
+                ' attendance records'
+              : 'Attendance summary'}
+          </p>
         </article>
       </div>
-      {!data.setupComplete && (
-        <p className="setup-note">
-          Organization setup is ready. Add an initial campus to complete the
-          basics.
+      <div className="admin-overview-bottom reference-dashboard-bottom">
+        <section
+          aria-labelledby="admin-recent-admissions-title"
+          className="admin-activity-panel reference-dashboard-panel"
+        >
+          <div className="admin-panel-heading reference-panel-heading">
+            <div>
+              <h2 id="admin-recent-admissions-title">Recent admissions</h2>
+              <p>Latest applications received by the college</p>
+            </div>
+            {data.organization.id && (
+              <Link
+                className="admin-panel-link reference-view-all"
+                to={`/admin/organizations/${encodeURIComponent(data.organization.id)}/admissions`}
+              >
+                View all <ArrowUpRight size={14} aria-hidden="true" />
+              </Link>
+            )}
+          </div>
+          {recentAdmissions.isPending ? (
+            <LoadingState message="Loading recent applications…" />
+          ) : recentAdmissions.isError ? (
+            <p className="admin-inline-message" role="status">
+              Recent applications are temporarily unavailable.
+            </p>
+          ) : (recentAdmissions.data?.items.length ?? 0) === 0 ? (
+            <div className="admin-inline-empty">
+              <span className="admin-inline-empty-mark" aria-hidden="true">
+                <GraduationCap size={17} />
+              </span>
+              <div>
+                <strong>No recent applications</strong>
+                <p>
+                  New applicants will appear here when the college receives
+                  them.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="admin-recent-list reference-activity-list">
+              {recentAdmissions.data!.items.slice(0, 3).map((application) => (
+                <Link
+                  className="admin-recent-row reference-activity-row"
+                  key={application.id}
+                  to={`/admin/organizations/${encodeURIComponent(data.organization.id)}/admissions/applications/${encodeURIComponent(application.id)}`}
+                >
+                  <span className="admin-recent-avatar" aria-hidden="true">
+                    {(
+                      application.firstName.trim().charAt(0) || 'A'
+                    ).toUpperCase()}
+                    {(
+                      application.lastName.trim().charAt(0) || ''
+                    ).toUpperCase()}
+                  </span>
+                  <span className="admin-recent-copy reference-activity-copy">
+                    <strong>
+                      {application.firstName} {application.lastName}
+                    </strong>
+                    <small>
+                      {application.program || 'Application'} ·{' '}
+                      {formatDateShort(application.createdAt)}
+                    </small>
+                  </span>
+                  <span
+                    className={`admin-status-pill admin-status-${application.status} reference-status reference-status-${application.status === 'admitted' ? 'enrolled' : application.status === 'approved' ? 'approved' : application.status === 'rejected' ? 'info' : 'pending'}`}
+                  >
+                    {formatApplicationStatus(application.status)}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section
+          aria-labelledby="admin-weekly-attendance-title"
+          className="admin-activity-panel admin-attendance-panel reference-dashboard-panel"
+        >
+          <div className="admin-panel-heading reference-panel-heading">
+            <div>
+              <h2 id="admin-weekly-attendance-title">Attendance · This week</h2>
+              <p>Daily student attendance records</p>
+            </div>
+          </div>
+          {weeklyAttendance.isPending ? (
+            <LoadingState message="Loading attendance…" />
+          ) : weeklyAttendance.isError ? (
+            <p className="admin-inline-message" role="status">
+              Weekly attendance is temporarily unavailable.
+            </p>
+          ) : (
+            <>
+              <div
+                aria-label="Daily student attendance rate for the last seven days"
+                className="admin-weekly-bars reference-chart-bars"
+                role="img"
+              >
+                {dailyAttendance.map((day) => (
+                  <div
+                    className="admin-weekly-day reference-chart-day"
+                    key={day.key}
+                  >
+                    <div
+                      className="admin-weekly-track reference-chart-track"
+                      title={`${day.fullLabel}: ${day.count ? `${day.rate}% attendance` : 'No records'}`}
+                    >
+                      <span
+                        className="admin-weekly-fill reference-chart-fill"
+                        style={{ height: `${day.rate}%` }}
+                      />
+                    </div>
+                    <span className="admin-weekly-label">{day.label}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="admin-weekly-summary reference-chart-summary">
+                <span
+                  className="admin-weekly-summary-dot reference-chart-status-dot"
+                  aria-hidden="true"
+                />
+                {weeklyRate === null
+                  ? `No attendance records from ${attendanceRange.dateFrom} to ${attendanceRange.dateTo}`
+                  : `${weeklyRate}% average · ${recordedDays.length} day${recordedDays.length === 1 ? '' : 's'} with records`}
+              </div>
+            </>
+          )}
+        </section>
+      </div>
+      {(summary.isError || guardians.isError) && (
+        <p className="admin-data-note" role="status">
+          Some overview totals are temporarily unavailable. No sample figures
+          are being substituted; open the relevant module to review its records.
         </p>
       )}
     </section>

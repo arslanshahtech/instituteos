@@ -5,9 +5,11 @@ import {
   AcademicSectionModel,
   AcademicYearModel,
   SubjectModel,
+  TeacherAssignmentModel,
   TermModel,
 } from '../academics/academics.model.js';
-import { StudentModel } from '../people/people.model.js';
+import { AuthUserModel } from '../auth/auth.model.js';
+import { StaffMemberModel, StudentModel } from '../people/people.model.js';
 import { StudentSectionPlacementModel } from '../attendance/attendance.model.js';
 import { CampusModel } from '../tenancy/tenancy.model.js';
 import {
@@ -109,6 +111,52 @@ function scopedCampus(
 }
 
 export class MongoExaminationsRepository implements ExaminationsRepository {
+  async isTeacherAssignedToSection(
+    organizationId: string,
+    userId: string,
+    input: {
+      classId: string;
+      sectionId: string;
+      academicYearId: string;
+      subjectId: string;
+    },
+  ): Promise<boolean> {
+    if (
+      !Types.ObjectId.isValid(organizationId) ||
+      !Types.ObjectId.isValid(userId)
+    )
+      return false;
+
+    const user = await AuthUserModel.findById(oid(userId))
+      .select({ email: 1 })
+      .lean();
+    const email =
+      typeof user?.email === 'string' ? user.email.trim().toLowerCase() : '';
+    if (!email) return false;
+
+    const staff = await StaffMemberModel.find({
+      organizationId: oid(organizationId),
+      email,
+      status: 'active',
+    })
+      .select({ _id: 1 })
+      .limit(2)
+      .lean();
+    if (staff.length !== 1) return false;
+
+    const assignment = await TeacherAssignmentModel.findOne({
+      organizationId: oid(organizationId),
+      teacherStaffId: staff[0]!._id,
+      classId: oid(input.classId),
+      sectionId: oid(input.sectionId),
+      academicYearId: oid(input.academicYearId),
+      subjectId: oid(input.subjectId),
+    })
+      .select({ _id: 1 })
+      .lean();
+    return Boolean(assignment);
+  }
+
   async validateCampus(organizationId: string, campusId: string) {
     return Boolean(
       await CampusModel.exists({
@@ -215,7 +263,10 @@ export class MongoExaminationsRepository implements ExaminationsRepository {
     return record ? examRecord(record) : null;
   }
 
-  async createExam(organizationId: string, input: ExamInput): Promise<ExamRecord> {
+  async createExam(
+    organizationId: string,
+    input: ExamInput,
+  ): Promise<ExamRecord> {
     const record = await ExamModel.create({
       organizationId: oid(organizationId),
       ...input,
@@ -316,8 +367,7 @@ export class MongoExaminationsRepository implements ExaminationsRepository {
     input: Partial<ExamScheduleInput>,
   ) {
     const changes: Record<string, unknown> = { ...input };
-    if (changes.date)
-      changes.date = new Date(`${changes.date}T00:00:00.000Z`);
+    if (changes.date) changes.date = new Date(`${changes.date}T00:00:00.000Z`);
     const record = await ExamScheduleModel.findOneAndUpdate(
       { _id: oid(id), organizationId: oid(organizationId) },
       { $set: changes },
@@ -483,8 +533,9 @@ export class MongoExaminationsRepository implements ExaminationsRepository {
       records.map((input) => {
         const percentage = input.isAbsent
           ? null
-          : Math.round(((input.marksObtained ?? 0) / schedule.totalMarks) * 10000) /
-            100;
+          : Math.round(
+              ((input.marksObtained ?? 0) / schedule.totalMarks) * 10000,
+            ) / 100;
         const grade = percentage === null ? undefined : gradeFor(percentage);
         return {
           updateOne: {
@@ -522,7 +573,11 @@ export class MongoExaminationsRepository implements ExaminationsRepository {
     return result.map(markRecord);
   }
 
-  async getStudentReport(organizationId: string, examId: string, studentId: string) {
+  async getStudentReport(
+    organizationId: string,
+    examId: string,
+    studentId: string,
+  ) {
     const exam = await this.getExam(organizationId, examId);
     if (!exam) return null;
     const studentExists = await StudentModel.exists({
@@ -575,7 +630,11 @@ export class MongoExaminationsRepository implements ExaminationsRepository {
 
   private required<T>(record: T | null, label: string): T {
     if (!record)
-      throw new AppError(500, 'PERSISTENCE_ERROR', `${label} could not be saved.`);
+      throw new AppError(
+        500,
+        'PERSISTENCE_ERROR',
+        `${label} could not be saved.`,
+      );
     return record;
   }
 }

@@ -39,7 +39,11 @@ const examManagementRoles = [
 
 function bodyObject(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value))
-    throw new AppError(400, 'VALIDATION_ERROR', 'A valid JSON object is required.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'A valid JSON object is required.',
+    );
   return value as Record<string, unknown>;
 }
 
@@ -161,15 +165,18 @@ function partialScheduleInput(
     'totalMarks',
     'passingMarks',
   ] as const) {
-    if (body[field] !== undefined)
-      input[field] = numberField(body, field)!;
+    if (body[field] !== undefined) input[field] = numberField(body, field)!;
   }
   return input;
 }
 
 function scaleBreakdowns(value: unknown): GradeBreakdown[] {
   if (!Array.isArray(value) || value.length > 30)
-    throw new AppError(400, 'VALIDATION_ERROR', 'Enter valid grade breakdowns.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Enter valid grade breakdowns.',
+    );
   return value.map((entry) => {
     const body = bodyObject(entry);
     return {
@@ -212,9 +219,10 @@ function markInputs(value: unknown): ExamMarkInput[] {
       body.marksObtained === undefined
         ? undefined
         : numberField(body, 'marksObtained');
-    const remarks = body.remarks === undefined
-      ? undefined
-      : stringField(body, 'remarks', 500, true);
+    const remarks =
+      body.remarks === undefined
+        ? undefined
+        : stringField(body, 'remarks', 500, true);
     return {
       studentId: objectId(body.studentId, 'student'),
       isAbsent: booleanField(body, 'isAbsent')!,
@@ -230,16 +238,22 @@ function organizationContext(response: {
       organizationId: string;
       campusIds?: string[];
       role?: string;
+      userId?: string;
     };
   };
 }) {
   const context = response.locals?.organizationContext;
   if (!context)
-    throw new AppError(404, 'ORGANIZATION_NOT_FOUND', 'Organization not found.');
+    throw new AppError(
+      404,
+      'ORGANIZATION_NOT_FOUND',
+      'Organization not found.',
+    );
   return {
     organizationId: context.organizationId,
     campusIds: context.campusIds ?? [],
     role: context.role ?? '',
+    userId: context.userId,
   };
 }
 

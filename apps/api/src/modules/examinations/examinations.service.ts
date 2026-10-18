@@ -169,6 +169,38 @@ function normalizeBreakdowns(values: GradeBreakdown[]): GradeBreakdown[] {
 export class ExaminationsService {
   constructor(private readonly repository: ExaminationsRepository) {}
 
+  private async assertTeacherAssignment(
+    context: ExaminationsContext,
+    schedule: {
+      classId: string;
+      sectionId: string;
+      subjectId: string;
+      academicYearId: string;
+    },
+  ): Promise<void> {
+    if (context.role !== 'teacher') return;
+    if (
+      !context.userId ||
+      !context.organizationId ||
+      !(await this.repository.isTeacherAssignedToSection(
+        context.organizationId,
+        context.userId,
+        {
+          classId: schedule.classId,
+          sectionId: schedule.sectionId,
+          subjectId: schedule.subjectId,
+          academicYearId: schedule.academicYearId,
+        },
+      ))
+    ) {
+      throw new AppError(
+        403,
+        'TEACHER_ASSIGNMENT_REQUIRED',
+        'You can only access marks for a subject, class, section, and academic year assigned to your teacher account.',
+      );
+    }
+  }
+
   listExams(
     context: ExaminationsContext,
     filter: { campusId?: string; termId?: string },
@@ -185,7 +217,12 @@ export class ExaminationsService {
   async createExam(context: ExaminationsContext, input: ExamInput) {
     const normalized = normalizeExam(input);
     assertCampus(context, normalized.campusId);
-    if (!(await this.repository.validateCampus(context.organizationId, normalized.campusId)))
+    if (
+      !(await this.repository.validateCampus(
+        context.organizationId,
+        normalized.campusId,
+      ))
+    )
       throw new AppError(400, 'VALIDATION_ERROR', 'Select an active campus.');
     if (
       !(await this.repository.validateAcademicYear(
@@ -216,7 +253,12 @@ export class ExaminationsService {
     const current = await this.requiredExam(context, examId);
     const normalized = normalizeExam({ ...current, ...input });
     assertCampus(context, normalized.campusId);
-    if (!(await this.repository.validateCampus(context.organizationId, normalized.campusId)))
+    if (
+      !(await this.repository.validateCampus(
+        context.organizationId,
+        normalized.campusId,
+      ))
+    )
       throw new AppError(400, 'VALIDATION_ERROR', 'Select an active campus.');
     if (
       !(await this.repository.validateAcademicYear(
@@ -252,11 +294,26 @@ export class ExaminationsService {
   async listSchedules(context: ExaminationsContext, examId: string) {
     const exam = await this.requiredExam(context, examId);
     assertCampus(context, exam.campusId);
-    return this.repository.listSchedules(
+    const schedules = await this.repository.listSchedules(
       context.organizationId,
       examId,
       campusScope(context),
     );
+    if (context.role !== 'teacher') return schedules;
+    const visible: typeof schedules = [];
+    for (const schedule of schedules) {
+      try {
+        await this.assertTeacherAssignment(context, {
+          ...schedule,
+          academicYearId: exam.academicYearId,
+        });
+        visible.push(schedule);
+      } catch (error) {
+        if (!(error instanceof AppError) || error.statusCode !== 403)
+          throw error;
+      }
+    }
+    return visible;
   }
 
   async createSchedule(
@@ -341,7 +398,11 @@ export class ExaminationsService {
         'The schedule must use a valid subject, class, section, and exam date.',
       );
     return this.requiredResult(
-      this.repository.updateSchedule(context.organizationId, scheduleId, normalized),
+      this.repository.updateSchedule(
+        context.organizationId,
+        scheduleId,
+        normalized,
+      ),
       'Exam schedule',
     );
   }
@@ -384,7 +445,11 @@ export class ExaminationsService {
       id(scaleId, 'grading scale'),
     );
     if (!current)
-      throw new AppError(404, 'GRADING_SCALE_NOT_FOUND', 'Grading scale not found.');
+      throw new AppError(
+        404,
+        'GRADING_SCALE_NOT_FOUND',
+        'Grading scale not found.',
+      );
     const changes: Partial<GradingScaleInput> = { ...input };
     if (input.name !== undefined)
       changes.name = text(input.name, 'grading scale name', 100);
@@ -406,7 +471,11 @@ export class ExaminationsService {
       id(scaleId, 'grading scale'),
     );
     if (!current)
-      throw new AppError(404, 'GRADING_SCALE_NOT_FOUND', 'Grading scale not found.');
+      throw new AppError(
+        404,
+        'GRADING_SCALE_NOT_FOUND',
+        'Grading scale not found.',
+      );
     if (current.isActive)
       throw new AppError(
         409,
@@ -425,7 +494,15 @@ export class ExaminationsService {
     const exam = await this.requiredExam(context, schedule.examId);
     assertCampus(context, exam.campusId);
     if (sectionId !== schedule.sectionId)
-      throw new AppError(400, 'VALIDATION_ERROR', 'Select the scheduled section.');
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Select the scheduled section.',
+      );
+    await this.assertTeacherAssignment(context, {
+      ...schedule,
+      academicYearId: exam.academicYearId,
+    });
     return this.repository.listRoster(
       context.organizationId,
       schedule.id,
@@ -443,7 +520,15 @@ export class ExaminationsService {
     const schedule = await this.requiredSchedule(context, scheduleId);
     const exam = await this.requiredExam(context, schedule.examId);
     assertCampus(context, exam.campusId);
-    if (!Array.isArray(records) || records.length === 0 || records.length > 1000)
+    await this.assertTeacherAssignment(context, {
+      ...schedule,
+      academicYearId: exam.academicYearId,
+    });
+    if (
+      !Array.isArray(records) ||
+      records.length === 0 ||
+      records.length > 1000
+    )
       throw new AppError(
         400,
         'VALIDATION_ERROR',
@@ -480,7 +565,10 @@ export class ExaminationsService {
           : { remarks: text(record.remarks || '-', 'remarks', 500) }),
       };
     });
-    if (new Set(normalized.map((record) => record.studentId)).size !== normalized.length)
+    if (
+      new Set(normalized.map((record) => record.studentId)).size !==
+      normalized.length
+    )
       throw new AppError(
         400,
         'DUPLICATE_STUDENT',
@@ -532,6 +620,32 @@ export class ExaminationsService {
         'STUDENT_REPORT_NOT_FOUND',
         'Student report not found for this exam.',
       );
+    if (context.role === 'teacher') {
+      const scopedResults: typeof report.results = [];
+      for (const result of report.results) {
+        const isAssigned = context.userId
+          ? await this.repository.isTeacherAssignedToSection(
+              context.organizationId,
+              context.userId,
+              {
+                classId: result.schedule.classId,
+                sectionId: result.schedule.sectionId,
+                subjectId: result.schedule.subjectId,
+                academicYearId: exam.academicYearId,
+              },
+            )
+          : false;
+        if (isAssigned) scopedResults.push(result);
+      }
+      if (scopedResults.length === 0) {
+        throw new AppError(
+          403,
+          'TEACHER_ASSIGNMENT_REQUIRED',
+          'You can only view reports for students in your assigned classes and subjects.',
+        );
+      }
+      report.results = scopedResults;
+    }
     const totalMarksPossible = report.results.reduce(
       (sum, result) => sum + result.schedule.totalMarks,
       0,
@@ -583,11 +697,18 @@ export class ExaminationsService {
       scheduleId,
     );
     if (!schedule)
-      throw new AppError(404, 'EXAM_SCHEDULE_NOT_FOUND', 'Exam schedule not found.');
+      throw new AppError(
+        404,
+        'EXAM_SCHEDULE_NOT_FOUND',
+        'Exam schedule not found.',
+      );
     return schedule;
   }
 
-  private requiredResult<T>(value: Promise<T | null>, label: string): Promise<T> {
+  private requiredResult<T>(
+    value: Promise<T | null>,
+    label: string,
+  ): Promise<T> {
     return value.then((result) => {
       if (!result)
         throw new AppError(404, 'RESOURCE_NOT_FOUND', `${label} not found.`);

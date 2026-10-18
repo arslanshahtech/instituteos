@@ -30,6 +30,19 @@ const tenancyMocks = vi.hoisted(() => ({
   getOrganizationAccessContext: vi.fn(),
 }));
 
+const dashboardDataMocks = vi.hoisted(() => ({
+  listApplications: vi.fn(),
+  listStudentAttendance: vi.fn(),
+  listGuardians: vi.fn(),
+  listDailyCollections: vi.fn(),
+}));
+
+const platformMocks = vi.hoisted(() => ({
+  getPlatformOrganizations: vi.fn(),
+  getPlatformDemoRequests: vi.fn(),
+  createPlatformOrganization: vi.fn(),
+}));
+
 const organizationMocks = vi.hoisted(() => ({
   getAccessibleOrganizations: vi.fn(),
   createOrganization: vi.fn(),
@@ -75,6 +88,33 @@ vi.mock('./api/client.js', async (importOriginal) => {
 vi.mock('./auth/auth-api.js', () => authMocks);
 vi.mock('./tenancy/tenancy-api.js', () => tenancyMocks);
 vi.mock('./organizations/organizations-api.js', () => organizationMocks);
+vi.mock('./pages/platform-api.js', () => platformMocks);
+vi.mock('./admissions/admissions-api.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./admissions/admissions-api.js')>();
+  return { ...actual, listApplications: dashboardDataMocks.listApplications };
+});
+vi.mock('./attendance/attendance-api.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./attendance/attendance-api.js')>();
+  return {
+    ...actual,
+    listStudentAttendance: dashboardDataMocks.listStudentAttendance,
+  };
+});
+vi.mock('./guardians/guardians-api.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./guardians/guardians-api.js')>();
+  return { ...actual, listGuardians: dashboardDataMocks.listGuardians };
+});
+vi.mock('./finance/finance-api.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./finance/finance-api.js')>();
+  return {
+    ...actual,
+    listDailyCollections: dashboardDataMocks.listDailyCollections,
+  };
+});
 
 function renderPath(path: string, authenticated: boolean | null = true) {
   if (authenticated === null)
@@ -98,6 +138,39 @@ describe('frontend application foundation', () => {
     });
     authMocks.getCurrentUser.mockResolvedValue({ user: authMocks.user });
     authMocks.loginRequest.mockResolvedValue({ user: authMocks.user });
+    platformMocks.getPlatformOrganizations.mockResolvedValue({
+      organizations: [],
+    });
+    platformMocks.getPlatformDemoRequests.mockResolvedValue({ requests: [] });
+    platformMocks.createPlatformOrganization.mockResolvedValue({
+      organization: {
+        id: 'org-created-1',
+        name: 'City College',
+        subdomain: 'citycollege',
+        adminEmail: 'admin@citycollege.edu',
+        studentCount: 0,
+        plan: 'Growth',
+        mrr: 0,
+        trialEndsAt: '2026-10-31T00:00:00.000Z',
+        status: 'active',
+        createdAt: '2026-10-17T00:00:00.000Z',
+      },
+      ownerInvitationSent: true,
+    });
+    dashboardDataMocks.listApplications.mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 3,
+    });
+    dashboardDataMocks.listStudentAttendance.mockResolvedValue({ items: [] });
+    dashboardDataMocks.listGuardians.mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 1,
+    });
+    dashboardDataMocks.listDailyCollections.mockResolvedValue({ items: [] });
     authMocks.logoutRequest.mockResolvedValue(undefined);
     authMocks.registerRequest.mockResolvedValue({
       verificationRequired: false,
@@ -213,29 +286,113 @@ describe('frontend application foundation', () => {
     });
   });
 
-  it('redirects to the platform layout and loads API status through the query client', async () => {
+  it('renders the public landing page with the expected scroll sections', async () => {
     renderPath('/');
 
     expect(
-      await screen.findByRole('heading', { name: 'Platform workspace' }),
+      await screen.findByRole('heading', { name: /Run your institute/i }),
     ).toBeInTheDocument();
-    expect(await screen.findByText('instituteos-api')).toBeInTheDocument();
-    expect(getApiHealth).toHaveBeenCalledOnce();
+    expect(document.getElementById('features')).toBeInTheDocument();
+    expect(document.getElementById('how-it-works')).toBeInTheDocument();
+    expect(document.getElementById('pricing')).toBeInTheDocument();
+    expect(document.getElementById('contact')).toBeInTheDocument();
   });
 
-  it('switches between role layout previews without implying authorization', async () => {
-    const user = userEvent.setup();
-    renderPath('/admin');
-
-    await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Role layout preview' }),
-      'teacher',
-    );
+  it('renders the platform organizations workspace', async () => {
+    renderPath('/platform');
 
     expect(
-      await screen.findByRole('heading', { name: 'Teaching workspace' }),
+      await screen.findByRole('heading', { name: 'Super Admin' }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Teacher · Layout preview')).toBeInTheDocument();
+    expect(platformMocks.getPlatformOrganizations).toHaveBeenCalledOnce();
+  });
+
+  it('denies the Super Admin screen when the backend rejects the platform grant', async () => {
+    platformMocks.getPlatformOrganizations.mockRejectedValueOnce(
+      new ApiError('Platform access required.', 403, 'PLATFORM_ROLE_REQUIRED'),
+    );
+    renderPath('/super-admin');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Platform access required' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'Main navigation' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('blocks direct /platform access when the signed-in account has no platform grant', async () => {
+    platformMocks.getPlatformOrganizations.mockRejectedValueOnce(
+      new ApiError('Platform access required.', 403, 'PLATFORM_ROLE_REQUIRED'),
+    );
+    renderPath('/platform');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Platform access required' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'Main navigation' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('creates an organization from the platform workspace and refreshes the list', async () => {
+    const user = userEvent.setup();
+    renderPath('/super-admin');
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Add organization' }),
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Organization name' }),
+      'City College',
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: /Subdomain/ }),
+      'citycollege',
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Organization owner email' }),
+      'admin@citycollege.edu',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Plan' }),
+      'Growth',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Create & invite owner' }),
+    );
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Organization created. The owner invitation has been sent securely.',
+    );
+    expect(platformMocks.createPlatformOrganization).toHaveBeenCalledWith(
+      {
+        name: 'City College',
+        subdomain: 'citycollege',
+        adminEmail: 'admin@citycollege.edu',
+        plan: 'Growth',
+      },
+      expect.any(Object),
+    );
+  });
+
+  it('does not expose development role-preview controls in the workspace shell', async () => {
+    renderPath('/admin');
+
+    expect(
+      screen.queryByRole('button', { name: 'Teacher preview' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: 'Mobile role layout preview' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('provides a safe development-only route back to the reference UI preview', () => {
+    renderPath('/admin');
+
+    expect(
+      screen.getByRole('link', { name: 'Open reference UI preview' }),
+    ).toHaveAttribute('href', '/admin/organizations/preview?preview=demo');
   });
 
   it('opens mobile navigation and closes it after navigation', async () => {
@@ -246,14 +403,13 @@ describe('frontend application foundation', () => {
     await user.click(menuButton);
     expect(menuButton).toHaveAttribute('aria-expanded', 'true');
     expect(
-      screen.getByRole('combobox', { name: 'Mobile role layout preview' }),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole('link', { name: 'UI foundations' }));
+      screen.queryByRole('combobox', { name: 'Mobile role layout preview' }),
+    ).not.toBeInTheDocument();
 
     expect(
-      await screen.findByRole('heading', { name: 'UI foundations' }),
-    ).toBeInTheDocument();
+      screen.queryByRole('link', { name: 'UI foundations' }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('link', { name: 'Overview' }));
     await waitFor(() =>
       expect(menuButton).toHaveAttribute('aria-expanded', 'false'),
     );
@@ -263,7 +419,9 @@ describe('frontend application foundation', () => {
     const user = userEvent.setup();
     renderPath('/platform/foundations');
 
-    await user.click(screen.getByRole('button', { name: 'Open dialog' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Open dialog' }),
+    );
     expect(
       screen.getByRole('dialog', { name: 'Dialog foundation' }),
     ).toBeInTheDocument();
@@ -348,7 +506,7 @@ describe('frontend application foundation', () => {
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
     expect(
-      await screen.findByRole('heading', { name: 'Platform workspace' }),
+      await screen.findByRole('heading', { name: 'Super Admin' }),
     ).toBeInTheDocument();
     expect(loginRequest).toHaveBeenCalledWith({
       email: 'user@example.test',
@@ -428,8 +586,35 @@ describe('frontend application foundation', () => {
     expect(await screen.findByText('Access not available')).toBeInTheDocument();
   });
 
-  it('onboards an organization and shows dashboard values returned by the API', async () => {
+  it('onboards an organization and opens a clean overview with permission-aware quick actions', async () => {
     const user = userEvent.setup();
+    tenancyMocks.getOrganizationAccessContext.mockResolvedValueOnce({
+      organizationId: '650000000000000000000001',
+      role: 'organization_owner',
+      permissions: [
+        'organization.read',
+        'organization.update',
+        'campus.read',
+        'campus.create',
+        'campus.update',
+        'campus.status.update',
+        'member.read',
+        'member.invite',
+        'member.manage',
+        'student.read',
+        'student.create',
+        'guardian.read',
+        'guardian.create',
+        'staff.read',
+        'staff.create',
+        'attendance.read',
+        'attendance.write',
+        'finance.read',
+        'finance.write',
+        'reporting.read',
+      ],
+      campusIds: [],
+    });
     renderPath('/admin/organizations/onboarding');
 
     await user.type(
@@ -445,12 +630,29 @@ describe('frontend application foundation', () => {
     );
 
     expect(
-      await screen.findByRole('heading', { name: 'North Institute' }),
+      await screen.findByRole('heading', { name: 'Institute Overview' }),
     ).toBeInTheDocument();
-    expect(await screen.findByText('Active campuses')).toBeInTheDocument();
+    expect(await screen.findByText('Active students')).toBeInTheDocument();
+    expect(screen.getAllByText('Staff & teachers').length).toBeGreaterThan(0);
+    expect(screen.getByText('Today’s attendance')).toBeInTheDocument();
+    expect(screen.queryByText('Active campuses')).not.toBeInTheDocument();
+    expect(screen.queryByText('College setup')).not.toBeInTheDocument();
+    for (const action of [
+      'Add Student',
+      'Collect Fee',
+      'Mark Attendance',
+      'Generate Report',
+    ]) {
+      expect(
+        await screen.findByRole('link', { name: action }),
+      ).toBeInTheDocument();
+    }
     expect(
-      await screen.findAllByText('1', { selector: 'strong' }),
-    ).toHaveLength(2);
+      screen.queryByRole('link', { name: 'Add Staff' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Add Guardian' }),
+    ).not.toBeInTheDocument();
     expect(organizationMocks.createOrganization.mock.calls[0]?.[0]).toEqual({
       name: 'North Institute',
       contactEmail: undefined,
@@ -512,7 +714,7 @@ describe('frontend application foundation', () => {
     renderPath('/admin');
 
     expect(
-      await screen.findByRole('heading', { name: 'North Institute' }),
+      await screen.findByRole('heading', { name: 'Institute Overview' }),
     ).toBeInTheDocument();
     expect(organizationMocks.getOrganizationDashboard).toHaveBeenCalledWith(
       '650000000000000000000001',
@@ -552,13 +754,13 @@ describe('frontend application foundation', () => {
     );
   });
 
-  it('shows organization names instead of route IDs in workspace navigation', async () => {
+  it('shows the organization name in the overview instead of a route ID', async () => {
     const organizationId = '650000000000000000000001';
     renderPath(`/admin/organizations/${organizationId}`);
 
-    const identity = await screen.findByLabelText('Current workspace');
-    expect(identity).toHaveTextContent('Organization workspace');
-    await waitFor(() => expect(identity).toHaveTextContent('North Institute'));
+    expect(
+      await screen.findByRole('heading', { name: 'Institute Overview' }),
+    ).toBeInTheDocument();
     expect(screen.queryByText(organizationId)).not.toBeInTheDocument();
   });
 
@@ -575,7 +777,7 @@ describe('frontend application foundation', () => {
 
   it('loads organization members and sends an invitation through the API', async () => {
     const user = userEvent.setup();
-    renderPath('/admin/organizations/650000000000000000000001');
+    renderPath('/admin/organizations/650000000000000000000001?tab=members');
     await user.click(await screen.findByRole('button', { name: 'members' }));
 
     expect(
@@ -602,7 +804,7 @@ describe('frontend application foundation', () => {
 
   it('loads and saves organization settings', async () => {
     const user = userEvent.setup();
-    renderPath('/admin/organizations/650000000000000000000001');
+    renderPath('/admin/organizations/650000000000000000000001?tab=members');
     await user.click(await screen.findByRole('button', { name: 'settings' }));
     const name = await screen.findByRole('textbox', {
       name: 'Organization name',
@@ -622,12 +824,12 @@ describe('frontend application foundation', () => {
 
   it('allows choosing every organization section from the compact selector', async () => {
     const user = userEvent.setup();
-    renderPath('/admin/organizations/650000000000000000000001');
+    renderPath('/admin/organizations/650000000000000000000001?tab=members');
 
     const sectionSelector = await screen.findByRole('combobox', {
       name: 'Organization section',
     });
-    expect(sectionSelector).toHaveValue('overview');
+    expect(sectionSelector).toHaveValue('members');
     await user.selectOptions(sectionSelector, 'settings');
 
     expect(
@@ -647,7 +849,7 @@ describe('frontend application foundation', () => {
       permissions: ['organization.read', 'organization.update'],
       campusIds: [],
     });
-    renderPath('/admin/organizations/650000000000000000000001');
+    renderPath('/admin/organizations/650000000000000000000001?tab=members');
     await user.click(await screen.findByRole('button', { name: 'settings' }));
     await user.click(
       await screen.findByRole('button', { name: 'Archive organization' }),
@@ -673,7 +875,7 @@ describe('frontend application foundation', () => {
 
   it('does not expose archive controls to organization administrators', async () => {
     const user = userEvent.setup();
-    renderPath('/admin/organizations/650000000000000000000001');
+    renderPath('/admin/organizations/650000000000000000000001?tab=members');
     await user.click(await screen.findByRole('button', { name: 'settings' }));
 
     expect(
@@ -802,7 +1004,7 @@ describe('frontend application foundation', () => {
         },
       ],
     });
-    renderPath('/admin/organizations/' + organizationId);
+    renderPath('/admin/organizations/' + organizationId + '?tab=campuses');
     await user.click(await screen.findByRole('button', { name: 'campuses' }));
 
     await user.type(
@@ -870,7 +1072,7 @@ describe('frontend application foundation', () => {
         },
       ],
     });
-    renderPath('/admin/organizations/' + organizationId);
+    renderPath('/admin/organizations/' + organizationId + '?tab=members');
     await user.click(await screen.findByRole('button', { name: 'members' }));
     expect((await screen.findAllByText('Teacher')).length).toBeGreaterThan(0);
     expect(screen.getByText('teacher@example.test')).toBeInTheDocument();
@@ -907,7 +1109,7 @@ describe('frontend application foundation', () => {
     renderPath('/invitations/accept');
 
     expect(
-      await screen.findByRole('heading', { name: 'North Institute' }),
+      await screen.findByRole('heading', { name: 'Institute Overview' }),
     ).toBeInTheDocument();
     expect(
       organizationMocks.acceptOrganizationInvitation.mock.calls[0]?.[0],
@@ -924,7 +1126,7 @@ describe('frontend application foundation', () => {
       permissions: ['organization.read'],
       campusIds: [],
     });
-    renderPath('/admin/organizations/650000000000000000000001');
+    renderPath('/admin/organizations/650000000000000000000001?tab=campuses');
 
     for (const tab of ['campuses', 'members', 'invitations']) {
       await user.click(await screen.findByRole('button', { name: tab }));

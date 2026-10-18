@@ -14,6 +14,8 @@ interface DataTableProps<T> {
   rowKey: (row: T, index: number) => Key;
   emptyTitle?: string;
   emptyDescription?: string;
+  wrapperClassName?: string;
+  tableClassName?: string;
 }
 
 export function DataTable<T>({
@@ -23,10 +25,16 @@ export function DataTable<T>({
   rowKey,
   emptyTitle = 'No results yet',
   emptyDescription = 'When there is information to show, it will appear here.',
+  wrapperClassName,
+  tableClassName,
 }: DataTableProps<T>) {
   return (
-    <div className="table-scroll">
-      <table className="data-table">
+    <div
+      className={['table-scroll', wrapperClassName].filter(Boolean).join(' ')}
+    >
+      <table
+        className={['data-table', tableClassName].filter(Boolean).join(' ')}
+      >
         <caption className="visually-hidden">{caption}</caption>
         <thead>
           <tr>

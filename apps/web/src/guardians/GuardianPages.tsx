@@ -174,9 +174,11 @@ export function GuardiansListPage() {
               <>
                 <DataTable
                   caption="Guardians"
+                  wrapperClassName="reference-table-wrap"
+                  tableClassName="reference-table"
                   columns={[
                     {
-                      header: 'Guardian',
+                      header: 'Name',
                       render: (guardian) => (
                         <Link
                           className="student-name-link"
@@ -187,16 +189,24 @@ export function GuardiansListPage() {
                       ),
                     },
                     {
-                      header: 'Relationship',
+                      header: 'Phone',
+                      render: (guardian) => guardian.phone || '—',
+                    },
+                    {
+                      header: 'Relation',
                       render: (guardian) => guardian.relationship || '—',
                     },
                     {
-                      header: 'Email',
-                      render: (guardian) => guardian.email || '—',
-                    },
-                    {
-                      header: 'Phone',
-                      render: (guardian) => guardian.phone || '—',
+                      header: 'Children',
+                      render: (guardian) => (
+                        <Link
+                          className="reference-mini-pill"
+                          aria-label={`${guardian.studentCount ?? 0} linked children for ${guardian.firstName} ${guardian.lastName}`}
+                          to={`/admin/organizations/${encodeURIComponent(organizationId)}/guardians/${encodeURIComponent(guardian.id)}`}
+                        >
+                          {guardian.studentCount ?? 0}
+                        </Link>
+                      ),
                     },
                   ]}
                   emptyDescription={

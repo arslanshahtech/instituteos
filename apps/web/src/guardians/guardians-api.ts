@@ -12,6 +12,7 @@ export interface GuardianRecord {
   phone?: string;
   email?: string;
   communicationPreference?: CommunicationPreference;
+  studentCount?: number;
   address?: {
     line1?: string;
     line2?: string;

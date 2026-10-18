@@ -4,7 +4,10 @@ import {
   AcademicClassModel,
   AcademicSectionModel,
   AcademicYearModel,
+  TeacherAssignmentModel,
 } from '../academics/academics.model.js';
+import { AuthUserModel } from '../auth/auth.model.js';
+import { CampusModel } from '../tenancy/tenancy.model.js';
 import {
   EnrollmentModel,
   StaffMemberModel,
@@ -27,6 +30,7 @@ import type {
   StudentPlacementInput,
   StudentPlacementRecord,
   StudentRosterMember,
+  TeacherAttendanceAssignment,
 } from './attendance.types.js';
 
 const oid = (id: string) => new Types.ObjectId(id);
@@ -97,6 +101,140 @@ function dateRangeFilter(input: {
 }
 
 export class MongoAttendanceRepository implements AttendanceRepository {
+  async listTeacherAssignmentsForUser(
+    organizationId: string,
+    userId: string,
+  ): Promise<TeacherAttendanceAssignment[]> {
+    if (
+      !Types.ObjectId.isValid(organizationId) ||
+      !Types.ObjectId.isValid(userId)
+    ) {
+      return [];
+    }
+    const [user] = await AuthUserModel.find({ _id: oid(userId) })
+      .select({ email: 1 })
+      .limit(1)
+      .lean();
+    const email =
+      typeof user?.email === 'string' ? user.email.trim().toLowerCase() : '';
+    if (!email) return [];
+
+    // Staff records currently link to accounts by email. Fail closed if that link is ambiguous.
+    const staffMatches = await StaffMemberModel.find({
+      organizationId: oid(organizationId),
+      email,
+      status: 'active',
+    })
+      .select({ _id: 1 })
+      .limit(2)
+      .lean();
+    if (staffMatches.length !== 1) return [];
+
+    const assignments = await TeacherAssignmentModel.find({
+      organizationId: oid(organizationId),
+      teacherStaffId: staffMatches[0]!._id,
+    })
+      .sort({ createdAt: 1 })
+      .lean();
+    if (!assignments.length) return [];
+
+    const classIds = [
+      ...new Set(assignments.map((item) => String(item.classId))),
+    ];
+    const sectionIds = [
+      ...new Set(assignments.map((item) => String(item.sectionId))),
+    ];
+    const yearIds = [
+      ...new Set(assignments.map((item) => String(item.academicYearId))),
+    ];
+    const [classes, sections, years] = await Promise.all([
+      AcademicClassModel.find({
+        _id: { $in: classIds.map(oid) },
+        organizationId: oid(organizationId),
+      })
+        .select({ _id: 1, name: 1, campusId: 1 })
+        .lean(),
+      AcademicSectionModel.find({
+        _id: { $in: sectionIds.map(oid) },
+        organizationId: oid(organizationId),
+      })
+        .select({ _id: 1, name: 1, classId: 1 })
+        .lean(),
+      AcademicYearModel.find({
+        _id: { $in: yearIds.map(oid) },
+        organizationId: oid(organizationId),
+        status: 'active',
+      })
+        .select({ _id: 1, name: 1 })
+        .lean(),
+    ]);
+    const campusIds = [
+      ...new Set(classes.map((item) => String(item.campusId))),
+    ];
+    const campuses = await CampusModel.find({
+      _id: { $in: campusIds.map(oid) },
+      organizationId: oid(organizationId),
+      status: 'active',
+    })
+      .select({ _id: 1, name: 1 })
+      .lean();
+
+    const classById = new Map(classes.map((item) => [String(item._id), item]));
+    const sectionById = new Map(
+      sections.map((item) => [String(item._id), item]),
+    );
+    const yearById = new Map(years.map((item) => [String(item._id), item]));
+    const campusById = new Map(
+      campuses.map((item) => [String(item._id), item]),
+    );
+
+    return assignments.flatMap((assignment) => {
+      const classRecord = classById.get(String(assignment.classId));
+      const sectionRecord = sectionById.get(String(assignment.sectionId));
+      const yearRecord = yearById.get(String(assignment.academicYearId));
+      if (
+        !classRecord ||
+        !sectionRecord ||
+        !yearRecord ||
+        String(sectionRecord.classId) !== String(classRecord._id)
+      )
+        return [];
+      const campusId = String(classRecord.campusId);
+      const campusRecord = campusById.get(campusId);
+      if (!campusRecord) return [];
+      return [
+        {
+          id: String(assignment._id),
+          classId: String(classRecord._id),
+          className: String(classRecord.name),
+          sectionId: String(sectionRecord._id),
+          sectionName: String(sectionRecord.name),
+          academicYearId: String(yearRecord._id),
+          academicYearName: String(yearRecord.name),
+          campusId,
+          campusName: String(campusRecord.name),
+        },
+      ];
+    });
+  }
+
+  async isTeacherAssignedToSection(
+    organizationId: string,
+    userId: string,
+    input: { classId: string; sectionId: string; academicYearId: string },
+  ): Promise<boolean> {
+    const assignments = await this.listTeacherAssignmentsForUser(
+      organizationId,
+      userId,
+    );
+    return assignments.some(
+      (assignment) =>
+        assignment.classId === input.classId &&
+        assignment.sectionId === input.sectionId &&
+        assignment.academicYearId === input.academicYearId,
+    );
+  }
+
   async getClassCampus(
     organizationId: string,
     classId: string,
@@ -281,7 +419,14 @@ export class MongoAttendanceRepository implements AttendanceRepository {
         status: 'active',
         _id: { $in: studentIds },
       })
-        .select({ _id: 1, firstName: 1, lastName: 1, preferredName: 1 })
+        .select({
+          _id: 1,
+          firstName: 1,
+          lastName: 1,
+          preferredName: 1,
+          contactEmail: 1,
+          phone: 1,
+        })
         .sort({ lastName: 1, firstName: 1 })
         .lean(),
       EnrollmentModel.find({
@@ -319,6 +464,10 @@ export class MongoAttendanceRepository implements AttendanceRepository {
           ...(student.preferredName
             ? { preferredName: String(student.preferredName) }
             : {}),
+          ...(student.contactEmail
+            ? { contactEmail: String(student.contactEmail) }
+            : {}),
+          ...(student.phone ? { phone: String(student.phone) } : {}),
           ...(mark
             ? {
                 status: mark.status as StudentRosterMember['status'],

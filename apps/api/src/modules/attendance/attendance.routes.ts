@@ -92,6 +92,7 @@ function organizationContext(response: {
       organizationId: string;
       campusIds?: string[];
       role?: string;
+      userId?: string;
     };
   };
 }): AttendanceContext {
@@ -107,6 +108,7 @@ function organizationContext(response: {
     organizationId: context.organizationId,
     campusIds: context.campusIds ?? [],
     role: context.role ?? '',
+    userId: context.userId,
   };
 }
 
@@ -149,6 +151,12 @@ export function createAttendanceRouter(
     requireOrganizationRole(studentAttendanceRoles),
   ] as const;
 
+  const protectTeacherAttendance = [
+    authenticate,
+    resolveOrganization,
+    requireOrganizationRole(['teacher']),
+  ] as const;
+
   // Management & Staff Attendance: Accessible only by Admin/Managers
   const protectStaffAttendance = [
     authenticate,
@@ -157,6 +165,17 @@ export function createAttendanceRouter(
   ] as const;
 
   const base = '/:organizationId';
+
+  router.get(
+    `${base}/attendance/teacher-assignments`,
+    ...protectTeacherAttendance,
+    asyncHandler(async (_request, response) => {
+      const assignments = await service.listTeacherAssignments(
+        organizationContext(response),
+      );
+      response.status(200).json({ items: assignments });
+    }),
+  );
 
   router.get(
     `${base}/attendance/students/roster`,
@@ -179,7 +198,7 @@ export function createAttendanceRouter(
 
   router.get(
     `${base}/attendance/students/eligible`,
-    ...protectStudentAttendance,
+    ...protectStaffAttendance,
     asyncHandler(async (request, response) => {
       const query = request.query as Record<string, unknown>;
       const items = await service.listEligibleStudents(
@@ -228,7 +247,7 @@ export function createAttendanceRouter(
       const records = body.records.map((entry) => {
         const record = bodyObject(entry);
         const status = text(record.status, 'student attendance status', 20);
-        if (!['present', 'absent', 'late', 'excused'].includes(status)) {
+        if (!['present', 'absent', 'leave'].includes(status)) {
           throw new AppError(
             400,
             'VALIDATION_ERROR',

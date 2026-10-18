@@ -301,7 +301,7 @@ export function AdmissionsListPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(true);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -369,7 +369,7 @@ export function AdmissionsListPage() {
       : undefined;
 
   return (
-    <main className="page-stack student-management-page">
+    <main className="page-stack student-management-page admissions-live-page reference-live-module">
       <section className="page-heading student-page-heading">
         <div>
           <p className="eyebrow">Organization workspace</p>
@@ -428,185 +428,189 @@ export function AdmissionsListPage() {
           </button>
         </div>
 
-        {formOpen && canCreate && (
-          <section
-            className="student-form-panel panel"
-            aria-label={
-              tab === 'inquiries' ? 'Create inquiry' : 'Submit application'
-            }
-          >
-            <div className="student-detail-heading">
-              <h2>
-                {tab === 'inquiries'
-                  ? 'Create an inquiry'
-                  : 'Submit an application'}
-              </h2>
-            </div>
-            {campusError && (
-              <ErrorState
-                title="Campus choices unavailable"
-                description={campusError}
-              />
-            )}
-            {campusRequired &&
-              !campusQuery.isPending &&
-              campuses.length === 0 && (
-                <p className="form-error" role="alert">
-                  No assigned campus is available. Contact your organization
-                  administrator.
-                </p>
-              )}
-            {tab === 'inquiries' ? (
-              <InquiryForm
-                campuses={campuses}
-                campusRequired={campusRequired}
-                isSaving={createInquiry.isPending}
-                saveError={
-                  createInquiry.isError
-                    ? apiMessage(createInquiry.error)
-                    : undefined
-                }
-                onSubmit={(input) =>
-                  createInquiry.mutate(input, {
-                    onSuccess: () => {
-                      showToast('Inquiry created.');
-                      setFormOpen(false);
-                    },
-                  })
-                }
-              />
-            ) : (
-              <ApplicationForm
-                inquiries={inquiryChoices.data?.items ?? []}
-                campuses={campuses}
-                campusRequired={campusRequired}
-                isSaving={createApplication.isPending}
-                saveError={
-                  createApplication.isError
-                    ? apiMessage(createApplication.error)
-                    : undefined
-                }
-                onSubmit={(input) =>
-                  createApplication.mutate(input, {
-                    onSuccess: () => {
-                      showToast('Application submitted.');
-                      setFormOpen(false);
-                      setTab('applications');
-                    },
-                  })
-                }
-              />
-            )}
-            {tab === 'applications' && inquiryChoices.isPending && (
-              <LoadingState message="Loading inquiry choices…" />
-            )}
-            {tab === 'applications' && inquiryChoices.isError && (
-              <ErrorState
-                title="Inquiry choices unavailable"
-                description={apiMessage(inquiryChoices.error)}
-                onRetry={() => void inquiryChoices.refetch()}
-              />
-            )}
-          </section>
-        )}
-
-        <div className="student-filters">
-          <label className="student-search-field">
-            <span>
-              {tab === 'applications' && formOpen
-                ? 'Search applications or linked inquiries'
-                : `Search ${tab}`}
-            </span>
-            <input
-              aria-label={`Search ${tab}`}
-              autoComplete="off"
-              onChange={(event) => {
-                setSearchInput(event.target.value);
-                setPage(1);
-              }}
-              placeholder="Search by applicant name or contact"
-              type="search"
-              value={searchInput}
-            />
-          </label>
-          <label className="student-status-filter">
-            <span>Status</span>
-            <select
-              aria-label="Filter by status"
-              onChange={(event) => {
-                setStatus(event.target.value);
-                setPage(1);
-              }}
-              value={status}
+        <div className="admissions-live-content">
+          {formOpen && canCreate && (
+            <section
+              className="student-form-panel panel"
+              aria-label={
+                tab === 'inquiries' ? 'Create inquiry' : 'Submit application'
+              }
             >
-              {(tab === 'inquiries'
-                ? inquiryStatuses
-                : applicationStatuses
-              ).map((option) => (
-                <option key={option.value || 'all'} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        {tab === 'inquiries' ? (
-          inquiries.isPending ? (
-            <LoadingState message="Loading inquiries…" />
-          ) : inquiries.isError ? (
-            <ErrorState
-              title="Could not load inquiries"
-              description={apiMessage(inquiries.error)}
-              onRetry={() => void inquiries.refetch()}
-            />
-          ) : (
-            <>
-              {inquiries.data.items.length === 0 && (search || status) ? (
-                <EmptyState title="No inquiries match these filters" />
-              ) : (
-                <InquiryTable
-                  canReview={canReview}
-                  campuses={campuses}
-                  organizationId={organizationId}
-                  rows={inquiries.data.items}
+              <div className="student-detail-heading">
+                <h2>
+                  {tab === 'inquiries'
+                    ? 'Create an inquiry'
+                    : 'Submit an application'}
+                </h2>
+              </div>
+              {campusError && (
+                <ErrorState
+                  title="Campus choices unavailable"
+                  description={campusError}
                 />
               )}
-              <Pagination
-                currentPage={inquiries.data.page}
-                pageSize={inquiries.data.pageSize}
-                totalItems={inquiries.data.total}
-                onPageChange={setPage}
+              {campusRequired &&
+                !campusQuery.isPending &&
+                campuses.length === 0 && (
+                  <p className="form-error" role="alert">
+                    No assigned campus is available. Contact your organization
+                    administrator.
+                  </p>
+                )}
+              {tab === 'inquiries' ? (
+                <InquiryForm
+                  campuses={campuses}
+                  campusRequired={campusRequired}
+                  isSaving={createInquiry.isPending}
+                  saveError={
+                    createInquiry.isError
+                      ? apiMessage(createInquiry.error)
+                      : undefined
+                  }
+                  onSubmit={(input) =>
+                    createInquiry.mutate(input, {
+                      onSuccess: () => {
+                        showToast('Inquiry created.');
+                        setFormOpen(false);
+                      },
+                    })
+                  }
+                />
+              ) : (
+                <ApplicationForm
+                  inquiries={inquiryChoices.data?.items ?? []}
+                  campuses={campuses}
+                  campusRequired={campusRequired}
+                  isSaving={createApplication.isPending}
+                  saveError={
+                    createApplication.isError
+                      ? apiMessage(createApplication.error)
+                      : undefined
+                  }
+                  onSubmit={(input) =>
+                    createApplication.mutate(input, {
+                      onSuccess: () => {
+                        showToast('Application submitted.');
+                        setFormOpen(false);
+                        setTab('applications');
+                      },
+                    })
+                  }
+                />
+              )}
+              {tab === 'applications' && inquiryChoices.isPending && (
+                <LoadingState message="Loading inquiry choices…" />
+              )}
+              {tab === 'applications' && inquiryChoices.isError && (
+                <ErrorState
+                  title="Inquiry choices unavailable"
+                  description={apiMessage(inquiryChoices.error)}
+                  onRetry={() => void inquiryChoices.refetch()}
+                />
+              )}
+            </section>
+          )}
+
+          <div className="admissions-live-records">
+            <div className="student-filters">
+              <label className="student-search-field">
+                <span>
+                  {tab === 'applications' && formOpen
+                    ? 'Search applications or linked inquiries'
+                    : `Search ${tab}`}
+                </span>
+                <input
+                  aria-label={`Search ${tab}`}
+                  autoComplete="off"
+                  onChange={(event) => {
+                    setSearchInput(event.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="Search by applicant name or contact"
+                  type="search"
+                  value={searchInput}
+                />
+              </label>
+              <label className="student-status-filter">
+                <span>Status</span>
+                <select
+                  aria-label="Filter by status"
+                  onChange={(event) => {
+                    setStatus(event.target.value);
+                    setPage(1);
+                  }}
+                  value={status}
+                >
+                  {(tab === 'inquiries'
+                    ? inquiryStatuses
+                    : applicationStatuses
+                  ).map((option) => (
+                    <option key={option.value || 'all'} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {tab === 'inquiries' ? (
+              inquiries.isPending ? (
+                <LoadingState message="Loading inquiries…" />
+              ) : inquiries.isError ? (
+                <ErrorState
+                  title="Could not load inquiries"
+                  description={apiMessage(inquiries.error)}
+                  onRetry={() => void inquiries.refetch()}
+                />
+              ) : (
+                <>
+                  {inquiries.data.items.length === 0 && (search || status) ? (
+                    <EmptyState title="No inquiries match these filters" />
+                  ) : (
+                    <InquiryTable
+                      canReview={canReview}
+                      campuses={campuses}
+                      organizationId={organizationId}
+                      rows={inquiries.data.items}
+                    />
+                  )}
+                  <Pagination
+                    currentPage={inquiries.data.page}
+                    pageSize={inquiries.data.pageSize}
+                    totalItems={inquiries.data.total}
+                    onPageChange={setPage}
+                  />
+                </>
+              )
+            ) : applications.isPending ? (
+              <LoadingState message="Loading applications…" />
+            ) : applications.isError ? (
+              <ErrorState
+                title="Could not load applications"
+                description={apiMessage(applications.error)}
+                onRetry={() => void applications.refetch()}
               />
-            </>
-          )
-        ) : applications.isPending ? (
-          <LoadingState message="Loading applications…" />
-        ) : applications.isError ? (
-          <ErrorState
-            title="Could not load applications"
-            description={apiMessage(applications.error)}
-            onRetry={() => void applications.refetch()}
-          />
-        ) : (
-          <>
-            {applications.data.items.length === 0 && (search || status) ? (
-              <EmptyState title="No applications match these filters" />
             ) : (
-              <ApplicationTable
-                campuses={campuses}
-                organizationId={organizationId}
-                rows={applications.data.items}
-              />
+              <>
+                {applications.data.items.length === 0 && (search || status) ? (
+                  <EmptyState title="No applications match these filters" />
+                ) : (
+                  <ApplicationTable
+                    campuses={campuses}
+                    organizationId={organizationId}
+                    rows={applications.data.items}
+                  />
+                )}
+                <Pagination
+                  currentPage={applications.data.page}
+                  pageSize={applications.data.pageSize}
+                  totalItems={applications.data.total}
+                  onPageChange={setPage}
+                />
+              </>
             )}
-            <Pagination
-              currentPage={applications.data.page}
-              pageSize={applications.data.pageSize}
-              totalItems={applications.data.total}
-              onPageChange={setPage}
-            />
-          </>
-        )}
+          </div>
+        </div>
       </section>
     </main>
   );
