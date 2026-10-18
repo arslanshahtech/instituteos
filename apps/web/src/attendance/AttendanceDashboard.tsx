@@ -43,6 +43,7 @@ const managerRoles = [
 const studentStatuses: StudentAttendanceStatus[] = [
   'present',
   'absent',
+  'late',
   'leave',
 ];
 const staffStatuses: StaffAttendanceStatus[] = [
@@ -434,7 +435,7 @@ export function AttendanceDashboard() {
   );
 
   return (
-    <main className="page-stack attendance-page reference-attendance-page">
+    <main className="page-stack attendance-page reference-attendance-page reference-live-module">
       <section className="page-heading attendance-page-heading">
         <div>
           <h1>

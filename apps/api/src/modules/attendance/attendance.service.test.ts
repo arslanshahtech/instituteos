@@ -80,6 +80,29 @@ describe('AttendanceService', () => {
     );
   });
 
+  it('accepts Late as a valid student attendance status', async () => {
+    const repo = repository();
+    const service = new AttendanceService(repo);
+
+    await service.saveStudentAttendance(context, {
+      ...baseBulkInput,
+      records: [
+        { studentId, status: 'late' },
+        { studentId: anotherStudentId, status: 'present' },
+      ],
+    });
+
+    expect(repo.saveStudentAttendance).toHaveBeenCalledWith(
+      organizationId,
+      expect.objectContaining({
+        records: [
+          { studentId, status: 'late' },
+          { studentId: anotherStudentId, status: 'present' },
+        ],
+      }),
+    );
+  });
+
   it('lets a teacher take attendance only for an assigned section', async () => {
     const repo = repository({
       isTeacherAssignedToSection: vi.fn().mockResolvedValue(true),

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { ReactNode } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import { Download, ReceiptText, WalletCards, BadgePercent } from 'lucide-react';
 import { Button } from '../components/ui/Button.js';
 import { DataTable } from '../components/ui/DataTable.js';
 import { Dialog } from '../components/ui/Dialog.js';
@@ -56,6 +57,41 @@ function today() {
 
 function amountText(value: number) {
   return value.toFixed(2);
+}
+
+function csvCell(value: string | number) {
+  const text = String(value);
+  const safeText = /^[=+\-@\t\r]/.test(text) ? "'" + text : text;
+  return '"' + safeText.replaceAll('"', '""') + '"';
+}
+
+function exportInvoiceResults(
+  invoices: StudentInvoice[],
+  classes: AcademicClass[],
+  campuses: { id: string; name: string }[],
+) {
+  const rows = [
+    ['Invoice', 'Student', 'Class', 'Campus', 'Due date', 'Total (PKR)', 'Paid (PKR)', 'Due (PKR)', 'Status'],
+    ...invoices.map((invoice) => [
+      invoice.invoiceNumber,
+      invoice.studentName,
+      className(invoice.classId, classes),
+      campusName(invoice.campusId, campuses),
+      invoice.dueDate.slice(0, 10),
+      amountText(invoice.totalAmount),
+      amountText(invoice.paidAmount),
+      amountText(Math.max(0, invoice.totalAmount - invoice.paidAmount)),
+      statusLabels[invoice.status],
+    ]),
+  ];
+  const csv = rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'instituteos-fee-ledger-' + today() + '.csv';
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 function campusName(id: string, campuses: { id: string; name: string }[]) {
@@ -206,6 +242,8 @@ function handlePrintReceipt(invoice: StudentInvoice, classNameText: string) {
 
 export function FinanceDashboard() {
   const { organizationId = '' } = useParams();
+  const location = useLocation();
+  const roleBase = location.pathname.startsWith('/accountant') ? '/accountant' : '/admin';
   const access = useOrganizationAccess(organizationId);
   const canRead = access.data?.permissions.includes('finance.read') ?? false;
   const canWrite = access.data?.permissions.includes('finance.write') ?? false;
@@ -239,6 +277,10 @@ export function FinanceDashboard() {
   );
   const feeStructures = finance.feeStructures.data?.items ?? [];
   const invoices = finance.invoices.data?.items ?? [];
+  const collectedTotal = invoices.reduce((sum, invoice) => sum + invoice.paidAmount, 0);
+  const pendingTotal = invoices.reduce((sum, invoice) => sum + Math.max(0, invoice.totalAmount - invoice.paidAmount), 0);
+  const discountsTotal = invoices.reduce((sum, invoice) => sum + (invoice.discountAmount ?? 0), 0);
+  const discountedInvoiceCount = invoices.filter((invoice) => (invoice.discountAmount ?? 0) > 0).length;
   const saveStructure = useSaveFeeStructure(organizationId);
   const deleteStructure = useDeleteFeeStructure(organizationId);
   const generateInvoices = useGenerateInvoices(organizationId);
@@ -549,16 +591,46 @@ export function FinanceDashboard() {
   }
 
   return (
-    <main className="finance-page">
-      <header className="page-heading finance-page-heading">
+    <main className="finance-page reference-live-module">
+      <header className="page-heading finance-page-heading reference-dashboard-heading">
         <div>
           <p className="eyebrow">Organization workspace</p>
           <h1>Fee & financial management</h1>
           <p className="page-description">
-            Set fee schedules, generate student invoices, and record collections.
+            Review collections, outstanding dues, concessions and student fee records.
           </p>
         </div>
+        <Link className="reference-quick-action" to={`${roleBase}/organizations/${encodeURIComponent(organizationId)}/concessions`}>
+          Manage concessions
+        </Link>
       </header>
+
+      <section className="reference-metrics-grid finance-overview-metrics" aria-label="Finance summary">
+        <article className="reference-metric-card">
+          <div className="admin-metric-heading">
+            <span className="reference-metric-icon"><WalletCards size={16} aria-hidden="true" /></span>
+            <span className="reference-metric-label">Collected fees</span>
+          </div>
+          <strong>{canRead && !finance.invoices.isPending ? `Rs ${collectedTotal.toLocaleString('en-PK')}` : '—'}</strong>
+          <small>Across current invoice results</small>
+        </article>
+        <article className="reference-metric-card">
+          <div className="admin-metric-heading">
+            <span className="reference-metric-icon"><ReceiptText size={16} aria-hidden="true" /></span>
+            <span className="reference-metric-label">Pending balance</span>
+          </div>
+          <strong>{canRead && !finance.invoices.isPending ? `Rs ${pendingTotal.toLocaleString('en-PK')}` : '—'}</strong>
+          <small>Remaining balance in current results</small>
+        </article>
+        <article className="reference-metric-card">
+          <div className="admin-metric-heading">
+            <span className="reference-metric-icon"><BadgePercent size={16} aria-hidden="true" /></span>
+            <span className="reference-metric-label">Discounts applied</span>
+          </div>
+          <strong>{canRead && !finance.invoices.isPending ? `Rs ${discountsTotal.toLocaleString('en-PK')}` : '—'}</strong>
+          <small>{discountedInvoiceCount} invoices with a discount applied</small>
+        </article>
+      </section>
 
       <label className="finance-mobile-tab-switcher">
         <span className="visually-hidden">Finance view</span>
@@ -604,10 +676,15 @@ export function FinanceDashboard() {
         <section className="finance-section" aria-label="Invoices and billing">
           <div className="finance-section-heading">
             <div>
-              <h2>Student invoices</h2>
-              <p>Review balances and record payments against an invoice.</p>
+              <h2>Fee ledger</h2>
+              <p>Review balances, collect payments and export the current filtered results.</p>
             </div>
-            <span className="finance-result-count">{invoices.length} invoices</span>
+            <div className="finance-section-heading-actions">
+              <Button disabled={!invoices.length} onClick={() => exportInvoiceResults(invoices, classes, campuses)} type="button" variant="quiet">
+                <Download size={14} aria-hidden="true" /> Export
+              </Button>
+              <span className="finance-result-count">{invoices.length} invoices</span>
+            </div>
           </div>
           <div className="finance-filter-grid">
             <FinanceField label="Campus">

@@ -19,7 +19,7 @@ import { Link, Navigate, useLocation, useParams } from 'react-router-dom';
 import { useOutletContext } from 'react-router-dom';
 import type { RoleLayoutConfig } from '../layouts/layoutTypes.js';
 
-type DemoAttendanceStatus = 'Present' | 'Absent' | 'Leave';
+type DemoAttendanceStatus = 'Present' | 'Absent' | 'Late' | 'Leave';
 
 const demoStudents = [
   {
@@ -134,7 +134,7 @@ const initialAttendance: Array<{
   { name: 'Ishita Verma', roll: 'Roll 12', status: 'Present' },
   { name: 'Kabir Khan', roll: 'Roll 05', status: 'Absent' },
   { name: 'Ananya Gupta', roll: 'Roll 02', status: 'Present' },
-  { name: 'Reyansh Patel', roll: 'Roll 19', status: 'Leave' },
+  { name: 'Reyansh Patel', roll: 'Roll 19', status: 'Late' },
   { name: 'Saanvi Mehta', roll: 'Roll 07', status: 'Present' },
 ];
 
@@ -588,7 +588,7 @@ export function RoleDemoModulePage() {
                     </td>
                     <td colSpan={3}>
                       <div className="reference-attendance-options">
-                        {(['Present', 'Absent', 'Leave'] as const).map(
+                        {(['Present', 'Absent', 'Late', 'Leave'] as const).map(
                           (status) => (
                             <button
                               className={

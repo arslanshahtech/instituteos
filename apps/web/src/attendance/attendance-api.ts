@@ -12,7 +12,7 @@ export interface TeacherAttendanceAssignment {
   campusName: string;
 }
 
-export type StudentAttendanceStatus = 'present' | 'absent' | 'leave';
+export type StudentAttendanceStatus = 'present' | 'absent' | 'leave' | 'late';
 export type StaffAttendanceStatus =
   'present' | 'absent' | 'half-day' | 'on-leave';
 

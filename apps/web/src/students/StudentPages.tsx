@@ -167,7 +167,7 @@ export function StudentsListPage() {
       onRetry={() => void access.refetch()}
       requiredPermission="student.read"
     >
-      <main className="page-stack student-management-page">
+      <main className="page-stack student-management-page reference-live-module">
         <StudentPageHeading
           action={
             <>
@@ -344,7 +344,7 @@ export function StudentCreatePage() {
       onRetry={() => void access.refetch()}
       requiredPermission="student.create"
     >
-      <main className="page-stack student-management-page">
+      <main className="page-stack student-management-page reference-live-module">
         <StudentPageHeading
           description="Add a student record to this organization."
           organizationId={organizationId}
@@ -408,7 +408,7 @@ export function StudentDetailPage() {
   const canUpdate = access.data.permissions.includes('student.update');
 
   return (
-    <main className="page-stack student-management-page">
+    <main className="page-stack student-management-page reference-live-module">
       <StudentPageHeading
         action={
           <>
@@ -571,7 +571,7 @@ export function StudentEditPage() {
           onRetry={() => void student.refetch()}
         />
       ) : (
-        <main className="page-stack student-management-page">
+        <main className="page-stack student-management-page reference-live-module">
           <StudentPageHeading
             description="Update the student's record."
             organizationId={organizationId}

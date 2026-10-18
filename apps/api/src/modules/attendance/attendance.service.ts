@@ -15,6 +15,7 @@ const studentStatuses: readonly StudentAttendanceStatus[] = [
   'present',
   'absent',
   'leave',
+  'late',
 ];
 const staffStatuses = ['present', 'absent', 'half-day', 'on-leave'] as const;
 

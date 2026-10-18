@@ -27,6 +27,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { ApiError } from '../../api/client.js';
+import { WorkspaceMetricCard } from '../../components/ui/WorkspacePrimitives.js';
 import { listApplications } from '../../admissions/admissions-api.js';
 import type { ApplicationRecord } from '../../admissions/admissions-api.js';
 import { listStudentAttendance } from '../../attendance/attendance-api.js';
@@ -714,38 +715,57 @@ export function OrganizationAdminPage() {
             className="organization-heading-actions organization-dashboard-actions reference-quick-actions"
             role="group"
           >
-            {access.data.permissions.includes('student.create') && (
-              <Link
-                className="organization-dashboard-action reference-quick-action"
-                to={`${organizationPath}/students/new`}
-              >
-                <UserPlus size={15} aria-hidden="true" /> Add Student
-              </Link>
-            )}
-            {access.data.permissions.includes('finance.write') && (
-              <Link
-                className="organization-dashboard-action reference-quick-action"
-                to={`${organizationPath}/finance`}
-              >
-                <WalletCards size={15} aria-hidden="true" /> Collect Fee
-              </Link>
-            )}
-            {access.data.permissions.includes('attendance.write') && (
-              <Link
-                className="organization-dashboard-action reference-quick-action"
-                to={`${organizationPath}/attendance`}
-              >
-                <CalendarCheck size={15} aria-hidden="true" /> Mark Attendance
-              </Link>
-            )}
-            {access.data.permissions.includes('reporting.read') && (
-              <Link
-                className="organization-dashboard-action reference-quick-action"
-                to={`${organizationPath}/reports`}
-              >
-                <BarChart3 size={15} aria-hidden="true" /> Generate Report
-              </Link>
-            )}
+            {(
+              [
+                {
+                  label: 'Add Student',
+                  to: `${organizationPath}/students/new`,
+                  permission: 'student.create',
+                  icon: UserPlus,
+                },
+                {
+                  label: 'Collect Fee',
+                  to: `${organizationPath}/finance`,
+                  permission: 'finance.write',
+                  icon: WalletCards,
+                },
+                {
+                  label: 'Mark Attendance',
+                  to: `${organizationPath}/attendance`,
+                  permission: 'attendance.write',
+                  icon: CalendarCheck,
+                },
+                {
+                  label: 'Generate Report',
+                  to: `${organizationPath}/reports`,
+                  permission: 'reporting.read',
+                  icon: BarChart3,
+                },
+              ] as const
+            ).map((action) => {
+              const Icon = action.icon;
+              const permitted = access.data.permissions.includes(
+                action.permission,
+              );
+              return permitted ? (
+                <Link
+                  className="organization-dashboard-action reference-quick-action"
+                  key={action.label}
+                  to={action.to}
+                >
+                  <Icon size={15} aria-hidden="true" /> {action.label}
+                </Link>
+              ) : (
+                <span
+                  aria-disabled="true"
+                  className="organization-dashboard-action reference-quick-action is-unavailable"
+                  key={action.label}
+                  title={`Your current role does not have permission to: ${action.label.toLowerCase()}.`}
+                >
+                  <Icon size={15} aria-hidden="true" /> {action.label}
+                </span>
+              );
+            })}
           </div>
         )}
       </section>
@@ -977,95 +997,57 @@ function OverviewPanel({
       aria-label="College overview"
     >
       <div className="admin-metrics-grid reference-metrics-grid">
-        <article className="admin-metric-card reference-metric-card">
-          <div className="admin-metric-heading">
-            <span>Active students</span>
-            <span className="admin-metric-icon reference-metric-icon">
-              <Users size={18} aria-hidden="true" />
-            </span>
-          </div>
-          <strong>
-            {totals ? totals.activeStudentCount.toLocaleString('en-PK') : '—'}
-          </strong>
-          <p>Currently enrolled learners</p>
-        </article>
-        <article className="admin-metric-card reference-metric-card">
-          <div className="admin-metric-heading">
-            <span>Staff &amp; teachers</span>
-            <span className="admin-metric-icon reference-metric-icon">
-              <GraduationCap size={18} aria-hidden="true" />
-            </span>
-          </div>
-          <strong>
-            {totals ? totals.activeStaffCount.toLocaleString('en-PK') : '—'}
-          </strong>
-          <p>Active college staff</p>
-        </article>
-        <article className="admin-metric-card reference-metric-card">
-          <div className="admin-metric-heading">
-            <span>Guardians</span>
-            <span className="admin-metric-icon reference-metric-icon">
-              <UserCheck size={18} aria-hidden="true" />
-            </span>
-          </div>
-          <strong>
-            {guardians.data
-              ? guardians.data.total.toLocaleString('en-PK')
-              : '—'}
-          </strong>
-          <p>Guardian records in your college</p>
-        </article>
-        <article className="admin-metric-card reference-metric-card">
-          <div className="admin-metric-heading">
-            <span>Monthly collection</span>
-            <span className="admin-metric-icon reference-metric-icon">
-              <ReceiptText size={18} aria-hidden="true" />
-            </span>
-          </div>
-          <strong>
-            {monthlyCollections.isPending || monthlyCollections.isError
+        {[
+          {
+            label: 'Active students',
+            value: totals ? totals.activeStudentCount.toLocaleString('en-PK') : '—',
+            detail: 'Currently enrolled learners',
+            icon: Users,
+          },
+          {
+            label: 'Staff & teachers',
+            value: totals ? totals.activeStaffCount.toLocaleString('en-PK') : '—',
+            detail: 'Active college staff',
+            icon: GraduationCap,
+          },
+          {
+            label: 'Guardians',
+            value: guardians.data ? guardians.data.total.toLocaleString('en-PK') : '—',
+            detail: 'Guardian records in your college',
+            icon: UserCheck,
+          },
+          {
+            label: 'Monthly collection',
+            value: monthlyCollections.isPending || monthlyCollections.isError
               ? '—'
-              : formatPKR(monthlyCollectionTotal)}
-          </strong>
-          <p>
-            {monthlyCollections.isError
+              : formatPKR(monthlyCollectionTotal),
+            detail: monthlyCollections.isError
               ? 'Monthly receipts unavailable'
-              : `${collectionRange.dateFrom} to ${collectionRange.dateTo}`}
-          </p>
-        </article>
-        <article className="admin-metric-card reference-metric-card">
-          <div className="admin-metric-heading">
-            <span>Outstanding dues</span>
-            <span className="admin-metric-icon admin-metric-icon-warning reference-metric-icon">
-              <WalletCards size={18} aria-hidden="true" />
-            </span>
-          </div>
-          <strong>{formatPKR(totals?.finance.totalPending)}</strong>
-          <p>
-            {totals
+              : `${collectionRange.dateFrom} to ${collectionRange.dateTo}`,
+            icon: ReceiptText,
+          },
+          {
+            label: 'Outstanding dues',
+            value: formatPKR(totals?.finance.totalPending),
+            detail: totals
               ? 'Overdue: ' + formatPKR(totals.finance.totalOverdue)
-              : 'Dues load from college finance records'}
-          </p>
-        </article>
-        <article className="admin-metric-card reference-metric-card">
-          <div className="admin-metric-heading">
-            <span>Today’s attendance</span>
-            <span className="admin-metric-icon reference-metric-icon">
-              <CalendarCheck size={18} aria-hidden="true" />
-            </span>
-          </div>
-          <strong>
-            {typeof totals?.attendance.todayAttendanceRate === 'number'
+              : 'Dues load from college finance records',
+            icon: WalletCards,
+            className: 'admin-metric-card',
+          },
+          {
+            label: 'Today’s attendance',
+            value: typeof totals?.attendance.todayAttendanceRate === 'number'
               ? String(totals.attendance.todayAttendanceRate) + '%'
-              : '—'}
-          </strong>
-          <p>
-            {totals
-              ? String(totals.attendance.recordsCount.toLocaleString('en-PK')) +
-                ' attendance records'
-              : 'Attendance summary'}
-          </p>
-        </article>
+              : '—',
+            detail: totals
+              ? String(totals.attendance.recordsCount.toLocaleString('en-PK')) + ' attendance records'
+              : 'Attendance summary',
+            icon: CalendarCheck,
+          },
+        ].map((metric) => (
+          <WorkspaceMetricCard key={metric.label} metric={metric} />
+        ))}
       </div>
       <div className="admin-overview-bottom reference-dashboard-bottom">
         <section

@@ -14,6 +14,69 @@
   margin-bottom: 0;
 }
 
+.finance-page.reference-live-module {
+  gap: 12px;
+}
+
+.finance-overview-metrics {
+  gap: 10px;
+}
+
+.finance-overview-metrics .reference-metric-card {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 7px;
+  border: 1px solid #e9e7e3;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px 13px;
+}
+
+.finance-overview-metrics .admin-metric-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.finance-overview-metrics .reference-metric-label {
+  color: #85817b;
+  font-size: 8px;
+  font-weight: 650;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.finance-overview-metrics .reference-metric-card > strong {
+  overflow-wrap: anywhere;
+  color: #161616;
+  font-size: clamp(18px, 1.8vw, 24px);
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  line-height: 1.12;
+}
+
+.finance-overview-metrics .reference-metric-card > small {
+  color: #8e8a84;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.finance-section-heading-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .finance-section-heading-actions {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
 /* Tabs Base */
 .finance-tabs {
   display: flex;

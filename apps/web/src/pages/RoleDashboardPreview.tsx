@@ -13,6 +13,11 @@ import {
   WalletCards,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import {
+  WorkspaceMetricCard,
+  WorkspacePageHeading,
+  WorkspaceQuickAction,
+} from '../components/ui/WorkspacePrimitives.js';
 import type { RoleLayoutConfig } from '../layouts/layoutTypes.js';
 
 type PreviewMetric = {
@@ -473,68 +478,48 @@ export function RoleDashboardPreview({
 
   return (
     <main className="page-stack role-dashboard reference-dashboard-preview">
-      <section className="page-heading reference-dashboard-heading">
-        <div>
-          <p className="eyebrow">
-            {role === 'admin'
-              ? 'Admin view'
-              : role === 'accountant'
-                ? 'Finance view'
-                : role === 'parent'
-                  ? 'Parent view'
-                  : role === 'teacher'
-                    ? 'Teacher view'
-                    : 'Student view'}
-          </p>
-          <h1>{config.title}</h1>
-          <p className="page-description">{config.description}</p>
-          {userName && (
-            <p className="reference-dashboard-greeting">
-              Previewing for {userName}
-            </p>
-          )}
-        </div>
-        <span className="reference-preview-note">
-          LAYOUT PREVIEW · SAMPLE DATA
-        </span>
-      </section>
+      <WorkspacePageHeading
+        eyebrow={
+          role === 'admin'
+            ? 'Admin view'
+            : role === 'accountant'
+              ? 'Finance view'
+              : role === 'parent'
+                ? 'Parent view'
+                : role === 'teacher'
+                  ? 'Teacher view'
+                  : 'Student view'
+        }
+        title={config.title}
+        description={config.description}
+        aside={
+          <span className="reference-preview-note">
+            LAYOUT PREVIEW · SAMPLE DATA
+          </span>
+        }
+      />
+      {userName && (
+        <p className="reference-dashboard-greeting">
+          Previewing for {userName}
+        </p>
+      )}
 
       <nav
         aria-label="Dashboard quick actions"
         className="reference-quick-actions"
       >
-        {config.actions.map((action) => {
-          const Icon = action.icon;
-          return (
-            <Link
-              className="reference-quick-action"
-              key={action.label}
-              to={action.to}
-            >
-              <Icon size={14} aria-hidden="true" />
-              {action.label}
-            </Link>
-          );
-        })}
+        {config.actions.map((action) => (
+          <WorkspaceQuickAction key={action.label} {...action} />
+        ))}
       </nav>
 
       <section
         aria-label="Sample dashboard metrics"
         className="reference-metrics-grid"
       >
-        {config.metrics.map((metric) => {
-          const Icon = metric.icon;
-          return (
-            <article className="reference-metric-card" key={metric.label}>
-              <div className="reference-metric-icon">
-                <Icon size={15} aria-hidden="true" />
-              </div>
-              <span className="reference-metric-label">{metric.label}</span>
-              <strong>{metric.value}</strong>
-              <small>{metric.detail}</small>
-            </article>
-          );
-        })}
+        {config.metrics.map((metric) => (
+          <WorkspaceMetricCard key={metric.label} metric={metric} />
+        ))}
       </section>
 
       <div className="reference-dashboard-bottom">

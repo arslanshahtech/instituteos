@@ -2558,6 +2558,11 @@
   background: #e0f2fe;
   color: #075985;
 }
+.reference-attendance-option.is-late {
+  border-color: #e79a12;
+  background: #f5a900;
+  color: #fff;
+}
 .reference-form-footer {
   display: flex;
   align-items: center;
@@ -4363,6 +4368,21 @@
   background: #303030;
 }
 
+.organization-admin-page
+  .organization-dashboard-action.reference-quick-action.is-unavailable {
+  border-color: #d9d6d0;
+  background: #eeece8;
+  color: #85817b;
+  cursor: not-allowed;
+  opacity: 0.9;
+}
+
+.organization-admin-page
+  .organization-dashboard-action.reference-quick-action.is-unavailable:hover {
+  transform: none;
+  background: #eeece8;
+}
+
 .organization-overview.admin-dashboard.reference-dashboard-preview {
   gap: 12px;
 }
@@ -4680,6 +4700,13 @@
   border-color: #0284c7;
   background: #e0f2fe;
   color: #075985;
+}
+
+.reference-attendance-page
+  .attendance-status-choice.reference-attendance-option.is-late {
+  border-color: #e79a12;
+  background: #f5a900;
+  color: #fff;
 }
 
 .reference-attendance-page .attendance-save-row .button {

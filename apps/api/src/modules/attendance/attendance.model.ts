@@ -31,7 +31,12 @@ const studentAttendanceSchema = new Schema(
     date: { type: Date, required: true },
     status: {
       type: String,
-      enum: ['present', 'absent', 'leave'] satisfies StudentAttendanceStatus[],
+      enum: [
+        'present',
+        'absent',
+        'leave',
+        'late',
+      ] satisfies StudentAttendanceStatus[],
       required: true,
     },
     remarks: { type: String, trim: true, maxlength: 500 },

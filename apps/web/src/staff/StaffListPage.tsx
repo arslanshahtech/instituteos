@@ -61,7 +61,7 @@ export function StaffListPage() {
       requiredPermission="staff.read"
     >
       {(organizationAccess) => (
-        <main className="page-stack student-management-page staff-management-page">
+        <main className="page-stack student-management-page staff-management-page reference-live-module">
           <StaffHeading
             action={
               canCreate ? (

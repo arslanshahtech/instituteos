@@ -662,6 +662,34 @@ describe('frontend application foundation', () => {
     });
   });
 
+  it('keeps all four overview quick actions visible but disables actions without permission', async () => {
+    tenancyMocks.getOrganizationAccessContext.mockResolvedValueOnce({
+      organizationId: '650000000000000000000001',
+      role: 'organization_owner',
+      permissions: ['organization.read'],
+      campusIds: [],
+    });
+
+    renderPath('/admin/organizations/650000000000000000000001');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Institute Overview' }),
+    ).toBeInTheDocument();
+
+    for (const action of [
+      'Add Student',
+      'Collect Fee',
+      'Mark Attendance',
+      'Generate Report',
+    ]) {
+      const actionLabel = screen.getByText(action);
+      expect(actionLabel.closest('[aria-disabled="true"]')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('link', { name: action }),
+      ).not.toBeInTheDocument();
+    }
+  });
+
   it('lists accessible organizations with open and create actions', async () => {
     organizationMocks.getAccessibleOrganizations.mockResolvedValueOnce({
       organizations: [

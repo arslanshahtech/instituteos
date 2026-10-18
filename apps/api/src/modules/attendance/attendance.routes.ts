@@ -247,7 +247,7 @@ export function createAttendanceRouter(
       const records = body.records.map((entry) => {
         const record = bodyObject(entry);
         const status = text(record.status, 'student attendance status', 20);
-        if (!['present', 'absent', 'leave'].includes(status)) {
+        if (!['present', 'absent', 'leave', 'late'].includes(status)) {
           throw new AppError(
             400,
             'VALIDATION_ERROR',

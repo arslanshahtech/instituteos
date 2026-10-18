@@ -135,7 +135,7 @@ export function GuardiansListPage() {
   return (
     <GuardianAccess organizationId={organizationId} permission="guardian.read">
       {() => (
-        <main className="page-stack student-management-page">
+        <main className="page-stack student-management-page reference-live-module">
           <GuardianHeading
             action={
               canCreate ? (
@@ -291,7 +291,7 @@ export function GuardianCreatePage() {
       permission="guardian.create"
     >
       {() => (
-        <main className="page-stack student-management-page">
+        <main className="page-stack student-management-page reference-live-module">
           <GuardianHeading
             description="Add a guardian contact record to this organization."
             organizationId={organizationId}
@@ -356,7 +356,7 @@ export function GuardianDetailPage() {
   const record = guardian.data.guardian;
   const canUpdate = access.data.permissions.includes('guardian.update');
   return (
-    <main className="page-stack student-management-page">
+    <main className="page-stack student-management-page reference-live-module">
       <GuardianHeading
         action={
           canUpdate ? (
@@ -464,7 +464,7 @@ export function GuardianEditPage() {
             onRetry={() => void guardian.refetch()}
           />
         ) : (
-          <main className="page-stack student-management-page">
+          <main className="page-stack student-management-page reference-live-module">
             <GuardianHeading
               description="Update guardian contact information."
               organizationId={organizationId}
