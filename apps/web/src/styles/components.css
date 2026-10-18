@@ -20,10 +20,11 @@
 .page-heading h1 {
   margin: 0;
   color: var(--color-ink);
-  font-size: clamp(25px, 3.4vw, 32px);
-  font-weight: 650;
-  letter-spacing: -0.04em;
-  line-height: 1.15;
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: clamp(28px, 3.4vw, 34px);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 0.98;
 }
 .page-description {
   max-width: 680px;
@@ -2378,6 +2379,23 @@
   border-color: #c9c6bf;
   background: #fcfbf9;
 }
+.reference-student-card > strong {
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+.reference-student-card > small {
+  font-size: 11px;
+  line-height: 1.4;
+}
+.reference-student-card-bottom {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 10px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.reference-student-card-bottom b {
+  font-size: 10px;
+}
 .reference-student-card-top {
   display: flex;
   align-items: center;
@@ -2476,8 +2494,29 @@
 }
 .reference-staff-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
+  gap: 12px;
+}
+.reference-staff-card {
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px 12px;
+  padding: 15px;
+}
+.reference-staff-avatar {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  font-size: 11px;
+}
+.reference-staff-copy strong {
+  font-size: 13px;
+  line-height: 1.3;
+}
+.reference-staff-copy small,
+.reference-staff-copy span {
+  font-size: 11px;
+  overflow-wrap: anywhere;
 }
 .reference-staff-card {
   display: grid;
@@ -4618,6 +4657,81 @@
   padding: 12px;
 }
 
+.reference-guardian-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 245px), 1fr));
+  gap: 12px;
+}
+.reference-guardian-card {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 8px;
+  border: 1px solid #e9e7e3;
+  border-radius: 14px;
+  background: #fff;
+  padding: 16px;
+  color: #171717;
+  text-decoration: none;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.reference-guardian-card:hover {
+  border-color: #c9c6bf;
+  background: #fcfbf9;
+}
+.reference-guardian-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.reference-guardian-count {
+  border: 1px solid #e9e7e3;
+  border-radius: 999px;
+  background: #faf9f7;
+  padding: 5px 9px;
+  color: #5f5b54;
+  font-size: 10px;
+}
+.reference-guardian-card > strong {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-weight: 650;
+}
+.reference-guardian-phone {
+  color: #3e3b36;
+  font-size: 12px;
+}
+.reference-guardian-relation {
+  color: #85817b;
+  font-size: 11px;
+  text-transform: capitalize;
+}
+.reference-guardian-children {
+  display: grid;
+  gap: 5px;
+  border-top: 1px solid #efede9;
+  margin-top: 3px;
+  padding-top: 10px;
+  color: #4c4943;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.reference-guardian-children small {
+  color: #85817b;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.organization-admin-page .organization-heading h1,
+.organization-admin-page .organization-heading.reference-dashboard-heading h1 {
+  letter-spacing: 0;
+  word-spacing: 0.03em;
+  font-kerning: normal;
+  overflow-wrap: normal;
+  white-space: normal;
+}
 .reference-attendance-page .attendance-filters label {
   color: #77736c;
   font-size: 9px;
@@ -4728,16 +4842,79 @@
 }
 
 /* Reference-system styling for the real, API-connected modules. */
+.reference-live-module {
+  gap: 14px;
+}
+.reference-live-module .reference-metrics-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.reference-live-module .reference-module-section {
+  gap: 13px;
+  border: 1px solid #e9e7e3;
+  border-radius: 13px;
+  background: #fff;
+  padding: 15px;
+  box-shadow: none;
+}
+.reference-live-module .reference-module-section > .attendance-filter-toolbar,
+.reference-live-module .reference-module-toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.reference-live-module .attendance-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid #efede9;
+  padding-bottom: 12px;
+}
+.reference-live-module .attendance-person {
+  border-bottom: 1px solid #efede9;
+  padding: 10px 0;
+}
+.reference-live-module .attendance-person:last-child {
+  border-bottom: 0;
+}
+.reference-live-module .attendance-status-choice {
+  min-height: 30px;
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 10px;
+}
+.reference-live-module .student-list-panel {
+  gap: 13px;
+}
+@media (max-width: 900px) {
+  .reference-live-module .reference-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 520px) {
+  .reference-live-module .reference-metrics-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .reference-live-module .reference-module-section > .attendance-filter-toolbar,
+  .reference-live-module .reference-module-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
 .reference-live-module .page-heading h1,
 .finance-page .page-heading h1,
 .organization-admin-page .page-heading h1 {
   margin: 0;
   color: #171715;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: clamp(24px, 2.25vw, 31px);
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: clamp(28px, 2.5vw, 34px);
   font-weight: 400;
-  letter-spacing: -0.035em;
-  line-height: 1.16;
+  letter-spacing: -0.025em;
+  line-height: 0.98;
 }
 
 .reference-live-module .page-description,
@@ -4746,7 +4923,7 @@
   max-width: 680px;
   margin-top: 7px;
   color: #77736d;
-  font-size: 10px;
+  font-size: 12.5px;
   line-height: 1.55;
 }
 
@@ -4754,7 +4931,7 @@
 .finance-page .eyebrow,
 .organization-admin-page .eyebrow {
   color: #817d76;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 650;
   letter-spacing: 0.11em;
   text-transform: uppercase;
@@ -4785,7 +4962,7 @@
 .reference-live-module .examinations-panel,
 .finance-page .finance-section,
 .finance-concessions-live-page .fee-concessions-panel {
-  padding: 14px;
+  padding: 16px;
 }
 
 .reference-live-module .panel-heading,
@@ -4805,7 +4982,7 @@
 .finance-page .finance-section-heading h2,
 .finance-concessions-live-page .panel-heading h2 {
   color: #292824;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 650;
   letter-spacing: -0.012em;
 }
@@ -4823,7 +5000,7 @@
   border-radius: 8px;
   background: #fff;
   color: #302e29;
-  font-size: 10px;
+  font-size: 12.5px;
   box-shadow: none;
 }
 
@@ -4835,24 +5012,24 @@
 .finance-page select,
 .finance-concessions-live-page input:not([type='checkbox']):not([type='radio']),
 .finance-concessions-live-page select {
-  min-height: 32px;
+  min-height: 36px;
 }
 
 .reference-live-module label,
 .finance-page .finance-field,
 .finance-concessions-live-page label {
   color: #6e6a63;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
 }
 
 .reference-live-module .button,
 .finance-page .button,
 .finance-concessions-live-page .button {
-  min-height: 31px;
+  min-height: 36px;
   border-radius: 999px;
-  padding-inline: 12px;
-  font-size: 10px;
+  padding-inline: 14px;
+  font-size: 12px;
   font-weight: 620;
 }
 
@@ -5273,4 +5450,164 @@
     padding-inline: 9px;
     font-size: 8px;
   }
+}
+
+/* Prototype parity refinements: readable headings and compact live directory cards. */
+.organization-admin-page .organization-heading h1,
+.organization-admin-page .organization-heading.reference-dashboard-heading h1 {
+  letter-spacing: 0;
+  word-spacing: 0.03em;
+  font-kerning: normal;
+  overflow-wrap: normal;
+  white-space: normal;
+}
+.reference-staff-grid .reference-staff-card {
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px 12px;
+  padding: 15px;
+}
+.reference-staff-grid .reference-staff-avatar {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  font-size: 11px;
+}
+.reference-staff-grid .reference-staff-copy strong {
+  font-size: 13px;
+  line-height: 1.3;
+}
+.reference-staff-grid .reference-staff-copy small,
+.reference-staff-grid .reference-staff-copy span {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.admissions-live-page .admissions-tabs,
+.admissions-live-page .admissions-live-records > .student-filters {
+  display: none;
+}
+.admissions-live-page .admissions-application-list {
+  display: grid;
+  gap: 8px;
+}
+.admissions-live-page .admissions-application-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #e9e7e3;
+  border-radius: 11px;
+  background: #faf9f7;
+  padding: 11px;
+}
+.admissions-live-page .admissions-application-avatar {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: #171717;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 650;
+}
+.admissions-live-page .admissions-application-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+.admissions-live-page .admissions-application-copy strong {
+  overflow-wrap: anywhere;
+  color: #282723;
+  font-size: 12px;
+}
+.admissions-live-page .admissions-application-copy small {
+  color: #85817b;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.admissions-live-page .reference-admission-form .student-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 620px) {
+  .admissions-live-page .admissions-application-row {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+  .admissions-live-page .admissions-application-row > .reference-status,
+  .admissions-live-page .admissions-application-row > .reference-outline-button {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .admissions-live-page .reference-admission-form .student-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.reference-student-card > strong {
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+.reference-student-card > small {
+  font-size: 11px;
+  line-height: 1.4;
+}
+.reference-student-card-bottom {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 10px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.reference-student-card-bottom b {
+  font-size: 10px;
+}
+.admissions-live-page .reference-panel-heading {
+  margin-bottom: 12px;
+}
+.admissions-live-page .reference-panel-heading h2 {
+  color: #292824;
+  font-size: 13px;
+  font-weight: 650;
+}
+.admissions-live-page .reference-panel-heading > span {
+  color: #85817b;
+  font-size: 10px;
+}
+.reporting-page .reporting-header .reporting-toolbar,
+.reporting-page section[aria-labelledby="report-summary-title"],
+.reporting-page section[aria-labelledby="audit-title"] {
+  display: none;
+}
+.reporting-page .reporting-report-card {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 20px;
+  align-items: start;
+  gap: 12px;
+  cursor: default;
+}
+.reporting-page .reporting-report-card .reporting-report-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  margin-top: 3px;
+}
+.reporting-page .reporting-report-actions .button {
+  min-height: 34px;
+  flex: 1;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 11px;
+}
+.reporting-page .reporting-preview-table {
+  max-width: 100%;
+  max-height: min(55vh, 520px);
+  overflow: auto;
+}
+.reporting-page .reporting-preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.reporting-page .reporting-preview-actions .button {
+  min-height: 36px;
+  border-radius: 999px;
 }

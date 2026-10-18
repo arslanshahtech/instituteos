@@ -123,18 +123,26 @@ function rowsToCsv(rows: ReportRow[]): string {
   ].join('\r\n');
 }
 
+export async function getReportRows(
+  organizationId: string,
+  type: ReportType,
+): Promise<ReportRow[]> {
+  const result = await apiRequest<{ reportType: ReportType; rows: ReportRow[] }>(
+    `${reportingPath(organizationId)}/reports/${type}/export`,
+  );
+  return result.rows;
+}
+
 export async function exportReport(
   organizationId: string,
   type: ReportType,
   format: 'csv' | 'json' = 'csv',
 ): Promise<void> {
-  const result = await apiRequest<{ reportType: ReportType; rows: ReportRow[] }>(
-    `${reportingPath(organizationId)}/reports/${type}/export`,
-  );
+  const rows = await getReportRows(organizationId, type);
   const content =
     format === 'json'
-      ? JSON.stringify(result.rows, null, 2)
-      : rowsToCsv(result.rows);
+      ? JSON.stringify(rows, null, 2)
+      : rowsToCsv(rows);
   const mimeType = format === 'json' ? 'application/json' : 'text/csv';
   const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
   const objectUrl = URL.createObjectURL(blob);

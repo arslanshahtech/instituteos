@@ -28,6 +28,7 @@ import type {
   TeacherAssignment,
 } from './academics-api.js';
 import { AcademicsForm } from './AcademicsForm.js';
+import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 
 const managerRoles = [
   'organization_owner',
@@ -296,19 +297,16 @@ export function AcademicsDashboard() {
 
   return (
     <main className="page-stack academics-page">
-      <section className="page-heading">
-        <div>
-          <p className="eyebrow">Organization workspace</p>
-          <h1>Academics</h1>
-          <p className="page-description">
-            Set up academic calendars, class structures, subjects, and teacher
-            assignments.
-          </p>
-        </div>
-        <Button onClick={beginCreate} type="button" variant="primary">
-          Add {resourceNames[resource]}
-        </Button>
-      </section>
+      <WorkspacePageHeading
+        eyebrow="Organization workspace"
+        title="Academics"
+        description="Set up academic calendars, class structures, subjects, and teacher assignments."
+        aside={(
+          <Button onClick={beginCreate} type="button" variant="primary">
+            Add {resourceNames[resource]}
+          </Button>
+        )}
+      />
 
       <nav aria-label="Academic management areas" className="academics-tabs">
         {tabs.map((tab) => (

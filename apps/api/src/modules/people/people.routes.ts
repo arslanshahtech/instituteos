@@ -888,6 +888,10 @@ export function createPeopleRouter(
               ? body.preferredCampusId
               : undefined,
           program: optionalString(body, 'program', 120),
+          dateOfBirth: optionalString(body, 'dateOfBirth', 10),
+          guardianName: optionalString(body, 'guardianName', 160),
+          guardianPhone: optionalString(body, 'guardianPhone', 40),
+          feePlan: body.feePlan === 'Standard' || body.feePlan === 'Scholarship' || body.feePlan === 'Sibling plan' ? body.feePlan : undefined,
           status,
           notes: optionalString(body, 'notes', 1200),
         },

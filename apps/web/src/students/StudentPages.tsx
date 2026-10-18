@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
+import {
+  WorkspacePageHeading,
+  WorkspaceSearchField,
+  WorkspaceFilterSelect,
+  WorkspaceModuleSection,
+  WorkspaceModuleToolbar,
+  WorkspaceStudentCard,
+} from '../components/ui/WorkspacePrimitives.js';
 import { ApiError } from '../api/client.js';
 import { DataTable } from '../components/ui/DataTable.js';
 import { Pagination } from '../components/ui/Pagination.js';
@@ -16,8 +23,12 @@ import { getCampuses } from '../organizations/organizations-api.js';
 import type { Campus } from '../organizations/organizations-api.js';
 import { getOrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import type { OrganizationAccessContext } from '../tenancy/tenancy-api.js';
+import { listInvoices } from '../finance/finance-api.js';
+import type { StudentInvoice } from '../finance/finance-api.js';
 import { StudentForm } from './StudentForm.js';
 import { StudentGuardiansSection } from '../guardians/GuardianPages.js';
+import { getGuardian } from '../guardians/guardians-api.js';
+import { listStudentAttendance } from '../attendance/attendance-api.js';
 import { ChildPickupPanel } from './ChildPickupPanel.js';
 import type { StudentInput, StudentStatus } from './students-api.js';
 import {
@@ -160,6 +171,68 @@ export function StudentsListPage() {
   );
   const canCreate =
     access.data?.permissions.includes('student.create') ?? false;
+  const canReadFinance =
+    access.data?.permissions.includes('finance.read') ?? false;
+  const invoices = useQuery({
+    queryKey: ['finance', organizationId, 'student-directory-invoices'],
+    queryFn: () => listInvoices(organizationId),
+    enabled: Boolean(access.data && canReadFinance),
+    retry: false,
+  });
+  const canReadAttendance =
+    access.data?.permissions.includes('attendance.read') ?? false;
+  const attendance = useQuery({
+    queryKey: ['attendance', organizationId, 'student-directory-summary'],
+    queryFn: () => {
+      const dateTo = new Date();
+      const dateFrom = new Date(dateTo);
+      dateFrom.setDate(dateTo.getDate() - 89);
+      return listStudentAttendance(organizationId, {
+        dateFrom: dateFrom.toISOString().slice(0, 10),
+        dateTo: dateTo.toISOString().slice(0, 10),
+      });
+    },
+    enabled: Boolean(access.data && canReadAttendance),
+    retry: false,
+    staleTime: 60_000,
+  });
+  const attendanceByStudent = new Map<string, { attended: number; recorded: number }>();
+  for (const record of attendance.data?.items ?? []) {
+    const counts = attendanceByStudent.get(record.studentId) ?? { attended: 0, recorded: 0 };
+    if (record.status !== 'leave') {
+      counts.recorded += 1;
+      if (record.status === 'present' || record.status === 'late') counts.attended += 1;
+    }
+    attendanceByStudent.set(record.studentId, counts);
+  }
+  const invoicesByStudent = new Map<string, StudentInvoice[]>();
+  for (const invoice of invoices.data?.items ?? []) {
+    const current = invoicesByStudent.get(invoice.studentId) ?? [];
+    current.push(invoice);
+    invoicesByStudent.set(invoice.studentId, current);
+  }
+  const visibleGuardianIds = Array.from(
+    new Set((students.data?.items ?? []).flatMap((student) => student.guardianIds)),
+  );
+  const guardianDetailsQueries = useQueries({
+    queries: visibleGuardianIds.map((guardianId) => ({
+      queryKey: ['guardian-detail', organizationId, guardianId],
+      queryFn: () => getGuardian(organizationId, guardianId),
+      enabled: Boolean(access.data?.permissions.includes('guardian.read')),
+      staleTime: 60_000,
+    })),
+  });
+  const primaryGuardianByStudent = new Map<string, string>();
+  for (const guardianQuery of guardianDetailsQueries) {
+    const detail = guardianQuery.data;
+    if (!detail) continue;
+    for (const relation of detail.students) {
+      const guardianName = `${detail.guardian.firstName} ${detail.guardian.lastName}`;
+      if (!primaryGuardianByStudent.has(relation.student.id) || relation.isPrimary) {
+        primaryGuardianByStudent.set(relation.student.id, guardianName);
+      }
+    }
+  }
 
   return (
     <AccessState
@@ -188,34 +261,29 @@ export function StudentsListPage() {
           title="Students"
         />
 
-        <section className="student-list-panel panel">
-          <div className="student-filters">
-            <label className="student-search-field">
-              <span>Search students</span>
-              <input
-                autoComplete="off"
-                onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Search by name, email, or phone"
-                type="search"
-                value={searchInput}
-              />
-            </label>
-            <label className="student-status-filter">
-              <span>Status</span>
-              <select
-                onChange={(event) => {
-                  setStatus(event.target.value as StudentStatus | '');
-                  setPage(1);
-                }}
-                value={status}
-              >
-                <option value="">All statuses</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="withdrawn">Withdrawn</option>
-              </select>
-            </label>
-          </div>
+        <WorkspaceModuleSection className="student-list-panel panel">
+          <WorkspaceModuleToolbar className="student-filters">
+            <WorkspaceSearchField
+              label="Search students"
+              onChange={setSearchInput}
+              placeholder="Search name, class, email or phone..."
+              value={searchInput}
+            />
+            <WorkspaceFilterSelect
+              label="Status"
+              onChange={(value) => {
+                setStatus(value as StudentStatus | '');
+                setPage(1);
+              }}
+              options={[
+                { value: '', label: 'All statuses' },
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+                { value: 'withdrawn', label: 'Withdrawn' },
+              ]}
+              value={status}
+            />
+          </WorkspaceModuleToolbar>
           {students.isPending ? (
             <LoadingState message="Loading students…" />
           ) : students.isError ? (
@@ -263,44 +331,91 @@ export function StudentsListPage() {
                         student.firstName.trim().charAt(0) || 'S'
                       ).toUpperCase() +
                       (student.lastName.trim().charAt(0) || '').toUpperCase();
+                    const studentInvoices = invoicesByStudent.get(student.id) ?? [];
+                    const totalAmount = studentInvoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0);
+                    const paidAmount = studentInvoices.reduce((sum, invoice) => sum + invoice.paidAmount, 0);
+                    const dueAmount = Math.max(0, totalAmount - paidAmount);
+                    const feeStatus = !canReadFinance
+                      ? student.status
+                      : invoices.isPending
+                        ? 'Loading fees…'
+                        : invoices.isError
+                          ? 'Fee data unavailable'
+                          : studentInvoices.length === 0
+                            ? 'No fee record'
+                            : dueAmount <= 0
+                              ? 'Paid'
+                              : studentInvoices.some((invoice) => invoice.status === 'overdue')
+                                ? 'Due'
+                                : paidAmount > 0
+                                  ? 'Partial'
+                                  : 'Unpaid';
+                    const money = (amount: number) =>
+                      new Intl.NumberFormat('en-PK', {
+                        style: 'currency',
+                        currency: 'PKR',
+                        maximumFractionDigits: 0,
+                      }).format(amount);
                     return (
-                      <Link
-                        aria-label={`${student.firstName} ${student.lastName}`}
-                        className="reference-student-card student-live-card"
+                      <WorkspaceStudentCard
+                        ariaLabel={`${student.firstName} ${student.lastName}`}
+                        footer={
+                          <>
+                            <span>
+                              {primaryGuardianByStudent.get(student.id)
+                                ? `Guardian: ${primaryGuardianByStudent.get(student.id)}`
+                                : student.guardianIds.length > 0
+                                  ? `${student.guardianIds.length} linked guardian${student.guardianIds.length === 1 ? '' : 's'}`
+                                  : 'No guardian linked'}
+                            </span>
+                            <span>{student.phone || 'Phone not provided'}</span>
+                            {canReadFinance && (
+                              <>
+                                <span>Total {money(totalAmount)}</span>
+                                <span>Paid {money(paidAmount)}</span>
+                                <b>Due {money(dueAmount)}</b>
+                              </>
+                            )}
+                            {canReadAttendance && (() => {
+                              const counts = attendanceByStudent.get(student.id);
+                              const percentage = counts && counts.recorded > 0
+                                ? Math.round((counts.attended / counts.recorded) * 100)
+                                : null;
+                              return (
+                                <span>
+                                  Attendance {attendance.isPending
+                                    ? 'Loading…'
+                                    : attendance.isError
+                                      ? 'Unavailable'
+                                      : percentage === null
+                                        ? '—'
+                                        : `${percentage}%`}
+                                </span>
+                              );
+                            })()}
+                            {!canReadFinance && !canReadAttendance && (
+                              <b>{student.contactEmail || 'Email not provided'}</b>
+                            )}
+                          </>
+                        }
+                        className="student-live-card"
+                        initials={initials}
                         key={student.id}
-                        to={`/admin/organizations/${encodeURIComponent(organizationId)}/students/${encodeURIComponent(student.id)}`}
-                      >
-                        <span className="reference-student-card-top">
-                          <span
-                            className="reference-student-avatar"
-                            aria-hidden="true"
-                          >
-                            {initials}
-                          </span>
-                          <span
-                            className={`reference-status ${student.status === 'active' ? 'reference-status-approved' : 'reference-status-pending'}`}
-                          >
-                            {student.status}
-                          </span>
-                        </span>
-                        <strong>
-                          {student.firstName} {student.lastName}
-                        </strong>
-                        <small>
+                        name={`${student.firstName} ${student.lastName}`}
+                        status={feeStatus}
+                        statusClassName={
+                          feeStatus === 'Paid' || feeStatus === 'active'
+                            ? 'reference-status-approved'
+                            : 'reference-status-pending'
+                        }
+                        subtitle={
                           <StudentCampusName
                             campusId={student.campusId}
                             campuses={campuses.data?.campuses ?? []}
                           />
-                        </small>
-                        <span className="reference-student-card-bottom">
-                          <span>
-                            {student.guardianIds.length} linked guardian
-                            {student.guardianIds.length === 1 ? '' : 's'}
-                          </span>
-                          <span>{student.phone || 'Phone not provided'}</span>
-                          <b>{student.contactEmail || 'Email not provided'}</b>
-                        </span>
-                      </Link>
+                        }
+                        to={`/admin/organizations/${encodeURIComponent(organizationId)}/students/${encodeURIComponent(student.id)}`}
+                      />
                     );
                   })}
                 </div>
@@ -313,7 +428,7 @@ export function StudentsListPage() {
               />
             </>
           )}
-        </section>
+        </WorkspaceModuleSection>
       </main>
     </AccessState>
   );

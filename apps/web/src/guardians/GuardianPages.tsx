@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { ReactNode } from 'react';
-import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
+import {
+  WorkspacePageHeading,
+  WorkspaceSearchField,
+  WorkspaceModuleSection,
+  WorkspaceModuleToolbar,
+  WorkspaceGuardianCard,
+} from '../components/ui/WorkspacePrimitives.js';
 import { ApiError } from '../api/client.js';
-import { DataTable } from '../components/ui/DataTable.js';
 import { Pagination } from '../components/ui/Pagination.js';
 import {
+  EmptyState,
   ErrorState,
   LoadingState,
   PermissionDeniedState,
@@ -17,7 +23,7 @@ import { getOrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import type { OrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import { GuardianForm } from './GuardianForm.js';
 import type { GuardianInput } from './guardians-api.js';
-import { listGuardians } from './guardians-api.js';
+import { getGuardian, listGuardians } from './guardians-api.js';
 import type { GuardianRelationship } from './guardians-api.js';
 import {
   useCreateGuardian,
@@ -133,6 +139,14 @@ export function GuardiansListPage() {
   );
   const canCreate =
     access.data?.permissions.includes('guardian.create') ?? false;
+  const guardianChildrenQueries = useQueries({
+    queries: (guardians.data?.items ?? []).map((guardian) => ({
+      queryKey: ['guardian-detail', organizationId, guardian.id],
+      queryFn: () => getGuardian(organizationId, guardian.id),
+      enabled: Boolean(access.data?.permissions.includes('guardian.read')),
+      staleTime: 60_000,
+    })),
+  });
 
   return (
     <GuardianAccess organizationId={organizationId} permission="guardian.read">
@@ -153,17 +167,15 @@ export function GuardiansListPage() {
             organizationId={organizationId}
             title="Guardians"
           />
-          <section className="student-list-panel panel">
-            <label className="student-search-field">
-              <span>Search guardians</span>
-              <input
-                autoComplete="off"
-                onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Search by name or email"
-                type="search"
+          <WorkspaceModuleSection className="student-list-panel panel">
+            <WorkspaceModuleToolbar>
+              <WorkspaceSearchField
+                label="Search guardians"
+                onChange={setSearchInput}
+                placeholder="Search name or email..."
                 value={searchInput}
               />
-            </label>
+            </WorkspaceModuleToolbar>
             {guardians.isPending ? (
               <LoadingState message="Loading guardians…" />
             ) : guardians.isError ? (
@@ -174,56 +186,38 @@ export function GuardiansListPage() {
               />
             ) : (
               <>
-                <DataTable
-                  caption="Guardians"
-                  wrapperClassName="reference-table-wrap"
-                  tableClassName="reference-table"
-                  columns={[
-                    {
-                      header: 'Name',
-                      render: (guardian) => (
-                        <Link
-                          className="student-name-link"
+                {guardians.data.items.length === 0 ? (
+                  <EmptyState
+                    title={search ? 'No guardians match this search' : 'No guardians yet'}
+                    description={
+                      search
+                        ? 'Try changing or clearing your search.'
+                        : 'Create the first guardian record for this organization.'
+                    }
+                  />
+                ) : (
+                  <div className="reference-guardian-grid" aria-label="Guardian directory">
+                    {guardians.data.items.map((guardian, index) => {
+                      const linkedStudents = guardianChildrenQueries[index]?.data?.students ?? [];
+                      return (
+                        <WorkspaceGuardianCard
+                          childCount={guardian.studentCount ?? linkedStudents.length}
+                          childrenLoading={guardianChildrenQueries[index]?.isPending ?? false}
+                          childrenUnavailable={guardianChildrenQueries[index]?.isError ?? false}
+                          childrenNames={linkedStudents.map(
+                            (relation) => `${relation.student.firstName} ${relation.student.lastName}`,
+                          )}
+                          initials={`${guardian.firstName.trim().charAt(0)}${guardian.lastName.trim().charAt(0)}`.toUpperCase()}
+                          key={guardian.id}
+                          name={`${guardian.firstName} ${guardian.lastName}`}
+                          phone={guardian.phone}
+                          relationship={guardian.relationship}
                           to={`/admin/organizations/${encodeURIComponent(organizationId)}/guardians/${encodeURIComponent(guardian.id)}`}
-                        >
-                          {guardian.firstName} {guardian.lastName}
-                        </Link>
-                      ),
-                    },
-                    {
-                      header: 'Phone',
-                      render: (guardian) => guardian.phone || '—',
-                    },
-                    {
-                      header: 'Relation',
-                      render: (guardian) => guardian.relationship || '—',
-                    },
-                    {
-                      header: 'Children',
-                      render: (guardian) => (
-                        <Link
-                          className="reference-mini-pill"
-                          aria-label={`${guardian.studentCount ?? 0} linked children for ${guardian.firstName} ${guardian.lastName}`}
-                          to={`/admin/organizations/${encodeURIComponent(organizationId)}/guardians/${encodeURIComponent(guardian.id)}`}
-                        >
-                          {guardian.studentCount ?? 0}
-                        </Link>
-                      ),
-                    },
-                  ]}
-                  emptyDescription={
-                    search
-                      ? 'Try changing or clearing your search.'
-                      : 'Create the first guardian record for this organization.'
-                  }
-                  emptyTitle={
-                    search
-                      ? 'No guardians match this search'
-                      : 'No guardians yet'
-                  }
-                  rowKey={(guardian) => guardian.id}
-                  rows={guardians.data.items}
-                />
+                        />
+                      );
+                    })}
+                  </div>
+                )}
                 <Pagination
                   currentPage={guardians.data.page}
                   onPageChange={setPage}
@@ -232,7 +226,7 @@ export function GuardiansListPage() {
                 />
               </>
             )}
-          </section>
+          </WorkspaceModuleSection>
         </main>
       )}
     </GuardianAccess>

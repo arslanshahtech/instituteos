@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { CalendarCheck, CheckCircle2, ClipboardCheck, Users } from 'lucide-react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui/Button.js';
+import {
+  WorkspaceMetricCard,
+  WorkspacePageHeading,
+} from '../components/ui/WorkspacePrimitives.js';
 import {
   EmptyState,
   ErrorState,
@@ -436,18 +441,25 @@ export function AttendanceDashboard() {
 
   return (
     <main className="page-stack attendance-page reference-attendance-page reference-live-module">
-      <section className="page-heading attendance-page-heading">
-        <div>
-          <h1>
-            {view === 'students' ? 'Student roll call' : 'Staff attendance'}
-          </h1>
-          <p className="page-description">
-            {view === 'students'
-              ? 'Record daily attendance for the selected class and section.'
-              : 'Record daily attendance for staff at the selected campus.'}
-          </p>
-        </div>
-      </section>
+      <WorkspacePageHeading
+        className="attendance-page-heading"
+        eyebrow="Organization workspace"
+        title={view === 'students' ? 'Student roll call' : 'Staff attendance'}
+        description={
+          view === 'students'
+            ? 'Record daily attendance for the selected class and section.'
+            : 'Record daily attendance for staff at the selected campus.'
+        }
+      />
+
+      {view === 'students' && roster.length > 0 && (
+        <section aria-label="Attendance summary" className="reference-metrics-grid attendance-reference-metrics">
+          <WorkspaceMetricCard metric={{ label: 'Students in section', value: String(roster.length), detail: 'Current selected roster', icon: Users }} />
+          <WorkspaceMetricCard metric={{ label: 'Attendance marked', value: String(markedCount), detail: `${Math.max(roster.length - markedCount, 0)} remaining`, icon: ClipboardCheck }} />
+          <WorkspaceMetricCard metric={{ label: 'Present', value: String(statusCounts.present), detail: attendancePercent === null ? 'Mark attendance to calculate rate' : `${attendancePercent}% of marked students`, icon: CheckCircle2 }} />
+          <WorkspaceMetricCard metric={{ label: 'Attendance date', value: attendanceDate, detail: 'Selected roll-call date', icon: CalendarCheck }} />
+        </section>
+      )}
 
       {!isTeacher && (
         <nav
@@ -473,7 +485,7 @@ export function AttendanceDashboard() {
         </nav>
       )}
 
-      <section className="panel attendance-panel">
+      <section className="panel attendance-panel reference-module-section">
         <div className="attendance-filter-toolbar">{filters}</div>
 
         {view === 'students' ? (

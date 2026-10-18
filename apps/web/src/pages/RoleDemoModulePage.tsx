@@ -1,23 +1,23 @@
 import { useMemo, useState } from 'react';
 import {
   ArrowUpRight,
-  BookOpenText,
-  CalendarCheck,
   ChartNoAxesColumnIncreasing,
-  CheckCircle2,
-  ClipboardCheck,
   Download,
-  GraduationCap,
-  MessageCircle,
   Plus,
-  ReceiptText,
-  Search,
-  Users,
-  WalletCards,
 } from 'lucide-react';
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom';
 import { useOutletContext } from 'react-router-dom';
 import type { RoleLayoutConfig } from '../layouts/layoutTypes.js';
+import { DataTable } from '../components/ui/DataTable.js';
+import {
+  WorkspacePageHeading,
+  WorkspaceSearchField,
+  WorkspaceFilterSelect,
+  WorkspaceModuleSection,
+  WorkspaceModuleToolbar,
+  WorkspaceStudentCard,
+  WorkspaceStaffCard,
+} from '../components/ui/WorkspacePrimitives.js';
 
 type DemoAttendanceStatus = 'Present' | 'Absent' | 'Late' | 'Leave';
 
@@ -245,12 +245,11 @@ const moduleTitles: Record<string, string> = {
 
 export function RoleDemoModulePage() {
   const { role } = useOutletContext<{ role: RoleLayoutConfig }>();
-  const { previewModule = '' } = useParams();
+  const { previewModule = '', organizationId = '' } = useParams();
   const location = useLocation();
   const module = previewModule.toLowerCase();
   const demoMode =
-    import.meta.env.DEV &&
-    location.pathname.includes('/organizations/preview/');
+    import.meta.env.DEV && location.pathname.includes('/preview/');
   const [search, setSearch] = useState('');
   const [studentStatusFilter, setStudentStatusFilter] = useState('all');
   const [selectedDemoStudent, setSelectedDemoStudent] = useState<
@@ -276,8 +275,9 @@ export function RoleDemoModulePage() {
   ]);
   const [admissionSubmitted, setAdmissionSubmitted] = useState(false);
 
-  const base =
-    role.key === 'admin'
+  const base = organizationId
+    ? `/${role.key}/organizations/${encodeURIComponent(organizationId)}`
+    : role.key === 'admin'
       ? '/admin/organizations/preview'
       : '/' + role.key + '/organizations/preview';
   const filteredStudents = useMemo(
@@ -317,16 +317,12 @@ export function RoleDemoModulePage() {
 
   return (
     <main className="page-stack role-demo-module">
-      <section className="page-heading">
-        <div>
-          <p className="eyebrow">{role.label} · Layout preview</p>
-          <h1>{title}</h1>
-          <p className="page-description">
-            Reference-aligned screen with local sample values for visual review.
-          </p>
-        </div>
-        <span className="reference-preview-note">SAMPLE DATA · NOT SAVED</span>
-      </section>
+      <WorkspacePageHeading
+        eyebrow={`${role.label} · Layout preview`}
+        title={title}
+        description="Reference-aligned screen with local sample values for visual review."
+        aside={<span className="reference-preview-note">SAMPLE DATA · NOT SAVED</span>}
+      />
 
       {notice && (
         <p className="role-demo-notice" role="status">
@@ -335,26 +331,24 @@ export function RoleDemoModulePage() {
       )}
 
       {module === 'students' && (
-        <section className="reference-module-section">
-          <div className="reference-module-toolbar">
-            <label className="reference-search-input">
-              <Search size={14} aria-hidden="true" />
-              <input
-                aria-label="Search students"
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search name, class or roll..."
-                value={search}
-              />
-            </label>
-            <select
-              aria-label="Student fee status"
-              onChange={(event) => setStudentStatusFilter(event.target.value)}
+        <WorkspaceModuleSection>
+          <WorkspaceModuleToolbar>
+            <WorkspaceSearchField
+              label="Search students"
+              onChange={setSearch}
+              placeholder="Search name, class or roll..."
+              value={search}
+            />
+            <WorkspaceFilterSelect
+              label="Student fee status"
+              onChange={setStudentStatusFilter}
+              options={[
+                { value: 'all', label: 'All statuses' },
+                { value: 'paid', label: 'Paid' },
+                { value: 'due', label: 'Due' },
+              ]}
               value={studentStatusFilter}
-            >
-              <option value="all">All statuses</option>
-              <option value="paid">Paid</option>
-              <option value="due">Due</option>
-            </select>
+            />
             {role.key === 'admin' && (
               <button
                 className="reference-quick-action"
@@ -366,7 +360,7 @@ export function RoleDemoModulePage() {
                 <Plus size={14} /> Add Student
               </button>
             )}
-          </div>
+          </WorkspaceModuleToolbar>
           {selectedDemoStudent ? (
             <section className="reference-detail-panel panel">
               <div className="reference-detail-heading">
@@ -435,37 +429,31 @@ export function RoleDemoModulePage() {
           ) : (
             <div className="reference-student-grid">
               {filteredStudents.map((student) => (
-                <button
-                  aria-label={`Open sample profile for ${student.name}`}
-                  className="reference-student-card"
+                <WorkspaceStudentCard
+                  ariaLabel={`Open sample profile for ${student.name}`}
+                  footer={
+                    <>
+                      <span>{student.guardian}</span>
+                      <span>{student.attendance}</span>
+                      <b>{student.fee}</b>
+                    </>
+                  }
+                  initials={student.initials}
                   key={student.name}
+                  name={student.name}
                   onClick={() => setSelectedDemoStudent(student)}
-                  type="button"
-                >
-                  <span className="reference-student-card-top">
-                    <span className="reference-student-avatar">
-                      {student.initials}
-                    </span>
-                    <span
-                      className={
-                        student.status === 'Paid'
-                          ? 'reference-status reference-status-paid'
-                          : 'reference-status reference-status-pending'
-                      }
-                    >
-                      {student.status}
-                    </span>
-                  </span>
-                  <strong>{student.name}</strong>
-                  <small>
-                    {student.className} · {student.roll}
-                  </small>
-                  <span className="reference-student-card-bottom">
-                    <span>{student.guardian}</span>
-                    <span>{student.attendance}</span>
-                    <b>{student.fee}</b>
-                  </span>
-                </button>
+                  status={student.status}
+                  statusClassName={
+                    student.status === 'Paid'
+                      ? 'reference-status-paid'
+                      : 'reference-status-pending'
+                  }
+                  subtitle={
+                    <>
+                      {student.className} · {student.roll}
+                    </>
+                  }
+                />
               ))}
               {filteredStudents.length === 0 && (
                 <p className="reference-scope-note">
@@ -474,50 +462,44 @@ export function RoleDemoModulePage() {
               )}
             </div>
           )}
-        </section>
+        </WorkspaceModuleSection>
       )}
 
       {module === 'guardians' && (
-        <section className="reference-module-section">
-          <div className="reference-module-toolbar">
+        <WorkspaceModuleSection>
+          <WorkspaceModuleToolbar>
             <p>Guardians · 298</p>
             <span className="reference-scope-note">
               Visible to authorized college staff
             </span>
-          </div>
-          <div className="reference-table-wrap">
-            <table className="reference-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Phone</th>
-                  <th>Relation</th>
-                  <th>Children</th>
-                </tr>
-              </thead>
-              <tbody>
-                {demoGuardians.map((guardian) => (
-                  <tr key={guardian.name}>
-                    <td>{guardian.name}</td>
-                    <td>{guardian.phone}</td>
-                    <td>{guardian.relation}</td>
-                    <td>
-                      <button
-                        className="reference-mini-pill"
-                        onClick={() =>
-                          setNotice(guardian.name + ' linked children preview.')
-                        }
-                        type="button"
-                      >
-                        {guardian.children}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+          </WorkspaceModuleToolbar>
+          <DataTable
+            caption="Sample guardians"
+            wrapperClassName="reference-table-wrap"
+            tableClassName="reference-table"
+            columns={[
+              { header: 'Name', render: (guardian) => guardian.name },
+              { header: 'Phone', render: (guardian) => guardian.phone },
+              { header: 'Relation', render: (guardian) => guardian.relation },
+              {
+                header: 'Children',
+                render: (guardian) => (
+                  <button
+                    className="reference-mini-pill"
+                    onClick={() =>
+                      setNotice(guardian.name + ' linked children preview.')
+                    }
+                    type="button"
+                  >
+                    {guardian.children}
+                  </button>
+                ),
+              },
+            ]}
+            rowKey={(guardian) => guardian.name}
+            rows={demoGuardians}
+          />
+        </WorkspaceModuleSection>
       )}
 
       {module === 'staff' && (
@@ -534,21 +516,24 @@ export function RoleDemoModulePage() {
           </div>
           <div className="reference-staff-grid">
             {demoStaff.map((person) => (
-              <article className="reference-staff-card" key={person.name}>
-                <div className="reference-staff-avatar">{person.initials}</div>
-                <div className="reference-staff-copy">
-                  <strong>{person.name}</strong>
-                  <small>{person.subject}</small>
-                  <span>{person.phone}</span>
-                </div>
-                <button
-                  className="reference-outline-button"
-                  onClick={() => setNotice(person.name + ' timetable preview.')}
-                  type="button"
-                >
-                  View Timetable
-                </button>
-              </article>
+              <WorkspaceStaffCard
+                action={
+                  <button
+                    className="reference-outline-button"
+                    onClick={() =>
+                      setNotice(person.name + ' timetable preview.')
+                    }
+                    type="button"
+                  >
+                    View Timetable
+                  </button>
+                }
+                details={[person.phone]}
+                initials={person.initials}
+                key={person.name}
+                name={person.name}
+                subtitle={person.subject}
+              />
             ))}
           </div>
         </section>

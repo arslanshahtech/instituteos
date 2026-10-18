@@ -395,6 +395,13 @@ describe('frontend application foundation', () => {
     ).toHaveAttribute('href', '/admin/organizations/preview?preview=demo');
   });
 
+  it('opens the reference module preview scoped to the same organization ID', () => {
+    renderPath('/admin/organizations/650000000000000000000001/preview/students');
+
+    expect(screen.getByRole('heading', { name: 'Students' })).toBeInTheDocument();
+    expect(screen.getByText(/SAMPLE DATA/)).toBeInTheDocument();
+  });
+
   it('opens mobile navigation and closes it after navigation', async () => {
     const user = userEvent.setup();
     renderPath('/student');

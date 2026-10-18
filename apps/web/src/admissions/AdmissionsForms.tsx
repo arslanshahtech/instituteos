@@ -6,7 +6,6 @@ import { Button } from '../components/ui/Button.js';
 import { FormField } from '../components/ui/FormField.js';
 import type { Campus } from '../organizations/organizations-api.js';
 import type { ApplicationInput, InquiryInput } from './admissions-api.js';
-import type { InquiryRecord } from './admissions-api.js';
 
 const applicantFields = {
   firstName: z.string().trim().min(2, 'Enter at least two characters.').max(80),
@@ -32,9 +31,14 @@ const inquirySchema = z.object({
 type InquiryValues = z.infer<typeof inquirySchema>;
 
 const applicationSchema = z.object({
-  ...applicantFields,
-  inquiryId: z.string(),
-  program: z.string().trim().max(120),
+  fullName: z.string().trim().min(5, 'Enter the student’s full name.').max(160)
+    .refine((value) => value.trim().split(/\s+/).length >= 2, 'Enter first and last name.'),
+  dateOfBirth: z.string().min(1, 'Select the date of birth.'),
+  program: z.string().trim().min(1, 'Select a class or grade.').max(120),
+  guardianName: z.string().trim().min(2, 'Enter the guardian’s name.').max(160),
+  guardianPhone: z.string().trim().min(7, 'Enter a valid guardian phone number.').max(40),
+  feePlan: z.enum(['Standard', 'Scholarship', 'Sibling plan']),
+  campusId: z.string(),
 });
 type ApplicationValues = z.infer<typeof applicationSchema>;
 
@@ -239,14 +243,12 @@ export function InquiryForm({
 }
 
 export function ApplicationForm({
-  inquiries,
   campuses,
   campusRequired,
   isSaving,
   saveError,
   onSubmit,
 }: {
-  inquiries: InquiryRecord[];
   campuses: Campus[];
   campusRequired: boolean;
   isSaving: boolean;
@@ -262,80 +264,85 @@ export function ApplicationForm({
       }),
     ),
     defaultValues: {
-      firstName: '',
-      lastName: '',
-      email: '',
-      phone: '',
-      campusId: '',
-      source: '',
-      notes: '',
-      inquiryId: '',
+      fullName: '',
+      dateOfBirth: '',
       program: '',
+      guardianName: '',
+      guardianPhone: '',
+      feePlan: 'Standard',
+      campusId: '',
     },
     mode: 'onBlur',
   });
+
   return (
     <form
-      className="student-form"
+      className="student-form reference-admission-form"
       noValidate
-      onSubmit={form.handleSubmit((values) =>
+      onSubmit={form.handleSubmit((values) => {
+        const [firstName, ...lastNameParts] = values.fullName.trim().split(/\s+/);
         onSubmit({
-          firstName: values.firstName,
-          lastName: values.lastName,
+          firstName: firstName!,
+          lastName: lastNameParts.join(' '),
           status: 'submitted',
-          ...(values.email ? { email: values.email } : {}),
-          ...(values.phone ? { phone: values.phone } : {}),
+          phone: values.guardianPhone,
           ...(values.campusId ? { preferredCampusId: values.campusId } : {}),
-          ...(values.source ? { source: values.source } : {}),
-          ...(values.notes ? { notes: values.notes } : {}),
-          ...(values.inquiryId ? { inquiryId: values.inquiryId } : {}),
-          ...(values.program ? { program: values.program } : {}),
-        }),
-      )}
+          program: values.program,
+          dateOfBirth: values.dateOfBirth,
+          guardianName: values.guardianName,
+          guardianPhone: values.guardianPhone,
+          feePlan: values.feePlan,
+        });
+      })}
     >
       <div className="student-form-grid">
         <FormField
-          hint="Use the admissions search field to find older inquiries."
-          label="Link to inquiry"
-          name="inquiryId"
-        >
-          <select id="inquiryId" {...form.register('inquiryId')}>
-            <option value="">Direct application</option>
-            {inquiries.map((inquiry) => (
-              <option key={inquiry.id} value={inquiry.id}>
-                {inquiry.firstName} {inquiry.lastName}
-              </option>
-            ))}
-          </select>
-        </FormField>
-        <ApplicantFields
-          campuses={campuses}
-          campusRequired={campusRequired}
-          registrations={{
-            firstName: form.register('firstName'),
-            lastName: form.register('lastName'),
-            email: form.register('email'),
-            phone: form.register('phone'),
-            campusId: form.register('campusId'),
-            source: form.register('source'),
-            notes: form.register('notes'),
-          }}
-          errors={{
-            firstName: form.formState.errors.firstName?.message,
-            lastName: form.formState.errors.lastName?.message,
-            email: form.formState.errors.email?.message,
-            phone: form.formState.errors.phone?.message,
-            campusId: form.formState.errors.campusId?.message,
-            source: form.formState.errors.source?.message,
-            notes: form.formState.errors.notes?.message,
-          }}
+          error={form.formState.errors.fullName?.message}
+          label="Student name"
+          maxLength={160}
+          {...form.register('fullName')}
+        />
+        <FormField
+          error={form.formState.errors.dateOfBirth?.message}
+          label="Date of birth"
+          type="date"
+          {...form.register('dateOfBirth')}
         />
         <FormField
           error={form.formState.errors.program?.message}
-          label="Program / grade"
+          label="Class / grade"
           maxLength={120}
           {...form.register('program')}
         />
+        <FormField
+          error={form.formState.errors.guardianName?.message}
+          label="Guardian name"
+          maxLength={160}
+          {...form.register('guardianName')}
+        />
+        <FormField
+          autoComplete="tel"
+          error={form.formState.errors.guardianPhone?.message}
+          label="Guardian phone"
+          maxLength={40}
+          type="tel"
+          {...form.register('guardianPhone')}
+        />
+        <FormField error={form.formState.errors.feePlan?.message} label="Fee plan" name="feePlan">
+          <select id="feePlan" {...form.register('feePlan')}>
+            <option value="Standard">Standard</option>
+            <option value="Scholarship">Scholarship</option>
+            <option value="Sibling plan">Sibling plan</option>
+          </select>
+        </FormField>
+        {campusRequired && (
+          <CampusSelect
+            campuses={campuses}
+            campusRequired={campusRequired}
+            registration={form.register('campusId')}
+            error={form.formState.errors.campusId?.message}
+          />
+        )}
       </div>
       {saveError && (
         <p className="form-error" role="alert">
@@ -343,7 +350,7 @@ export function ApplicationForm({
         </p>
       )}
       <Button disabled={isSaving} type="submit" variant="primary">
-        {isSaving ? 'Submitting…' : 'Submit application'}
+        {isSaving ? 'Submitting…' : 'Submit for approval'}
       </Button>
     </form>
   );

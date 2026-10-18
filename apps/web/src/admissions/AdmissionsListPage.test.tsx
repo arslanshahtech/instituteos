@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -103,69 +103,68 @@ describe('Admissions list page', () => {
     apiMocks.updateInquiryStatus.mockResolvedValue({ inquiry });
   });
 
-  it('shows server records and filters inquiries by status', async () => {
-    const { container } = renderAdmissionsPage();
+  it('shows the simple admission form and recent server-backed applications without inquiry UI', async () => {
+    renderAdmissionsPage();
     expect(await screen.findByText('Nora Ali')).toBeVisible();
-    expect(screen.getByText('Year 4')).toBeVisible();
-    expect(
-      container.querySelectorAll(
-        '.admissions-inquiry-table .inquiry-mobile-label',
-      ),
-    ).toHaveLength(6);
-    expect(
-      container.querySelector('.admissions-inquiry-table tbody tr'),
-    ).toBeInTheDocument();
-
-    fireEvent.change(
-      screen.getByRole('combobox', { name: 'Filter by status' }),
-      {
-        target: { value: 'contacted' },
-      },
+    expect(screen.getByRole('heading', { name: 'New Admission Form' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Recent Applications' })).toBeVisible();
+    expect(screen.getByText('Pending', { selector: '.reference-status' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Inquiries' })).not.toBeInTheDocument();
+    expect(apiMocks.listApplications).toHaveBeenCalledWith(
+      organizationId,
+      expect.objectContaining({ page: 1, pageSize: 20 }),
     );
-    await waitFor(() =>
-      expect(apiMocks.listInquiries).toHaveBeenLastCalledWith(
-        organizationId,
-        expect.objectContaining({ status: 'contacted', page: 1 }),
-      ),
-    );
+    expect(apiMocks.listInquiries).not.toHaveBeenCalled();
   });
 
-  it('creates a validated inquiry and reports success', async () => {
+  it('submits the simplified admission form for approval', async () => {
     const user = userEvent.setup();
     renderAdmissionsPage();
     await screen.findByText('Nora Ali');
-    await user.type(screen.getByLabelText('Applicant first name'), 'Rina');
-    await user.type(screen.getByLabelText('Applicant last name'), 'Patel');
-    await user.click(screen.getByRole('button', { name: 'Create inquiry' }));
+    await user.type(screen.getByLabelText('Student name'), 'Rina Patel');
+    await user.type(screen.getByLabelText('Date of birth'), '2012-05-15');
+    await user.clear(screen.getByLabelText('Class / grade'));
+    await user.type(screen.getByLabelText('Class / grade'), 'Year 5');
+    await user.type(screen.getByLabelText('Guardian name'), 'Raj Patel');
+    await user.type(screen.getByLabelText('Guardian phone'), '03001234567');
+    await user.click(screen.getByRole('button', { name: 'Submit for approval' }));
 
     await waitFor(() =>
-      expect(apiMocks.createInquiry).toHaveBeenCalledWith(
+      expect(apiMocks.createApplication).toHaveBeenCalledWith(
         organizationId,
-        expect.objectContaining({ firstName: 'Rina', lastName: 'Patel' }),
+        expect.objectContaining({
+          firstName: 'Rina',
+          lastName: 'Patel',
+          status: 'submitted',
+          phone: '03001234567',
+          program: 'Year 5',
+          dateOfBirth: '2012-05-15',
+          guardianName: 'Raj Patel',
+          guardianPhone: '03001234567',
+          feePlan: 'Standard',
+        }),
       ),
     );
-    expect(await screen.findByText('Inquiry created.')).toBeVisible();
-  });
-
-  it('shows validation errors and does not submit an incomplete inquiry', async () => {
-    const user = userEvent.setup();
-    renderAdmissionsPage();
-    await screen.findByText('Nora Ali');
-    await user.click(screen.getByRole('button', { name: 'Create inquiry' }));
-
-    expect(
-      await screen.findAllByText('Enter at least two characters.'),
-    ).toHaveLength(2);
+    expect(await screen.findByText('Application submitted.')).toBeVisible();
     expect(apiMocks.createInquiry).not.toHaveBeenCalled();
   });
 
-  it('opens application review records without rendering their internal ids', async () => {
+  it('validates the admission form and does not submit incomplete data', async () => {
     const user = userEvent.setup();
     renderAdmissionsPage();
     await screen.findByText('Nora Ali');
-    await user.click(screen.getByRole('button', { name: 'Applications' }));
+    await user.click(screen.getByRole('button', { name: 'Submit for approval' }));
+
+    expect(await screen.findByText('Enter the student’s full name.')).toBeVisible();
+    expect(screen.getByText('Select the date of birth.')).toBeVisible();
+    expect(screen.getByText('Select a class or grade.')).toBeVisible();
+    expect(apiMocks.createApplication).not.toHaveBeenCalled();
+  });
+
+  it('opens application review records without rendering their internal ids', async () => {
+    renderAdmissionsPage();
     expect(
-      await screen.findByRole('link', { name: 'Nora Ali' }),
+      await screen.findByRole('link', { name: 'Review Nora Ali application' }),
     ).toHaveAttribute(
       'href',
       `/admin/organizations/${organizationId}/admissions/applications/${application.id}`,

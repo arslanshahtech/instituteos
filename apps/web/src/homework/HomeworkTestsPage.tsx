@@ -17,6 +17,7 @@ import {
 } from '../components/ui/States.js';
 import { useAcademicsWorkspace } from '../academics/academics-queries.js';
 import { apiMessage, useOrganizationAccess } from '../staff/StaffPageShared.js';
+import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 import {
   createHomeworkTest,
   deleteHomeworkTest,
@@ -229,16 +230,11 @@ export function HomeworkTestsPage() {
 
   return (
     <main className="page-stack homework-tests-page reference-live-module">
-      <section className="page-heading">
-        <div>
-          <p className="eyebrow">Academic workspace</p>
-          <h1>Homework & tests</h1>
-          <p className="page-description">
-            Create, publish and review class homework and tests. Teachers can
-            only manage items for their assigned class sections and subjects.
-          </p>
-        </div>
-        {canWrite && (
+      <WorkspacePageHeading
+        eyebrow="Academic workspace"
+        title="Homework & tests"
+        description="Create, publish and review class homework and tests. Teachers can only manage items for their assigned class sections and subjects."
+        aside={canWrite && (
           <Button onClick={() => setFormOpen((open) => !open)}>
             <Plus size={15} />{' '}
             {formOpen
@@ -248,7 +244,7 @@ export function HomeworkTestsPage() {
                 : 'Add test'}
           </Button>
         )}
-      </section>
+      />
 
       <nav className="homework-tabs" aria-label="Homework and test types">
         <button

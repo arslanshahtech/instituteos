@@ -1147,6 +1147,10 @@ export class MongoPeopleRepository {
         phone: record.phone ? String(record.phone) : undefined,
         source: record.source ? String(record.source) : undefined,
         program: record.program ? String(record.program) : undefined,
+        dateOfBirth: record.dateOfBirth ? String(record.dateOfBirth) : undefined,
+        guardianName: record.guardianName ? String(record.guardianName) : undefined,
+        guardianPhone: record.guardianPhone ? String(record.guardianPhone) : undefined,
+        feePlan: record.feePlan ? record.feePlan as ApplicationRecord['feePlan'] : undefined,
         status: (record.status as ApplicationRecord['status']) ?? 'draft',
         convertedStudentId: studentIdsByApplication.get(String(record._id)),
         notes: record.notes ? String(record.notes) : undefined,
@@ -1188,6 +1192,10 @@ export class MongoPeopleRepository {
       phone: record.phone ? String(record.phone) : undefined,
       source: record.source ? String(record.source) : undefined,
       program: record.program ? String(record.program) : undefined,
+      dateOfBirth: record.dateOfBirth ? String(record.dateOfBirth) : undefined,
+      guardianName: record.guardianName ? String(record.guardianName) : undefined,
+      guardianPhone: record.guardianPhone ? String(record.guardianPhone) : undefined,
+      feePlan: record.feePlan ? record.feePlan as ApplicationRecord['feePlan'] : undefined,
       status: (record.status as ApplicationRecord['status']) ?? 'draft',
       convertedStudentId: convertedStudent
         ? String(convertedStudent._id)
@@ -1217,6 +1225,10 @@ export class MongoPeopleRepository {
       phone: input.phone,
       source: input.source,
       program: input.program,
+      dateOfBirth: input.dateOfBirth,
+      guardianName: input.guardianName,
+      guardianPhone: input.guardianPhone,
+      feePlan: input.feePlan,
       status: input.status ?? 'draft',
       notes: input.notes,
     });
@@ -1231,6 +1243,10 @@ export class MongoPeopleRepository {
       phone: record.phone ? String(record.phone) : undefined,
       source: record.source ? String(record.source) : undefined,
       program: record.program ? String(record.program) : undefined,
+      dateOfBirth: record.dateOfBirth ? String(record.dateOfBirth) : undefined,
+      guardianName: record.guardianName ? String(record.guardianName) : undefined,
+      guardianPhone: record.guardianPhone ? String(record.guardianPhone) : undefined,
+      feePlan: record.feePlan ? record.feePlan as ApplicationRecord['feePlan'] : undefined,
       status: (record.status as ApplicationRecord['status']) ?? 'draft',
       notes: record.notes ? String(record.notes) : undefined,
       decisionReason: record.decisionReason
@@ -1273,6 +1289,10 @@ export class MongoPeopleRepository {
       phone: record.phone ? String(record.phone) : undefined,
       source: record.source ? String(record.source) : undefined,
       program: record.program ? String(record.program) : undefined,
+      dateOfBirth: record.dateOfBirth ? String(record.dateOfBirth) : undefined,
+      guardianName: record.guardianName ? String(record.guardianName) : undefined,
+      guardianPhone: record.guardianPhone ? String(record.guardianPhone) : undefined,
+      feePlan: record.feePlan ? record.feePlan as ApplicationRecord['feePlan'] : undefined,
       status: (record.status as ApplicationRecord['status']) ?? 'draft',
       notes: record.notes ? String(record.notes) : undefined,
       decisionReason: record.decisionReason
@@ -1335,6 +1355,9 @@ export class MongoPeopleRepository {
                 {
                   firstName: String(application.firstName),
                   lastName: String(application.lastName),
+                  dateOfBirth: application.dateOfBirth
+                    ? String(application.dateOfBirth)
+                    : undefined,
                   status: 'active',
                   contactEmail: application.email
                     ? String(application.email)
@@ -1425,6 +1448,10 @@ export class MongoPeopleRepository {
             phone: approved.phone ? String(approved.phone) : undefined,
             source: approved.source ? String(approved.source) : undefined,
             program: approved.program ? String(approved.program) : undefined,
+            dateOfBirth: approved.dateOfBirth ? String(approved.dateOfBirth) : undefined,
+            guardianName: approved.guardianName ? String(approved.guardianName) : undefined,
+            guardianPhone: approved.guardianPhone ? String(approved.guardianPhone) : undefined,
+            feePlan: approved.feePlan ? approved.feePlan as ApplicationRecord['feePlan'] : undefined,
             status:
               (approved.status as ApplicationRecord['status']) ?? 'approved',
             notes: approved.notes ? String(approved.notes) : undefined,

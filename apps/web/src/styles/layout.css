@@ -10,9 +10,9 @@
   width: 240px;
   flex-direction: column;
   overflow-y: auto;
-  border-right: 1px solid rgb(255 255 255 / 7%);
+  border-right: 1px solid var(--color-border);
   background: var(--color-sidebar);
-  color: #fff;
+  color: var(--color-ink);
 }
 .brand-lockup {
   display: flex;
@@ -28,9 +28,9 @@
   height: 38px;
   flex: 0 0 38px;
   place-items: center;
-  border: 1px solid rgb(255 255 255 / 17%);
-  border-radius: 9px;
-  background: #23777a;
+  border: 1px solid #111111;
+  border-radius: 10px;
+  background: #111111;
   color: white;
   font-size: 20px;
   font-weight: 700;
@@ -53,7 +53,7 @@
 }
 .sidebar-label {
   margin: 18px 18px 7px;
-  color: #8495a5;
+  color: var(--color-muted);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -70,7 +70,7 @@
 }
 .sidebar-navigation-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgb(255 255 255 / 30%) transparent;
+  scrollbar-color: #d7d4ce transparent;
 }
 .navigation-link {
   position: relative;
@@ -80,8 +80,8 @@
   gap: 10px;
   border-radius: 7px;
   padding: 0 10px;
-  color: #b9c5d0;
-  font-size: 13px;
+  color: #686868;
+  font-size: 12px;
   font-weight: 520;
   text-decoration: none;
   transition:
@@ -89,47 +89,40 @@
     background-color 120ms ease;
 }
 .navigation-link:hover {
-  background: rgb(255 255 255 / 6%);
-  color: #fff;
+  background: #f0efeb;
+  color: #111111;
 }
 .navigation-link-active {
-  background: #263c4c;
-  color: #fff;
+  background: #111111;
+  color: #ffffff;
 }
 .navigation-link-active:hover {
-  background: #263c4c;
-  color: #fff;
+  background: #111111;
+  color: #ffffff;
 }
 .navigation-link-active::before {
-  position: absolute;
-  top: 9px;
-  bottom: 9px;
-  left: -12px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: #64b8b6;
-  content: '';
+  display: none;
 }
 .reference-preview-link {
   margin: 0 10px 12px;
-  border: 1px solid rgb(255 255 255 / 14%);
-  background: rgb(255 255 255 / 3%);
-  color: #d9e5e9;
+  border: 1px solid var(--color-border);
+  background: #ffffff;
+  color: var(--color-ink);
   font-size: 12px;
 }
 .reference-preview-link:hover {
-  border-color: rgb(100 184 182 / 55%);
-  background: rgb(255 255 255 / 7%);
-  color: #fff;
+  border-color: var(--color-border-strong);
+  background: #f0efeb;
+  color: #111111;
 }
 .sidebar-bottom {
   display: flex;
   align-items: center;
   gap: 9px;
   margin-top: auto;
-  border-top: 1px solid rgb(255 255 255 / 9%);
+  border-top: 1px solid var(--color-border);
   padding: 19px 22px;
-  color: #a7b5c1;
+  color: var(--color-muted);
   font-size: 11px;
 }
 .environment-indicator {
@@ -399,16 +392,19 @@
   }
 }
 @media (max-width: 620px) {
+  .mobile-account-actions {
+    border-top-color: var(--color-border);
+  }
   .mobile-account-actions .current-user-name {
     max-width: none;
-    color: #d5dee6;
+    color: var(--color-ink);
     font-size: 12px;
   }
 }
 @media (max-width: 620px) {
   .mobile-account-actions .sign-out-button {
     justify-self: start;
-    color: #fff;
+    color: var(--color-ink);
   }
 }
 @media (max-width: 620px) {
@@ -515,20 +511,15 @@
 }
 .navigation-link-active,
 .navigation-link-active:hover {
-  background: #f0f0ee;
-  color: #111;
-  font-weight: 650;
+  background: #111111;
+  color: #ffffff;
+  font-weight: 600;
 }
 .navigation-link-active svg {
-  color: #111;
+  color: #ffffff;
 }
 .navigation-link-active::before {
-  top: 9px;
-  bottom: 9px;
-  left: -10px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: #111;
+  display: none;
 }
 .sidebar-bottom {
   gap: 8px;

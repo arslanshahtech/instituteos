@@ -64,6 +64,18 @@ function normalizeOptionalDate(value: string | undefined): string | undefined {
   return date.toISOString();
 }
 
+function normalizeOptionalDateOnly(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Enter a valid birth date.');
+  }
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Enter a valid birth date.');
+  }
+  return value;
+}
+
 function normalizeStatus(
   value: string | undefined,
   allowed: readonly string[],
@@ -722,6 +734,9 @@ export class PeopleService {
         'application status',
       ) as ApplicationRecord['status'],
       email: normalizeOptionalEmail(input.email),
+      dateOfBirth: normalizeOptionalDateOnly(input.dateOfBirth),
+      guardianName: input.guardianName?.trim() || undefined,
+      guardianPhone: input.guardianPhone?.trim() || undefined,
     });
   }
 

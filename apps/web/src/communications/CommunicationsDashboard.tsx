@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Megaphone, MessageSquare, Pin, Plus, Trash2 } from 'lucide-react';
+import { MessageSquare, Pin, Plus, Trash2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { listAcademicCampuses } from '../academics/academics-api.js';
@@ -30,6 +30,7 @@ import {
   useUpdateAnnouncement,
 } from './communications-api.js';
 import { ParentTeacherInbox } from './ParentTeacherInbox.js';
+import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 
 const managerRoles = [
   'organization_owner',
@@ -115,7 +116,7 @@ export function CommunicationsDashboard() {
   const canAccessMessaging = messagingRoles.includes(currentRole);
 
   const [activeTab, setActiveTab] = useState<'announcements' | 'messaging'>(
-    canManageAnnouncements ? 'announcements' : 'messaging',
+    'messaging',
   );
 
   const [audienceFilter, setAudienceFilter] = useState<
@@ -135,19 +136,19 @@ export function CommunicationsDashboard() {
 
   const announcements = useAnnouncements(
     organizationId,
-    Boolean(access.data && canManageAnnouncements),
+    Boolean(access.data && canManageAnnouncements && activeTab === 'announcements'),
     filters,
   );
   const campuses = useQuery({
     queryKey: ['academics', organizationId, 'campuses'],
     queryFn: () => listAcademicCampuses(organizationId),
-    enabled: Boolean(access.data && canManageAnnouncements),
+    enabled: Boolean(access.data && canManageAnnouncements && activeTab === 'announcements'),
     retry: false,
   });
   const members = useQuery({
     queryKey: ['organization-members', organizationId],
     queryFn: () => getMembers(organizationId),
-    enabled: Boolean(access.data && canManageAnnouncements),
+    enabled: Boolean(access.data && canManageAnnouncements && activeTab === 'announcements'),
     retry: false,
   });
 
@@ -276,26 +277,20 @@ export function CommunicationsDashboard() {
 
   return (
     <main className="communications-page reference-live-module">
-      <header className="page-heading communications-heading">
-        <div className="communications-heading-text">
-          <p className="eyebrow">
-            <Megaphone size={15} aria-hidden="true" />
-            Organization workspace
-          </p>
-          <h1>Communications</h1>
-          <p className="page-description">
-            School-wide announcements and scoped, private parent-teacher
-            messaging.
-          </p>
-        </div>
-
-        {activeTab === 'announcements' && canManageAnnouncements && (
-          <Button onClick={openCreate} type="button" variant="primary">
-            <Plus size={17} aria-hidden="true" />
-            Create announcement
-          </Button>
+      <WorkspacePageHeading
+        className="communications-heading"
+        eyebrow="Organization workspace"
+        title="Communications"
+        description="Private, role-scoped conversations between parents, teachers and authorized staff."
+        aside={(
+          activeTab === 'announcements' && canManageAnnouncements ? (
+            <Button onClick={openCreate} type="button" variant="primary">
+              <Plus size={17} aria-hidden="true" />
+              Create announcement
+            </Button>
+          ) : undefined
         )}
-      </header>
+      />
 
       {/* Workspace Tabs */}
       <div
@@ -309,29 +304,6 @@ export function CommunicationsDashboard() {
           paddingBottom: '0.25rem',
         }}
       >
-        {canManageAnnouncements && (
-          <button
-            type="button"
-            onClick={() => setActiveTab('announcements')}
-            style={{
-              padding: '0.5rem 0.85rem',
-              border: 'none',
-              borderRadius: '0.375rem',
-              background:
-                activeTab === 'announcements' ? '#2563eb' : 'transparent',
-              color: activeTab === 'announcements' ? '#ffffff' : '#64748b',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-            }}
-          >
-            <Megaphone size={15} />
-            Announcements
-          </button>
-        )}
 
         {canAccessMessaging && (
           <button

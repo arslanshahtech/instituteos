@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError } from '../api/client.js';
-import { Button } from '../components/ui/Button.js';
 import { DataTable } from '../components/ui/DataTable.js';
 import { Pagination } from '../components/ui/Pagination.js';
 import {
@@ -26,6 +25,7 @@ import {
 import type { ApplicationStatus, InquiryStatus } from './admissions-api.js';
 import type { ApplicationRecord, InquiryRecord } from './admissions-api.js';
 import { ApplicationForm, InquiryForm } from './AdmissionsForms.js';
+import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 
 const PAGE_SIZE = 20;
 type AdmissionsTab = 'inquiries' | 'applications';
@@ -248,46 +248,42 @@ function ApplicationTable({
   organizationId: string;
   campuses: Campus[];
 }) {
+  if (rows.length === 0) {
+    return (
+      <EmptyState
+        title="No recent applications"
+        description="New applications submitted for approval will appear here."
+      />
+    );
+  }
+
   return (
-    <DataTable
-      caption="Admission applications"
-      columns={[
-        {
-          header: 'Applicant',
-          render: (row) => (
-            <Link
-              className="student-name-link"
-              to={`/admin/organizations/${encodeURIComponent(organizationId)}/admissions/applications/${encodeURIComponent(row.id)}`}
-            >
-              {row.firstName} {row.lastName}
-            </Link>
-          ),
-        },
-        { header: 'Program / grade', render: (row) => row.program ?? '—' },
-        {
-          header: 'Campus',
-          render: (row) => (
-            <span className="admissions-campus-tag">
-              {campusName(row.campusId, campuses)}
-            </span>
-          ),
-        },
-        {
-          header: 'Status',
-          render: (row) => (
-            <span className="status-badge">{statusLabel(row.status)}</span>
-          ),
-        },
-        {
-          header: 'Received',
-          render: (row) => new Date(row.createdAt).toLocaleDateString(),
-        },
-      ]}
-      emptyTitle="No admission applications"
-      emptyDescription="Submitted applications will appear here."
-      rowKey={(row) => row.id}
-      rows={rows}
-    />
+    <div className="admissions-application-list" aria-label="Recent applications">
+      {rows.map((row) => (
+        <article className="admissions-application-row" key={row.id}>
+          <span className="admissions-application-avatar" aria-hidden="true">
+            {`${row.firstName.charAt(0)}${row.lastName.charAt(0)}`.toUpperCase()}
+          </span>
+          <div className="admissions-application-copy">
+            <strong>{row.firstName} {row.lastName}</strong>
+            <small>
+              {row.program || 'Class not specified'} · {campusName(row.campusId, campuses)}
+            </small>
+            <small>Applied {new Date(row.createdAt).toLocaleDateString()}</small>
+          </div>
+          <span className={`reference-status ${row.status === 'approved' || row.status === 'admitted' ? 'reference-status-approved' : 'reference-status-pending'}`}>
+            {statusLabel(row.status)}
+          </span>
+          <Link
+            aria-label={`Review ${row.firstName} ${row.lastName} application`}
+            className="reference-outline-button"
+            to={`/admin/organizations/${encodeURIComponent(organizationId)}/admissions/applications/${encodeURIComponent(row.id)}`}
+          >
+            Review
+          </Link>
+        </article>
+      ))}
+    </div>
   );
 }
 
@@ -296,7 +292,7 @@ export function AdmissionsListPage() {
   const access = useOrganizationAccess(organizationId);
   const campusQuery = useCampusChoices(organizationId, access.data);
   const { showToast } = useToast();
-  const [tab, setTab] = useState<AdmissionsTab>('inquiries');
+  const [tab, setTab] = useState<AdmissionsTab>('applications');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
@@ -332,11 +328,6 @@ export function AdmissionsListPage() {
     query as typeof query & { status?: ApplicationStatus },
     Boolean(canRead && tab === 'applications'),
   );
-  const inquiryChoices = useInquiries(
-    organizationId,
-    { search, page: 1, pageSize: 100 },
-    Boolean(canRead && tab === 'applications' && formOpen),
-  );
   const createInquiry = useCreateInquiry(organizationId);
   const createApplication = useCreateApplication(organizationId);
 
@@ -370,49 +361,18 @@ export function AdmissionsListPage() {
 
   return (
     <main className="page-stack student-management-page admissions-live-page reference-live-module">
-      <section className="page-heading student-page-heading">
-        <div>
-          <p className="eyebrow">Organization workspace</p>
-          <h1>Admissions</h1>
-          <p className="page-description">
-            Track prospective students from first inquiry through application
-            review.
-          </p>
-        </div>
-        <div className="student-page-actions">
-          {canCreate && (
-            <Button
-              onClick={() => setFormOpen((open) => !open)}
-              variant="primary"
-            >
-              {formOpen
-                ? 'Close form'
-                : tab === 'inquiries'
-                  ? 'Add inquiry'
-                  : 'New application'}
-            </Button>
-          )}
-        </div>
-      </section>
+      <WorkspacePageHeading
+        className="student-page-heading"
+        eyebrow="Organization workspace"
+        title="Admissions"
+        description="Submit new admission applications and review recent applications awaiting approval."
+      />
 
       <section
         aria-label="Admissions records"
         className="student-list-panel panel"
       >
         <div className="admissions-tabs" aria-label="Admissions record type">
-          <button
-            aria-pressed={tab === 'inquiries'}
-            className="admissions-tab"
-            onClick={() => {
-              setTab('inquiries');
-              setStatus('');
-              setPage(1);
-              setFormOpen(false);
-            }}
-            type="button"
-          >
-            Inquiries
-          </button>
           <button
             aria-pressed={tab === 'applications'}
             className="admissions-tab"
@@ -437,11 +397,7 @@ export function AdmissionsListPage() {
               }
             >
               <div className="student-detail-heading">
-                <h2>
-                  {tab === 'inquiries'
-                    ? 'Create an inquiry'
-                    : 'Submit an application'}
-                </h2>
+                <h2>New Admission Form</h2>
               </div>
               {campusError && (
                 <ErrorState
@@ -478,7 +434,6 @@ export function AdmissionsListPage() {
                 />
               ) : (
                 <ApplicationForm
-                  inquiries={inquiryChoices.data?.items ?? []}
                   campuses={campuses}
                   campusRequired={campusRequired}
                   isSaving={createApplication.isPending}
@@ -491,27 +446,21 @@ export function AdmissionsListPage() {
                     createApplication.mutate(input, {
                       onSuccess: () => {
                         showToast('Application submitted.');
-                        setFormOpen(false);
+                        setFormOpen(true);
                         setTab('applications');
                       },
                     })
                   }
                 />
               )}
-              {tab === 'applications' && inquiryChoices.isPending && (
-                <LoadingState message="Loading inquiry choices…" />
-              )}
-              {tab === 'applications' && inquiryChoices.isError && (
-                <ErrorState
-                  title="Inquiry choices unavailable"
-                  description={apiMessage(inquiryChoices.error)}
-                  onRetry={() => void inquiryChoices.refetch()}
-                />
-              )}
             </section>
           )}
 
           <div className="admissions-live-records">
+            <div className="reference-panel-heading">
+              <h2>Recent Applications</h2>
+              <span>Latest</span>
+            </div>
             <div className="student-filters">
               <label className="student-search-field">
                 <span>

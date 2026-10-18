@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { Button } from '../components/ui/Button.js';
+import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 import {
   ErrorState,
   LoadingState,
@@ -121,38 +122,42 @@ export function SettingsPage() {
 
   return (
     <div className="settings-page reference-live-module">
-      <header className="page-heading settings-heading">
-        <div>
-          <p className="eyebrow">Organization workspace</p>
-          <h1>Organization settings</h1>
-          <p className="page-description">
-            Manage your organization identity, contact details, regional
-            preferences, and notifications.
-          </p>
-        </div>
-      </header>
+      <WorkspacePageHeading
+        className="settings-heading"
+        eyebrow="Organization workspace"
+        title="Settings"
+        description="Manage institute information and open the core academic, fee and access settings."
+      />
 
       <form className="settings-form" onSubmit={submit}>
         <nav className="settings-tabs" aria-label="Settings sections">
-          {(
-            [
-              ['branding', 'Branding'],
-              ['contact', 'Contact'],
-              ['localization', 'Localization'],
-              ['notifications', 'Notifications'],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              aria-current={activeTab === key ? 'page' : undefined}
-              aria-pressed={activeTab === key}
-              className={`settings-tab${activeTab === key ? ' is-active' : ''}`}
-              key={key}
-              onClick={() => setActiveTab(key)}
-              type="button"
-            >
-              {label}
-            </button>
-          ))}
+          <button
+            aria-current={activeTab === 'branding' ? 'page' : undefined}
+            aria-pressed={activeTab === 'branding'}
+            className={`settings-tab${activeTab === 'branding' ? ' is-active' : ''}`}
+            onClick={() => setActiveTab('branding')}
+            type="button"
+          >
+            Institute Info
+          </button>
+          <Link
+            className="settings-tab"
+            to={`/admin/organizations/${encodeURIComponent(organizationId)}/academics`}
+          >
+            Classes &amp; Sections
+          </Link>
+          <Link
+            className="settings-tab"
+            to={`/admin/organizations/${encodeURIComponent(organizationId)}/finance`}
+          >
+            Fee Structure
+          </Link>
+          <Link
+            className="settings-tab"
+            to={`/admin/organizations/${encodeURIComponent(organizationId)}?tab=members`}
+          >
+            Roles &amp; Permissions
+          </Link>
         </nav>
         {activeTab === 'branding' && (
           <section
@@ -161,9 +166,9 @@ export function SettingsPage() {
           >
             <div className="settings-card-heading">
               <div>
-                <h2 id="settings-branding-title">Branding</h2>
+                <h2 id="settings-branding-title">Institute information</h2>
                 <p>
-                  Set the name and visual identity shown across your workspace.
+                  Manage the institute identity, contact details and branding used across the workspace.
                 </p>
               </div>
             </div>
@@ -238,7 +243,7 @@ export function SettingsPage() {
           </section>
         )}
 
-        {activeTab === 'contact' && (
+        {activeTab === 'branding' && (
           <section
             aria-labelledby="settings-contact-title"
             className="settings-card"

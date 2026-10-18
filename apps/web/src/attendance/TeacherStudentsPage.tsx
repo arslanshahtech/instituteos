@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { CalendarCheck, GraduationCap, Users } from 'lucide-react';
+import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 import {
   EmptyState,
   ErrorState,
@@ -131,20 +132,17 @@ export function TeacherStudentsPage() {
   if (access.data.role !== 'teacher') return <PermissionDeniedState />;
 
   return (
-    <main className="page-stack">
-      <section className="page-heading">
-        <div>
-          <p className="eyebrow">Teacher workspace</p>
-          <h1>My classes & students</h1>
-          <p className="page-description">
-            Only classes and student rosters assigned to your teacher account
-            are shown here.
-          </p>
-        </div>
-        <Link className="button button-secondary" to={attendanceHref}>
-          <CalendarCheck size={16} aria-hidden="true" /> Mark attendance
-        </Link>
-      </section>
+    <main className="page-stack reference-live-module teacher-students-page">
+      <WorkspacePageHeading
+        eyebrow="Teacher workspace"
+        title="My classes & students"
+        description="Only classes and student rosters assigned to your teacher account are shown here."
+        aside={(
+          <Link className="button button-secondary" to={attendanceHref}>
+            <CalendarCheck size={16} aria-hidden="true" /> Mark attendance
+          </Link>
+        )}
+      />
 
       {assignmentsQuery.isPending ? (
         <LoadingState message="Loading your assigned classes..." />

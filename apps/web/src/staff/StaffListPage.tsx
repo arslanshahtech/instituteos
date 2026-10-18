@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Pagination } from '../components/ui/Pagination.js';
+import {
+  WorkspaceModuleSection,
+  WorkspaceStaffCard,
+} from '../components/ui/WorkspacePrimitives.js';
 import { ErrorState, LoadingState } from '../components/ui/States.js';
 import {
   StaffAccess,
@@ -77,7 +81,7 @@ export function StaffListPage() {
             organizationId={organizationId}
             title="Staff & teachers"
           />
-          <section className="student-list-panel panel">
+          <WorkspaceModuleSection className="student-list-panel panel">
             <div className="staff-filters">
               <label className="student-search-field">
                 <span>Search staff</span>
@@ -189,51 +193,40 @@ export function StaffListPage() {
                         `${person.firstName} ${person.lastName}`.trim();
                       const profilePath = `/admin/organizations/${encodeURIComponent(organizationId)}/staff/${encodeURIComponent(person.id)}`;
                       return (
-                        <article
-                          className="reference-staff-card"
+                        <WorkspaceStaffCard
+                          action={
+                            <Link
+                              className="reference-outline-button"
+                              to={profilePath}
+                            >
+                              View profile
+                            </Link>
+                          }
+                          details={[
+                            person.subjects?.length
+                              ? person.subjects.join(', ')
+                              : person.department || 'Department not set',
+                            campusName(person.campusId, campusesData),
+                            person.phone || person.email || 'Contact not provided',
+                          ]}
+                          initials={
+                            `${person.firstName?.[0] ?? ''}${person.lastName?.[0] ?? ''}`.toUpperCase() ||
+                            'S'
+                          }
                           key={person.id}
-                        >
-                          <span
-                            className="reference-staff-avatar"
-                            aria-hidden="true"
-                          >
-                            {`${person.firstName?.[0] ?? ''}${person.lastName?.[0] ?? ''}`.toUpperCase() ||
-                              'S'}
-                          </span>
-                          <div className="reference-staff-copy">
-                            <strong>
-                              <Link
-                                className="staff-profile-name"
-                                to={profilePath}
-                              >
-                                {name}
-                              </Link>
-                            </strong>
-                            <small>
-                              {person.designation ??
-                                person.role ??
-                                'Staff member'}
-                            </small>
-                            <span>
-                              {person.department || 'Department not set'}
-                            </span>
-                            <span>
-                              {campusName(person.campusId, campusesData)}
-                            </span>
-                            <span>
-                              {person.phone ||
-                                person.email ||
-                                'Contact not provided'}
-                            </span>
-                            <StaffStatusBadge status={person.status} />
-                          </div>
-                          <Link
-                            className="reference-outline-button"
-                            to={profilePath}
-                          >
-                            View profile
-                          </Link>
-                        </article>
+                          name={
+                            <Link
+                              className="staff-profile-name"
+                              to={profilePath}
+                            >
+                              {name}
+                            </Link>
+                          }
+                          status={<StaffStatusBadge status={person.status} />}
+                          subtitle={
+                            person.designation ?? person.role ?? 'Staff member'
+                          }
+                        />
                       );
                     })}
                   </div>
@@ -252,7 +245,7 @@ export function StaffListPage() {
                   No campus access is assigned to this account.
                 </p>
               )}
-          </section>
+          </WorkspaceModuleSection>
         </main>
       )}
     </StaffAccess>

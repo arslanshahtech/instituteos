@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { BadgePercent, Search, Users } from 'lucide-react';
 import { Button } from '../components/ui/Button.js';
+import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 import {
   EmptyState,
   ErrorState,
@@ -100,21 +101,18 @@ export function FeeConcessionsPage() {
 
   return (
     <main className="page-stack finance-concessions-live-page reference-live-module">
-      <section className="page-heading">
-        <div>
-          <p className="eyebrow">Finance workspace</p>
-          <h1>Fee concessions</h1>
-          <p className="page-description">
-            Review students with fee accounts and manage their scholarships,
-            sibling discounts, and approved waivers.
-          </p>
-        </div>
-        <div className="concession-count">
-          <BadgePercent size={17} aria-hidden="true" />
-          <strong>{students.length}</strong>
-          <span>students with fee accounts</span>
-        </div>
-      </section>
+      <WorkspacePageHeading
+        eyebrow="Finance workspace"
+        title="Fee concessions"
+        description="Review students with fee accounts and manage their scholarships, sibling discounts, and approved waivers."
+        aside={(
+          <div className="concession-count">
+            <BadgePercent size={17} aria-hidden="true" />
+            <strong>{students.length}</strong>
+            <span>students with fee accounts</span>
+          </div>
+        )}
+      />
 
       <section className="panel fee-concessions-panel">
         <div className="panel-heading">

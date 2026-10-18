@@ -100,6 +100,10 @@ const roleRoutes: RouteObject[] = [
         element: <RoleDemoModulePage />,
       },
       {
+        path: 'organizations/:organizationId/preview/:previewModule',
+        element: <RoleDemoModulePage />,
+      },
+      {
         path: 'organizations/:organizationId',
         element: <OrganizationAdminPage />,
       },
@@ -210,6 +214,10 @@ const roleRoutes: RouteObject[] = [
         path: 'organizations/preview/:previewModule',
         element: <RoleDemoModulePage />,
       },
+      {
+        path: 'organizations/:organizationId/preview/:previewModule',
+        element: <RoleDemoModulePage />,
+      },
       { path: 'organizations/:organizationId', element: <OverviewPage /> },
       {
         path: 'organizations/:organizationId/students',
@@ -246,6 +254,10 @@ const roleRoutes: RouteObject[] = [
         path: 'organizations/preview/:previewModule',
         element: <RoleDemoModulePage />,
       },
+      {
+        path: 'organizations/:organizationId/preview/:previewModule',
+        element: <RoleDemoModulePage />,
+      },
       { path: 'organizations/:organizationId', element: <OverviewPage /> },
       {
         path: 'organizations/:organizationId/finance',
@@ -274,6 +286,10 @@ const roleRoutes: RouteObject[] = [
         path: 'organizations/preview/:previewModule',
         element: <RoleDemoModulePage />,
       },
+      {
+        path: 'organizations/:organizationId/preview/:previewModule',
+        element: <RoleDemoModulePage />,
+      },
       { path: 'organizations/:organizationId', element: <StudentPortalPage /> },
       {
         path: 'organizations/:organizationId/:section',
@@ -292,6 +308,10 @@ const roleRoutes: RouteObject[] = [
       { path: 'organizations/preview', element: <OverviewPage /> },
       {
         path: 'organizations/preview/:previewModule',
+        element: <RoleDemoModulePage />,
+      },
+      {
+        path: 'organizations/:organizationId/preview/:previewModule',
         element: <RoleDemoModulePage />,
       },
       { path: 'organizations/:organizationId', element: <ParentPortalPage /> },

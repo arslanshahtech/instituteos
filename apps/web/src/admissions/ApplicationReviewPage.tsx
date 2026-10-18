@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError } from '../api/client.js';
 import { Button } from '../components/ui/Button.js';
+import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 import {
   ErrorState,
   LoadingState,
@@ -137,26 +138,23 @@ export function ApplicationReviewPage() {
   }
 
   return (
-    <main className="page-stack student-management-page">
-      <section className="page-heading student-page-heading">
-        <div>
-          <p className="eyebrow">Application review</p>
-          <h1>
-            {record.firstName} {record.lastName}
-          </h1>
-          <p className="page-description">
-            Review applicant information and record an admissions decision.
-          </p>
-        </div>
-        <div className="student-page-actions">
-          <Link
-            className="button button-secondary"
-            to={`/admin/organizations/${encodeURIComponent(organizationId)}/admissions`}
-          >
-            Back to admissions
-          </Link>
-        </div>
-      </section>
+    <main className="page-stack student-management-page reference-live-module">
+      <WorkspacePageHeading
+        className="student-page-heading"
+        eyebrow="Application review"
+        title={`${record.firstName} ${record.lastName}`}
+        description="Review applicant information and record an admissions decision."
+        aside={(
+          <div className="student-page-actions">
+            <Link
+              className="button button-secondary"
+              to={`/admin/organizations/${encodeURIComponent(organizationId)}/admissions`}
+            >
+              Back to admissions
+            </Link>
+          </div>
+        )}
+      />
 
       <section className="student-detail-panel panel">
         <div className="student-detail-heading">
@@ -181,6 +179,22 @@ export function ApplicationReviewPage() {
           <div>
             <dt>Program / grade</dt>
             <dd>{record.program ?? '—'}</dd>
+          </div>
+          <div>
+            <dt>Date of birth</dt>
+            <dd>{record.dateOfBirth ?? '—'}</dd>
+          </div>
+          <div>
+            <dt>Guardian</dt>
+            <dd>{record.guardianName ?? '—'}</dd>
+          </div>
+          <div>
+            <dt>Guardian phone</dt>
+            <dd>{record.guardianPhone ?? '—'}</dd>
+          </div>
+          <div>
+            <dt>Fee plan</dt>
+            <dd>{record.feePlan ?? '—'}</dd>
           </div>
           <div>
             <dt>Campus</dt>

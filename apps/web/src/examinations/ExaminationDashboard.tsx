@@ -25,6 +25,7 @@ import type {
   ExamSchedule,
   GradeBreakdown,
 } from './examinations-api.js';
+import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 import {
   useDeleteExam,
   useDeleteExamSchedule,
@@ -507,15 +508,12 @@ export function ExaminationDashboard() {
 
   return (
     <main className="examinations-page reference-live-module">
-      <header className="page-heading examinations-page-heading">
-        <div>
-          <h1>Examinations & assessment</h1>
-          <p className="page-description">
-            Manage exam schedules, enter marks, configure grading, and review
-            student results.
-          </p>
-        </div>
-      </header>
+      <WorkspacePageHeading
+        className="examinations-page-heading"
+        eyebrow="Academic workspace"
+        title="Examinations & assessment"
+        description="Manage exam schedules, enter marks, configure grading, and review student results."
+      />
       <label className="examinations-mobile-tab-switcher">
         <span className="visually-hidden">Examination view</span>
         <select
