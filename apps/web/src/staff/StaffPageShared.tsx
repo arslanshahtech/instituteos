@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 import { ApiError } from '../api/client.js';
 import {
   ErrorState,
@@ -84,22 +85,23 @@ export function StaffHeading({
   action?: ReactNode;
 }) {
   return (
-    <section className="page-heading student-page-heading">
-      <div>
-        <p className="eyebrow">Organization workspace</p>
-        <h1>{title}</h1>
-        <p className="page-description">{description}</p>
-      </div>
-      <div className="student-page-actions">
-        <Link
-          className="button button-secondary"
-          to={`/admin/organizations/${encodeURIComponent(organizationId)}/staff`}
-        >
-          Staff directory
-        </Link>
-        {action}
-      </div>
-    </section>
+    <WorkspacePageHeading
+      className="student-page-heading"
+      eyebrow="Organization workspace"
+      title={title}
+      description={description}
+      aside={
+        <div className="student-page-actions">
+          <Link
+            className="button button-secondary"
+            to={`/admin/organizations/${encodeURIComponent(organizationId)}/staff`}
+          >
+            Staff directory
+          </Link>
+          {action}
+        </div>
+      }
+    />
   );
 }
 

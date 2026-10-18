@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 import { ApiError } from '../api/client.js';
 import { DataTable } from '../components/ui/DataTable.js';
 import { Pagination } from '../components/ui/Pagination.js';
@@ -90,22 +91,23 @@ function GuardianHeading({
   action?: ReactNode;
 }) {
   return (
-    <section className="page-heading student-page-heading">
-      <div>
-        <p className="eyebrow">Organization workspace</p>
-        <h1>{title}</h1>
-        <p className="page-description">{description}</p>
-      </div>
-      <div className="student-page-actions">
-        <Link
-          className="button button-secondary"
-          to={`/admin/organizations/${encodeURIComponent(organizationId)}/guardians`}
-        >
-          Guardian directory
-        </Link>
-        {action}
-      </div>
-    </section>
+    <WorkspacePageHeading
+      className="student-page-heading"
+      eyebrow="Organization workspace"
+      title={title}
+      description={description}
+      aside={
+        <div className="student-page-actions">
+          <Link
+            className="button button-secondary"
+            to={`/admin/organizations/${encodeURIComponent(organizationId)}/guardians`}
+          >
+            Guardian directory
+          </Link>
+          {action}
+        </div>
+      }
+    />
   );
 }
 
