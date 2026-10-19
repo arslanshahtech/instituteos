@@ -1971,10 +1971,9 @@
   }
 }
 
-/* Typography and spacing aligned to the supplied InstituteOS reference */
+/* Shared page and parent-portal heading defaults. Organization typography lives in modules/organizations.css. */
 .page-heading h1,
-.parent-portal-heading h1,
-.organization-heading h1 {
+.parent-portal-heading h1 {
   font-family: Georgia, 'Times New Roman', serif;
   font-size: clamp(27px, 3vw, 34px);
   font-weight: 500;
@@ -4206,10 +4205,8 @@
   margin-bottom: 0;
 }
 
-.app-frame-live-organization .page-heading h1,
 .app-frame-live-organization .reporting-title h1,
-.app-frame-live-organization .settings-page-heading h1,
-.app-frame-live-organization .organization-heading h1 {
+.app-frame-live-organization .settings-page-heading h1 {
   color: #171715;
   font-family: Georgia, 'Times New Roman', serif;
   font-size: clamp(23px, 2.2vw, 28px);
@@ -4351,301 +4348,9 @@
     gap: 13px;
   }
 
-  .app-frame-live-organization .page-heading h1,
   .app-frame-live-organization .reporting-title h1,
-  .app-frame-live-organization .settings-page-heading h1,
-  .app-frame-live-organization .organization-heading h1 {
+  .app-frame-live-organization .settings-page-heading h1 {
     font-size: 23px;
-  }
-}
-
-/* Live organization dashboard: match the reference dashboard geometry while keeping real API data. */
-.organization-admin-page .organization-heading.reference-dashboard-heading {
-  min-height: 0;
-  align-items: center;
-  gap: 12px;
-}
-
-.organization-admin-page .organization-user-meta {
-  margin: 6px 0 0;
-  color: #89857f;
-  font-size: 10px;
-}
-
-.organization-admin-page
-  .organization-dashboard-actions.reference-quick-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.organization-admin-page .organization-dashboard-action.reference-quick-action {
-  display: inline-flex;
-  min-height: 32px;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid #111;
-  border-radius: 999px;
-  background: #111;
-  padding: 0 12px;
-  color: #fff;
-  cursor: pointer;
-  font-size: 10px;
-  font-weight: 620;
-  line-height: 1.2;
-  text-decoration: none;
-  white-space: nowrap;
-  transition:
-    background-color 120ms ease,
-    transform 120ms ease;
-}
-
-.organization-admin-page
-  .organization-dashboard-action.reference-quick-action:hover {
-  transform: translateY(-1px);
-  background: #303030;
-}
-
-.organization-admin-page
-  .organization-dashboard-action.reference-quick-action.is-unavailable {
-  border-color: #d9d6d0;
-  background: #eeece8;
-  color: #85817b;
-  cursor: not-allowed;
-  opacity: 0.9;
-}
-
-.organization-admin-page
-  .organization-dashboard-action.reference-quick-action.is-unavailable:hover {
-  transform: none;
-  background: #eeece8;
-}
-
-.organization-overview.admin-dashboard.reference-dashboard-preview {
-  gap: 12px;
-}
-
-.organization-overview.admin-dashboard
-  .admin-metrics-grid.reference-metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.organization-overview.admin-dashboard
-  .admin-metric-card.reference-metric-card {
-  display: grid;
-  min-width: 0;
-  align-content: start;
-  gap: 7px;
-  border: 1px solid #e9e7e3;
-  border-radius: 12px;
-  background: #fff;
-  padding: 12px 12px 13px;
-}
-
-.organization-overview.admin-dashboard .admin-metric-heading {
-  display: contents;
-}
-
-.organization-overview.admin-dashboard
-  .admin-metric-heading
-  > span:first-child {
-  grid-row: 2;
-  overflow-wrap: anywhere;
-  color: #85817b;
-  font-size: 8px;
-  font-weight: 650;
-  letter-spacing: 0.055em;
-  text-transform: uppercase;
-}
-
-.organization-overview.admin-dashboard .admin-metric-icon {
-  grid-row: 1;
-  grid-column: 1;
-  display: grid;
-  width: 27px;
-  height: 27px;
-  place-items: center;
-  border-radius: 8px;
-  background: #f2f1ee;
-  color: #3e3c38;
-}
-
-.organization-overview.admin-dashboard .admin-metric-icon-warning {
-  background: #fff8e8;
-  color: #9a670c;
-}
-
-.organization-overview.admin-dashboard .admin-metric-card > strong {
-  grid-row: 3;
-  overflow-wrap: anywhere;
-  color: #161616;
-  font-size: clamp(18px, 1.8vw, 24px);
-  font-weight: 650;
-  letter-spacing: -0.045em;
-  line-height: 1.12;
-}
-
-.organization-overview.admin-dashboard .admin-metric-card > p {
-  grid-row: 4;
-  margin: 0;
-  color: #8e8a84;
-  font-size: 9px;
-  line-height: 1.4;
-}
-
-.organization-overview.admin-dashboard
-  .admin-overview-bottom.reference-dashboard-bottom {
-  display: grid;
-  grid-template-columns: minmax(0, 1.22fr) minmax(270px, 0.78fr);
-  gap: 12px;
-  align-items: stretch;
-}
-
-.organization-overview.admin-dashboard
-  .admin-activity-panel.reference-dashboard-panel {
-  display: grid;
-  min-width: 0;
-  align-content: start;
-  gap: 13px;
-  border: 1px solid #e9e7e3;
-  border-radius: 13px;
-  background: #fff;
-  padding: 15px;
-}
-
-.organization-overview.admin-dashboard
-  .admin-panel-heading.reference-panel-heading {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.organization-overview.admin-dashboard .admin-panel-heading > div p {
-  margin: 5px 0 0;
-  color: #89857f;
-  font-size: 9px;
-  line-height: 1.4;
-}
-
-.organization-overview.admin-dashboard
-  .admin-recent-list.reference-activity-list {
-  display: grid;
-  gap: 7px;
-}
-
-.organization-overview.admin-dashboard
-  .admin-recent-row.reference-activity-row {
-  display: flex;
-  min-width: 0;
-  min-height: 49px;
-  align-items: center;
-  gap: 9px;
-  border: 1px solid #efede9;
-  border-radius: 9px;
-  background: #faf9f7;
-  padding: 8px 10px;
-  text-decoration: none;
-}
-
-.organization-overview.admin-dashboard .admin-recent-avatar {
-  display: grid;
-  width: 27px;
-  height: 27px;
-  flex: 0 0 27px;
-  place-items: center;
-  border-radius: 50%;
-  background: #171717;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 650;
-}
-
-.organization-overview.admin-dashboard
-  .admin-recent-copy.reference-activity-copy {
-  display: grid;
-  min-width: 0;
-  flex: 1;
-  gap: 3px;
-}
-
-.organization-overview.admin-dashboard .admin-recent-copy strong {
-  overflow: hidden;
-  color: #282723;
-  font-size: 10px;
-  font-weight: 620;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.organization-overview.admin-dashboard .admin-recent-copy small {
-  overflow: hidden;
-  color: #89857f;
-  font-size: 9px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.organization-overview.admin-dashboard .admin-weekly-label {
-  color: #8b8780;
-  font-size: 8px;
-}
-
-.organization-overview.admin-dashboard
-  .admin-weekly-summary.reference-chart-summary {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid #efede9;
-  border-radius: 8px;
-  background: #faf9f7;
-  padding: 9px 10px;
-  color: #78746d;
-  font-size: 9px;
-  line-height: 1.45;
-}
-
-.organization-overview.admin-dashboard
-  .admin-weekly-summary-dot.reference-chart-status-dot {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 6px;
-  border-radius: 50%;
-  background: #aaa69e;
-}
-
-@media (max-width: 1200px) {
-  .organization-overview.admin-dashboard
-    .admin-metrics-grid.reference-metrics-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 760px) {
-  .organization-overview.admin-dashboard
-    .admin-metrics-grid.reference-metrics-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .organization-overview.admin-dashboard
-    .admin-overview-bottom.reference-dashboard-bottom {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .organization-admin-page .organization-heading.reference-dashboard-heading {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
-
-@media (max-width: 420px) {
-  .organization-overview.admin-dashboard
-    .admin-metrics-grid.reference-metrics-grid {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -4724,14 +4429,7 @@
   letter-spacing: .06em;
   text-transform: uppercase;
 }
-.organization-admin-page .organization-heading h1,
-.organization-admin-page .organization-heading.reference-dashboard-heading h1 {
-  letter-spacing: 0;
-  word-spacing: 0.03em;
-  font-kerning: normal;
-  overflow-wrap: normal;
-  white-space: normal;
-}
+
 .reference-attendance-page .attendance-filters label {
   color: #77736c;
   font-size: 9px;
@@ -4905,9 +4603,49 @@
     flex-direction: column;
   }
 }
+/* Canonical heading treatment for every page using WorkspacePageHeading.
+   Keep these styles shared so organization modules cannot drift apart. */
+.page-heading.reference-dashboard-heading {
+  min-height: 0;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 0;
+}
+.page-heading.reference-dashboard-heading > div:first-child {
+  width: 100%;
+  min-width: 0;
+}
+.page-heading.reference-dashboard-heading h1 {
+  margin: 0;
+  color: #171715;
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-size: 28px;
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 0.95;
+}
+.page-heading.reference-dashboard-heading .page-description {
+  max-width: 680px;
+  margin-top: 8px;
+  color: #77736d;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.page-heading.reference-dashboard-heading .eyebrow {
+  color: #817d76;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+@media (min-width: 1024px) {
+  .page-heading.reference-dashboard-heading h1 {
+    font-size: 34px;
+  }
+}
+
 .reference-live-module .page-heading h1,
-.finance-page .page-heading h1,
-.organization-admin-page .page-heading h1 {
+.finance-page .page-heading h1 {
   margin: 0;
   color: #171715;
   font-family: 'Instrument Serif', Georgia, serif;
@@ -4918,8 +4656,7 @@
 }
 
 .reference-live-module .page-description,
-.finance-page .page-description,
-.organization-admin-page .page-description {
+.finance-page .page-description {
   max-width: 680px;
   margin-top: 7px;
   color: #77736d;
@@ -4928,8 +4665,7 @@
 }
 
 .reference-live-module .eyebrow,
-.finance-page .eyebrow,
-.organization-admin-page .eyebrow {
+.finance-page .eyebrow {
   color: #817d76;
   font-size: 9px;
   font-weight: 650;
@@ -5452,15 +5188,7 @@
   }
 }
 
-/* Prototype parity refinements: readable headings and compact live directory cards. */
-.organization-admin-page .organization-heading h1,
-.organization-admin-page .organization-heading.reference-dashboard-heading h1 {
-  letter-spacing: 0;
-  word-spacing: 0.03em;
-  font-kerning: normal;
-  overflow-wrap: normal;
-  white-space: normal;
-}
+/* Compact live directory cards. */
 .reference-staff-grid .reference-staff-card {
   grid-template-columns: 36px minmax(0, 1fr);
   align-items: center;

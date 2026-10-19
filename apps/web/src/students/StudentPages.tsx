@@ -104,28 +104,32 @@ function StudentPageHeading({
   description,
   organizationId,
   action,
+  referenceLayout = false,
 }: {
   title: string;
   description: string;
   organizationId: string;
   action?: ReactNode;
+  referenceLayout?: boolean;
 }) {
   return (
     <WorkspacePageHeading
       className="student-page-heading"
-      eyebrow="Organization workspace"
+      eyebrow={referenceLayout ? 'College admin · Layout preview' : 'Organization workspace'}
       title={title}
       description={description}
       aside={
-        <div className="student-page-actions">
-          <Link
-            className="button button-secondary"
-            to={`/admin/organizations/${encodeURIComponent(organizationId)}/students`}
-          >
-            Student list
-          </Link>
-          {action}
-        </div>
+        referenceLayout ? undefined : (
+          <div className="student-page-actions">
+            <Link
+              className="button button-secondary"
+              to={`/admin/organizations/${encodeURIComponent(organizationId)}/students`}
+            >
+              Student list
+            </Link>
+            {action}
+          </div>
+        )
       }
     />
   );
@@ -244,20 +248,9 @@ export function StudentsListPage() {
     >
       <main className="page-stack student-management-page reference-live-module">
         <StudentPageHeading
-          action={
-            <>
-              {canCreate && (
-                <Link
-                  className="button button-primary"
-                  to={`/admin/organizations/${encodeURIComponent(organizationId)}/students/new`}
-                >
-                  Add student
-                </Link>
-              )}
-            </>
-          }
-          description="Search and manage students in this organization."
+          description="Reference-aligned student directory with live organization records."
           organizationId={organizationId}
+          referenceLayout
           title="Students"
         />
 
@@ -266,11 +259,11 @@ export function StudentsListPage() {
             <WorkspaceSearchField
               label="Search students"
               onChange={setSearchInput}
-              placeholder="Search name, class, email or phone..."
+              placeholder="Search name, class or roll..."
               value={searchInput}
             />
             <WorkspaceFilterSelect
-              label="Status"
+              label="Student status"
               onChange={(value) => {
                 setStatus(value as StudentStatus | '');
                 setPage(1);
@@ -283,6 +276,14 @@ export function StudentsListPage() {
               ]}
               value={status}
             />
+            {canCreate && (
+              <Link
+                className="button button-primary student-add-button"
+                to={`/admin/organizations/${encodeURIComponent(organizationId)}/students/new`}
+              >
+                + Add Student
+              </Link>
+            )}
           </WorkspaceModuleToolbar>
           {students.isPending ? (
             <LoadingState message="Loading students…" />
@@ -362,39 +363,22 @@ export function StudentsListPage() {
                         footer={
                           <>
                             <span>
-                              {primaryGuardianByStudent.get(student.id)
-                                ? `Guardian: ${primaryGuardianByStudent.get(student.id)}`
-                                : student.guardianIds.length > 0
+                              {primaryGuardianByStudent.get(student.id) ??
+                                (student.guardianIds.length > 0
                                   ? `${student.guardianIds.length} linked guardian${student.guardianIds.length === 1 ? '' : 's'}`
-                                  : 'No guardian linked'}
+                                  : 'No guardian linked')}
                             </span>
-                            <span>{student.phone || 'Phone not provided'}</span>
-                            {canReadFinance && (
-                              <>
-                                <span>Total {money(totalAmount)}</span>
-                                <span>Paid {money(paidAmount)}</span>
-                                <b>Due {money(dueAmount)}</b>
-                              </>
-                            )}
                             {canReadAttendance && (() => {
                               const counts = attendanceByStudent.get(student.id);
                               const percentage = counts && counts.recorded > 0
                                 ? Math.round((counts.attended / counts.recorded) * 100)
                                 : null;
-                              return (
-                                <span>
-                                  Attendance {attendance.isPending
-                                    ? 'Loading…'
-                                    : attendance.isError
-                                      ? 'Unavailable'
-                                      : percentage === null
-                                        ? '—'
-                                        : `${percentage}%`}
-                                </span>
-                              );
+                              return <span>{attendance.isPending ? 'Attendance loading' : attendance.isError ? 'Attendance unavailable' : percentage === null ? '—' : `${percentage}% attendance`}</span>;
                             })()}
-                            {!canReadFinance && !canReadAttendance && (
-                              <b>{student.contactEmail || 'Email not provided'}</b>
+                            {canReadFinance ? (
+                              <b>{invoices.isPending ? 'Loading fees…' : invoices.isError ? 'Fee data unavailable' : money(totalAmount)}</b>
+                            ) : (
+                              <b>{student.contactEmail || student.phone || 'Contact not provided'}</b>
                             )}
                           </>
                         }
