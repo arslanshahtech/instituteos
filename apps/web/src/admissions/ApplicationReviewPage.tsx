@@ -59,6 +59,7 @@ export function ApplicationReviewPage() {
   const { organizationId = '', applicationId = '' } = useParams();
   const { showToast } = useToast();
   const [decisionReason, setDecisionReason] = useState('');
+  const [selectedCampusId, setSelectedCampusId] = useState('');
   const access = useQuery({
     queryKey: ['organization-context', organizationId],
     queryFn: () => getOrganizationAccessContext(organizationId),
@@ -106,10 +107,14 @@ export function ApplicationReviewPage() {
   const record = application.data.application;
   const canCreateStudent = access.data.permissions.includes('student.create');
   const actions = canReview
-    ? (reviewActions[record.status] ?? []).filter(
-        (action) => action.status !== 'approved' || canCreateStudent,
-      )
+    ? record.status === 'approved' && !record.convertedStudentId && canCreateStudent
+      ? [{ status: 'approved' as ApplicationStatus, label: 'Create missing student record' }]
+      : (reviewActions[record.status] ?? []).filter(
+          (action) => action.status !== 'approved' || canCreateStudent,
+        )
     : [];
+  const needsCampusForApproval = actions.some((action) => action.status === 'approved');
+  const assignedCampusId = selectedCampusId || record.campusId;
   const studentPath = record.convertedStudentId
     ? `/admin/organizations/${encodeURIComponent(organizationId)}/students/${encodeURIComponent(record.convertedStudentId)}`
     : undefined;
@@ -118,6 +123,7 @@ export function ApplicationReviewPage() {
     review.mutate(
       {
         status,
+        ...(status === 'approved' && assignedCampusId ? { campusId: assignedCampusId } : {}),
         ...(decisionReason.trim()
           ? { decisionReason: decisionReason.trim() }
           : {}),
@@ -235,6 +241,24 @@ export function ApplicationReviewPage() {
           <div className="student-detail-heading">
             <h2>Review decision</h2>
           </div>
+          {needsCampusForApproval && (
+            <label className="form-field" htmlFor="approvalCampusId">
+              <span>Assign campus before approval</span>
+              <select
+                id="approvalCampusId"
+                value={assignedCampusId ?? ''}
+                onChange={(event) => setSelectedCampusId(event.target.value)}
+                required
+              >
+                <option value="">Select campus</option>
+                {(campuses.data?.campuses ?? []).map((campus) => (
+                  <option key={campus.id} value={campus.id}>{campus.name}</option>
+                ))}
+              </select>
+              <small className="muted-copy">Approval creates the student record in this campus. Other missing profile details can be completed later.</small>
+              {campuses.isError && <span className="field-error" role="alert">{apiMessage(campuses.error)}</span>}
+            </label>
+          )}
           <label className="form-field" htmlFor="decisionReason">
             <span>Decision note (optional)</span>
             <textarea
@@ -253,7 +277,7 @@ export function ApplicationReviewPage() {
           <div className="button-row">
             {actions.map((action) => (
               <Button
-                disabled={review.isPending}
+                disabled={review.isPending || (action.status === 'approved' && !assignedCampusId)}
                 key={action.status}
                 onClick={() => transition(action.status)}
                 variant={action.status === 'rejected' ? 'danger' : 'primary'}

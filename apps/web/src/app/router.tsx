@@ -29,7 +29,6 @@ import {
   AcceptOrganizationInvitationPage,
   MyOrganizationsPage,
   OrganizationAdminPage,
-  OrganizationOnboardingPage,
 } from '../pages/organizations/OrganizationPages.js';
 import {
   StudentCreatePage,
@@ -61,6 +60,7 @@ import {
   StaffEditPage,
   StaffListPage,
 } from '../staff/StaffPages.js';
+import { TeacherTimetablePage } from '../staff/TeacherTimetablePage.js';
 import { ProtectedRoute } from '../auth/ProtectedRoute.js';
 import {
   ForgotPasswordPage,
@@ -92,7 +92,7 @@ const roleRoutes: RouteObject[] = [
       { path: 'organizations', element: <MyOrganizationsPage /> },
       {
         path: 'organizations/onboarding',
-        element: <OrganizationOnboardingPage />,
+        element: <Navigate to="/admin/organizations" replace />,
       },
       { path: 'organizations/preview', element: <OverviewPage /> },
       {
@@ -190,6 +190,10 @@ const roleRoutes: RouteObject[] = [
       {
         path: 'organizations/:organizationId/staff/new',
         element: <StaffCreatePage />,
+      },
+      {
+        path: 'organizations/:organizationId/staff/:staffId/timetable',
+        element: <TeacherTimetablePage />,
       },
       {
         path: 'organizations/:organizationId/staff/:staffId/edit',

@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react';
 import {
   ArrowRight,
   Check,
-  GraduationCap,
   Menu,
   ShieldCheck,
   X,

@@ -201,7 +201,7 @@ describe('organization administration routes', () => {
     expect(service.listAccessibleOrganizations).toHaveBeenCalledWith(user.id);
   });
 
-  it('creates an organization for the authenticated creator with an initial campus', async () => {
+  it('denies organization-level accounts permission to create new organizations', async () => {
     const response = await request(app)
       .post('/api/v1/organizations')
       .set('Cookie', user.cookie)
@@ -211,13 +211,10 @@ describe('organization administration routes', () => {
         initialCampus: { name: 'Main Campus' },
       });
 
-    expect(response.status).toBe(201);
-    expect(service.provision).toHaveBeenCalledWith(user.id, {
-      name: 'North Institute',
-      initialCampus: { name: 'Main Campus' },
-    });
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe('PLATFORM_ROLE_REQUIRED');
+    expect(service.provision).not.toHaveBeenCalled();
   });
-
   it('serves dashboard data only to an active organization member', async () => {
     const allowed = await request(app)
       .get(`/api/v1/organizations/${organizationA}/dashboard`)

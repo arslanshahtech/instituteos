@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { apiMessage, useOrganizationAccess } from '../staff/StaffPageShared.js';
 import { listStaff } from '../staff/staff-api.js';
 import { Button } from '../components/ui/Button.js';
@@ -29,6 +29,8 @@ import type {
 } from './academics-api.js';
 import { AcademicsForm } from './AcademicsForm.js';
 import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
+import { ClassEnrollmentPanel } from './ClassEnrollmentPanel.js';
+import { ClassesSectionsReferenceView } from './ClassesSectionsReferenceView.js';
 
 const managerRoles = [
   'organization_owner',
@@ -82,6 +84,7 @@ function displayName(firstName: string, lastName: string) {
 
 export function AcademicsDashboard() {
   const { organizationId = '' } = useParams();
+  const navigate = useNavigate();
   const access = useOrganizationAccess(organizationId);
   const canManage = managerRoles.includes(access.data?.role ?? '');
   const workspace = useAcademicsWorkspace(
@@ -103,9 +106,19 @@ export function AcademicsDashboard() {
   });
   const save = useSaveAcademicsResource(organizationId);
   const remove = useDeleteAcademicsResource(organizationId);
-  const [resource, setResource] = useState<AcademicsResource>('academic-years');
+  const [resource, setResource] = useState<AcademicsResource>('classes');
   const [editing, setEditing] = useState<AcademicsRow>();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [showEnrollment, setShowEnrollment] = useState(false);
+  const [enrollmentView, setEnrollmentView] = useState<'students' | 'teacher'>('students');
+  const [subjectDialogOpen, setSubjectDialogOpen] = useState(false);
+  const [enrollmentSectionId, setEnrollmentSectionId] = useState<string | undefined>();
+  const [enrollmentClassId, setEnrollmentClassId] = useState<string | undefined>();
+  const [newSectionClassId, setNewSectionClassId] = useState<string | undefined>();
+  const enrollmentRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (showEnrollment) enrollmentRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }, [showEnrollment, enrollmentClassId]);
   const selectedTab = tabs.find((tab) => tab.resource === resource) ?? tabs[0]!;
 
   const campusNames = new Map(
@@ -270,6 +283,123 @@ export function AcademicsDashboard() {
   }
   if (!canManage) return <PermissionDeniedState />;
 
+  if (resource === 'classes' || resource === 'sections') {
+    const openCreate = (targetResource: 'classes' | 'sections', targetClassId?: string) => {
+      save.reset();
+      remove.reset();
+      setResource(targetResource);
+      setEditing(undefined);
+      setNewSectionClassId(targetResource === 'sections' ? targetClassId : undefined);
+      setDialogOpen(true);
+    };
+    const openEdit = (
+      targetResource: 'classes' | 'sections',
+      record: AcademicClass | AcademicSection,
+    ) => {
+      save.reset();
+      setResource(targetResource);
+      setNewSectionClassId(undefined);
+      const details =
+        targetResource === 'classes'
+          ? `${(record as AcademicClass).code} · ${campusNames.get((record as AcademicClass).campusId) ?? 'Assigned campus'}`
+          : `${classNames.get((record as AcademicSection).classId) ?? 'Class'} · ${(record as AcademicSection).capacity ? `Capacity ${(record as AcademicSection).capacity}` : 'Capacity not set'}`;
+      setEditing(row(record, record.name, details));
+      setDialogOpen(true);
+    };
+    const deleteAcademicRecord = (
+      targetResource: 'classes' | 'sections',
+      id: string,
+      title: string,
+    ) => {
+      if (!window.confirm(`Delete ${title}?`)) return;
+      remove.mutate({ resource: targetResource, id });
+    };
+
+    return (
+      <>
+        <ClassesSectionsReferenceView
+          classes={workspace.classes.data?.items ?? []}
+          sections={workspace.sections.data?.items ?? []}
+          years={workspace.years.data?.items ?? []}
+          campuses={workspace.campuses.data?.campuses ?? []}
+          subjects={workspace.subjects.data?.items ?? []}
+          assignments={workspace.assignments.data?.items ?? []}
+          teachers={(staff.data?.items ?? []).map(({ id, firstName, lastName }) => ({
+            id,
+            firstName,
+            lastName,
+          }))}
+          onCreate={openCreate}
+          onCreateSubject={() => { save.reset(); setSubjectDialogOpen(true); }}
+          onEdit={openEdit}
+          onDelete={deleteAcademicRecord}
+          onOpenEnrollment={(sectionId, classId, view = 'students') => { setEnrollmentSectionId(sectionId); setEnrollmentClassId(classId); setEnrollmentView(view); setShowEnrollment(true); }}
+          onOpenCampusSetup={() => navigate(`/admin/organizations/${encodeURIComponent(organizationId)}?tab=campuses`)}
+        />
+        {showEnrollment && (
+          <div className="academics-page class-enrollment-shell" ref={enrollmentRef}>
+            <div className="class-enrollment-shell-heading">
+              <div><strong>{enrollmentView === 'students' ? 'Student Management' : 'Assign Subject Teacher'}</strong><p>{enrollmentView === 'students' ? 'View enrolled students, search the roster, add students, or remove selected students.' : 'Choose the academic session, section, subject and teacher for this assignment.'}</p></div>
+              <Button type="button" variant="quiet" onClick={() => setShowEnrollment(false)}>Close</Button>
+            </div>
+            <ClassEnrollmentPanel
+              key={`${enrollmentClassId ?? 'all'}:${enrollmentSectionId ?? 'none'}`}
+              organizationId={organizationId}
+              classes={workspace.classes.data?.items ?? []}
+              sections={workspace.sections.data?.items ?? []}
+              years={workspace.years.data?.items ?? []}
+              subjects={workspace.subjects.data?.items ?? []}
+              teachers={(staff.data?.items ?? []).map(({ id, firstName, lastName }) => ({
+                id,
+                firstName,
+                lastName,
+              }))}
+              teachersLoading={staff.isPending}
+              teachersError={staff.isError ? apiMessage(staff.error) : undefined}
+              initialSectionId={enrollmentSectionId}
+              initialClassId={enrollmentClassId}
+              initialView={enrollmentView}
+              onViewChange={setEnrollmentView}
+              onCreateSection={(classId) => openCreate('sections', classId) }
+            />
+          </div>
+        )}
+        <Dialog
+          description="Add a subject to your organization so it can be assigned to classes, sections and teachers."
+          onOpenChange={setSubjectDialogOpen}
+          open={subjectDialogOpen}
+          title="Add subject"
+        >
+          <AcademicsForm
+            choices={choices}
+            isSaving={save.isPending}
+            onSubmit={(input) => save.mutate(
+              { resource: 'subjects', data: input },
+              { onSuccess: () => setSubjectDialogOpen(false) },
+            )}
+            resource="subjects"
+            saveError={save.error ? apiMessage(save.error) : undefined}
+          />
+        </Dialog>
+        <Dialog
+          description={`${editing ? 'Update' : 'Create'} ${selectedTab.label.toLowerCase()} for this organization.`}
+          onOpenChange={(open) => setDialogOpen(open)}
+          open={dialogOpen}
+          title={`${editing ? 'Edit' : 'Add'} ${resourceNames[resource]}`}
+        >
+          <AcademicsForm
+            choices={choices}
+            isSaving={save.isPending}
+            onSubmit={saveRecord}
+            record={editing?.values ?? (resource === 'sections' && newSectionClassId ? { classId: newSectionClassId } : undefined)}
+            resource={resource}
+            saveError={save.error ? apiMessage(save.error) : undefined}
+          />
+        </Dialog>
+      </>
+    );
+  }
+
   const rows = recordsByResource();
   const columns: TableColumn<AcademicsRow>[] = [
     { header: 'Name', render: (item) => <strong>{item.title}</strong> },
@@ -301,11 +431,11 @@ export function AcademicsDashboard() {
         eyebrow="Organization workspace"
         title="Academics"
         description="Set up academic calendars, class structures, subjects, and teacher assignments."
-        aside={(
+        aside={
           <Button onClick={beginCreate} type="button" variant="primary">
             Add {resourceNames[resource]}
           </Button>
-        )}
+        }
       />
 
       <nav aria-label="Academic management areas" className="academics-tabs">
@@ -354,12 +484,6 @@ export function AcademicsDashboard() {
             rowKey={(item) => item.id}
             rows={rows}
           />
-        )}
-        {resource === 'classes' && workspace.campuses.isError && (
-          <p className="form-error" role="alert">
-            Campus choices are unavailable:{' '}
-            {apiMessage(workspace.campuses.error)}
-          </p>
         )}
         {resource === 'teacher-assignments' && staff.isError && (
           <p className="form-error" role="alert">

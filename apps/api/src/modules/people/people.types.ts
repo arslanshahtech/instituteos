@@ -416,6 +416,7 @@ export interface PeopleRepository {
     organizationId: string,
     applicationId: string,
     decisionReason?: string,
+    campusId?: string,
   ): Promise<{
     application: ApplicationRecord;
     student: StudentRecord;
@@ -534,7 +535,7 @@ export interface PeopleServices {
   reviewApplication(
     organizationId: string,
     applicationId: string,
-    input: { status: ApplicationStatus; decisionReason?: string },
+    input: { status: ApplicationStatus; decisionReason?: string; campusId?: string },
   ): Promise<{
     application: ApplicationRecord;
     student?: StudentRecord;

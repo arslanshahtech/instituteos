@@ -1,11 +1,9 @@
-import { randomUUID } from 'node:crypto';
 import mongoose, { Types, type PipelineStage } from 'mongoose';
 import {
   AcademicClassModel,
   AcademicYearModel,
 } from '../academics/academics.model.js';
 import {
-  EnrollmentModel,
   StudentModel,
   GuardianModel,
   StudentGuardianLinkModel,
@@ -33,6 +31,7 @@ import {
   PaymentReceiptModel,
   StudentInvoiceModel,
   FeeConcessionModel,
+  FinanceSequenceModel,
 } from './finance.model.js';
 
 const oid = (id: string) => new Types.ObjectId(id);
@@ -40,9 +39,6 @@ const money = (amount: number) =>
   mongoose.Types.Decimal128.fromString(amount.toFixed(2));
 const decimalNumber = (value: unknown) => Number(value?.toString() ?? 0);
 const iso = (value: Date | string) => new Date(value).toISOString();
-const randomNumber = (prefix: string) =>
-  `${prefix}-${randomUUID().replaceAll('-', '').slice(0, 16).toUpperCase()}`;
-
 function feeStructureRecord(
   record: Record<string, unknown>,
 ): FeeStructureRecord {
@@ -404,19 +400,14 @@ export class MongoFinanceRepository implements FinanceRepository {
       .select({ studentId: 1 })
       .lean();
     const placedIds = placements.map((placement) => placement.studentId);
-    const enrolled = await EnrollmentModel.find({
-      organizationId: oid(organizationId),
-      studentId: { $in: placedIds },
-      campusId: academicClass.campusId,
-      status: 'active',
-    })
-      .select({ studentId: 1 })
-      .lean();
-    const enrolledIds = enrolled.map((item) => item.studentId);
+    // Class placement for the selected academic year is the source of truth
+    // for class membership. Do not require a second active Enrollment record:
+    // legacy students may have a valid placement but an absent/stale enrollment.
+    if (!placedIds.length) return [];
     const students = await StudentModel.find({
       organizationId: oid(organizationId),
       status: 'active',
-      _id: { $in: enrolledIds },
+      _id: { $in: placedIds },
     })
       .select({ _id: 1 })
       .lean();
@@ -492,14 +483,25 @@ export class MongoFinanceRepository implements FinanceRepository {
     const issued = new Date(`${issueDate}T00:00:00.000Z`);
     const status = due < issued ? 'overdue' : 'unpaid';
 
-    const documents = targetStudentIds.map((studentId) => {
+    if (!targetStudentIds.length) return [];
+
+    const sequence = await FinanceSequenceModel.findOneAndUpdate(
+      { organizationId: oid(organizationId), name: 'invoice' },
+      { $inc: { value: targetStudentIds.length } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ).lean();
+    const sequenceEnd = Number(sequence?.value ?? targetStudentIds.length);
+    const sequenceStart = sequenceEnd - targetStudentIds.length + 1;
+    const year = String(new Date().getFullYear()).slice(-2);
+
+    const documents = targetStudentIds.map((studentId, index) => {
       const conc = concessionMap.get(studentId);
       const discount = conc ? conc.discountAmount : 0;
       const netTotal = Math.max(0, totalAmount - discount);
 
       return {
         organizationId: oid(organizationId),
-        invoiceNumber: randomNumber('INV'),
+        invoiceNumber: `INV-${year}-${String(sequenceStart + index).padStart(6, '0')}`,
         studentId: oid(studentId),
         feeStructureId: oid(feeStructure.id),
         classId: oid(input.classId),
@@ -550,6 +552,15 @@ export class MongoFinanceRepository implements FinanceRepository {
       calculatedStatus = 'partial';
     }
 
+    const receiptSequence = await FinanceSequenceModel.findOneAndUpdate(
+      { organizationId: oid(organizationId), name: 'receipt' },
+      { $inc: { value: 1 } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ).lean();
+    const receiptNumber = `RCT-${String(new Date().getFullYear()).slice(-2)}-${String(
+      Number(receiptSequence?.value ?? 1),
+    ).padStart(6, '0')}`;
+
     const record = await StudentInvoiceModel.findOneAndUpdate(
       {
         _id: oid(invoice.id),
@@ -573,7 +584,7 @@ export class MongoFinanceRepository implements FinanceRepository {
     const [receiptRecord] = await PaymentReceiptModel.create([
       {
         organizationId: oid(organizationId),
-        receiptNumber: randomNumber('RCT'),
+        receiptNumber,
         invoiceId: oid(invoice.id),
         studentId: oid(invoice.studentId),
         amountPaid: amount,

@@ -76,7 +76,7 @@ export function SettingsPage() {
   const updateSettings = useUpdateOrganizationSettings(organizationId);
   const [form, setForm] = useState<SettingsForm>(initialForm);
   const [activeTab, setActiveTab] = useState<
-    'branding' | 'contact' | 'localization' | 'notifications'
+    'branding' | 'contact' | 'localization' | 'notifications' | 'campuses'
   >('branding');
 
   useEffect(() => {
@@ -126,38 +126,30 @@ export function SettingsPage() {
         className="settings-heading"
         eyebrow="Organization workspace"
         title="Settings"
-        description="Manage institute information and open the core academic, fee and access settings."
+        description="Manage organization details, regional preferences, and notification settings."
       />
 
       <form className="settings-form" onSubmit={submit}>
         <nav className="settings-tabs" aria-label="Settings sections">
-          <button
-            aria-current={activeTab === 'branding' ? 'page' : undefined}
-            aria-pressed={activeTab === 'branding'}
-            className={`settings-tab${activeTab === 'branding' ? ' is-active' : ''}`}
-            onClick={() => setActiveTab('branding')}
-            type="button"
-          >
-            Institute Info
-          </button>
-          <Link
-            className="settings-tab"
-            to={`/admin/organizations/${encodeURIComponent(organizationId)}/academics`}
-          >
-            Classes &amp; Sections
-          </Link>
-          <Link
-            className="settings-tab"
-            to={`/admin/organizations/${encodeURIComponent(organizationId)}/finance`}
-          >
-            Fee Structure
-          </Link>
-          <Link
-            className="settings-tab"
-            to={`/admin/organizations/${encodeURIComponent(organizationId)}?tab=members`}
-          >
-            Roles &amp; Permissions
-          </Link>
+          {(
+            [
+              ['branding', 'Institute Info'],
+              ['contact', 'Contact & details'],
+              ['localization', 'Localization'],
+              ['notifications', 'Notifications'],
+              ['campuses', 'Campuses & branches'],
+            ] as const
+          ).map(([tab, label]) => (
+            <button
+              aria-pressed={activeTab === tab}
+              className={`settings-tab${activeTab === tab ? ' is-active' : ''}`}
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
         </nav>
         {activeTab === 'branding' && (
           <section
@@ -168,7 +160,8 @@ export function SettingsPage() {
               <div>
                 <h2 id="settings-branding-title">Institute information</h2>
                 <p>
-                  Manage the institute identity, contact details and branding used across the workspace.
+                  Manage the institute identity, contact details and branding
+                  used across the workspace.
                 </p>
               </div>
             </div>
@@ -243,7 +236,7 @@ export function SettingsPage() {
           </section>
         )}
 
-        {activeTab === 'branding' && (
+        {activeTab === 'contact' && (
           <section
             aria-labelledby="settings-contact-title"
             className="settings-card"
@@ -400,6 +393,33 @@ export function SettingsPage() {
                   <option value="DD/MM/YYYY">DD/MM/YYYY</option>
                 </select>
               </label>
+            </div>
+          </section>
+        )}
+
+        {activeTab === 'campuses' && (
+          <section
+            aria-labelledby="settings-campuses-title"
+            className="settings-card"
+          >
+            <div className="settings-card-heading">
+              <div>
+                <h2 id="settings-campuses-title">Campuses &amp; branches</h2>
+                <p>
+                  Manage campus records, campus status and campus-specific
+                  access in the organization workspace. Campus records are
+                  shared with Academics, Students, Admissions and Finance, so
+                  they are managed in one place rather than duplicated here.
+                </p>
+              </div>
+            </div>
+            <div className="settings-save-row">
+              <Link
+                className="button button-primary"
+                to={`/admin/organizations/${encodeURIComponent(organizationId)}?tab=campuses`}
+              >
+                Manage campuses
+              </Link>
             </div>
           </section>
         )}

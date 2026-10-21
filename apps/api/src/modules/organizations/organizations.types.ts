@@ -12,6 +12,10 @@ export interface AddressInput {
 
 export interface OrganizationProfileInput {
   name: string;
+  adminName?: string;
+  shortCode?: string;
+  tagline?: string;
+  logoDataUrl?: string;
   contactEmail?: string;
   phone?: string;
   address?: AddressInput;

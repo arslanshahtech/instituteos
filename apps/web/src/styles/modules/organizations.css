@@ -15,11 +15,9 @@
   overflow-x: clip;
 }
 
-
 .organization-heading {
   align-items: center;
 }
-
 
 .organization-heading-actions {
   display: flex;
@@ -1486,7 +1484,9 @@
 /* Organization page heading: mirror the approved HTML prototype. */
 /* Layout-only exception for the overview header; shared heading typography
    lives with WorkspacePageHeading in components.css. */
-.organization-admin-page .organization-heading.reference-dashboard-heading > div {
+.organization-admin-page
+  .organization-heading.reference-dashboard-heading
+  > div {
   width: 100%;
   min-width: 0;
 }

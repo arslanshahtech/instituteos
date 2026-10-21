@@ -11,12 +11,12 @@ import {
   StaffHeading,
   StaffStatusBadge,
   apiMessage,
-  campusName,
   useCampusChoices,
   useOrganizationAccess,
 } from './StaffPageShared.js';
 import type { StaffStatus } from './staff-api.js';
 import { useStaffList } from './staff-queries.js';
+import { useAcademicsWorkspace } from '../academics/academics-queries.js';
 
 const PAGE_SIZE = 20;
 
@@ -24,6 +24,10 @@ export function StaffListPage() {
   const { organizationId = '' } = useParams();
   const access = useOrganizationAccess(organizationId);
   const campuses = useCampusChoices(organizationId, access.data);
+  const academics = useAcademicsWorkspace(
+    organizationId,
+    Boolean(access.data?.permissions.includes('staff.read')),
+  );
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [department, setDepartment] = useState('');
@@ -77,7 +81,8 @@ export function StaffListPage() {
                 </Link>
               ) : undefined
             }
-            description="Search and manage staff and teachers in this organization."
+            description="Browse teachers, their subjects, and assigned classes."
+            eyebrow="Staff directory · Subjects & classes"
             organizationId={organizationId}
             title="Staff & teachers"
           />
@@ -163,12 +168,12 @@ export function StaffListPage() {
                     <h2>
                       {search || department || status || campusId
                         ? 'No staff match these filters'
-                        : 'No staff records yet'}
+                        : 'Add new teacher or staff'}
                     </h2>
                     <p>
                       {search || department || status || campusId
                         ? 'Try changing or clearing your search and filters.'
-                        : 'Create the first staff record for this organization.'}
+                        : 'Assign subjects and sections'}
                     </p>
                     {canCreate &&
                       !search &&
@@ -192,22 +197,50 @@ export function StaffListPage() {
                       const name =
                         `${person.firstName} ${person.lastName}`.trim();
                       const profilePath = `/admin/organizations/${encodeURIComponent(organizationId)}/staff/${encodeURIComponent(person.id)}`;
+                      const assignments = academics.assignments.data?.items.filter(
+                        (assignment) => assignment.teacherStaffId === person.id,
+                      ) ?? [];
+                      const classLabels = assignments.map((assignment) => {
+                        const className = academics.classes.data?.items.find(
+                          (item) => item.id === assignment.classId,
+                        )?.name;
+                        const sectionName = academics.sections.data?.items.find(
+                          (item) => item.id === assignment.sectionId,
+                        )?.name;
+                        return className && sectionName ? `${className}-${sectionName}` : '';
+                      }).filter(Boolean);
+                      const assignedSubjects = assignments.map((assignment) =>
+                        academics.subjects.data?.items.find(
+                          (item) => item.id === assignment.subjectId,
+                        )?.name,
+                      ).filter((subject): subject is string => Boolean(subject));
+                      const subjects = [...new Set([
+                        ...(person.subjects ?? []),
+                        ...assignedSubjects,
+                      ])];
+                      const classes = [...new Set(classLabels)];
                       return (
                         <WorkspaceStaffCard
                           action={
-                            <Link
-                              className="reference-outline-button"
-                              to={profilePath}
-                            >
-                              View profile
-                            </Link>
+                            <div className="reference-staff-actions">
+                              <Link
+                                className="reference-outline-button reference-staff-profile-action"
+                                to={profilePath}
+                              >
+                                View Profile
+                              </Link>
+                              <Link
+                                className="reference-outline-button reference-staff-timetable-action"
+                                to={`${profilePath}/timetable`}
+                              >
+                                Timetable
+                              </Link>
+                            </div>
                           }
                           details={[
-                            person.subjects?.length
-                              ? person.subjects.join(', ')
-                              : person.department || 'Department not set',
-                            campusName(person.campusId, campusesData),
-                            person.phone || person.email || 'Contact not provided',
+                            [...subjects, ...classes].length
+                              ? [...subjects, ...classes].join(' · ')
+                              : 'Subjects & classes not assigned',
                           ]}
                           initials={
                             `${person.firstName?.[0] ?? ''}${person.lastName?.[0] ?? ''}`.toUpperCase() ||
@@ -223,9 +256,7 @@ export function StaffListPage() {
                             </Link>
                           }
                           status={<StaffStatusBadge status={person.status} />}
-                          subtitle={
-                            person.designation ?? person.role ?? 'Staff member'
-                          }
+                          subtitle={null}
                         />
                       );
                     })}

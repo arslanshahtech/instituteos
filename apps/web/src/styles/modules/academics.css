@@ -194,3 +194,646 @@
     flex-wrap: wrap;
   }
 }
+
+.class-enrollment-panel .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-block: 1rem;
+}
+
+.class-enrollment-panel .form-grid label,
+.class-enrollment-panel .form-field {
+  display: grid;
+  gap: 0.45rem;
+  font-weight: 600;
+}
+
+.class-enrollment-panel input:not([type='checkbox']),
+.class-enrollment-panel select {
+  width: 100%;
+  min-height: 2.8rem;
+  border: 1px solid var(--border, #d6dde7);
+  border-radius: 0.65rem;
+  padding: 0.65rem 0.8rem;
+  background: var(--surface, #fff);
+  color: inherit;
+}
+
+.class-enrollment-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  max-height: 22rem;
+  overflow: auto;
+  margin-block: 0.75rem 1rem;
+}
+
+.class-enrollment-student {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid var(--border, #d6dde7);
+  border-radius: 0.7rem;
+  padding: 0.8rem;
+  cursor: pointer;
+}
+
+.class-enrollment-student span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.class-enrollment-student small {
+  color: var(--text-muted, #657187);
+}
+
+@media (max-width: 640px) {
+  .class-enrollment-panel .form-grid,
+  .class-enrollment-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Class enrollment: compact, readable management surface */
+.class-enrollment-panel {
+  display: grid;
+  gap: 1.15rem;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  border: 1px solid var(--color-border, #dbe2ea);
+  border-radius: 1rem;
+  background: var(--color-surface, #fff);
+  box-shadow: 0 8px 28px rgb(15 23 42 / 4%);
+}
+.class-enrollment-panel .academics-panel-heading {
+  margin: 0;
+}
+.class-enrollment-panel .academics-panel-heading h2 {
+  font-size: 1.25rem;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+}
+.class-enrollment-panel .academics-panel-heading p {
+  margin-top: 0.35rem;
+  line-height: 1.5;
+}
+.class-enrollment-panel .form-grid {
+  margin: 0;
+  gap: 1rem;
+}
+.class-teacher-assignment {
+  display: grid;
+  gap: 0.75rem;
+  border-top: 1px solid var(--color-border, #dbe2ea);
+  padding-top: 1rem;
+}
+.class-teacher-assignment h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.class-teacher-assignment .success-note {
+  margin: 0;
+}
+.class-enrollment-panel .form-grid label,
+.class-enrollment-panel .form-field {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  color: var(--color-text, #172033);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.class-enrollment-panel input:not([type='checkbox']),
+.class-enrollment-panel select {
+  box-sizing: border-box;
+  min-height: 2.75rem;
+  width: 100%;
+  border: 1px solid var(--color-border, #dbe2ea);
+  border-radius: 0.65rem;
+  padding: 0.65rem 0.8rem;
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #172033);
+  font: inherit;
+  font-weight: 400;
+  outline-offset: 2px;
+}
+.class-enrollment-panel input:focus-visible,
+.class-enrollment-panel select:focus-visible {
+  outline: 2px solid var(--color-accent, #2563eb);
+}
+.class-enrollment-panel .form-field input {
+  margin-top: 0.1rem;
+}
+.class-enrollment-panel .class-enrollment-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--color-muted, #64748b);
+  font-size: 0.875rem;
+}
+.class-enrollment-panel .class-enrollment-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  max-height: 20rem;
+  overflow: auto;
+  margin: 0;
+  padding: 1px;
+}
+.class-enrollment-panel .class-enrollment-student {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
+  border: 1px solid var(--color-border, #dbe2ea);
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+  background: var(--color-surface, #fff);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.class-enrollment-panel .class-enrollment-student:hover {
+  border-color: var(--color-accent, #2563eb);
+  background: var(--color-surface-subtle, #f8fafc);
+}
+.class-enrollment-panel .class-enrollment-student:has(input:checked) {
+  border-color: var(--color-accent, #2563eb);
+  background: var(--color-accent-soft, #eff6ff);
+}
+.class-enrollment-panel .class-enrollment-student input[type='checkbox'] {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--color-accent, #2563eb);
+}
+.class-enrollment-panel .class-enrollment-student span {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+.class-enrollment-panel .class-enrollment-student strong {
+  overflow-wrap: anywhere;
+  font-size: 0.925rem;
+}
+.class-enrollment-panel .class-enrollment-student small {
+  color: var(--color-muted, #64748b);
+  font-size: 0.8rem;
+}
+.class-enrollment-panel .class-enrollment-actions {
+  justify-content: flex-end;
+  padding-top: 0.25rem;
+}
+.class-enrollment-panel .enrollment-result {
+  border: 1px solid var(--color-border, #dbe2ea);
+  border-radius: 0.75rem;
+  padding: 0.85rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.class-enrollment-panel .enrollment-result p {
+  margin: 0.25rem 0 0;
+}
+.class-enrollment-panel .enrollment-result ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}
+.class-enrollment-panel .enrollment-result-error {
+  border-color: #fecaca;
+  background: #fff7f7;
+  color: #991b1b;
+}
+.class-enrollment-panel .enrollment-result-success {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+@media (max-width: 700px) {
+  .class-enrollment-panel .form-grid,
+  .class-enrollment-panel .class-enrollment-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .class-enrollment-panel .academics-panel-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .class-enrollment-panel .class-enrollment-actions,
+  .class-enrollment-panel .class-enrollment-actions button {
+    width: 100%;
+  }
+}
+
+/* Reference-matched Classes & Sections workspace */
+.classes-reference-page {
+  min-width: 0;
+  color: #0a0a0a;
+  gap: 1.5rem;
+}
+.classes-reference-page .cr-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+.classes-reference-page .cr-kicker-row,
+.classes-reference-page .cr-header-actions,
+.classes-reference-page .cr-session-control,
+.classes-reference-page .cr-toolbar,
+.classes-reference-page .cr-search,
+.classes-reference-page .cr-section-title,
+.classes-reference-page .cr-class-card-top,
+.classes-reference-page .cr-card-footer,
+.classes-reference-page .cr-detail-header,
+.classes-reference-page .cr-detail-title,
+.classes-reference-page .cr-detail-tabs,
+.classes-reference-page .cr-detail-section-heading,
+.classes-reference-page .cr-section-row,
+.classes-reference-page .cr-detail-actions,
+.classes-reference-page .cr-footer {
+  display: flex;
+  align-items: center;
+}
+.classes-reference-page .cr-kicker-row { gap: .5rem; margin-bottom: .5rem; }
+.classes-reference-page .cr-module-pill {
+  padding: .25rem .625rem;
+  border-radius: 999px;
+  background: #000;
+  color: #fff;
+  font-size: 10px;
+  line-height: 1.5;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.classes-reference-page .cr-muted { color: #71717a; font-size: 12px; }
+.classes-reference-page .cr-header h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -.025em;
+}
+.classes-reference-page .cr-header p {
+  max-width: 520px;
+  margin: .5rem 0 0;
+  color: #71717a;
+  font-size: 14px;
+  line-height: 1.625;
+}
+.classes-reference-page .cr-header-actions { flex-wrap: wrap; justify-content: flex-end; gap: .75rem; }
+.classes-reference-page .cr-session-control {
+  gap: .5rem;
+  padding: .25rem;
+  border: 1px solid rgba(228,228,231,.7);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.05);
+}
+.classes-reference-page .cr-session-control > span { padding-left: .75rem; color: #71717a; font-size: 12px; }
+.classes-reference-page .cr-session-control select {
+  max-width: 220px;
+  height: 32px;
+  padding: 0 1.75rem 0 .75rem;
+  border: 0;
+  border-radius: 999px;
+  outline: none;
+  background: #000;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+}
+.classes-reference-page .cr-primary-button,
+.classes-reference-page .cr-small-dark-button,
+.classes-reference-page .cr-secondary-button,
+.classes-reference-page .cr-danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .45rem;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background .15s ease, border-color .15s ease;
+}
+.classes-reference-page .cr-primary-button { min-height: 40px; padding: 0 1.25rem; border: 1px solid #000; background: #000; color: #fff; }
+.classes-reference-page .cr-primary-button:hover, .classes-reference-page .cr-small-dark-button:hover { background: #27272a; }
+.classes-reference-page .cr-stat-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 1rem; }
+.classes-reference-page .cr-stat-card {
+  position: relative;
+  min-width: 0;
+  padding: 1.25rem;
+  border: 1px solid rgba(228,228,231,.7);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0,0,0,.03);
+}
+.classes-reference-page .cr-stat-icon {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: #f6f5f2;
+}
+.classes-reference-page .cr-stat-card p { margin: .85rem 0 .2rem; color: #71717a; font-size: 12px; }
+.classes-reference-page .cr-stat-card strong { display: block; font-size: 28px; font-weight: 700; line-height: 1.05; letter-spacing: -.025em; }
+.classes-reference-page .cr-stat-card small { display: block; margin-top: .45rem; color: #71717a; font-size: 11px; }
+.classes-reference-page .cr-workspace { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(320px,.85fr); gap: 1.25rem; align-items: start; }
+.classes-reference-page .cr-list-column { min-width: 0; }
+.classes-reference-page .cr-toolbar { flex-wrap: wrap; gap: .625rem; margin-bottom: 1.25rem; }
+.classes-reference-page .cr-search { flex: 1 1 220px; gap: .5rem; min-width: 0; height: 40px; padding: 0 .875rem; border: 1px solid #e4e4e7; border-radius: 999px; background: #fff; color: #a1a1aa; }
+.classes-reference-page .cr-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: #18181b; font-size: 13px; }
+.classes-reference-page .cr-search input::placeholder { color: #a1a1aa; }
+.classes-reference-page .cr-filter-select { max-width: 100%; height: 40px; padding: 0 .875rem; border: 1px solid #e4e4e7; border-radius: 999px; background: #fff; color: #27272a; font-size: 12px; }
+.classes-reference-page .cr-section-title { justify-content: space-between; gap: 1rem; margin-bottom: .875rem; }
+.classes-reference-page .cr-eyebrow { color: #71717a; font-size: 10px; font-weight: 650; letter-spacing: .1em; }
+.classes-reference-page .cr-section-title h2 { margin: .25rem 0 0; font-size: 18px; font-weight: 650; letter-spacing: -.02em; }
+.classes-reference-page .cr-count { padding: .25rem .625rem; border: 1px solid #e4e4e7; border-radius: 999px; background: #fff; color: #71717a; font-size: 11px; }
+.classes-reference-page .cr-class-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .75rem; }
+.classes-reference-page .cr-class-card {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid rgba(228,228,231,.8);
+  border-radius: 16px;
+  background: #fff;
+  color: #0a0a0a;
+  text-align: left;
+  box-shadow: 0 2px 12px rgba(0,0,0,.025);
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.classes-reference-page .cr-class-card:hover { border-color: #a1a1aa; box-shadow: 0 8px 24px rgba(0,0,0,.06); }
+.classes-reference-page .cr-class-card.is-selected { border-color: #000; background: #fbfaf8; box-shadow: 0 0 0 1px #000; }
+.classes-reference-page .cr-class-card-top { justify-content: space-between; gap: .5rem; }
+.classes-reference-page .cr-class-avatar { display: inline-flex; flex: 0 0 auto; width: 36px; height: 36px; align-items: center; justify-content: center; border-radius: 12px; background: #0a0a0a; color: #fff; font-size: 11px; font-weight: 700; }
+.classes-reference-page .cr-card-code { max-width: 120px; overflow: hidden; padding: .25rem .5rem; border: 1px solid #e4e4e7; border-radius: 999px; color: #52525b; font-family: ui-monospace,SFMono-Regular,Menlo,monospace; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.classes-reference-page .cr-class-card h3 { margin: 1rem 0 .2rem; overflow-wrap: anywhere; font-size: 15px; font-weight: 650; letter-spacing: -.015em; }
+.classes-reference-page .cr-card-campus { margin: 0; color: #71717a; font-size: 12px; }
+.classes-reference-page .cr-card-footer { justify-content: space-between; gap: .5rem; margin-top: 1rem; padding-top: .75rem; border-top: 1px solid #f4f4f5; color: #52525b; font-size: 11px; }
+.classes-reference-page .cr-card-footer span { display: inline-flex; align-items: center; gap: .35rem; }
+.classes-reference-page .cr-detail-column { min-width: 0; overflow: hidden; border: 1px solid rgba(228,228,231,.8); border-radius: 20px; background: #fbfaf8; box-shadow: 0 2px 12px rgba(0,0,0,.03); }
+.classes-reference-page .cr-detail-header { justify-content: space-between; gap: .75rem; padding: 1rem; border-bottom: 1px solid #e4e4e7; background: #fff; }
+.classes-reference-page .cr-detail-title { min-width: 0; gap: .75rem; }
+.classes-reference-page .cr-detail-avatar { width: 40px; height: 40px; border-radius: 999px; }
+.classes-reference-page .cr-detail-title > div { min-width: 0; }
+.classes-reference-page .cr-detail-title h2 { margin: 0; overflow-wrap: anywhere; font-size: 14px; font-weight: 650; letter-spacing: -.015em; }
+.classes-reference-page .cr-detail-title p { margin: .25rem 0 0; color: #71717a; font-size: 11px; overflow-wrap: anywhere; }
+.classes-reference-page .cr-icon-button { display: inline-flex; flex: 0 0 auto; width: 32px; height: 32px; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: #f4f4f5; color: #27272a; }
+.classes-reference-page .cr-detail-tabs { gap: .25rem; overflow-x: auto; padding: .5rem; border-bottom: 1px solid #e4e4e7; background: #fff; }
+.classes-reference-page .cr-detail-tabs button { flex: 0 0 auto; min-height: 32px; padding: 0 .75rem; border: 1px solid #e4e4e7; border-radius: 999px; background: #fff; color: #52525b; font-size: 11px; font-weight: 500; white-space: nowrap; }
+.classes-reference-page .cr-detail-tabs button.active { border-color: #000; background: #000; color: #fff; }
+.classes-reference-page .cr-detail-body { padding: 1rem; }
+.classes-reference-page .cr-detail-section-heading { align-items: flex-start; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
+.classes-reference-page .cr-detail-section-heading h3 { margin: 0; font-size: 13px; font-weight: 650; }
+.classes-reference-page .cr-detail-section-heading p { margin: .25rem 0 0; color: #71717a; font-size: 11px; line-height: 1.5; }
+.classes-reference-page .cr-small-dark-button { min-height: 32px; padding: 0 .75rem; border: 1px solid #18181b; background: #18181b; color: #fff; font-size: 11px; }
+.classes-reference-page .cr-section-list { overflow: hidden; border: 1px solid #e4e4e7; border-radius: 14px; background: #fff; }
+.classes-reference-page .cr-section-row { gap: .625rem; min-width: 0; padding: .75rem; border-bottom: 1px solid #f4f4f5; }
+.classes-reference-page .cr-section-row:last-child { border-bottom: 0; }
+.classes-reference-page .cr-section-letter { display: inline-flex; flex: 0 0 auto; width: 30px; height: 30px; align-items: center; justify-content: center; border-radius: 10px; background: #f6f5f2; color: #18181b; font-size: 11px; font-weight: 650; }
+.classes-reference-page .cr-section-row-copy { flex: 1 1 auto; min-width: 0; }
+.classes-reference-page .cr-section-row-copy strong { display: block; overflow-wrap: anywhere; font-size: 12px; font-weight: 600; }
+.classes-reference-page .cr-section-row-copy small { display: block; margin-top: .2rem; color: #71717a; font-size: 10px; }
+.classes-reference-page .cr-text-button { flex: 0 0 auto; padding: .25rem; border: 0; background: transparent; color: #52525b; font-size: 11px; font-weight: 500; }
+.classes-reference-page .cr-text-button:hover { color: #000; }
+.classes-reference-page .cr-text-button.danger { color: #b91c1c; }
+.classes-reference-page .cr-empty-inline { padding: 1.25rem .75rem; border: 1px dashed #d4d4d8; border-radius: 14px; background: #fff; text-align: center; }
+.classes-reference-page .cr-empty-inline p { margin: 0 0 .5rem; color: #52525b; font-size: 12px; }
+.classes-reference-page .cr-empty-inline span { color: #71717a; font-size: 11px; }
+.classes-reference-page .cr-detail-actions { flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+.classes-reference-page .cr-secondary-button { min-height: 34px; padding: 0 .75rem; border: 1px solid #e4e4e7; background: #fff; color: #27272a; font-size: 11px; }
+.classes-reference-page .cr-secondary-button:hover { border-color: #a1a1aa; }
+.classes-reference-page .cr-danger-button { min-height: 34px; padding: 0 .75rem; border: 1px solid #fecaca; background: #fff5f5; color: #b91c1c; font-size: 11px; }
+.classes-reference-page .cr-empty-state, .classes-reference-page .cr-detail-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem 1.5rem; border: 1px dashed #d4d4d8; border-radius: 20px; background: #fff; text-align: center; }
+.classes-reference-page .cr-detail-placeholder { min-height: 340px; border: 0; border-radius: 0; background: transparent; }
+.classes-reference-page .cr-empty-icon { display: inline-flex; width: 48px; height: 48px; align-items: center; justify-content: center; border-radius: 16px; background: #f6f5f2; color: #18181b; }
+.classes-reference-page .cr-empty-state h3, .classes-reference-page .cr-detail-placeholder h3 { margin: 1rem 0 .25rem; font-size: 14px; font-weight: 650; }
+.classes-reference-page .cr-empty-state p, .classes-reference-page .cr-detail-placeholder p { max-width: 300px; margin: 0; color: #71717a; font-size: 12px; line-height: 1.6; }
+.classes-reference-page .cr-empty-state .cr-primary-button { margin-top: 1rem; }
+.classes-reference-page .cr-footer { justify-content: space-between; gap: .75rem; padding-top: 1rem; border-top: 1px solid rgba(228,228,231,.6); color: #71717a; font-size: 11px; }
+.classes-reference-page .cr-live-dot { display: inline-block; width: 7px; height: 7px; margin-right: .35rem; border-radius: 50%; background: #000; }
+.classes-reference-page .cr-footer-actions { display: inline-flex; align-items: center; gap: 1rem; }
+.classes-reference-page .cr-footer-link { padding: 0; border: 0; background: transparent; color: #52525b; font: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.classes-reference-page .cr-footer-link:hover { color: #000; }
+@media (max-width: 1023px) {
+  .classes-reference-page .cr-header { flex-direction: column; }
+  .classes-reference-page .cr-header-actions { justify-content: flex-start; }
+  .classes-reference-page .cr-stat-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .classes-reference-page .cr-workspace { grid-template-columns: minmax(0,1fr); }
+  .classes-reference-page .cr-detail-placeholder { min-height: 220px; }
+}
+@media (max-width: 600px) {
+  .classes-reference-page { gap: 1rem; }
+  .classes-reference-page .cr-header h1 { font-size: 28px; }
+  .classes-reference-page .cr-header-actions { width: 100%; }
+  .classes-reference-page .cr-session-control { flex: 1 1 auto; justify-content: space-between; }
+  .classes-reference-page .cr-session-control select { max-width: 180px; }
+  .classes-reference-page .cr-header-actions > .cr-primary-button { flex: 1 1 100%; }
+  .classes-reference-page .cr-stat-grid { gap: .625rem; }
+  .classes-reference-page .cr-stat-card { padding: .875rem; border-radius: 16px; }
+  .classes-reference-page .cr-stat-card strong { font-size: 24px; }
+  .classes-reference-page .cr-class-grid { grid-template-columns: minmax(0,1fr); }
+  .classes-reference-page .cr-toolbar { align-items: stretch; flex-direction: column; }
+  .classes-reference-page .cr-search, .classes-reference-page .cr-filter-select { width: 100%; max-width: none; box-sizing: border-box; }
+  .classes-reference-page .cr-detail-actions > button { flex: 1 1 100%; }
+  .classes-reference-page .cr-footer { align-items: flex-start; flex-direction: column; }
+}
+
+
+/* Clear helper copy for setup-dependent academic fields. */
+.form-help-text { margin: 0.4rem 0 0; color: var(--text-muted, #68707d); font-size: 0.82rem; line-height: 1.45; }
+
+
+.class-enrollment-view-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.3rem;
+  border: 1px solid var(--color-border, #dbe2ea);
+  border-radius: 0.85rem;
+  background: var(--color-surface-subtle, #f8fafc);
+}
+.class-enrollment-view-tabs button {
+  min-height: 2.65rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 0.65rem;
+  background: transparent;
+  color: var(--color-muted, #64748b);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.class-enrollment-view-tabs button.active,
+.class-enrollment-view-tabs button[aria-selected='true'] {
+  border-color: var(--color-border, #dbe2ea);
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #172033);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+}
+.class-enrollment-view-tabs button:focus-visible {
+  outline: 2px solid var(--color-accent, #2563eb);
+  outline-offset: 2px;
+}
+
+
+.class-enrollment-anchor {
+  scroll-margin-top: 1.5rem;
+}
+.class-roster-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+.class-roster-heading-actions .class-roster-count {
+  white-space: nowrap;
+}
+.class-roster-select-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-border, #dbe2ea);
+  border-radius: 0.75rem;
+  background: var(--color-surface-subtle, #f8fafc);
+}
+.class-roster-select-toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.class-roster-select-toolbar > span {
+  color: var(--color-muted, #64748b);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.class-enrollment-view-tabs button {
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .class-enrollment-view-tabs button { transition: none; }
+}
+
+
+/* Enrollment roster polish: clear hierarchy, breathing room, responsive actions. */
+.class-enrollment-panel .class-roster-section {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.class-enrollment-panel .class-roster-section .academics-panel-heading {
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0;
+}
+.class-enrollment-panel .class-roster-heading-actions {
+  gap: 0.75rem;
+}
+.class-enrollment-panel .class-roster-count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--color-border, #dbe2ea);
+  border-radius: 999px;
+  background: var(--color-surface-subtle, #f8fafc);
+  color: var(--color-muted, #64748b);
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1.2;
+}
+.class-enrollment-panel .class-roster-heading-actions button {
+  min-height: 2.4rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: 0.65rem;
+  white-space: nowrap;
+}
+.class-enrollment-panel .class-roster-section > .form-field {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.15rem 0 0.25rem;
+}
+.class-enrollment-panel .class-roster-select-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem 1.1rem;
+  margin: 0.25rem 0 0.5rem;
+  padding: 0.85rem 1rem;
+}
+.class-enrollment-panel .class-roster-select-toolbar label {
+  gap: 0.55rem;
+  min-height: 2rem;
+  font-weight: 550;
+}
+.class-enrollment-panel .class-roster-select-toolbar input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--color-accent, #2563eb);
+}
+.class-enrollment-panel .class-roster-select-toolbar button {
+  min-height: 2.35rem;
+  margin-left: auto;
+}
+.class-enrollment-panel .class-enrollment-list {
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+.class-enrollment-panel .class-enrollment-student {
+  gap: 0.85rem;
+  min-height: 4.25rem;
+  padding: 0.9rem 1rem;
+}
+.class-enrollment-panel .class-roster-status {
+  margin-left: auto;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  background: var(--color-surface-subtle, #f8fafc);
+  color: var(--color-muted, #64748b);
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.class-enrollment-panel .class-roster-remove-button {
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border, #dbe2ea);
+  border-radius: 0.55rem;
+  padding: 0.4rem 0.65rem;
+  background: transparent;
+  color: var(--color-muted, #64748b);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.class-enrollment-panel .class-roster-remove-button:hover {
+  border-color: var(--color-danger, #dc2626);
+  color: var(--color-danger, #dc2626);
+}
+@media (max-width: 700px) {
+  .class-enrollment-panel .class-roster-section .academics-panel-heading {
+    align-items: stretch;
+  }
+  .class-enrollment-panel .class-roster-heading-actions {
+    justify-content: flex-start;
+  }
+  .class-enrollment-panel .class-roster-select-toolbar {
+    align-items: stretch;
+  }
+  .class-enrollment-panel .class-roster-select-toolbar button {
+    margin-left: 0;
+  }
+  .class-enrollment-panel .class-enrollment-student {
+    flex-wrap: wrap;
+    gap: 0.65rem;
+  }
+  .class-enrollment-panel .class-roster-status {
+    margin-left: 0;
+  }
+}

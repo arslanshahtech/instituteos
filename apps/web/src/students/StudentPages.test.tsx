@@ -146,7 +146,10 @@ describe('student management pages', () => {
       );
     });
 
-    await user.selectOptions(screen.getByLabelText('Status'), 'inactive');
+    await user.selectOptions(
+      screen.getByLabelText('Student status'),
+      'inactive',
+    );
     await waitFor(() => {
       expect(studentMocks.listStudents).toHaveBeenLastCalledWith(
         organizationId,

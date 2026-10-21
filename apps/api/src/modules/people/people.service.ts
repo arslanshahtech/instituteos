@@ -743,7 +743,7 @@ export class PeopleService {
   async reviewApplication(
     organizationId: string,
     applicationId: string,
-    input: { status: ApplicationStatus; decisionReason?: string },
+    input: { status: ApplicationStatus; decisionReason?: string; campusId?: string },
     context?: { organizationId: string; campusIds?: string[]; role?: string },
   ): Promise<{
     application: ApplicationRecord;
@@ -761,7 +761,14 @@ export class PeopleService {
       context,
     );
     const allowed = TRANSITIONS[existing.status] ?? [];
-    if (!allowed.includes(input.status)) {
+    // Approval is intentionally idempotent when an older application was
+    // marked approved before its student record was created. The repository
+    // repairs missing student/enrollment records without creating duplicates.
+    const repairingApprovedApplication =
+      existing.status === 'approved' &&
+      input.status === 'approved' &&
+      !existing.convertedStudentId;
+    if (!allowed.includes(input.status) && !repairingApprovedApplication) {
       throw new AppError(
         400,
         'INVALID_TRANSITION',
@@ -769,10 +776,20 @@ export class PeopleService {
       );
     }
     if (input.status === 'approved') {
+      const campusId = input.campusId ?? existing.campusId;
+      if (!campusId) {
+        throw new AppError(
+          400,
+          'CAMPUS_REQUIRED',
+          'Assign a campus before approving this application so the student is placed in the correct campus roster.',
+        );
+      }
+      assertCampusScope(context ?? { organizationId }, campusId);
       const result = await this.repository.approveApplication(
         organizationId,
         applicationId,
         input.decisionReason,
+        campusId,
       );
       return {
         application: result.application,

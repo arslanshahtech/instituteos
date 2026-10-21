@@ -153,12 +153,58 @@ teacherAssignmentSchema.index(
   {
     organizationId: 1,
     teacherStaffId: 1,
+    subjectId: 1,
     classId: 1,
     sectionId: 1,
     academicYearId: 1,
   },
   { unique: true, name: 'uniq_teacher_section_per_year' },
 );
+
+const teacherTimetableSchema = new Schema(
+  {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: true,
+    },
+    teacherStaffId: {
+      type: Schema.Types.ObjectId,
+      ref: 'StaffMember',
+      required: true,
+    },
+    teacherAssignmentId: {
+      type: Schema.Types.ObjectId,
+      ref: 'TeacherAssignment',
+      required: true,
+    },
+    dayOfWeek: {
+      type: String,
+      enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+      required: true,
+    },
+    startTime: {
+      type: String,
+      required: true,
+      match: /^([01]\d|2[0-3]):[0-5]\d$/,
+    },
+    endTime: {
+      type: String,
+      required: true,
+      match: /^([01]\d|2[0-3]):[0-5]\d$/,
+    },
+    room: { type: String, trim: true, maxlength: 80 },
+  },
+  { timestamps: true, versionKey: false },
+);
+teacherTimetableSchema.index(
+  { organizationId: 1, teacherStaffId: 1, dayOfWeek: 1, startTime: 1 },
+  { name: 'teacher_timetable_by_day' },
+);
+
+export const TeacherTimetableModel =
+  mongoose.models.TeacherTimetable ??
+  mongoose.model('TeacherTimetable', teacherTimetableSchema);
 
 export const AcademicYearModel =
   mongoose.models.AcademicYear ??

@@ -157,6 +157,10 @@ export interface AttendanceRepository {
     organizationId: string,
     input: StudentPlacementInput,
   ): Promise<StudentPlacementRecord>;
+  deactivateStudentPlacement(
+    organizationId: string,
+    input: StudentPlacementInput,
+  ): Promise<boolean>;
   listStudentRoster(
     organizationId: string,
     input: Pick<

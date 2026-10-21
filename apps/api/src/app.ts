@@ -16,9 +16,18 @@ export function createApp(config: AppConfig = env) {
   const application = express();
 
   application.disable('x-powered-by');
+  // API responses contain session and tenant-scoped data. Do not allow browser
+  // caches to revalidate them into body-less 304 responses or reuse stale data.
+  application.set('etag', false);
   application.set('trust proxy', config.trustProxyHops);
   application.use(requestIdMiddleware);
   application.use(requestLogger);
+  application.use('/api/v1', (_request, response, next) => {
+    response.setHeader('Cache-Control', 'no-store, max-age=0');
+    response.setHeader('Pragma', 'no-cache');
+    response.setHeader('Expires', '0');
+    next();
+  });
   application.use(helmet());
   application.use(
     cors({

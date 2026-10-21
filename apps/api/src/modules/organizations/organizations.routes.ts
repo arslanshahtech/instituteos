@@ -121,6 +121,37 @@ function parseOrganizationProfile(
   const name = create
     ? requiredString(body.name, 'organization name', 2, 160)
     : optionalString(body.name, 'organization name', 160);
+  const adminName =
+    body.adminName === ''
+      ? ''
+      : optionalString(body.adminName, 'organization admin name', 120);
+  const shortCode =
+    body.shortCode === ''
+      ? ''
+      : optionalString(body.shortCode, 'organization short code', 24);
+  if (shortCode && !/^[a-zA-Z0-9-]+$/.test(shortCode))
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Short code may contain letters, numbers and hyphens only.',
+    );
+  const tagline =
+    body.tagline === ''
+      ? ''
+      : optionalString(body.tagline, 'organization tagline', 180);
+  const logoDataUrl =
+    body.logoDataUrl === ''
+      ? ''
+      : optionalString(body.logoDataUrl, 'organization logo', 500000);
+  if (
+    logoDataUrl &&
+    !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(logoDataUrl)
+  )
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Upload a PNG, JPG or WebP logo image.',
+    );
   const contactEmail =
     body.contactEmail === undefined ? undefined : email(body.contactEmail);
   const phone = optionalString(body.phone, 'phone number', 40);
@@ -145,6 +176,10 @@ function parseOrganizationProfile(
     );
   return {
     ...(name ? { name } : {}),
+    ...(adminName !== undefined ? { adminName } : {}),
+    ...(shortCode !== undefined ? { shortCode: shortCode.toUpperCase() } : {}),
+    ...(tagline !== undefined ? { tagline } : {}),
+    ...(logoDataUrl !== undefined ? { logoDataUrl } : {}),
     ...(contactEmail ? { contactEmail } : {}),
     ...(phone ? { phone } : {}),
     ...(address ? { address } : {}),
@@ -340,6 +375,7 @@ export function createOrganizationRouter(
   router.post(
     '/',
     authenticate,
+    requirePlatformRole(accessRepository, 'platform_super_admin'),
     csrfProtection,
     asyncHandler(async (request, response) => {
       const created = await service.provision(

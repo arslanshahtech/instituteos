@@ -56,7 +56,19 @@ export function AuthProvider({ children }: PropsWithChildren) {
         throw error;
       }
     },
-    retry: false,
+    // A short API/network interruption must not immediately lock the whole
+    // app behind the session error screen. Retry transient failures, but do
+    // not retry expected auth/client errors such as 401 or 403.
+    // Keep recovering from transient API/network failures instead of giving
+    // up after three attempts and leaving the user on a session-error screen.
+    // Expected client/auth responses are handled immediately, not retried.
+    retry: (_failureCount, error) => {
+      if (error instanceof ApiError && error.status < 500) return false;
+      return true;
+    },
+    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 15_000),
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
     staleTime: 30_000,
   });
 

@@ -150,9 +150,6 @@ export function LoginPage() {
           {...form.register('password')}
           error={form.formState.errors.password?.message}
         />
-        <div className="auth-inline-link">
-          <Link to="/forgot-password">Forgot password?</Link>
-        </div>
         <FormStatus error={error} />
         {searchParams.get('registration') === 'complete' && (
           <FormStatus success="If registration was completed, you can sign in. If you already have an account, sign in or use Forgot password." />
@@ -167,6 +164,9 @@ export function LoginPage() {
         >
           {form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}
         </Button>
+        <div className="auth-inline-link">
+          <Link to="/forgot-password">Forgot password?</Link>
+        </div>
       </form>
     </AuthFrame>
   );

@@ -132,3 +132,185 @@
     display: none !important;
   }
 }
+
+/* Teacher directory cards match the supplied reference. */
+.staff-management-page .reference-staff-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.staff-management-page .reference-staff-card {
+  position: relative;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px 12px;
+  min-height: 96px;
+  padding: 14px;
+  border: 1px solid #e9e6e1;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.staff-management-page .reference-staff-avatar {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  border-radius: 50%;
+  background: #111;
+  color: #fff;
+  font-size: 10px;
+}
+
+.staff-management-page .reference-staff-copy {
+  gap: 5px;
+  padding-right: 44px;
+}
+
+.staff-management-page .reference-staff-copy strong {
+  color: #171715;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.staff-management-page .reference-staff-copy small,
+.staff-management-page .reference-staff-copy span {
+  color: #85817b;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.staff-management-page .reference-staff-copy .status-badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  margin: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #e5f5e9;
+  padding: 4px 9px;
+  color: #24834a;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.staff-management-page .reference-staff-actions {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.staff-management-page .reference-staff-actions .reference-outline-button {
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 9px;
+  text-decoration: none;
+}
+
+.staff-management-page .reference-staff-profile-action {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+
+.staff-management-page .reference-staff-timetable-action {
+  border-color: #e9e6e1;
+  background: #fff;
+  color: #171715;
+}
+
+.staff-management-page .staff-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.staff-management-page .staff-empty-grid {
+  display: grid;
+  min-height: 90px;
+  justify-items: center;
+  align-content: center;
+  gap: 6px;
+  border: 1px dashed #e9e6e1;
+  border-radius: 16px;
+  background: #faf9f6;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .staff-management-page .reference-staff-grid,
+  .staff-management-page .staff-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.teacher-timetable-form form {
+  display: grid;
+  gap: 1rem;
+}
+
+.teacher-timetable-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.teacher-timetable-list {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.teacher-timetable-day {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.teacher-timetable-day h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.teacher-timetable-entry {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.7fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border-subtle, #d9dce2);
+  border-radius: 0.75rem;
+}
+
+.teacher-timetable-time,
+.teacher-timetable-copy {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.teacher-timetable-time span {
+  color: var(--text-muted, #687080);
+  font-size: 0.85rem;
+}
+
+.teacher-timetable-copy strong {
+  overflow-wrap: anywhere;
+}
+
+.teacher-timetable-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+@media (max-width: 760px) {
+  .teacher-timetable-fields,
+  .teacher-timetable-entry {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .teacher-timetable-entry {
+    align-items: stretch;
+  }
+}

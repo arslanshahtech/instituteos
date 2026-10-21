@@ -53,6 +53,7 @@ export interface StudentInvoice {
   invoiceNumber: string;
   studentId: string;
   studentName: string;
+  guardianPhone?: string;
   feeStructureId: string;
   feeStructureName: string;
   classId: string;
@@ -313,5 +314,153 @@ export function setInvoiceDiscount(
       method: 'PATCH',
       body: JSON.stringify({ applyDiscount }),
     },
+  );
+}
+
+
+export type ExpenseCategory =
+  | 'salaries'
+  | 'utilities'
+  | 'stationery'
+  | 'maintenance'
+  | 'transport'
+  | 'supplies'
+  | 'other';
+
+export interface FinanceExpense {
+  id: string;
+  organizationId: string;
+  campusId?: string;
+  description: string;
+  category: ExpenseCategory;
+  amount: number;
+  paymentMethod: PaymentMethod;
+  expenseDate: string;
+  reference?: string;
+  recordedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FinancePayment {
+  id: string;
+  organizationId: string;
+  receiptNumber: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  studentId: string;
+  studentName: string;
+  campusId: string;
+  classId: string;
+  amountPaid: number;
+  paymentMethod: PaymentMethod;
+  paymentDate: string;
+  transactionReference?: string;
+}
+
+export interface FinanceConcessionWithStudent extends FeeConcession {
+  studentName: string;
+  campusId?: string;
+}
+
+export interface FinanceOperationFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  month?: string;
+  campusId?: string;
+  classId?: string;
+  paymentMethod?: PaymentMethod;
+  category?: ExpenseCategory;
+  academicYearId?: string;
+}
+
+function financeQuery(filters: object) {
+  const query = new URLSearchParams(
+    Object.entries(filters).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && Boolean(entry[1])),
+  );
+  return query.size ? `?${query.toString()}` : '';
+}
+
+export function listFinancePayments(
+  organizationId: string,
+  filters: FinanceOperationFilters = {},
+) {
+  return apiRequest<{ items: FinancePayment[] }>(
+    `${financePath(organizationId)}/payments${financeQuery(filters)}`,
+  );
+}
+
+export function listFinanceExpenses(
+  organizationId: string,
+  filters: FinanceOperationFilters = {},
+) {
+  return apiRequest<{ items: FinanceExpense[] }>(
+    `${financePath(organizationId)}/expenses${financeQuery(filters)}`,
+  );
+}
+
+export function createFinanceExpense(
+  organizationId: string,
+  input: {
+    description: string;
+    category: ExpenseCategory;
+    amount: number;
+    paymentMethod: PaymentMethod;
+    expenseDate: string;
+    campusId?: string;
+    reference?: string;
+  },
+) {
+  return apiRequest<{ expense: FinanceExpense }>(
+    `${financePath(organizationId)}/expenses`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+}
+
+export function deleteFinanceExpense(organizationId: string, expenseId: string) {
+  return apiRequest<void>(
+    `${financePath(organizationId)}/expenses/${encodeURIComponent(expenseId)}`,
+    { method: 'DELETE' },
+  );
+}
+
+export function listFinanceConcessions(
+  organizationId: string,
+  filters: Pick<FinanceOperationFilters, 'campusId' | 'academicYearId'> = {},
+) {
+  return apiRequest<{ items: FinanceConcessionWithStudent[] }>(
+    `${financePath(organizationId)}/concessions${financeQuery(filters)}`,
+  );
+}
+
+
+export interface FinanceExpenseBudget {
+  id: string;
+  organizationId: string;
+  campusId?: string;
+  category: ExpenseCategory;
+  month: string;
+  budgetAmount: number;
+  recordedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function listFinanceExpenseBudgets(
+  organizationId: string,
+  filters: { month: string; campusId?: string },
+) {
+  return apiRequest<{ items: FinanceExpenseBudget[] }>(
+    `${financePath(organizationId)}/expenses/budgets${financeQuery(filters)}`,
+  );
+}
+
+export function saveFinanceExpenseBudget(
+  organizationId: string,
+  input: { category: ExpenseCategory; month: string; budgetAmount: number; campusId?: string },
+) {
+  return apiRequest<{ budget: FinanceExpenseBudget }>(
+    `${financePath(organizationId)}/expenses/budgets`,
+    { method: 'POST', body: JSON.stringify(input) },
   );
 }

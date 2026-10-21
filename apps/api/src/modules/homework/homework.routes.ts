@@ -115,7 +115,7 @@ function statusOf(value: unknown): WorkStatus {
   return value as WorkStatus;
 }
 function dateOf(value: unknown): Date {
-  if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value))
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))
     throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid due date.');
   const date = new Date(`${value}T00:00:00.000Z`);
   if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value)
@@ -202,8 +202,27 @@ async function resolveTeacher(context: Context) {
     );
   return staff[0]!._id;
 }
+type HomeworkTestRecord = {
+  _id: { toString(): string };
+  organizationId: { toString(): string };
+  campusId: { toString(): string };
+  academicYearId: { toString(): string };
+  classId: { toString(): string };
+  sectionId: { toString(): string };
+  subjectId: { toString(): string };
+  title: string;
+  instructions?: string | null;
+  type: WorkType;
+  dueDate: Date | string;
+  totalMarks?: number;
+  status: WorkStatus;
+  createdBy: { toString(): string };
+  createdAt: Date | string;
+  updatedAt: Date | string;
+};
+
 function present(
-  item: any,
+  item: HomeworkTestRecord,
   names: {
     classes: Map<string, string>;
     sections: Map<string, string>;

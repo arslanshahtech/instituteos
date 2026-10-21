@@ -151,6 +151,11 @@ function getNavigationItems(
   if (role.key === 'admin') {
     items.push(
       { label: 'Students', to: base + '/students', icon: Users },
+      {
+        label: 'Academics & Classes',
+        to: base + '/academics',
+        icon: BookOpenText,
+      },
       { label: 'Guardians', to: base + '/guardians', icon: UserCheck },
       { label: 'Teachers / Staff', to: base + '/staff', icon: GraduationCap },
       { label: 'Attendance', to: base + '/attendance', icon: ClipboardCheck },

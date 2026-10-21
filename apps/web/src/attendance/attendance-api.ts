@@ -105,6 +105,37 @@ export function placeStudent(
   );
 }
 
+export function removeStudentFromSection(
+  organizationId: string,
+  studentId: string,
+  input: { classId: string; sectionId: string; academicYearId: string; campusId: string },
+) {
+  return apiRequest<{ removed: boolean }>(
+    `${organizationPath(organizationId)}/attendance/students/placements/${encodeURIComponent(studentId)}`,
+    { method: 'DELETE', body: JSON.stringify(input) },
+  );
+}
+
+export function bulkPlaceStudents(
+  organizationId: string,
+  input: {
+    studentIds: string[];
+    classId: string;
+    sectionId: string;
+    academicYearId: string;
+    campusId: string;
+  },
+) {
+  return apiRequest<{
+    added: string[];
+    skipped: string[];
+    failed: Array<{ studentId: string; message: string }>;
+  }>(
+    `${organizationPath(organizationId)}/attendance/students/placements/bulk`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+}
+
 export function saveStudentAttendance(
   organizationId: string,
   input: {

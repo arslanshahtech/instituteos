@@ -211,7 +211,7 @@ export function AcademicsForm({
           ? ('archived' as const)
           : ('active' as const),
       academicYearId: value('academicYearId'),
-      campusId: value('campusId'),
+      campusId: value('campusId') || (resource === 'classes' && choices.campusId?.length === 1 ? choices.campusId[0]!.value : ''),
       classId: value('classId'),
       capacity: value('capacity'),
       department: value('department'),
@@ -219,7 +219,7 @@ export function AcademicsForm({
       subjectId: value('subjectId'),
       sectionId: value('sectionId'),
     };
-  }, [record]);
+  }, [record, resource, choices.campusId?.length, choices.campusId?.[0]?.value]);
   const form = useForm<FormValues>({
     resolver: zodResolver(schemaForResource(resource)),
     defaultValues: initialValues,
@@ -274,6 +274,12 @@ export function AcademicsForm({
                     </option>
                   ))}
                 </select>
+                {field.name === 'campusId' && fieldChoices.length === 0 && (
+                  <p className="form-help-text">No campus is set up yet. A campus means your school branch or location. Create one in organization campus settings, then return here to create the class.</p>
+                )}
+                {field.name === 'campusId' && fieldChoices.length === 1 && (
+                  <p className="form-help-text">Your only campus is selected automatically.</p>
+                )}
               </FormField>
             );
           }

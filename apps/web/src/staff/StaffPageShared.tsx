@@ -15,7 +15,13 @@ import type { OrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import type { StaffStatus } from './staff-api.js';
 
 export function apiMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
+  if (error instanceof ApiError) {
+    const rows = error.details?.rows ?? [];
+    if (rows.length) {
+      return `${error.message} ${rows.map((row) => `Row ${row.row} (${row.field}): ${row.message}`).join(' ')}`;
+    }
+    return error.message;
+  }
   return 'The request could not be completed. Try again.';
 }
 
@@ -78,16 +84,18 @@ export function StaffHeading({
   description,
   organizationId,
   action,
+  eyebrow = 'Organization workspace',
 }: {
   title: string;
   description: string;
   organizationId: string;
   action?: ReactNode;
+  eyebrow?: string;
 }) {
   return (
     <WorkspacePageHeading
       className="student-page-heading"
-      eyebrow="Organization workspace"
+      eyebrow={eyebrow}
       title={title}
       description={description}
       aside={

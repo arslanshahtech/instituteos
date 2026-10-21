@@ -93,6 +93,9 @@ export const env = {
     'AUTH_REQUIRE_EMAIL_VERIFICATION',
   ),
   authWebAppUrl: process.env.AUTH_WEB_APP_URL ?? 'http://127.0.0.1:5173',
+  platformAdminEmail: (process.env.PLATFORM_ADMIN_EMAIL ?? '')
+    .trim()
+    .toLowerCase(),
   smtpHost: process.env.SMTP_HOST,
   smtpPort: readInteger(process.env.SMTP_PORT, 587, 'SMTP_PORT', 65535),
   smtpSecure: readBoolean(process.env.SMTP_SECURE, false, 'SMTP_SECURE'),

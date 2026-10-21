@@ -3,6 +3,10 @@ import { apiRequest } from '../api/client.js';
 export interface OrganizationProfile {
   id: string;
   name: string;
+  adminName?: string;
+  shortCode?: string;
+  tagline?: string;
+  logoDataUrl?: string;
   status: 'active' | 'suspended' | 'archived';
   contactEmail?: string;
   phone?: string;
@@ -97,7 +101,15 @@ export function updateOrganization(
   changes: Partial<
     Pick<
       OrganizationProfile,
-      'name' | 'contactEmail' | 'phone' | 'timezone' | 'address'
+      | 'name'
+      | 'adminName'
+      | 'shortCode'
+      | 'tagline'
+      | 'logoDataUrl'
+      | 'contactEmail'
+      | 'phone'
+      | 'timezone'
+      | 'address'
     >
   >,
 ) {

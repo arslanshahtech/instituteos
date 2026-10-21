@@ -1306,6 +1306,7 @@ export class MongoPeopleRepository {
     organizationId: string,
     applicationId: string,
     decisionReason?: string,
+    campusId?: string,
   ): Promise<{
     application: ApplicationRecord;
     student: StudentRecord;
@@ -1338,6 +1339,11 @@ export class MongoPeopleRepository {
           );
         }
 
+        const assignedCampusId = campusId ?? (application.campusId ? String(application.campusId) : undefined);
+        if (!assignedCampusId) {
+          throw new AppError(400, 'CAMPUS_REQUIRED', 'Assign a campus before approving this application.');
+        }
+
         const existingStudent = await StudentModel.findOne({
           organizationId: idObject(organizationId),
           sourceApplicationId: idObject(applicationId),
@@ -1365,9 +1371,7 @@ export class MongoPeopleRepository {
                   phone: application.phone
                     ? String(application.phone)
                     : undefined,
-                  campusId: application.campusId
-                    ? String(application.campusId)
-                    : undefined,
+                  campusId: assignedCampusId,
                 },
                 applicationId,
               ),
@@ -1376,6 +1380,13 @@ export class MongoPeopleRepository {
           );
 
           studentDocument = createdStudent;
+        } else if (String(existingStudent.campusId ?? '') !== assignedCampusId) {
+          await StudentModel.updateOne(
+            { _id: existingStudent._id, organizationId: idObject(organizationId) },
+            { $set: { campusId: idObject(assignedCampusId) } },
+            { session },
+          );
+          studentDocument = await StudentModel.findById(existingStudent._id).session(session).lean();
         }
 
         let enrollmentDocument = await EnrollmentModel.findOne({
@@ -1392,9 +1403,7 @@ export class MongoPeopleRepository {
               {
                 organizationId: idObject(organizationId),
                 studentId: studentDocument._id,
-                campusId: application.campusId
-                  ? idObject(String(application.campusId))
-                  : null,
+                campusId: idObject(assignedCampusId),
                 sourceApplicationId: idObject(applicationId),
                 status: 'active',
                 gradeLevel: application.program
@@ -1406,6 +1415,13 @@ export class MongoPeopleRepository {
           );
 
           enrollmentDocument = createdEnrollment;
+        } else if (String(enrollmentDocument.campusId ?? '') !== assignedCampusId) {
+          await EnrollmentModel.updateOne(
+            { _id: enrollmentDocument._id, organizationId: idObject(organizationId) },
+            { $set: { campusId: idObject(assignedCampusId) } },
+            { session },
+          );
+          enrollmentDocument = await EnrollmentModel.findById(enrollmentDocument._id).session(session).lean();
         }
 
         const approved = await AdmissionApplicationModel.findOneAndUpdate(
@@ -1416,6 +1432,7 @@ export class MongoPeopleRepository {
           {
             $set: {
               status: 'approved',
+              campusId: idObject(assignedCampusId),
               decisionReason: decisionReason ?? 'Approved by admissions review',
             },
           },

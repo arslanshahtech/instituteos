@@ -1,12 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarCheck, CheckCircle2, ClipboardCheck, Users } from 'lucide-react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui/Button.js';
-import {
-  WorkspaceMetricCard,
-  WorkspacePageHeading,
-} from '../components/ui/WorkspacePrimitives.js';
+import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 import {
   EmptyState,
   ErrorState,
@@ -51,6 +47,12 @@ const studentStatuses: StudentAttendanceStatus[] = [
   'late',
   'leave',
 ];
+const allStudentStatuses: StudentAttendanceStatus[] = [
+  'present',
+  'absent',
+  'late',
+  'leave',
+];
 const staffStatuses: StaffAttendanceStatus[] = [
   'present',
   'absent',
@@ -63,6 +65,15 @@ function today() {
   return new Date(current.getTime() - current.getTimezoneOffset() * 60_000)
     .toISOString()
     .slice(0, 10);
+}
+
+function savedAttendanceFilter(organizationId: string, key: string) {
+  if (typeof window === 'undefined' || !organizationId) return '';
+  try {
+    return window.localStorage.getItem(`instituteos:attendance:${organizationId}:${key}`) ?? '';
+  } catch {
+    return '';
+  }
 }
 
 function personName(person: {
@@ -91,7 +102,7 @@ function hasSameValues<T extends string>(
 
 export function AttendanceDashboard() {
   const { organizationId = '' } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const access = useOrganizationAccess(organizationId);
   const isTeacher = access.data?.role === 'teacher';
   const canManage = managerRoles.includes(access.data?.role ?? '');
@@ -109,19 +120,19 @@ export function AttendanceDashboard() {
   const teacherAssignments = teacherAssignmentsQuery.data?.items ?? [];
   const [view, setView] = useState<'students' | 'staff'>('students');
   const [selectedCampusId, setSelectedCampusId] = useState(
-    () => searchParams.get('campusId') ?? '',
+    () => searchParams.get('campusId') ?? savedAttendanceFilter(organizationId, 'campusId'),
   );
   const [selectedYearId, setSelectedYearId] = useState(
-    () => searchParams.get('academicYearId') ?? '',
+    () => searchParams.get('academicYearId') ?? savedAttendanceFilter(organizationId, 'academicYearId'),
   );
   const [selectedClassId, setSelectedClassId] = useState(
-    () => searchParams.get('classId') ?? '',
+    () => searchParams.get('classId') ?? savedAttendanceFilter(organizationId, 'classId'),
   );
   const [selectedSectionId, setSelectedSectionId] = useState(
-    () => searchParams.get('sectionId') ?? '',
+    () => searchParams.get('sectionId') ?? savedAttendanceFilter(organizationId, 'sectionId'),
   );
   const [attendanceDate, setAttendanceDate] = useState(
-    () => searchParams.get('date') ?? today(),
+    () => searchParams.get('date') || savedAttendanceFilter(organizationId, 'date') || today(),
   );
   const [studentStatusesById, setStudentStatusesById] = useState<
     Record<string, StudentAttendanceStatus | ''>
@@ -133,6 +144,7 @@ export function AttendanceDashboard() {
     Record<string, StaffAttendanceStatus | ''>
   >({});
   const [placementStudentId, setPlacementStudentId] = useState('');
+  const [placingAllStudents, setPlacingAllStudents] = useState(false);
   const attendance = useSaveStudentAttendance(organizationId);
   const place = usePlaceStudent(organizationId);
   const staffSave = useSaveStaffAttendance(organizationId);
@@ -214,6 +226,89 @@ export function AttendanceDashboard() {
         (item: AcademicSection) => item.classId === classId,
       );
   const sectionId = selectedSectionId || sections[0]?.id || '';
+  const classSectionOptions = isTeacher
+    ? [
+        ...new Map(
+          teacherAssignments
+            .filter(
+              (item) =>
+                item.campusId === campusId &&
+                item.academicYearId === academicYearId,
+            )
+            .map((item) => [
+              `${item.classId}::${item.sectionId}`,
+              {
+                classId: item.classId,
+                className: item.className,
+                sectionId: item.sectionId,
+                sectionName: item.sectionName,
+              },
+            ]),
+        ).values(),
+      ]
+    : (workspace.sections.data?.items ?? [])
+        .filter((item) => classes.some((classItem) => classItem.id === item.classId))
+        .map((item) => ({
+          classId: item.classId,
+          className: classes.find((classItem) => classItem.id === item.classId)?.name ?? 'Class',
+          sectionId: item.id,
+          sectionName: item.name,
+        }));
+  useEffect(() => {
+    const ready = isTeacher
+      ? teacherAssignmentsQuery.isSuccess
+      : workspace.campuses.isSuccess && workspace.years.isSuccess && workspace.classes.isSuccess && workspace.sections.isSuccess;
+    if (!ready) return;
+    if (selectedCampusId && !campuses.some((item) => item.id === selectedCampusId)) setSelectedCampusId('');
+    if (selectedYearId && !years.some((item) => item.id === selectedYearId)) setSelectedYearId('');
+    if (selectedClassId && !classes.some((item) => item.id === selectedClassId)) setSelectedClassId('');
+    if (selectedSectionId && !sections.some((item) => item.id === selectedSectionId)) setSelectedSectionId('');
+  }, [isTeacher, teacherAssignmentsQuery.isSuccess, workspace.campuses.isSuccess, workspace.years.isSuccess, workspace.classes.isSuccess, workspace.sections.isSuccess, campuses, years, classes, sections, selectedCampusId, selectedYearId, selectedClassId, selectedSectionId]);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (campusId) next.set('campusId', campusId); else next.delete('campusId');
+    if (academicYearId) next.set('academicYearId', academicYearId); else next.delete('academicYearId');
+    if (classId) next.set('classId', classId); else next.delete('classId');
+    if (sectionId) next.set('sectionId', sectionId); else next.delete('sectionId');
+    if (attendanceDate) next.set('date', attendanceDate); else next.delete('date');
+    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
+  }, [campusId, academicYearId, classId, sectionId, attendanceDate, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const filtersReady = isTeacher
+      ? teacherAssignmentsQuery.isSuccess
+      : workspace.campuses.isSuccess && workspace.years.isSuccess && workspace.classes.isSuccess && workspace.sections.isSuccess;
+    if (!filtersReady || !organizationId) return;
+    try {
+      const values: Record<string, string> = {
+        campusId,
+        academicYearId,
+        classId,
+        sectionId,
+        date: attendanceDate,
+      };
+      for (const [key, value] of Object.entries(values)) {
+        if (value) window.localStorage.setItem(`instituteos:attendance:${organizationId}:${key}`, value);
+        else window.localStorage.removeItem(`instituteos:attendance:${organizationId}:${key}`);
+      }
+    } catch {
+      // Keep attendance usable if browser storage is unavailable.
+    }
+  }, [
+    isTeacher,
+    teacherAssignmentsQuery.isSuccess,
+    workspace.campuses.isSuccess,
+    workspace.years.isSuccess,
+    workspace.classes.isSuccess,
+    workspace.sections.isSuccess,
+    organizationId,
+    campusId,
+    academicYearId,
+    classId,
+    sectionId,
+    attendanceDate,
+  ]);
   const rosterQuery = useAttendanceRoster(
     organizationId,
     {
@@ -309,7 +404,7 @@ export function AttendanceDashboard() {
     Boolean(studentStatusesById[person.id]),
   ).length;
   const statusCounts = Object.fromEntries(
-    studentStatuses.map((status) => [
+    allStudentStatuses.map((status) => [
       status,
       roster.filter((person) => studentStatusesById[person.id] === status)
         .length,
@@ -354,85 +449,105 @@ export function AttendanceDashboard() {
 
   const filters = (
     <div
-      className={`attendance-filters${view === 'staff' ? ' attendance-filters-compact' : ''}`}
+      className={`attendance-filters attendance-reference-filters${view === 'staff' ? ' attendance-filters-compact' : ''}`}
     >
-      <label>
-        Campus
-        <select
-          onChange={(event) => {
-            setSelectedCampusId(event.target.value);
-            setSelectedYearId('');
-            setSelectedClassId('');
-            setSelectedSectionId('');
-          }}
-          value={campusId}
-        >
-          <option value="">Select campus</option>
-          {campuses.map((campus) => (
-            <option key={campus.id} value={campus.id}>
-              {campus.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Date
-        <input
-          onChange={(event) => setAttendanceDate(event.target.value)}
-          type="date"
-          value={attendanceDate}
-        />
-      </label>
-      {view === 'students' && (
+      {view === 'students' ? (
         <>
-          <label>
-            Academic year
-            <select
-              onChange={(event) => {
-                setSelectedYearId(event.target.value);
-                setSelectedClassId('');
-                setSelectedSectionId('');
-              }}
-              value={academicYearId}
-            >
-              <option value="">Select academic year</option>
-              {years.map((year) => (
-                <option key={year.id} value={year.id}>
-                  {year.name}
-                </option>
-              ))}
-            </select>
+          <label className="attendance-reference-date">
+            Date
+            <input
+              onChange={(event) => setAttendanceDate(event.target.value)}
+              type="date"
+              value={attendanceDate}
+            />
           </label>
-          <label>
+          <label className="attendance-reference-class">
             Class
             <select
               onChange={(event) => {
-                setSelectedClassId(event.target.value);
-                setSelectedSectionId('');
+                const [nextClassId, nextSectionId] = event.target.value.split('::');
+                setSelectedClassId(nextClassId ?? '');
+                setSelectedSectionId(nextSectionId ?? '');
               }}
-              value={classId}
+              value={`${classId}::${sectionId}`}
             >
               <option value="">Select class</option>
-              {classes.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
+              {classSectionOptions.map((item) => (
+                <option
+                  key={`${item.classId}::${item.sectionId}`}
+                  value={`${item.classId}::${item.sectionId}`}
+                >
+                  {item.className}-{item.sectionName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <details className="attendance-reference-advanced">
+            <summary>Academic filters</summary>
+            <div className="attendance-reference-advanced-fields">
+              <label>
+                Campus
+                <select
+                  onChange={(event) => {
+                    setSelectedCampusId(event.target.value);
+                    setSelectedYearId('');
+                    setSelectedClassId('');
+                    setSelectedSectionId('');
+                  }}
+                  value={campusId}
+                >
+                  <option value="">Select campus</option>
+                  {campuses.map((campus) => (
+                    <option key={campus.id} value={campus.id}>
+                      {campus.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Academic year
+                <select
+                  onChange={(event) => {
+                    setSelectedYearId(event.target.value);
+                    setSelectedClassId('');
+                    setSelectedSectionId('');
+                  }}
+                  value={academicYearId}
+                >
+                  <option value="">Select academic year</option>
+                  {years.map((year) => (
+                    <option key={year.id} value={year.id}>
+                      {year.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </details>
+        </>
+      ) : (
+        <>
+          <label>
+            Campus
+            <select
+              onChange={(event) => setSelectedCampusId(event.target.value)}
+              value={campusId}
+            >
+              <option value="">Select campus</option>
+              {campuses.map((campus) => (
+                <option key={campus.id} value={campus.id}>
+                  {campus.name}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            Section
-            <select
-              onChange={(event) => setSelectedSectionId(event.target.value)}
-              value={sectionId}
-            >
-              <option value="">Select section</option>
-              {sections.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
+            Date
+            <input
+              onChange={(event) => setAttendanceDate(event.target.value)}
+              type="date"
+              value={attendanceDate}
+            />
           </label>
         </>
       )}
@@ -444,22 +559,13 @@ export function AttendanceDashboard() {
       <WorkspacePageHeading
         className="attendance-page-heading"
         eyebrow="Organization workspace"
-        title={view === 'students' ? 'Student roll call' : 'Staff attendance'}
+        title={view === 'students' ? 'Attendance' : 'Staff attendance'}
         description={
           view === 'students'
-            ? 'Record daily attendance for the selected class and section.'
+            ? 'Record attendance for the selected class and date.'
             : 'Record daily attendance for staff at the selected campus.'
         }
       />
-
-      {view === 'students' && roster.length > 0 && (
-        <section aria-label="Attendance summary" className="reference-metrics-grid attendance-reference-metrics">
-          <WorkspaceMetricCard metric={{ label: 'Students in section', value: String(roster.length), detail: 'Current selected roster', icon: Users }} />
-          <WorkspaceMetricCard metric={{ label: 'Attendance marked', value: String(markedCount), detail: `${Math.max(roster.length - markedCount, 0)} remaining`, icon: ClipboardCheck }} />
-          <WorkspaceMetricCard metric={{ label: 'Present', value: String(statusCounts.present), detail: attendancePercent === null ? 'Mark attendance to calculate rate' : `${attendancePercent}% of marked students`, icon: CheckCircle2 }} />
-          <WorkspaceMetricCard metric={{ label: 'Attendance date', value: attendanceDate, detail: 'Selected roll-call date', icon: CalendarCheck }} />
-        </section>
-      )}
 
       {!isTeacher && (
         <nav
@@ -531,19 +637,55 @@ export function AttendanceDashboard() {
                     ))}
                   </select>
                 </label>
-                <Button
-                  disabled={
-                    !placementStudentId ||
-                    !campusId ||
-                    !academicYearId ||
-                    !classId ||
-                    !sectionId ||
-                    place.isPending
-                  }
-                  type="submit"
-                >
-                  {place.isPending ? 'Placing…' : 'Add to section'}
-                </Button>
+                <div className="attendance-placement-actions">
+                  <Button
+                    disabled={
+                      !placementStudentId ||
+                      !campusId ||
+                      !academicYearId ||
+                      !classId ||
+                      !sectionId ||
+                      place.isPending
+                    }
+                    type="submit"
+                  >
+                    {place.isPending ? 'Placing…' : 'Add to section'}
+                  </Button>
+                  <Button
+                    disabled={
+                      !eligible.data.items.length ||
+                      !campusId ||
+                      !academicYearId ||
+                      !classId ||
+                      !sectionId ||
+                      place.isPending ||
+                      placingAllStudents
+                    }
+                    onClick={async () => {
+                      const unplacedStudents = [...eligible.data.items];
+                      setPlacingAllStudents(true);
+                      try {
+                        for (const student of unplacedStudents) {
+                          await place.mutateAsync({
+                            studentId: student.id,
+                            campusId,
+                            academicYearId,
+                            classId,
+                            sectionId,
+                          });
+                        }
+                      } finally {
+                        setPlacingAllStudents(false);
+                      }
+                    }}
+                    type="button"
+                    variant="secondary"
+                  >
+                    {placingAllStudents
+                      ? 'Adding students…'
+                      : `Add all ${eligible.data.items.length} students`}
+                  </Button>
+                </div>
               </form>
             ) : null}
 
@@ -572,8 +714,19 @@ export function AttendanceDashboard() {
                 workspace.sections.isError ||
                 workspace.campuses.isError) ? (
               <ErrorState
-                title="Academic setup unavailable"
-                description="Check that campuses, active academic years, classes, and sections are configured."
+                title="Academic setup could not be loaded"
+                description={apiMessage(
+                  workspace.campuses.error ??
+                    workspace.years.error ??
+                    workspace.classes.error ??
+                    workspace.sections.error,
+                )}
+                onRetry={() => {
+                  void workspace.campuses.refetch();
+                  void workspace.years.refetch();
+                  void workspace.classes.refetch();
+                  void workspace.sections.refetch();
+                }}
               />
             ) : !academicYearId || !classId || !sectionId || !campusId ? (
               <div className="attendance-setup-notice">
@@ -618,17 +771,23 @@ export function AttendanceDashboard() {
                       Marked: {markedCount}
                     </span>
                   </div>
-                  {attendancePercent !== null && (
-                    <span className="attendance-summary-rate">
-                      {attendancePercent}% present among marked
-                    </span>
-                  )}
+                  <span
+                    aria-live="polite"
+                    className="attendance-summary-rate"
+                  >
+                    Overall{' '}
+                    <strong>
+                      {attendancePercent === null
+                        ? '—'
+                        : `${attendancePercent}%`}
+                    </strong>
+                  </span>
                   <div
                     aria-label="Attendance totals"
                     className="attendance-breakdown"
                     role="group"
                   >
-                    {studentStatuses.map((status) => (
+                    {allStudentStatuses.map((status) => (
                       <span
                         className={`attendance-badge attendance-badge-${status}`}
                         key={status}
@@ -640,57 +799,75 @@ export function AttendanceDashboard() {
                   </div>
                 </div>
                 <div className="attendance-people-list">
-                  {roster.map((student: StudentRosterMember) => (
-                    <article className="attendance-person" key={student.id}>
-                      <div className="attendance-person-name">
-                        <strong>{personName(student)}</strong>
-                      </div>
-                      <div
-                        aria-label={`${personName(student)} attendance status`}
-                        className="attendance-status-choices"
-                        role="group"
-                      >
-                        {studentStatuses.map((status) => (
-                          <button
-                            aria-pressed={
-                              studentStatusesById[student.id] === status
-                            }
-                            className={`attendance-status-choice attendance-status-choice-${status} reference-attendance-option${studentStatusesById[student.id] === status ? ` is-active is-${status}` : ''}`}
-                            key={status}
-                            onClick={() =>
-                              setStudentStatusesById((current) => ({
-                                ...current,
-                                [student.id]: status,
-                              }))
-                            }
-                            type="button"
-                          >
-                            {status.charAt(0).toUpperCase() + status.slice(1)}
-                          </button>
+                  <div className="attendance-roster-scroll">
+                    <table className="attendance-roster-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Student · {classes.find((item) => item.id === classId)?.name ?? 'Class'}-{sections.find((item) => item.id === sectionId)?.name ?? 'Section'}</th>
+                          <th scope="col">Mark attendance</th>
+                          <th className="attendance-reference-notes-column" scope="col">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {roster.map((student: StudentRosterMember) => (
+                          <tr key={student.id}>
+                            <td data-label="Student">
+                              <strong>{personName(student)}</strong>
+                            </td>
+                            <td data-label="Status">
+                              <div
+                                aria-label={`${personName(student)} attendance status`}
+                                className="attendance-status-choices"
+                                role="group"
+                              >
+                                {studentStatuses.map((status) => (
+                                  <button
+                                    aria-pressed={
+                                      studentStatusesById[student.id] === status
+                                    }
+                                    className={`attendance-status-choice attendance-status-choice-${status}${studentStatusesById[student.id] === status ? ' is-active' : ''}`}
+                                    key={status}
+                                    onClick={() =>
+                                      setStudentStatusesById((current) => ({
+                                        ...current,
+                                        [student.id]: status,
+                                      }))
+                                    }
+                                    type="button"
+                                  >
+                                    {status.charAt(0).toUpperCase() +
+                                      status.slice(1)}
+                                  </button>
+                                ))}
+                              </div>
+                            </td>
+                            <td data-label="Notes">
+                              <details className="attendance-remark-details">
+                                <summary>
+                                  {studentRemarksById[student.id]?.trim()
+                                    ? 'Edit note'
+                                    : 'Add note'}
+                                </summary>
+                                <label>
+                                  Remarks
+                                  <input
+                                    maxLength={500}
+                                    onChange={(event) =>
+                                      setStudentRemarksById((current) => ({
+                                        ...current,
+                                        [student.id]: event.target.value,
+                                      }))
+                                    }
+                                    value={studentRemarksById[student.id] ?? ''}
+                                  />
+                                </label>
+                              </details>
+                            </td>
+                          </tr>
                         ))}
-                      </div>
-                      <details className="attendance-remark-details">
-                        <summary>
-                          {studentRemarksById[student.id]?.trim()
-                            ? 'Edit note'
-                            : 'Add note'}
-                        </summary>
-                        <label>
-                          Remarks
-                          <input
-                            maxLength={500}
-                            onChange={(event) =>
-                              setStudentRemarksById((current) => ({
-                                ...current,
-                                [student.id]: event.target.value,
-                              }))
-                            }
-                            value={studentRemarksById[student.id] ?? ''}
-                          />
-                        </label>
-                      </details>
-                    </article>
-                  ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
                 <div className="attendance-save-row">
                   {attendance.isError && (
@@ -722,8 +899,8 @@ export function AttendanceDashboard() {
                     variant="primary"
                   >
                     {attendance.isPending
-                      ? 'Marking attendance…'
-                      : 'Mark attendance'}
+                      ? 'Saving attendance…'
+                      : 'Save Attendance'}
                   </Button>
                 </div>
               </>

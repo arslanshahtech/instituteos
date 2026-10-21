@@ -195,6 +195,21 @@ export class AttendanceService {
     );
   }
 
+  async removeStudentFromSection(context: AttendanceContext, input: StudentPlacementInput) {
+    const normalized = {
+      studentId: objectId(input.studentId, 'student'),
+      classId: objectId(input.classId, 'class'),
+      sectionId: objectId(input.sectionId, 'section'),
+      academicYearId: objectId(input.academicYearId, 'academic year'),
+      campusId: objectId(input.campusId, 'campus'),
+    };
+    assertCampus(context, normalized.campusId);
+    await this.validateSectionContext(context, { ...normalized, date: undefined });
+    const removed = await this.repository.deactivateStudentPlacement(context.organizationId, normalized);
+    if (!removed) throw new AppError(404, 'STUDENT_PLACEMENT_NOT_FOUND', 'This student is not currently assigned to the selected class section.');
+    return { removed: true };
+  }
+
   async saveStudentAttendance(
     context: AttendanceContext,
     input: StudentAttendanceBulkInput,

@@ -8,6 +8,25 @@ import { MongoAcademicsRepository } from './academics.repository.js';
 
 afterEach(() => vi.restoreAllMocks());
 
+describe('TeacherAssignment schema and repository constraints', () => {
+  it('includes subjectId in the unique assignment index so a teacher can teach multiple subjects per section', () => {
+    const index = TeacherAssignmentModel.schema
+      .indexes()
+      .find(([, options]) => options.name === 'uniq_teacher_section_per_year');
+
+    expect(index).toBeDefined();
+    expect(index?.[0]).toEqual({
+      organizationId: 1,
+      teacherStaffId: 1,
+      subjectId: 1,
+      classId: 1,
+      sectionId: 1,
+      academicYearId: 1,
+    });
+    expect(index?.[1]).toMatchObject({ unique: true });
+  });
+});
+
 describe('MongoAcademicsRepository tenant and campus scopes', () => {
   it('lists only classes belonging to the organization and assigned campuses', async () => {
     const find = vi.spyOn(AcademicClassModel, 'find').mockReturnValue({
@@ -46,6 +65,7 @@ describe('MongoAcademicsRepository tenant and campus scopes', () => {
     expect(exists).toHaveBeenCalledWith({
       organizationId: new Types.ObjectId('650000000000000000000001'),
       teacherStaffId: new Types.ObjectId('650000000000000000000002'),
+      subjectId: new Types.ObjectId('650000000000000000000003'),
       classId: new Types.ObjectId('650000000000000000000004'),
       sectionId: new Types.ObjectId('650000000000000000000005'),
       academicYearId: new Types.ObjectId('650000000000000000000006'),

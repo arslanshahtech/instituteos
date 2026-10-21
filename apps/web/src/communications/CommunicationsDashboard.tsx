@@ -293,38 +293,16 @@ export function CommunicationsDashboard() {
       />
 
       {/* Workspace Tabs */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.5rem',
-          borderBottom: '1px solid #e2e8f0',
-          marginBottom: '1rem',
-          overflowX: 'auto',
-          whiteSpace: 'nowrap',
-          paddingBottom: '0.25rem',
-        }}
-      >
+      <div className="communications-workspace-tabs">
 
         {canAccessMessaging && (
           <button
             type="button"
             onClick={() => setActiveTab('messaging')}
-            style={{
-              padding: '0.5rem 0.85rem',
-              border: 'none',
-              borderRadius: '0.375rem',
-              background: activeTab === 'messaging' ? '#2563eb' : 'transparent',
-              color: activeTab === 'messaging' ? '#ffffff' : '#64748b',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-            }}
+            className={`communications-workspace-tab${activeTab === 'messaging' ? ' is-active' : ''}`}
           >
             <MessageSquare size={15} />
-            Parent-Teacher Messages
+            Messages
           </button>
         )}
       </div>

@@ -226,7 +226,7 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
                 Messages
               </h3>
               <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>
-                Parent-Teacher Desk
+
               </p>
             </div>
             {userRole === 'parent_guardian' && (
@@ -247,7 +247,7 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
                   gap: '0.3rem',
                 }}
               >
-                <Plus size={14} /> New
+                <Plus size={14} /> New Message
               </Button>
             )}
           </div>

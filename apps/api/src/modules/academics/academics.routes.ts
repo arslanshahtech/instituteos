@@ -18,6 +18,7 @@ import {
 } from '../tenancy/tenant-context.middleware.js';
 import { MongoAcademicsRepository } from './academics.repository.js';
 import { AcademicsService } from './academics.service.js';
+import { TeacherTimetableModel } from './academics.model.js';
 import type {
   AcademicYearInput,
   AcademicsContext,
@@ -650,6 +651,146 @@ export function createAcademicsRouter(
         organizationContext(response),
         routeId(request.params.id!, 'Teacher assignment'),
       );
+      response.status(204).end();
+    }),
+  );
+
+  router.get(
+    `${base}/teacher-timetable/:staffId`,
+    ...protect,
+    asyncHandler(async (request, response) => {
+      const context = organizationContext(response);
+      const staffId = routeId(request.params.staffId!, 'Teacher');
+      const items = await TeacherTimetableModel.find({
+        organizationId: new mongoose.Types.ObjectId(context.organizationId),
+        teacherStaffId: new mongoose.Types.ObjectId(staffId),
+      })
+        .sort({ dayOfWeek: 1, startTime: 1 })
+        .lean();
+      response.status(200).json({
+        items: items.map((item) => ({
+          id: String(item._id),
+          teacherStaffId: String(item.teacherStaffId),
+          teacherAssignmentId: String(item.teacherAssignmentId),
+          dayOfWeek: String(item.dayOfWeek),
+          startTime: String(item.startTime),
+          endTime: String(item.endTime),
+          room: item.room ? String(item.room) : undefined,
+          createdAt: new Date(item.createdAt).toISOString(),
+          updatedAt: new Date(item.updatedAt).toISOString(),
+        })),
+      });
+    }),
+  );
+  router.post(
+    `${base}/teacher-timetable`,
+    ...protect,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const context = organizationContext(response);
+      const body = bodyObject(request.body);
+      const teacherStaffId = routeId(requiredString(body, 'teacherStaffId', 24), 'Teacher');
+      const teacherAssignmentId = routeId(requiredString(body, 'teacherAssignmentId', 24), 'Teacher assignment');
+      const dayOfWeek = requiredString(body, 'dayOfWeek', 12);
+      const startTime = requiredString(body, 'startTime', 5);
+      const endTime = requiredString(body, 'endTime', 5);
+      const room = optionalString(body, 'room', 80);
+      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      if (!days.includes(dayOfWeek) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime) || startTime >= endTime) {
+        throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid day and a time range where the end is after the start.');
+      }
+      const assignment = await service.getTeacherAssignment(context, teacherAssignmentId);
+      if (assignment.teacherStaffId !== teacherStaffId) {
+        throw new AppError(400, 'VALIDATION_ERROR', 'Choose an assignment belonging to this teacher.');
+      }
+      const conflicts = await TeacherTimetableModel.find({
+        organizationId: new mongoose.Types.ObjectId(context.organizationId),
+        teacherStaffId: new mongoose.Types.ObjectId(teacherStaffId),
+        dayOfWeek,
+        startTime: { $lt: endTime },
+        endTime: { $gt: startTime },
+      }).lean();
+      if (conflicts.length) {
+        throw new AppError(409, 'TIMETABLE_CONFLICT', 'This teacher already has a timetable entry during that time.');
+      }
+      const created = await TeacherTimetableModel.create({
+        organizationId: new mongoose.Types.ObjectId(context.organizationId),
+        teacherStaffId: new mongoose.Types.ObjectId(teacherStaffId),
+        teacherAssignmentId: new mongoose.Types.ObjectId(teacherAssignmentId),
+        dayOfWeek,
+        startTime,
+        endTime,
+        room,
+      });
+      response.status(201).json({
+        item: {
+          id: String(created._id),
+          teacherStaffId,
+          teacherAssignmentId,
+          dayOfWeek,
+          startTime,
+          endTime,
+          room,
+          createdAt: new Date(created.createdAt).toISOString(),
+          updatedAt: new Date(created.updatedAt).toISOString(),
+        },
+      });
+    }),
+  );
+  router.patch(
+    `${base}/teacher-timetable/:id`,
+    ...protect,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const context = organizationContext(response);
+      const id = routeId(request.params.id!, 'Timetable entry');
+      const body = bodyObject(request.body);
+      const teacherStaffId = routeId(requiredString(body, 'teacherStaffId', 24), 'Teacher');
+      const teacherAssignmentId = routeId(requiredString(body, 'teacherAssignmentId', 24), 'Teacher assignment');
+      const dayOfWeek = requiredString(body, 'dayOfWeek', 12);
+      const startTime = requiredString(body, 'startTime', 5);
+      const endTime = requiredString(body, 'endTime', 5);
+      const room = optionalString(body, 'room', 80);
+      const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      if (!days.includes(dayOfWeek) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime) || startTime >= endTime) {
+        throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid day and a time range where the end is after the start.');
+      }
+      const assignment = await service.getTeacherAssignment(context, teacherAssignmentId);
+      if (assignment.teacherStaffId !== teacherStaffId) {
+        throw new AppError(400, 'VALIDATION_ERROR', 'Choose an assignment belonging to this teacher.');
+      }
+      const conflicts = await TeacherTimetableModel.find({
+        organizationId: new mongoose.Types.ObjectId(context.organizationId),
+        teacherStaffId: new mongoose.Types.ObjectId(teacherStaffId),
+        dayOfWeek,
+        _id: { $ne: new mongoose.Types.ObjectId(id) },
+        startTime: { $lt: endTime },
+        endTime: { $gt: startTime },
+      }).lean();
+      if (conflicts.length) {
+        throw new AppError(409, 'TIMETABLE_CONFLICT', 'This teacher already has a timetable entry during that time.');
+      }
+      const updated = await TeacherTimetableModel.findOneAndUpdate(
+        { _id: new mongoose.Types.ObjectId(id), organizationId: new mongoose.Types.ObjectId(context.organizationId) },
+        { $set: { teacherStaffId: new mongoose.Types.ObjectId(teacherStaffId), teacherAssignmentId: new mongoose.Types.ObjectId(teacherAssignmentId), dayOfWeek, startTime, endTime, room } },
+        { new: true, runValidators: true },
+      ).lean();
+      if (!updated) throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Timetable entry not found.');
+      response.status(200).json({ item: { id: String(updated._id), teacherStaffId, teacherAssignmentId, dayOfWeek, startTime, endTime, room, createdAt: new Date(updated.createdAt).toISOString(), updatedAt: new Date(updated.updatedAt).toISOString() } });
+    }),
+  );
+  router.delete(
+    `${base}/teacher-timetable/:id`,
+    ...protect,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const context = organizationContext(response);
+      const id = routeId(request.params.id!, 'Timetable entry');
+      const removed = await TeacherTimetableModel.findOneAndDelete({
+        _id: new mongoose.Types.ObjectId(id),
+        organizationId: new mongoose.Types.ObjectId(context.organizationId),
+      });
+      if (!removed) throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Timetable entry not found.');
       response.status(204).end();
     }),
   );

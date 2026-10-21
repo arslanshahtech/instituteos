@@ -87,6 +87,7 @@ export const errorHandler: ErrorRequestHandler = (
       code,
       message,
       ...(requestId ? { requestId } : {}),
+      ...(appError?.details !== undefined ? { details: appError.details } : {}),
     },
   });
 };

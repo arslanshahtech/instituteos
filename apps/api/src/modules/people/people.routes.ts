@@ -962,6 +962,7 @@ export function createPeopleRouter(
         {
           status,
           decisionReason: optionalString(body, 'decisionReason', 400),
+          campusId: optionalObjectId(body.campusId, 'campusId'),
         },
         context,
       );

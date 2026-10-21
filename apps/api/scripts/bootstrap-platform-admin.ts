@@ -23,6 +23,16 @@ async function main() {
     process.exitCode = 2;
     return;
   }
+  if (!env.platformAdminEmail) {
+    throw new Error(
+      'PLATFORM_ADMIN_EMAIL must be set in the server environment before bootstrapping platform access.',
+    );
+  }
+  if (email !== env.platformAdminEmail) {
+    throw new Error(
+      'This email is not the configured platform-admin allowlist address. No access was granted.',
+    );
+  }
 
   await connectDatabase(env.databaseUri, env.databaseServerSelectionTimeoutMs);
   try {

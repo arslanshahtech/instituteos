@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { AppError } from '../../errors/app-error.js';
 import {
   AcademicClassModel,
@@ -9,7 +9,6 @@ import {
 import { AuthUserModel } from '../auth/auth.model.js';
 import { CampusModel } from '../tenancy/tenancy.model.js';
 import {
-  EnrollmentModel,
   StaffMemberModel,
   StudentModel,
 } from '../people/people.model.js';
@@ -303,15 +302,10 @@ export class MongoAttendanceRepository implements AttendanceRepository {
       campusId: oid(campusId),
       status: 'active',
     });
-    if (!student) return false;
-    return Boolean(
-      await EnrollmentModel.exists({
-        organizationId: oid(organizationId),
-        studentId: oid(studentId),
-        campusId: oid(campusId),
-        status: 'active',
-      }),
-    );
+    // Class placement is recorded in StudentSectionPlacementModel.
+    // Do not create an unrelated admissions Enrollment record here: that
+    // model has its own admission/source-application uniqueness rules.
+    return Boolean(student);
   }
 
   async listEligibleStudents(
@@ -319,45 +313,37 @@ export class MongoAttendanceRepository implements AttendanceRepository {
     campusId: string,
     academicYearId: string,
   ): Promise<AttendanceStudentChoice[]> {
+    // A student can have only one active class placement per academic year.
+    // Exclude only students already placed at this campus for the selected year.
     const placements = await StudentSectionPlacementModel.find({
       organizationId: oid(organizationId),
+      campusId: oid(campusId),
       academicYearId: oid(academicYearId),
       status: 'active',
     })
       .select({ studentId: 1 })
       .lean();
     const placedIds = placements.map((item) => item.studentId);
-    const [students, enrollments] = await Promise.all([
-      StudentModel.find({
-        organizationId: oid(organizationId),
-        campusId: oid(campusId),
-        status: 'active',
-        _id: { $nin: placedIds },
-      })
-        .select({ _id: 1, firstName: 1, lastName: 1, preferredName: 1 })
-        .sort({ lastName: 1, firstName: 1 })
-        .lean(),
-      EnrollmentModel.find({
-        organizationId: oid(organizationId),
-        campusId: oid(campusId),
-        status: 'active',
-      })
-        .select({ studentId: 1 })
-        .lean(),
-    ]);
-    const enrolledIds = new Set(
-      enrollments.map((item) => String(item.studentId)),
-    );
-    return students
-      .filter((student) => enrolledIds.has(String(student._id)))
-      .map((student) => ({
-        id: String(student._id),
-        firstName: String(student.firstName),
-        lastName: String(student.lastName),
-        ...(student.preferredName
-          ? { preferredName: String(student.preferredName) }
-          : {}),
-      }));
+    const students = await StudentModel.find({
+      organizationId: oid(organizationId),
+      campusId: oid(campusId),
+      status: 'active',
+      _id: { $nin: placedIds },
+    })
+      .select({ _id: 1, firstName: 1, lastName: 1, preferredName: 1 })
+      .sort({ lastName: 1, firstName: 1 })
+      .lean();
+
+    // Students created directly in the directory may not have an enrollment
+    // until they are assigned to a class. Keep them eligible for that action.
+    return students.map((student) => ({
+      id: String(student._id),
+      firstName: String(student.firstName),
+      lastName: String(student.lastName),
+      ...(student.preferredName
+        ? { preferredName: String(student.preferredName) }
+        : {}),
+    }));
   }
 
   async upsertStudentPlacements(
@@ -393,6 +379,25 @@ export class MongoAttendanceRepository implements AttendanceRepository {
     return placementRecord(record);
   }
 
+  async deactivateStudentPlacement(
+    organizationId: string,
+    input: StudentPlacementInput,
+  ): Promise<boolean> {
+    const result = await StudentSectionPlacementModel.updateOne(
+      {
+        organizationId: oid(organizationId),
+        studentId: oid(input.studentId),
+        classId: oid(input.classId),
+        sectionId: oid(input.sectionId),
+        academicYearId: oid(input.academicYearId),
+        campusId: oid(input.campusId),
+        status: 'active',
+      },
+      { $set: { status: 'inactive' } },
+    );
+    return result.modifiedCount > 0;
+  }
+
   async listStudentRoster(
     organizationId: string,
     input: Pick<
@@ -412,7 +417,7 @@ export class MongoAttendanceRepository implements AttendanceRepository {
       .lean();
     const studentIds = placements.map((placement) => placement.studentId);
     if (!studentIds.length) return [];
-    const [students, enrollments, attendance] = await Promise.all([
+    const [students, attendance] = await Promise.all([
       StudentModel.find({
         organizationId: oid(organizationId),
         campusId: oid(input.campusId),
@@ -429,14 +434,6 @@ export class MongoAttendanceRepository implements AttendanceRepository {
         })
         .sort({ lastName: 1, firstName: 1 })
         .lean(),
-      EnrollmentModel.find({
-        organizationId: oid(organizationId),
-        campusId: oid(input.campusId),
-        status: 'active',
-        studentId: { $in: studentIds },
-      })
-        .select({ studentId: 1 })
-        .lean(),
       StudentAttendanceModel.find({
         organizationId: oid(organizationId),
         sectionId: oid(input.sectionId),
@@ -450,12 +447,9 @@ export class MongoAttendanceRepository implements AttendanceRepository {
     const marks = new Map(
       attendance.map((item) => [String(item.studentId), item]),
     );
-    const enrolledIds = new Set(
-      enrollments.map((item) => String(item.studentId)),
-    );
-    return students
-      .filter((student) => enrolledIds.has(String(student._id)))
-      .map((student) => {
+    // The active class placement is the roster source of truth. Requiring a
+    // separate admissions Enrollment record hides valid directory-created students.
+    return students.map((student) => {
         const mark = marks.get(String(student._id));
         return {
           id: String(student._id),
@@ -482,33 +476,54 @@ export class MongoAttendanceRepository implements AttendanceRepository {
     organizationId: string,
     input: StudentAttendanceBulkInput,
   ): Promise<StudentAttendanceRecord[]> {
-    await StudentAttendanceModel.bulkWrite(
-      input.records.map((record) => ({
-        updateOne: {
-          filter: {
-            organizationId: oid(organizationId),
-            studentId: oid(record.studentId),
-            date: utcDay(input.date),
-            academicYearId: oid(input.academicYearId),
-          },
-          update: {
-            $set: {
-              organizationId: oid(organizationId),
-              studentId: oid(record.studentId),
-              classId: oid(input.classId),
-              sectionId: oid(input.sectionId),
-              academicYearId: oid(input.academicYearId),
-              campusId: oid(input.campusId),
-              date: utcDay(input.date),
-              status: record.status,
-              remarks: record.remarks ?? '',
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        await StudentAttendanceModel.bulkWrite(
+          input.records.map((record) => ({
+            updateOne: {
+              filter: {
+                organizationId: oid(organizationId),
+                studentId: oid(record.studentId),
+                date: utcDay(input.date),
+                academicYearId: oid(input.academicYearId),
+              },
+              update: {
+                $set: {
+                  organizationId: oid(organizationId),
+                  studentId: oid(record.studentId),
+                  classId: oid(input.classId),
+                  sectionId: oid(input.sectionId),
+                  academicYearId: oid(input.academicYearId),
+                  campusId: oid(input.campusId),
+                  date: utcDay(input.date),
+                  status: record.status,
+                  remarks: record.remarks ?? '',
+                },
+              },
+              upsert: true,
             },
-          },
-          upsert: true,
-        },
-      })),
-      { ordered: true },
-    );
+          })),
+          { ordered: true, session },
+        );
+      });
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        /transaction numbers are only allowed|replica set|mongos/i.test(
+          error.message,
+        )
+      ) {
+        throw new AppError(
+          503,
+          'ATOMIC_ATTENDANCE_REQUIRES_TRANSACTIONS',
+          'Attendance was not saved because the database does not support transactions. Configure MongoDB as a replica set and retry; no attendance changes were committed.',
+        );
+      }
+      throw error;
+    } finally {
+      await session.endSession();
+    }
     return this.listStudentAttendance(
       organizationId,
       {

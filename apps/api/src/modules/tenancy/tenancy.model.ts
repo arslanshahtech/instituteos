@@ -10,6 +10,10 @@ import { PLATFORM_ROLES } from './authorization.js';
 const organizationSchema = new Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 160 },
+    adminName: { type: String, trim: true, maxlength: 120 },
+    shortCode: { type: String, trim: true, uppercase: true, maxlength: 24 },
+    tagline: { type: String, trim: true, maxlength: 180 },
+    logoDataUrl: { type: String, maxlength: 500000 },
     subdomain: { type: String, lowercase: true, trim: true, maxlength: 63 },
     plan: { type: String, enum: ['Starter', 'Growth', 'Enterprise'] },
     trialEndsAt: { type: Date, default: null },

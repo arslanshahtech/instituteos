@@ -164,7 +164,7 @@ export function FeeConcessionsPage() {
             description="Try a different search or clear the class filter."
           />
         ) : (
-          <div className="table-scroll">
+          <div className="table-scroll fee-concessions-table-scroll">
             <table className="fee-concessions-table">
               <thead>
                 <tr>

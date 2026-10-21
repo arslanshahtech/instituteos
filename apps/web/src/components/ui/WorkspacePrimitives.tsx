@@ -253,7 +253,7 @@ export function WorkspaceStaffCard({
       </span>
       <div className="reference-staff-copy">
         <strong>{name}</strong>
-        <small>{subtitle}</small>
+        {subtitle ? <small>{subtitle}</small> : null}
         {details.map((detail, index) => (
           <span key={index}>{detail}</span>
         ))}
