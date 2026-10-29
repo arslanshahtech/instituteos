@@ -8,10 +8,7 @@ import {
 } from '../academics/academics.model.js';
 import { AuthUserModel } from '../auth/auth.model.js';
 import { CampusModel } from '../tenancy/tenancy.model.js';
-import {
-  StaffMemberModel,
-  StudentModel,
-} from '../people/people.model.js';
+import { StaffMemberModel, StudentModel } from '../people/people.model.js';
 import {
   StaffAttendanceModel,
   StudentAttendanceModel,
@@ -450,26 +447,26 @@ export class MongoAttendanceRepository implements AttendanceRepository {
     // The active class placement is the roster source of truth. Requiring a
     // separate admissions Enrollment record hides valid directory-created students.
     return students.map((student) => {
-        const mark = marks.get(String(student._id));
-        return {
-          id: String(student._id),
-          firstName: String(student.firstName),
-          lastName: String(student.lastName),
-          ...(student.preferredName
-            ? { preferredName: String(student.preferredName) }
-            : {}),
-          ...(student.contactEmail
-            ? { contactEmail: String(student.contactEmail) }
-            : {}),
-          ...(student.phone ? { phone: String(student.phone) } : {}),
-          ...(mark
-            ? {
-                status: mark.status as StudentRosterMember['status'],
-                ...(mark.remarks ? { remarks: String(mark.remarks) } : {}),
-              }
-            : {}),
-        };
-      });
+      const mark = marks.get(String(student._id));
+      return {
+        id: String(student._id),
+        firstName: String(student.firstName),
+        lastName: String(student.lastName),
+        ...(student.preferredName
+          ? { preferredName: String(student.preferredName) }
+          : {}),
+        ...(student.contactEmail
+          ? { contactEmail: String(student.contactEmail) }
+          : {}),
+        ...(student.phone ? { phone: String(student.phone) } : {}),
+        ...(mark
+          ? {
+              status: mark.status as StudentRosterMember['status'],
+              ...(mark.remarks ? { remarks: String(mark.remarks) } : {}),
+            }
+          : {}),
+      };
+    });
   }
 
   async saveStudentAttendance(

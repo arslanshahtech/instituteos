@@ -110,14 +110,26 @@ export function AcademicsDashboard() {
   const [editing, setEditing] = useState<AcademicsRow>();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showEnrollment, setShowEnrollment] = useState(false);
-  const [enrollmentView, setEnrollmentView] = useState<'students' | 'teacher'>('students');
+  const [enrollmentView, setEnrollmentView] = useState<'students' | 'teacher'>(
+    'students',
+  );
   const [subjectDialogOpen, setSubjectDialogOpen] = useState(false);
-  const [enrollmentSectionId, setEnrollmentSectionId] = useState<string | undefined>();
-  const [enrollmentClassId, setEnrollmentClassId] = useState<string | undefined>();
-  const [newSectionClassId, setNewSectionClassId] = useState<string | undefined>();
+  const [enrollmentSectionId, setEnrollmentSectionId] = useState<
+    string | undefined
+  >();
+  const [enrollmentClassId, setEnrollmentClassId] = useState<
+    string | undefined
+  >();
+  const [newSectionClassId, setNewSectionClassId] = useState<
+    string | undefined
+  >();
   const enrollmentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (showEnrollment) enrollmentRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    if (showEnrollment)
+      enrollmentRef.current?.scrollIntoView?.({
+        behavior: 'smooth',
+        block: 'start',
+      });
   }, [showEnrollment, enrollmentClassId]);
   const selectedTab = tabs.find((tab) => tab.resource === resource) ?? tabs[0]!;
 
@@ -284,12 +296,17 @@ export function AcademicsDashboard() {
   if (!canManage) return <PermissionDeniedState />;
 
   if (resource === 'classes' || resource === 'sections') {
-    const openCreate = (targetResource: 'classes' | 'sections', targetClassId?: string) => {
+    const openCreate = (
+      targetResource: 'classes' | 'sections',
+      targetClassId?: string,
+    ) => {
       save.reset();
       remove.reset();
       setResource(targetResource);
       setEditing(undefined);
-      setNewSectionClassId(targetResource === 'sections' ? targetClassId : undefined);
+      setNewSectionClassId(
+        targetResource === 'sections' ? targetClassId : undefined,
+      );
       setDialogOpen(true);
     };
     const openEdit = (
@@ -324,23 +341,57 @@ export function AcademicsDashboard() {
           campuses={workspace.campuses.data?.campuses ?? []}
           subjects={workspace.subjects.data?.items ?? []}
           assignments={workspace.assignments.data?.items ?? []}
-          teachers={(staff.data?.items ?? []).map(({ id, firstName, lastName }) => ({
-            id,
-            firstName,
-            lastName,
-          }))}
+          teachers={(staff.data?.items ?? []).map(
+            ({ id, firstName, lastName }) => ({
+              id,
+              firstName,
+              lastName,
+            }),
+          )}
           onCreate={openCreate}
-          onCreateSubject={() => { save.reset(); setSubjectDialogOpen(true); }}
+          onCreateSubject={() => {
+            save.reset();
+            setSubjectDialogOpen(true);
+          }}
           onEdit={openEdit}
           onDelete={deleteAcademicRecord}
-          onOpenEnrollment={(sectionId, classId, view = 'students') => { setEnrollmentSectionId(sectionId); setEnrollmentClassId(classId); setEnrollmentView(view); setShowEnrollment(true); }}
-          onOpenCampusSetup={() => navigate(`/admin/organizations/${encodeURIComponent(organizationId)}?tab=campuses`)}
+          onOpenEnrollment={(sectionId, classId, view = 'students') => {
+            setEnrollmentSectionId(sectionId);
+            setEnrollmentClassId(classId);
+            setEnrollmentView(view);
+            setShowEnrollment(true);
+          }}
+          onOpenCampusSetup={() =>
+            navigate(
+              `/admin/organizations/${encodeURIComponent(organizationId)}?tab=campuses`,
+            )
+          }
         />
         {showEnrollment && (
-          <div className="academics-page class-enrollment-shell" ref={enrollmentRef}>
+          <div
+            className="academics-page class-enrollment-shell"
+            ref={enrollmentRef}
+          >
             <div className="class-enrollment-shell-heading">
-              <div><strong>{enrollmentView === 'students' ? 'Student Management' : 'Assign Subject Teacher'}</strong><p>{enrollmentView === 'students' ? 'View enrolled students, search the roster, add students, or remove selected students.' : 'Choose the academic session, section, subject and teacher for this assignment.'}</p></div>
-              <Button type="button" variant="quiet" onClick={() => setShowEnrollment(false)}>Close</Button>
+              <div>
+                <strong>
+                  {enrollmentView === 'students'
+                    ? 'Student Management'
+                    : 'Assign Subject Teacher'}
+                </strong>
+                <p>
+                  {enrollmentView === 'students'
+                    ? 'View enrolled students, search the roster, add students, or remove selected students.'
+                    : 'Choose the academic session, section, subject and teacher for this assignment.'}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="quiet"
+                onClick={() => setShowEnrollment(false)}
+              >
+                Close
+              </Button>
             </div>
             <ClassEnrollmentPanel
               key={`${enrollmentClassId ?? 'all'}:${enrollmentSectionId ?? 'none'}`}
@@ -349,18 +400,22 @@ export function AcademicsDashboard() {
               sections={workspace.sections.data?.items ?? []}
               years={workspace.years.data?.items ?? []}
               subjects={workspace.subjects.data?.items ?? []}
-              teachers={(staff.data?.items ?? []).map(({ id, firstName, lastName }) => ({
-                id,
-                firstName,
-                lastName,
-              }))}
+              teachers={(staff.data?.items ?? []).map(
+                ({ id, firstName, lastName }) => ({
+                  id,
+                  firstName,
+                  lastName,
+                }),
+              )}
               teachersLoading={staff.isPending}
-              teachersError={staff.isError ? apiMessage(staff.error) : undefined}
+              teachersError={
+                staff.isError ? apiMessage(staff.error) : undefined
+              }
               initialSectionId={enrollmentSectionId}
               initialClassId={enrollmentClassId}
               initialView={enrollmentView}
               onViewChange={setEnrollmentView}
-              onCreateSection={(classId) => openCreate('sections', classId) }
+              onCreateSection={(classId) => openCreate('sections', classId)}
             />
           </div>
         )}
@@ -373,10 +428,12 @@ export function AcademicsDashboard() {
           <AcademicsForm
             choices={choices}
             isSaving={save.isPending}
-            onSubmit={(input) => save.mutate(
-              { resource: 'subjects', data: input },
-              { onSuccess: () => setSubjectDialogOpen(false) },
-            )}
+            onSubmit={(input) =>
+              save.mutate(
+                { resource: 'subjects', data: input },
+                { onSuccess: () => setSubjectDialogOpen(false) },
+              )
+            }
             resource="subjects"
             saveError={save.error ? apiMessage(save.error) : undefined}
           />
@@ -391,7 +448,12 @@ export function AcademicsDashboard() {
             choices={choices}
             isSaving={save.isPending}
             onSubmit={saveRecord}
-            record={editing?.values ?? (resource === 'sections' && newSectionClassId ? { classId: newSectionClassId } : undefined)}
+            record={
+              editing?.values ??
+              (resource === 'sections' && newSectionClassId
+                ? { classId: newSectionClassId }
+                : undefined)
+            }
             resource={resource}
             saveError={save.error ? apiMessage(save.error) : undefined}
           />

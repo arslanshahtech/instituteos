@@ -1459,7 +1459,11 @@ function CampusesPanel({
           <p>Manage each campus and its contact details in one place.</p>
         </div>
         {canCreate && (
-          <Button variant="primary" onClick={() => setCreateOpen((open) => !open)} type="button">
+          <Button
+            variant="primary"
+            onClick={() => setCreateOpen((open) => !open)}
+            type="button"
+          >
             <Plus size={16} aria-hidden="true" />
             {createOpen ? 'Cancel' : 'New campus'}
           </Button>
@@ -1974,23 +1978,31 @@ function MembersPanel({
                     >
                       Save access
                     </Button>
-                    {member.role !== 'organization_owner' && member.status !== 'revoked' && (
-                      <Button
-                        variant="secondary"
-                        iconOnly
-                        type="button"
-                        aria-label={`Remove ${member.user?.displayName ?? member.user?.email ?? 'member'} access`}
-                        title="Remove member access"
-                        disabled={save.isPending}
-                        onClick={() => {
-                          if (window.confirm(`Remove organization access for ${member.user?.displayName ?? member.user?.email ?? 'this member'}?`)) {
-                            save.mutate({ id: member.id, draft: { ...draft, status: 'revoked' } });
-                          }
-                        }}
-                      >
-                        <X size={16} aria-hidden="true" />
-                      </Button>
-                    )}
+                    {member.role !== 'organization_owner' &&
+                      member.status !== 'revoked' && (
+                        <Button
+                          variant="secondary"
+                          iconOnly
+                          type="button"
+                          aria-label={`Remove ${member.user?.displayName ?? member.user?.email ?? 'member'} access`}
+                          title="Remove member access"
+                          disabled={save.isPending}
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Remove organization access for ${member.user?.displayName ?? member.user?.email ?? 'this member'}?`,
+                              )
+                            ) {
+                              save.mutate({
+                                id: member.id,
+                                draft: { ...draft, status: 'revoked' },
+                              });
+                            }
+                          }}
+                        >
+                          <X size={16} aria-hidden="true" />
+                        </Button>
+                      )}
                   </div>
                 )}
               </article>

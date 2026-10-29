@@ -17,7 +17,7 @@ InstituteOS is a multi-tenant education management and operations SaaS for schoo
 
 Authentication and identity; organizations, campuses, memberships, roles, and permissions; admissions; students and guardians; staff; academics; timetable; attendance; exams and assignments; finance; communication; documents; reports; SaaS billing; audit logs; and an AI assistant.
 
-This list describes product scope, not implemented features. Phases 00 and 01 implement only the application and operational API foundations; none of these business capabilities are implemented yet.
+This list describes the intended product scope, not a blanket statement that every feature is complete. The current repository also contains implemented modules for identity/authentication, organizations/campuses and membership permissions, admissions, students/guardians/staff, academics, attendance, examinations/homework, finance/fee operations/concessions, communications, reporting, settings and student pickup workflows. Individual workflows still require production-like end-to-end validation before being offered to a school. Treat AI assistance, SaaS subscription billing, official automated messaging/payment integrations and any missing document-management workflow as planned/unverified until they have implementation and acceptance evidence. The production readiness gates are tracked in docs/PRODUCTION_READINESS_PLAN.md.
 
 ## Initial role set
 

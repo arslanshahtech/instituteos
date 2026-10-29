@@ -46,4 +46,4 @@ npm run build
 npm run format:check
 ```
 
-See [docs/architecture.md](docs/architecture.md), [docs/decisions.md](docs/decisions.md), and [docs/INSTITUTEOS_CONTRACT.md](docs/INSTITUTEOS_CONTRACT.md) for the foundation and product boundaries.
+See [docs/architecture.md](docs/architecture.md), [docs/decisions.md](docs/decisions.md), and [docs/INSTITUTEOS_CONTRACT.md](docs/INSTITUTEOS_CONTRACT.md) for the foundation and product boundaries. Before any real-school rollout, follow [docs/PRODUCTION_READINESS_PLAN.md](docs/PRODUCTION_READINESS_PLAN.md) and its four release gates. Hosting settings are documented in [docs/DEPLOYMENT_RUNBOOK.md](docs/DEPLOYMENT_RUNBOOK.md); after staging is online, run `npm run smoke:staging`.

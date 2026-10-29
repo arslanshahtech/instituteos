@@ -26,7 +26,10 @@ export class PickupService {
     organizationId: string,
     studentId: string,
   ): Promise<AuthorizedPickupPerson[]> {
-    return this.repository.listPickupPersonsByStudent(organizationId, studentId);
+    return this.repository.listPickupPersonsByStudent(
+      organizationId,
+      studentId,
+    );
   }
 
   async setPersonStatus(
@@ -75,7 +78,8 @@ export class PickupService {
     // 6 digit secure code
     const passCode = randomInt(100000, 999999).toString();
     const now = new Date();
-    const validMinutes = input.validMinutes && input.validMinutes > 0 ? input.validMinutes : 60;
+    const validMinutes =
+      input.validMinutes && input.validMinutes > 0 ? input.validMinutes : 60;
     const expiry = new Date(now.getTime() + validMinutes * 60 * 1000);
 
     return this.repository.createPass(
@@ -105,7 +109,11 @@ export class PickupService {
 
     const now = new Date();
     if (new Date(pass.validUntil) < now) {
-      await this.repository.updatePassStatus(organizationId, pass.id, 'expired');
+      await this.repository.updatePassStatus(
+        organizationId,
+        pass.id,
+        'expired',
+      );
       throw new AppError(400, 'PASS_EXPIRED', 'This pass code has expired.');
     }
 

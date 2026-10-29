@@ -35,8 +35,17 @@ function readBoolean(
 }
 
 export const env = {
-  host: process.env.API_HOST ?? '127.0.0.1',
-  port: readInteger(process.env.API_PORT, 4000, 'API_PORT', 65535),
+  // Managed hosts expose their assigned port through PORT and require the
+  // process to listen on all interfaces. Local development stays loopback-only.
+  host:
+    process.env.API_HOST ??
+    (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1'),
+  port: readInteger(
+    process.env.PORT ?? process.env.API_PORT,
+    4000,
+    process.env.PORT ? 'PORT' : 'API_PORT',
+    65535,
+  ),
   nodeEnv: process.env.NODE_ENV ?? 'development',
   databaseUri:
     process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017/instituteos',
@@ -82,6 +91,10 @@ export const env = {
     'AUTH_SESSION_TTL_DAYS',
     30,
   ),
+  // Set only when the web app and API use HTTPS subdomains of the same
+  // domain. This lets frontend JavaScript read the CSRF cookie, not the session.
+  authCsrfCookieDomain:
+    process.env.AUTH_CSRF_COOKIE_DOMAIN?.trim() || undefined,
   authCookieSecure: readBoolean(
     process.env.AUTH_COOKIE_SECURE,
     process.env.NODE_ENV === 'production',

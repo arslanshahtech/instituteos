@@ -78,21 +78,33 @@ export function useFinanceWorkspace(
       placeholderData: keepPreviousData,
     }),
     expenseBudgets: useQuery({
-      queryKey: [...key, 'expense-budgets', operationFilters.month, operationFilters.campusId],
-      queryFn: () => listFinanceExpenseBudgets(organizationId, {
-        month: operationFilters.month ?? new Date().toISOString().slice(0, 7),
-        campusId: operationFilters.campusId,
-      }),
+      queryKey: [
+        ...key,
+        'expense-budgets',
+        operationFilters.month,
+        operationFilters.campusId,
+      ],
+      queryFn: () =>
+        listFinanceExpenseBudgets(organizationId, {
+          month: operationFilters.month ?? new Date().toISOString().slice(0, 7),
+          campusId: operationFilters.campusId,
+        }),
       enabled,
       retry: false,
       placeholderData: keepPreviousData,
     }),
     concessions: useQuery({
-      queryKey: [...key, 'all-concessions', operationFilters.campusId, operationFilters.academicYearId],
-      queryFn: () => listFinanceConcessions(organizationId, {
-        campusId: operationFilters.campusId,
-        academicYearId: operationFilters.academicYearId,
-      }),
+      queryKey: [
+        ...key,
+        'all-concessions',
+        operationFilters.campusId,
+        operationFilters.academicYearId,
+      ],
+      queryFn: () =>
+        listFinanceConcessions(organizationId, {
+          campusId: operationFilters.campusId,
+          academicYearId: operationFilters.academicYearId,
+        }),
       enabled,
       retry: false,
       placeholderData: keepPreviousData,
@@ -112,7 +124,8 @@ export function useCreateFinanceExpense(organizationId: string) {
 export function useDeleteFinanceExpense(organizationId: string) {
   const invalidate = useInvalidateFinance(organizationId);
   return useMutation({
-    mutationFn: (expenseId: string) => deleteFinanceExpense(organizationId, expenseId),
+    mutationFn: (expenseId: string) =>
+      deleteFinanceExpense(organizationId, expenseId),
     onSuccess: invalidate,
   });
 }
@@ -143,7 +156,9 @@ export function useStudentFeeLedger(
 function useInvalidateFinance(organizationId: string) {
   const queryClient = useQueryClient();
   return () =>
-    queryClient.invalidateQueries({ queryKey: financeQueryKey(organizationId) });
+    queryClient.invalidateQueries({
+      queryKey: financeQueryKey(organizationId),
+    });
 }
 
 export function useSaveFeeStructure(organizationId: string) {
@@ -194,7 +209,8 @@ export function useStudentConcessions(
   const key = financeQueryKey(organizationId);
   return useQuery({
     queryKey: [...key, 'concessions', studentId, academicYearId],
-    queryFn: () => listStudentConcessions(organizationId, studentId, academicYearId),
+    queryFn: () =>
+      listStudentConcessions(organizationId, studentId, academicYearId),
     enabled: Boolean(organizationId && studentId && enabled),
     retry: false,
   });

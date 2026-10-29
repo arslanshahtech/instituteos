@@ -195,7 +195,10 @@ export class AttendanceService {
     );
   }
 
-  async removeStudentFromSection(context: AttendanceContext, input: StudentPlacementInput) {
+  async removeStudentFromSection(
+    context: AttendanceContext,
+    input: StudentPlacementInput,
+  ) {
     const normalized = {
       studentId: objectId(input.studentId, 'student'),
       classId: objectId(input.classId, 'class'),
@@ -204,9 +207,20 @@ export class AttendanceService {
       campusId: objectId(input.campusId, 'campus'),
     };
     assertCampus(context, normalized.campusId);
-    await this.validateSectionContext(context, { ...normalized, date: undefined });
-    const removed = await this.repository.deactivateStudentPlacement(context.organizationId, normalized);
-    if (!removed) throw new AppError(404, 'STUDENT_PLACEMENT_NOT_FOUND', 'This student is not currently assigned to the selected class section.');
+    await this.validateSectionContext(context, {
+      ...normalized,
+      date: undefined,
+    });
+    const removed = await this.repository.deactivateStudentPlacement(
+      context.organizationId,
+      normalized,
+    );
+    if (!removed)
+      throw new AppError(
+        404,
+        'STUDENT_PLACEMENT_NOT_FOUND',
+        'This student is not currently assigned to the selected class section.',
+      );
     return { removed: true };
   }
 

@@ -350,6 +350,29 @@ export function createExaminationsRouter(
     }),
   );
 
+  router.patch(
+    `${base}/:examId/results-publication`,
+    ...manageExams,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const body = bodyObject(request.body);
+      if (typeof body.published !== 'boolean') {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Choose whether results should be published.',
+        );
+      }
+      response.status(200).json({
+        exam: await service.setResultsPublication(
+          organizationContext(response),
+          routeId(request.params.examId, 'Exam'),
+          body.published,
+        ),
+      });
+    }),
+  );
+
   router.delete(
     `${base}/:examId`,
     ...manageExams,

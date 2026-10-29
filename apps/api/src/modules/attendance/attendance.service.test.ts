@@ -58,15 +58,30 @@ const baseBulkInput: StudentAttendanceBulkInput = {
 
 describe('AttendanceService', () => {
   it('removes a student from the selected section without deleting the student record', async () => {
-    const repo = repository({ deactivateStudentPlacement: vi.fn().mockResolvedValue(true) });
+    const repo = repository({
+      deactivateStudentPlacement: vi.fn().mockResolvedValue(true),
+    });
     const service = new AttendanceService(repo);
 
-    await expect(service.removeStudentFromSection(context, {
-      studentId, classId, sectionId, academicYearId, campusId,
-    })).resolves.toEqual({ removed: true });
-    expect(repo.deactivateStudentPlacement).toHaveBeenCalledWith(organizationId, {
-      studentId, classId, sectionId, academicYearId, campusId,
-    });
+    await expect(
+      service.removeStudentFromSection(context, {
+        studentId,
+        classId,
+        sectionId,
+        academicYearId,
+        campusId,
+      }),
+    ).resolves.toEqual({ removed: true });
+    expect(repo.deactivateStudentPlacement).toHaveBeenCalledWith(
+      organizationId,
+      {
+        studentId,
+        classId,
+        sectionId,
+        academicYearId,
+        campusId,
+      },
+    );
   });
 
   it('accepts Leave as a valid student attendance status', async () => {

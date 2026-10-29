@@ -29,7 +29,8 @@ const iso = (value: unknown) => new Date(value as string | Date).toISOString();
 
 function dateQuery(filters: FinanceDateFilters, field: string) {
   const range: Record<string, Date> = {};
-  if (filters.dateFrom) range.$gte = new Date(`${filters.dateFrom}T00:00:00.000Z`);
+  if (filters.dateFrom)
+    range.$gte = new Date(`${filters.dateFrom}T00:00:00.000Z`);
   if (filters.dateTo) range.$lte = new Date(`${filters.dateTo}T23:59:59.999Z`);
   return Object.keys(range).length ? { [field]: range } : {};
 }
@@ -51,7 +52,9 @@ function expenseRecord(value: Record<string, unknown>): FinanceExpenseRecord {
   };
 }
 
-function expenseBudgetRecord(value: Record<string, unknown>): FinanceExpenseBudgetRecord {
+function expenseBudgetRecord(
+  value: Record<string, unknown>,
+): FinanceExpenseBudgetRecord {
   return {
     id: String(value._id),
     organizationId: String(value.organizationId),
@@ -74,14 +77,17 @@ export class MongoFinanceOperationsRepository implements FinanceOperationsReposi
       organizationId: oid(context.organizationId),
       ...dateQuery(filters, 'paymentDate'),
     };
-    if (filters.paymentMethod) receiptQuery.paymentMethod = filters.paymentMethod;
+    if (filters.paymentMethod)
+      receiptQuery.paymentMethod = filters.paymentMethod;
     const receipts = (await PaymentReceiptModel.find(receiptQuery)
       .sort({ paymentDate: -1, createdAt: -1 })
       .lean()
       .exec()) as unknown as Array<Record<string, unknown>>;
     if (!receipts.length) return [];
 
-    const invoiceIds = [...new Set(receipts.map((item) => String(item.invoiceId)))];
+    const invoiceIds = [
+      ...new Set(receipts.map((item) => String(item.invoiceId))),
+    ];
     const invoiceQuery: Record<string, unknown> = {
       organizationId: oid(context.organizationId),
       _id: { $in: invoiceIds.map(oid) },
@@ -95,8 +101,12 @@ export class MongoFinanceOperationsRepository implements FinanceOperationsReposi
       .select('_id invoiceNumber studentId campusId classId')
       .lean()
       .exec()) as unknown as Array<Record<string, unknown>>;
-    const invoiceMap = new Map(invoices.map((item) => [String(item._id), item]));
-    const studentIds = [...new Set(invoices.map((item) => String(item.studentId)))];
+    const invoiceMap = new Map(
+      invoices.map((item) => [String(item._id), item]),
+    );
+    const studentIds = [
+      ...new Set(invoices.map((item) => String(item.studentId))),
+    ];
     const students = (await StudentModel.find({
       organizationId: oid(context.organizationId),
       _id: { $in: studentIds.map(oid) },
@@ -107,30 +117,34 @@ export class MongoFinanceOperationsRepository implements FinanceOperationsReposi
     const studentMap = new Map(
       students.map((item) => [
         String(item._id),
-        [String(item.firstName ?? ''), String(item.lastName ?? '')].filter(Boolean).join(' '),
+        [String(item.firstName ?? ''), String(item.lastName ?? '')]
+          .filter(Boolean)
+          .join(' '),
       ]),
     );
 
     return receipts.flatMap((receipt) => {
       const invoice = invoiceMap.get(String(receipt.invoiceId));
       if (!invoice) return [];
-      return [{
-        id: String(receipt._id),
-        organizationId: String(receipt.organizationId),
-        receiptNumber: String(receipt.receiptNumber),
-        invoiceId: String(receipt.invoiceId),
-        invoiceNumber: String(invoice.invoiceNumber),
-        studentId: String(receipt.studentId),
-        studentName: studentMap.get(String(receipt.studentId)) ?? 'Student',
-        campusId: String(invoice.campusId),
-        classId: String(invoice.classId),
-        amountPaid: decimalNumber(receipt.amountPaid),
-        paymentMethod: receipt.paymentMethod as PaymentMethod,
-        paymentDate: iso(receipt.paymentDate),
-        transactionReference: receipt.transactionReference
-          ? String(receipt.transactionReference)
-          : undefined,
-      }];
+      return [
+        {
+          id: String(receipt._id),
+          organizationId: String(receipt.organizationId),
+          receiptNumber: String(receipt.receiptNumber),
+          invoiceId: String(receipt.invoiceId),
+          invoiceNumber: String(invoice.invoiceNumber),
+          studentId: String(receipt.studentId),
+          studentName: studentMap.get(String(receipt.studentId)) ?? 'Student',
+          campusId: String(invoice.campusId),
+          classId: String(invoice.classId),
+          amountPaid: decimalNumber(receipt.amountPaid),
+          paymentMethod: receipt.paymentMethod as PaymentMethod,
+          paymentDate: iso(receipt.paymentDate),
+          transactionReference: receipt.transactionReference
+            ? String(receipt.transactionReference)
+            : undefined,
+        },
+      ];
     });
   }
 
@@ -173,7 +187,9 @@ export class MongoFinanceOperationsRepository implements FinanceOperationsReposi
       reference: input.reference,
       recordedBy: oid(context.userId),
     });
-    return expenseRecord(record.toObject() as unknown as Record<string, unknown>);
+    return expenseRecord(
+      record.toObject() as unknown as Record<string, unknown>,
+    );
   }
 
   async deleteExpense(
@@ -228,12 +244,16 @@ export class MongoFinanceOperationsRepository implements FinanceOperationsReposi
           campusId,
           category: input.category,
           month: input.month,
-          budgetAmount: mongoose.Types.Decimal128.fromString(input.budgetAmount.toFixed(2)),
+          budgetAmount: mongoose.Types.Decimal128.fromString(
+            input.budgetAmount.toFixed(2),
+          ),
           recordedBy: oid(context.userId),
         },
       },
       { upsert: true, new: true, setDefaultsOnInsert: true },
-    ).lean().exec();
+    )
+      .lean()
+      .exec();
     if (!record) throw new Error('Expense budget could not be saved.');
     return expenseBudgetRecord(record as unknown as Record<string, unknown>);
   }
@@ -245,18 +265,25 @@ export class MongoFinanceOperationsRepository implements FinanceOperationsReposi
     const query: Record<string, unknown> = {
       organizationId: oid(context.organizationId),
     };
-    if (filters.academicYearId) query.academicYearId = oid(filters.academicYearId);
+    if (filters.academicYearId)
+      query.academicYearId = oid(filters.academicYearId);
     if (filters.campusId) {
       const studentsForCampus = await StudentModel.find({
         organizationId: oid(context.organizationId),
         campusId: oid(filters.campusId),
-      }).select('_id').lean().exec();
+      })
+        .select('_id')
+        .lean()
+        .exec();
       query.studentId = { $in: studentsForCampus.map((item) => item._id) };
     } else if (context.campusIds.length) {
       const studentsForCampuses = await StudentModel.find({
         organizationId: oid(context.organizationId),
         campusId: { $in: context.campusIds.map(oid) },
-      }).select('_id').lean().exec();
+      })
+        .select('_id')
+        .lean()
+        .exec();
       query.studentId = { $in: studentsForCampuses.map((item) => item._id) };
     }
     const records = (await FeeConcessionModel.find(query)
@@ -264,7 +291,9 @@ export class MongoFinanceOperationsRepository implements FinanceOperationsReposi
       .lean()
       .exec()) as unknown as Array<Record<string, unknown>>;
     if (!records.length) return [];
-    const studentIds = [...new Set(records.map((item) => String(item.studentId)))];
+    const studentIds = [
+      ...new Set(records.map((item) => String(item.studentId))),
+    ];
     const students = (await StudentModel.find({
       organizationId: oid(context.organizationId),
       _id: { $in: studentIds.map(oid) },
@@ -272,31 +301,42 @@ export class MongoFinanceOperationsRepository implements FinanceOperationsReposi
       .select('_id firstName lastName campusId')
       .lean()
       .exec()) as unknown as Array<Record<string, unknown>>;
-    const studentMap = new Map(students.map((item) => [
-      String(item._id),
-      {
-        name: [String(item.firstName ?? ''), String(item.lastName ?? '')].filter(Boolean).join(' ') || 'Student',
-        campusId: item.campusId ? String(item.campusId) : undefined,
-      },
-    ]));
+    const studentMap = new Map(
+      students.map((item) => [
+        String(item._id),
+        {
+          name:
+            [String(item.firstName ?? ''), String(item.lastName ?? '')]
+              .filter(Boolean)
+              .join(' ') || 'Student',
+          campusId: item.campusId ? String(item.campusId) : undefined,
+        },
+      ]),
+    );
     return records.flatMap((item) => {
       const student = studentMap.get(String(item.studentId));
       if (!student) return [];
-      return [{
-        id: String(item._id),
-        organizationId: String(item.organizationId),
-        studentId: String(item.studentId),
-        studentName: student.name,
-        campusId: student.campusId,
-        academicYearId: item.academicYearId ? String(item.academicYearId) : undefined,
-        concessionType: item.concessionType as FinanceConcessionRecord['concessionType'],
-        discountType: item.discountType as FinanceConcessionRecord['discountType'],
-        discountValue: decimalNumber(item.discountValue),
-        reason: item.reason ? String(item.reason) : undefined,
-        isActive: Boolean(item.isActive),
-        createdAt: iso(item.createdAt),
-        updatedAt: iso(item.updatedAt),
-      }];
+      return [
+        {
+          id: String(item._id),
+          organizationId: String(item.organizationId),
+          studentId: String(item.studentId),
+          studentName: student.name,
+          campusId: student.campusId,
+          academicYearId: item.academicYearId
+            ? String(item.academicYearId)
+            : undefined,
+          concessionType:
+            item.concessionType as FinanceConcessionRecord['concessionType'],
+          discountType:
+            item.discountType as FinanceConcessionRecord['discountType'],
+          discountValue: decimalNumber(item.discountValue),
+          reason: item.reason ? String(item.reason) : undefined,
+          isActive: Boolean(item.isActive),
+          createdAt: iso(item.createdAt),
+          updatedAt: iso(item.updatedAt),
+        },
+      ];
     });
   }
 }

@@ -234,16 +234,18 @@ export function HomeworkTestsPage() {
         eyebrow="Academic workspace"
         title="Homework & tests"
         description="Create, publish and review class homework and tests. Teachers can only manage items for their assigned class sections and subjects."
-        aside={canWrite && (
-          <Button onClick={() => setFormOpen((open) => !open)}>
-            <Plus size={15} />{' '}
-            {formOpen
-              ? 'Close form'
-              : tab === 'homework'
-                ? 'Add homework'
-                : 'Add test'}
-          </Button>
-        )}
+        aside={
+          canWrite && (
+            <Button onClick={() => setFormOpen((open) => !open)}>
+              <Plus size={15} />{' '}
+              {formOpen
+                ? 'Close form'
+                : tab === 'homework'
+                  ? 'Add homework'
+                  : 'Add test'}
+            </Button>
+          )
+        }
       />
 
       <nav className="homework-tabs" aria-label="Homework and test types">

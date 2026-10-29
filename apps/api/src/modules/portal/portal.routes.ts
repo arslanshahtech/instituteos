@@ -7,6 +7,7 @@ import {
   AcademicClassModel,
   AcademicSectionModel,
   AcademicYearModel,
+  SubjectModel,
 } from '../academics/academics.model.js';
 import { authEmailDelivery } from '../auth/auth.email.js';
 import { AuthUserModel } from '../auth/auth.model.js';
@@ -18,6 +19,11 @@ import {
   StudentSectionPlacementModel,
 } from '../attendance/attendance.model.js';
 import { StudentInvoiceModel } from '../finance/finance.model.js';
+import {
+  ExamMarkModel,
+  ExamModel,
+  ExamScheduleModel,
+} from '../examinations/examinations.model.js';
 import {
   GuardianModel,
   StudentGuardianLinkModel,
@@ -143,6 +149,102 @@ async function activeStudentIdsForAccount(
   ];
 }
 
+async function publishedExamResultsForStudent(
+  organizationId: string,
+  studentId: string,
+) {
+  const organizationObjectId = oid(organizationId);
+  const studentObjectId = oid(studentId);
+  const exams = await ExamModel.find({
+    organizationId: organizationObjectId,
+    resultsPublishedAt: { $ne: null },
+  })
+    .sort({ resultsPublishedAt: -1 })
+    .limit(100)
+    .lean();
+  if (exams.length === 0) return [];
+
+  const placements = await StudentSectionPlacementModel.find({
+    organizationId: organizationObjectId,
+    studentId: studentObjectId,
+    academicYearId: { $in: exams.map((exam) => exam.academicYearId) },
+  }).lean();
+  if (placements.length === 0) return [];
+
+  const examById = new Map(exams.map((exam) => [String(exam._id), exam]));
+  const placementByYear = new Map(
+    placements.map((placement) => [
+      String(placement.academicYearId),
+      placement,
+    ]),
+  );
+  const schedules = await ExamScheduleModel.find({
+    organizationId: organizationObjectId,
+    examId: { $in: exams.map((exam) => exam._id) },
+  })
+    .sort({ date: -1, startTime: 1 })
+    .lean();
+  const studentSchedules = schedules.filter((schedule) => {
+    const exam = examById.get(String(schedule.examId));
+    const placement = exam
+      ? placementByYear.get(String(exam.academicYearId))
+      : undefined;
+    return Boolean(
+      exam &&
+      placement &&
+      String(placement.campusId) === String(exam.campusId) &&
+      String(schedule.classId) === String(placement.classId) &&
+      String(schedule.sectionId) === String(placement.sectionId),
+    );
+  });
+  if (studentSchedules.length === 0) return [];
+
+  const [marks, subjects] = await Promise.all([
+    ExamMarkModel.find({
+      organizationId: organizationObjectId,
+      studentId: studentObjectId,
+      examScheduleId: { $in: studentSchedules.map((schedule) => schedule._id) },
+    }).lean(),
+    SubjectModel.find({
+      organizationId: organizationObjectId,
+      _id: { $in: studentSchedules.map((schedule) => schedule.subjectId) },
+    })
+      .select({ name: 1 })
+      .lean(),
+  ]);
+  const marksBySchedule = new Map(
+    marks.map((mark) => [String(mark.examScheduleId), mark]),
+  );
+  const subjectNames = new Map(
+    subjects.map((subject) => [String(subject._id), String(subject.name)]),
+  );
+
+  return studentSchedules.flatMap((schedule) => {
+    const mark = marksBySchedule.get(String(schedule._id));
+    const exam = examById.get(String(schedule.examId));
+    if (!mark || !exam) return [];
+    return [
+      {
+        id: String(mark._id),
+        examName: String(exam.name),
+        subjectName: subjectNames.get(String(schedule.subjectId)) ?? 'Subject',
+        date: dateOnly(schedule.date),
+        marksObtained:
+          mark.marksObtained === undefined || mark.marksObtained === null
+            ? null
+            : numeric(mark.marksObtained),
+        totalMarks: numeric(schedule.totalMarks),
+        percentage:
+          mark.percentage === undefined || mark.percentage === null
+            ? null
+            : numeric(mark.percentage),
+        grade: typeof mark.grade === 'string' && mark.grade ? mark.grade : null,
+        isAbsent: Boolean(mark.isAbsent),
+      },
+    ];
+  });
+}
+
 async function studentPortalRecord(organizationId: string, studentId: string) {
   const organizationObjectId = oid(organizationId);
   const studentObjectId = oid(studentId);
@@ -243,8 +345,11 @@ async function studentPortalRecord(organizationId: string, studentId: string) {
     };
   });
 
-  // ExamMark currently has no publication/visibility flag. Do not expose draft marks
-  // to students or guardians until the result-publishing workflow is implemented.
+  const publishedResults = await publishedExamResultsForStudent(
+    organizationId,
+    studentId,
+  );
+
   return {
     id: String(student._id),
     firstName: String(student.firstName),
@@ -277,8 +382,8 @@ async function studentPortalRecord(organizationId: string, studentId: string) {
         ) / 100,
       invoices: feeItems.slice(0, 12),
     },
-    results: [],
-    resultsAvailable: false,
+    results: publishedResults,
+    resultsAvailable: publishedResults.length > 0,
   };
 }
 

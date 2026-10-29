@@ -180,7 +180,15 @@ const teacherTimetableSchema = new Schema(
     },
     dayOfWeek: {
       type: String,
-      enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+      enum: [
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+        'sunday',
+      ],
       required: true,
     },
     startTime: {

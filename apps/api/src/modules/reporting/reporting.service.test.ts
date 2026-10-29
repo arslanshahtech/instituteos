@@ -50,20 +50,22 @@ describe('ReportingService', () => {
       organizationId,
       [campusOne, campusTwo],
     );
-    expect(repository.getFinanceOverview).toHaveBeenCalledWith(
-      organizationId,
-      [campusOne, campusTwo],
-    );
+    expect(repository.getFinanceOverview).toHaveBeenCalledWith(organizationId, [
+      campusOne,
+      campusTwo,
+    ]);
   });
 
   it('returns a zero attendance rate when no attendance records exist', async () => {
     const repository = makeRepository({
-      getTodayAttendanceStats: vi.fn().mockResolvedValue({ total: 0, attended: 0 }),
+      getTodayAttendanceStats: vi
+        .fn()
+        .mockResolvedValue({ total: 0, attended: 0 }),
     });
 
-    const summary = await new ReportingService(repository).getOrganizationSummary(
-      organizationId,
-    );
+    const summary = await new ReportingService(
+      repository,
+    ).getOrganizationSummary(organizationId);
 
     expect(summary.attendance).toEqual({
       todayAttendanceRate: 0,

@@ -268,7 +268,10 @@ const applicationSchema = new Schema(
     dateOfBirth: { type: String, trim: true, maxlength: 10 },
     guardianName: { type: String, trim: true, maxlength: 160 },
     guardianPhone: { type: String, trim: true, maxlength: 40 },
-    feePlan: { type: String, enum: ['Standard', 'Scholarship', 'Sibling plan'] },
+    feePlan: {
+      type: String,
+      enum: ['Standard', 'Scholarship', 'Sibling plan'],
+    },
     status: {
       type: String,
       enum: [

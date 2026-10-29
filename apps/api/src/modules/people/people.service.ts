@@ -64,13 +64,18 @@ function normalizeOptionalDate(value: string | undefined): string | undefined {
   return date.toISOString();
 }
 
-function normalizeOptionalDateOnly(value: string | undefined): string | undefined {
+function normalizeOptionalDateOnly(
+  value: string | undefined,
+): string | undefined {
   if (!value) return undefined;
   if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) {
     throw new AppError(400, 'VALIDATION_ERROR', 'Enter a valid birth date.');
   }
   const date = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== value
+  ) {
     throw new AppError(400, 'VALIDATION_ERROR', 'Enter a valid birth date.');
   }
   return value;
@@ -743,7 +748,11 @@ export class PeopleService {
   async reviewApplication(
     organizationId: string,
     applicationId: string,
-    input: { status: ApplicationStatus; decisionReason?: string; campusId?: string },
+    input: {
+      status: ApplicationStatus;
+      decisionReason?: string;
+      campusId?: string;
+    },
     context?: { organizationId: string; campusIds?: string[]; role?: string },
   ): Promise<{
     application: ApplicationRecord;

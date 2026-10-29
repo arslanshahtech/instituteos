@@ -237,13 +237,16 @@ export function createAttendanceRouter(
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
-      const result = await service.removeStudentFromSection(organizationContext(response), {
-        studentId: objectId(request.params.studentId, 'student'),
-        classId: objectId(body.classId, 'class'),
-        sectionId: objectId(body.sectionId, 'section'),
-        academicYearId: objectId(body.academicYearId, 'academic year'),
-        campusId: objectId(body.campusId, 'campus'),
-      });
+      const result = await service.removeStudentFromSection(
+        organizationContext(response),
+        {
+          studentId: objectId(request.params.studentId, 'student'),
+          classId: objectId(body.classId, 'class'),
+          sectionId: objectId(body.sectionId, 'section'),
+          academicYearId: objectId(body.academicYearId, 'academic year'),
+          campusId: objectId(body.campusId, 'campus'),
+        },
+      );
       response.status(200).json(result);
     }),
   );

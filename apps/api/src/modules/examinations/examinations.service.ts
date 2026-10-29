@@ -169,6 +169,18 @@ function normalizeBreakdowns(values: GradeBreakdown[]): GradeBreakdown[] {
 export class ExaminationsService {
   constructor(private readonly repository: ExaminationsRepository) {}
 
+  private assertResultsNotPublished(exam: {
+    resultsPublishedAt: string | null;
+  }) {
+    if (exam.resultsPublishedAt) {
+      throw new AppError(
+        409,
+        'RESULTS_ALREADY_PUBLISHED',
+        'Unpublish results before changing exam schedules or marks.',
+      );
+    }
+  }
+
   private async assertTeacherAssignment(
     context: ExaminationsContext,
     schedule: {
@@ -251,6 +263,7 @@ export class ExaminationsService {
     input: Partial<ExamInput>,
   ) {
     const current = await this.requiredExam(context, examId);
+    this.assertResultsNotPublished(current);
     const normalized = normalizeExam({ ...current, ...input });
     assertCampus(context, normalized.campusId);
     if (
@@ -281,7 +294,8 @@ export class ExaminationsService {
   }
 
   async deleteExam(context: ExaminationsContext, examId: string) {
-    await this.requiredExam(context, examId);
+    const exam = await this.requiredExam(context, examId);
+    this.assertResultsNotPublished(exam);
     if (await this.repository.hasSchedules(context.organizationId, examId))
       throw new AppError(
         409,
@@ -289,6 +303,68 @@ export class ExaminationsService {
         'Remove exam schedules before deleting this exam.',
       );
     return this.repository.deleteExam(context.organizationId, examId);
+  }
+
+  async setResultsPublication(
+    context: ExaminationsContext,
+    examId: string,
+    published: boolean,
+  ) {
+    const exam = await this.requiredExam(context, examId);
+    assertCampus(context, exam.campusId);
+    if (typeof published !== 'boolean')
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Choose whether results should be published.',
+      );
+    if (published === Boolean(exam.resultsPublishedAt)) return exam;
+
+    if (published) {
+      if (!context.userId)
+        throw new AppError(
+          403,
+          'PUBLISH_USER_REQUIRED',
+          'A signed-in school administrator is required to publish results.',
+        );
+      const schedules = await this.repository.listSchedules(
+        context.organizationId,
+        examId,
+        campusScope(context),
+      );
+      if (schedules.length === 0)
+        throw new AppError(
+          409,
+          'RESULTS_NOT_READY',
+          'Add at least one exam schedule before publishing results.',
+        );
+      for (const schedule of schedules) {
+        const roster = await this.repository.listRoster(
+          context.organizationId,
+          schedule.id,
+          schedule.classId,
+          schedule.sectionId,
+          exam.academicYearId,
+        );
+        if (roster.length === 0 || roster.some((student) => !student.mark)) {
+          throw new AppError(
+            409,
+            'RESULTS_NOT_READY',
+            'Enter marks for every student in every scheduled class and section before publishing results.',
+          );
+        }
+      }
+    }
+
+    return this.requiredResult(
+      this.repository.setResultsPublication(
+        context.organizationId,
+        examId,
+        published ? new Date().toISOString() : null,
+        published ? context.userId! : null,
+      ),
+      'Exam result publication',
+    );
   }
 
   async listSchedules(context: ExaminationsContext, examId: string) {
@@ -323,6 +399,7 @@ export class ExaminationsService {
   ) {
     const exam = await this.requiredExam(context, examId);
     assertCampus(context, exam.campusId);
+    this.assertResultsNotPublished(exam);
     const normalized = normalizeSchedule(input);
     if (
       normalized.date < exam.startDate ||
@@ -374,6 +451,7 @@ export class ExaminationsService {
     const current = await this.requiredSchedule(context, scheduleId);
     const exam = await this.requiredExam(context, current.examId);
     assertCampus(context, exam.campusId);
+    this.assertResultsNotPublished(exam);
     const normalized = normalizeSchedule({ ...current, ...input });
     if (
       normalized.date < exam.startDate ||
@@ -411,6 +489,7 @@ export class ExaminationsService {
     const schedule = await this.requiredSchedule(context, scheduleId);
     const exam = await this.requiredExam(context, schedule.examId);
     assertCampus(context, exam.campusId);
+    this.assertResultsNotPublished(exam);
     if (await this.repository.hasMarks(context.organizationId, scheduleId))
       throw new AppError(
         409,
@@ -520,6 +599,7 @@ export class ExaminationsService {
     const schedule = await this.requiredSchedule(context, scheduleId);
     const exam = await this.requiredExam(context, schedule.examId);
     assertCampus(context, exam.campusId);
+    this.assertResultsNotPublished(exam);
     await this.assertTeacherAssignment(context, {
       ...schedule,
       academicYearId: exam.academicYearId,

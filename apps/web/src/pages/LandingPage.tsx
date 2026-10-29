@@ -1,11 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import {
-  ArrowRight,
-  Check,
-  Menu,
-  ShieldCheck,
-  X,
-} from 'lucide-react';
+import { ArrowRight, Check, Menu, ShieldCheck, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiRequest } from '../api/client.js';
 import '../styles/landing.css';

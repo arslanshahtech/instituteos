@@ -188,7 +188,11 @@ export function GuardiansListPage() {
               <>
                 {guardians.data.items.length === 0 ? (
                   <EmptyState
-                    title={search ? 'No guardians match this search' : 'No guardians yet'}
+                    title={
+                      search
+                        ? 'No guardians match this search'
+                        : 'No guardians yet'
+                    }
                     description={
                       search
                         ? 'Try changing or clearing your search.'
@@ -196,16 +200,27 @@ export function GuardiansListPage() {
                     }
                   />
                 ) : (
-                  <div className="reference-guardian-grid" aria-label="Guardian directory">
+                  <div
+                    className="reference-guardian-grid"
+                    aria-label="Guardian directory"
+                  >
                     {guardians.data.items.map((guardian, index) => {
-                      const linkedStudents = guardianChildrenQueries[index]?.data?.students ?? [];
+                      const linkedStudents =
+                        guardianChildrenQueries[index]?.data?.students ?? [];
                       return (
                         <WorkspaceGuardianCard
-                          childCount={guardian.studentCount ?? linkedStudents.length}
-                          childrenLoading={guardianChildrenQueries[index]?.isPending ?? false}
-                          childrenUnavailable={guardianChildrenQueries[index]?.isError ?? false}
+                          childCount={
+                            guardian.studentCount ?? linkedStudents.length
+                          }
+                          childrenLoading={
+                            guardianChildrenQueries[index]?.isPending ?? false
+                          }
+                          childrenUnavailable={
+                            guardianChildrenQueries[index]?.isError ?? false
+                          }
                           childrenNames={linkedStudents.map(
-                            (relation) => `${relation.student.firstName} ${relation.student.lastName}`,
+                            (relation) =>
+                              `${relation.student.firstName} ${relation.student.lastName}`,
                           )}
                           initials={`${guardian.firstName.trim().charAt(0)}${guardian.lastName.trim().charAt(0)}`.toUpperCase()}
                           key={guardian.id}

@@ -7,8 +7,7 @@ import type {
 
 // 1. Authorized Pickup Person Schema
 export interface AuthorizedPickupPersonDocument
-  extends Omit<AuthorizedPickupPerson, 'id'>,
-    Document {}
+  extends Omit<AuthorizedPickupPerson, 'id'>, Document {}
 
 const authorizedPickupPersonSchema = new Schema<AuthorizedPickupPersonDocument>(
   {
@@ -53,9 +52,7 @@ authorizedPickupPersonSchema.index({
 });
 
 // 2. Pickup Pass (Temporary / Expiring Gate-Pass) Schema
-export interface PickupPassDocument
-  extends Omit<PickupPass, 'id'>,
-    Document {}
+export interface PickupPassDocument extends Omit<PickupPass, 'id'>, Document {}
 
 const pickupPassSchema = new Schema<PickupPassDocument>(
   {
@@ -87,9 +84,7 @@ pickupPassSchema.index({
 });
 
 // 3. Pickup Log (Immutable Handover Trail) Schema
-export interface PickupLogDocument
-  extends Omit<PickupLog, 'id'>,
-    Document {}
+export interface PickupLogDocument extends Omit<PickupLog, 'id'>, Document {}
 
 const pickupLogSchema = new Schema<PickupLogDocument>(
   {

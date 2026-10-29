@@ -46,6 +46,13 @@ function examRecord(record: Record<string, unknown>): ExamRecord {
     campusId: String(record.campusId),
     startDate: iso(record.startDate as Date).slice(0, 10),
     endDate: iso(record.endDate as Date).slice(0, 10),
+    resultsPublishedAt:
+      record.resultsPublishedAt instanceof Date
+        ? iso(record.resultsPublishedAt)
+        : null,
+    resultsPublishedBy: record.resultsPublishedBy
+      ? String(record.resultsPublishedBy)
+      : null,
     createdAt: iso(record.createdAt as Date),
     updatedAt: iso(record.updatedAt as Date),
   };
@@ -303,6 +310,25 @@ export class MongoExaminationsRepository implements ExaminationsRepository {
       organizationId: oid(organizationId),
     });
     return result.deletedCount === 1;
+  }
+
+  async setResultsPublication(
+    organizationId: string,
+    examId: string,
+    publishedAt: string | null,
+    publishedByUserId: string | null,
+  ) {
+    const record = await ExamModel.findOneAndUpdate(
+      { _id: oid(examId), organizationId: oid(organizationId) },
+      {
+        $set: {
+          resultsPublishedAt: publishedAt ? new Date(publishedAt) : null,
+          resultsPublishedBy: publishedByUserId ? oid(publishedByUserId) : null,
+        },
+      },
+      { new: true, runValidators: true },
+    ).lean();
+    return record ? examRecord(record) : null;
   }
 
   async hasSchedules(organizationId: string, examId: string) {

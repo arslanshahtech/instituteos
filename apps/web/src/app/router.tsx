@@ -1,3 +1,4 @@
+import { lazy } from 'react';
 import {
   createBrowserRouter,
   createMemoryRouter,
@@ -13,63 +14,230 @@ import {
   StudentLayout,
   TeacherLayout,
 } from '../layouts/RoleLayouts.js';
-import {
-  ParentPortalPage,
-  StudentPortalPage,
-} from '../pages/ParentPortalPage.js';
-import { FoundationsPage } from '../pages/FoundationsPage.js';
-import { NotFoundPage } from '../pages/NotFoundPage.js';
-import { OverviewPage } from '../pages/OverviewPage.js';
-import { LandingPage } from '../pages/LandingPage.js';
-import { PlatformOverviewPage } from '../pages/PlatformOverviewPage.js';
-import { WorkspaceRedirectPage } from '../pages/WorkspaceRedirectPage.js';
-import { RoleDemoModulePage } from '../pages/RoleDemoModulePage.js';
-import { OrganizationContextPage } from '../pages/OrganizationContextPage.js';
-import {
-  AcceptOrganizationInvitationPage,
-  MyOrganizationsPage,
-  OrganizationAdminPage,
-} from '../pages/organizations/OrganizationPages.js';
-import {
-  StudentCreatePage,
-  StudentDetailPage,
-  StudentEditPage,
-  StudentsListPage,
-} from '../students/StudentPages.js';
-import {
-  GuardianCreatePage,
-  GuardianDetailPage,
-  GuardianEditPage,
-  GuardiansListPage,
-} from '../guardians/GuardianPages.js';
-import { AdmissionsListPage } from '../admissions/AdmissionsListPage.js';
-import { ApplicationReviewPage } from '../admissions/ApplicationReviewPage.js';
-import { AcademicsDashboard } from '../academics/AcademicsDashboard.js';
-import { AttendanceDashboard } from '../attendance/AttendanceDashboard.js';
-import { TeacherStudentsPage } from '../attendance/TeacherStudentsPage.js';
-import { ExaminationDashboard } from '../examinations/ExaminationDashboard.js';
-import { HomeworkTestsPage } from '../homework/HomeworkTestsPage.js';
-import { FinanceDashboard } from '../finance/FinanceDashboard.js';
-import { FeeConcessionsPage } from '../finance/FeeConcessionsPage.js';
-import { CommunicationsDashboard } from '../communications/CommunicationsDashboard.js';
-import { ReportsDashboard } from '../reporting/ReportsDashboard.js';
-import { SettingsPage } from '../settings/SettingsPage.js';
-import {
-  StaffCreatePage,
-  StaffDetailPage,
-  StaffEditPage,
-  StaffListPage,
-} from '../staff/StaffPages.js';
-import { TeacherTimetablePage } from '../staff/TeacherTimetablePage.js';
 import { ProtectedRoute } from '../auth/ProtectedRoute.js';
-import {
-  ForgotPasswordPage,
-  LoginPage,
-  RegistrationPage,
-  ResetPasswordPage,
-  VerificationPendingPage,
-  VerifyEmailPage,
-} from '../pages/auth/AuthPages.js';
+
+// Route pages are loaded only when a user opens that route. Keeping these
+// imports lazy prevents the initial page from downloading every school module.
+const ParentPortalPage = lazy(() =>
+  import('../pages/ParentPortalPage.js').then((module) => ({
+    default: module.ParentPortalPage,
+  })),
+);
+const StudentPortalPage = lazy(() =>
+  import('../pages/ParentPortalPage.js').then((module) => ({
+    default: module.StudentPortalPage,
+  })),
+);
+const FoundationsPage = lazy(() =>
+  import('../pages/FoundationsPage.js').then((module) => ({
+    default: module.FoundationsPage,
+  })),
+);
+const NotFoundPage = lazy(() =>
+  import('../pages/NotFoundPage.js').then((module) => ({
+    default: module.NotFoundPage,
+  })),
+);
+const OverviewPage = lazy(() =>
+  import('../pages/OverviewPage.js').then((module) => ({
+    default: module.OverviewPage,
+  })),
+);
+const LandingPage = lazy(() =>
+  import('../pages/LandingPage.js').then((module) => ({
+    default: module.LandingPage,
+  })),
+);
+const PlatformOverviewPage = lazy(() =>
+  import('../pages/PlatformOverviewPage.js').then((module) => ({
+    default: module.PlatformOverviewPage,
+  })),
+);
+const WorkspaceRedirectPage = lazy(() =>
+  import('../pages/WorkspaceRedirectPage.js').then((module) => ({
+    default: module.WorkspaceRedirectPage,
+  })),
+);
+const RoleDemoModulePage = lazy(() =>
+  import('../pages/RoleDemoModulePage.js').then((module) => ({
+    default: module.RoleDemoModulePage,
+  })),
+);
+const OrganizationContextPage = lazy(() =>
+  import('../pages/OrganizationContextPage.js').then((module) => ({
+    default: module.OrganizationContextPage,
+  })),
+);
+const AcceptOrganizationInvitationPage = lazy(() =>
+  import('../pages/organizations/OrganizationPages.js').then((module) => ({
+    default: module.AcceptOrganizationInvitationPage,
+  })),
+);
+const MyOrganizationsPage = lazy(() =>
+  import('../pages/organizations/OrganizationPages.js').then((module) => ({
+    default: module.MyOrganizationsPage,
+  })),
+);
+const OrganizationAdminPage = lazy(() =>
+  import('../pages/organizations/OrganizationPages.js').then((module) => ({
+    default: module.OrganizationAdminPage,
+  })),
+);
+const StudentCreatePage = lazy(() =>
+  import('../students/StudentPages.js').then((module) => ({
+    default: module.StudentCreatePage,
+  })),
+);
+const StudentDetailPage = lazy(() =>
+  import('../students/StudentPages.js').then((module) => ({
+    default: module.StudentDetailPage,
+  })),
+);
+const StudentEditPage = lazy(() =>
+  import('../students/StudentPages.js').then((module) => ({
+    default: module.StudentEditPage,
+  })),
+);
+const StudentsListPage = lazy(() =>
+  import('../students/StudentPages.js').then((module) => ({
+    default: module.StudentsListPage,
+  })),
+);
+const GuardianCreatePage = lazy(() =>
+  import('../guardians/GuardianPages.js').then((module) => ({
+    default: module.GuardianCreatePage,
+  })),
+);
+const GuardianDetailPage = lazy(() =>
+  import('../guardians/GuardianPages.js').then((module) => ({
+    default: module.GuardianDetailPage,
+  })),
+);
+const GuardianEditPage = lazy(() =>
+  import('../guardians/GuardianPages.js').then((module) => ({
+    default: module.GuardianEditPage,
+  })),
+);
+const GuardiansListPage = lazy(() =>
+  import('../guardians/GuardianPages.js').then((module) => ({
+    default: module.GuardiansListPage,
+  })),
+);
+const AdmissionsListPage = lazy(() =>
+  import('../admissions/AdmissionsListPage.js').then((module) => ({
+    default: module.AdmissionsListPage,
+  })),
+);
+const ApplicationReviewPage = lazy(() =>
+  import('../admissions/ApplicationReviewPage.js').then((module) => ({
+    default: module.ApplicationReviewPage,
+  })),
+);
+const AcademicsDashboard = lazy(() =>
+  import('../academics/AcademicsDashboard.js').then((module) => ({
+    default: module.AcademicsDashboard,
+  })),
+);
+const AttendanceDashboard = lazy(() =>
+  import('../attendance/AttendanceDashboard.js').then((module) => ({
+    default: module.AttendanceDashboard,
+  })),
+);
+const TeacherStudentsPage = lazy(() =>
+  import('../attendance/TeacherStudentsPage.js').then((module) => ({
+    default: module.TeacherStudentsPage,
+  })),
+);
+const ExaminationDashboard = lazy(() =>
+  import('../examinations/ExaminationDashboard.js').then((module) => ({
+    default: module.ExaminationDashboard,
+  })),
+);
+const HomeworkTestsPage = lazy(() =>
+  import('../homework/HomeworkTestsPage.js').then((module) => ({
+    default: module.HomeworkTestsPage,
+  })),
+);
+const FinanceDashboard = lazy(() =>
+  import('../finance/FinanceDashboard.js').then((module) => ({
+    default: module.FinanceDashboard,
+  })),
+);
+const FeeConcessionsPage = lazy(() =>
+  import('../finance/FeeConcessionsPage.js').then((module) => ({
+    default: module.FeeConcessionsPage,
+  })),
+);
+const CommunicationsDashboard = lazy(() =>
+  import('../communications/CommunicationsDashboard.js').then((module) => ({
+    default: module.CommunicationsDashboard,
+  })),
+);
+const ReportsDashboard = lazy(() =>
+  import('../reporting/ReportsDashboard.js').then((module) => ({
+    default: module.ReportsDashboard,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import('../settings/SettingsPage.js').then((module) => ({
+    default: module.SettingsPage,
+  })),
+);
+const StaffCreatePage = lazy(() =>
+  import('../staff/StaffPages.js').then((module) => ({
+    default: module.StaffCreatePage,
+  })),
+);
+const StaffDetailPage = lazy(() =>
+  import('../staff/StaffPages.js').then((module) => ({
+    default: module.StaffDetailPage,
+  })),
+);
+const StaffEditPage = lazy(() =>
+  import('../staff/StaffPages.js').then((module) => ({
+    default: module.StaffEditPage,
+  })),
+);
+const StaffListPage = lazy(() =>
+  import('../staff/StaffPages.js').then((module) => ({
+    default: module.StaffListPage,
+  })),
+);
+const TeacherTimetablePage = lazy(() =>
+  import('../staff/TeacherTimetablePage.js').then((module) => ({
+    default: module.TeacherTimetablePage,
+  })),
+);
+const ForgotPasswordPage = lazy(() =>
+  import('../pages/auth/AuthPages.js').then((module) => ({
+    default: module.ForgotPasswordPage,
+  })),
+);
+const LoginPage = lazy(() =>
+  import('../pages/auth/AuthPages.js').then((module) => ({
+    default: module.LoginPage,
+  })),
+);
+const RegistrationPage = lazy(() =>
+  import('../pages/auth/AuthPages.js').then((module) => ({
+    default: module.RegistrationPage,
+  })),
+);
+const ResetPasswordPage = lazy(() =>
+  import('../pages/auth/AuthPages.js').then((module) => ({
+    default: module.ResetPasswordPage,
+  })),
+);
+const VerificationPendingPage = lazy(() =>
+  import('../pages/auth/AuthPages.js').then((module) => ({
+    default: module.VerificationPendingPage,
+  })),
+);
+const VerifyEmailPage = lazy(() =>
+  import('../pages/auth/AuthPages.js').then((module) => ({
+    default: module.VerifyEmailPage,
+  })),
+);
 
 const roleRoutes: RouteObject[] = [
   {

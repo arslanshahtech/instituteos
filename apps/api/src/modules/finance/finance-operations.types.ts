@@ -70,7 +70,8 @@ export interface FinanceConcessionRecord {
   studentName: string;
   campusId?: string;
   academicYearId?: string;
-  concessionType: 'sibling' | 'staff_child' | 'scholarship' | 'need_based' | 'special';
+  concessionType:
+    'sibling' | 'staff_child' | 'scholarship' | 'need_based' | 'special';
   discountType: 'percentage' | 'fixed';
   discountValue: number;
   reason?: string;

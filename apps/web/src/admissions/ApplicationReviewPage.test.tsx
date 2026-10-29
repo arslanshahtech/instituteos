@@ -65,7 +65,12 @@ describe('application review page', () => {
     accessMocks.getOrganizationAccessContext.mockResolvedValue({
       organizationId,
       role: 'organization_admin',
-      permissions: ['admission.read', 'admission.review', 'student.create', 'campus.read'],
+      permissions: [
+        'admission.read',
+        'admission.review',
+        'student.create',
+        'campus.read',
+      ],
       campusIds: [],
     });
     campusMocks.getCampuses.mockResolvedValue({
@@ -142,11 +147,15 @@ describe('application review page', () => {
     renderReviewPage();
 
     await user.selectOptions(
-      await screen.findByRole('combobox', { name: /Assign campus before approval/ }),
+      await screen.findByRole('combobox', {
+        name: /Assign campus before approval/,
+      }),
       '650000000000000000000004',
     );
     await user.click(
-      await screen.findByRole('button', { name: 'Create missing student record' }),
+      await screen.findByRole('button', {
+        name: 'Create missing student record',
+      }),
     );
 
     expect(apiMocks.reviewApplication).toHaveBeenCalledWith(

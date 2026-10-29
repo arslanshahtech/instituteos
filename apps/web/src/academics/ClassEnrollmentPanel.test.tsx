@@ -103,14 +103,20 @@ describe('ClassEnrollmentPanel', () => {
   it('assigns a selected teacher to the chosen class section, subject, and academic year', async () => {
     const user = userEvent.setup();
     renderPanel('teacher');
-    expect(screen.getByRole('heading', { name: 'Assign teacher' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Currently enrolled students' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Add students' })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Assign teacher' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Currently enrolled students' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Add students' }),
+    ).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Section'), 'section-1');
     await user.selectOptions(
-      screen.getByLabelText('Section'),
-      'section-1',
+      screen.getByLabelText('Subject teacher'),
+      'teacher-1',
     );
-    await user.selectOptions(screen.getByLabelText('Subject teacher'), 'teacher-1');
     await user.selectOptions(screen.getByLabelText('Subject'), 'subject-1');
     await user.click(screen.getByRole('button', { name: 'Assign teacher' }));
 
@@ -128,7 +134,11 @@ describe('ClassEnrollmentPanel', () => {
         },
       );
     });
-    expect(await screen.findByText('Teacher assigned to this class section and subject.')).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'Teacher assigned to this class section and subject.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('loads existing students for the selected class and bulk-adds all selected students', async () => {
@@ -154,7 +164,9 @@ describe('ClassEnrollmentPanel', () => {
     expect(await screen.findAllByText('Ayesha Noor')).toHaveLength(2);
 
     await user.click(screen.getByRole('button', { name: 'Select all shown' }));
-    await user.click(screen.getByRole('button', { name: 'Add 4 students to section' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Add 4 students to section' }),
+    );
 
     await waitFor(() => {
       expect(mocks.bulkPlaceStudents).toHaveBeenCalledWith('org-1', {
@@ -178,14 +190,18 @@ describe('ClassEnrollmentPanel', () => {
     });
     renderPanel();
 
-    const search = await screen.findByRole('textbox', { name: 'Search eligible students to add' });
+    const search = await screen.findByRole('textbox', {
+      name: 'Search eligible students to add',
+    });
     await user.type(search, 'Sara');
     expect(await screen.findAllByText('Sara Ahmed')).toHaveLength(2);
     expect(screen.queryByText('Ali Khan')).not.toBeInTheDocument();
 
     await user.clear(search);
     await user.type(search, 'Nobody');
-    expect(await screen.findByText('No students match “Nobody”.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('No students match “Nobody”.'),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Clear search' }));
     expect(await screen.findAllByText('Ali Khan')).toHaveLength(2);
   });
@@ -196,17 +212,33 @@ describe('ClassEnrollmentPanel', () => {
     });
     renderPanel('students');
 
-    expect(screen.queryByRole('heading', { name: 'Assign teacher' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Assign teacher' }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Subject teacher')).not.toBeInTheDocument();
-    expect(await screen.findByText('Currently enrolled students')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Currently enrolled students'),
+    ).toBeInTheDocument();
     expect(await screen.findByText('Enrolled')).toBeInTheDocument();
     expect(await screen.findAllByText('Mina Iqbal')).toHaveLength(2);
-    await userEvent.click(screen.getByRole('button', { name: /Select students/ }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /Select students/ }),
+    );
     await userEvent.click(screen.getByRole('checkbox', { name: /Mina Iqbal/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Remove selected' }));
-    await waitFor(() => expect(mocks.removeStudentFromSection).toHaveBeenCalledWith('org-1', 'roster-1', {
-      classId: 'class-1', sectionId: 'section-1', academicYearId: 'year-1', campusId: 'campus-1',
-    }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Remove selected' }),
+    );
+    await waitFor(() =>
+      expect(mocks.removeStudentFromSection).toHaveBeenCalledWith(
+        'org-1',
+        'roster-1',
+        {
+          classId: 'class-1',
+          sectionId: 'section-1',
+          academicYearId: 'year-1',
+          campusId: 'campus-1',
+        },
+      ),
+    );
   });
 });
-

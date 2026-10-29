@@ -9,6 +9,7 @@ import {
   listExams,
   listGradingScales,
   saveExam,
+  setExamResultsPublication,
   saveExamMarks,
   saveExamSchedule,
   saveGradingScale,
@@ -100,8 +101,10 @@ function useInvalidateExaminations(organizationId: string) {
 export function useSaveExam(organizationId: string) {
   const invalidate = useInvalidateExaminations(organizationId);
   return useMutation({
-    mutationFn: (input: { data: Parameters<typeof saveExam>[1]; id?: string }) =>
-      saveExam(organizationId, input.data, input.id),
+    mutationFn: (input: {
+      data: Parameters<typeof saveExam>[1];
+      id?: string;
+    }) => saveExam(organizationId, input.data, input.id),
     onSuccess: invalidate,
   });
 }
@@ -110,6 +113,15 @@ export function useDeleteExam(organizationId: string) {
   const invalidate = useInvalidateExaminations(organizationId);
   return useMutation({
     mutationFn: (id: string) => deleteExam(organizationId, id),
+    onSuccess: invalidate,
+  });
+}
+
+export function useSetExamResultsPublication(organizationId: string) {
+  const invalidate = useInvalidateExaminations(organizationId);
+  return useMutation({
+    mutationFn: (input: { examId: string; published: boolean }) =>
+      setExamResultsPublication(organizationId, input.examId, input.published),
     onSuccess: invalidate,
   });
 }

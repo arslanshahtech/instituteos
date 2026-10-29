@@ -66,38 +66,44 @@ describe('FinanceOperationsService', () => {
 
   it('rejects invalid calendar dates', async () => {
     const service = new FinanceOperationsService(makeRepository());
-    await expect(service.createExpense(context, {
-      description: 'Utilities',
-      category: 'utilities',
-      amount: 100,
-      paymentMethod: 'cash',
-      expenseDate: '2026-02-30',
-      campusId,
-    })).rejects.toThrow('Enter a valid expense date.');
+    await expect(
+      service.createExpense(context, {
+        description: 'Utilities',
+        category: 'utilities',
+        amount: 100,
+        paymentMethod: 'cash',
+        expenseDate: '2026-02-30',
+        campusId,
+      }),
+    ).rejects.toThrow('Enter a valid expense date.');
   });
 
   it('rejects expenses outside the caller campus scope', async () => {
     const service = new FinanceOperationsService(makeRepository());
-    await expect(service.createExpense(context, {
-      description: 'Office supplies',
-      category: 'supplies',
-      amount: 100,
-      paymentMethod: 'cash',
-      expenseDate: '2026-10-20',
-      campusId: '555555555555555555555555',
-    })).rejects.toThrow('Select a campus you have access to.');
+    await expect(
+      service.createExpense(context, {
+        description: 'Office supplies',
+        category: 'supplies',
+        amount: 100,
+        paymentMethod: 'cash',
+        expenseDate: '2026-10-20',
+        campusId: '555555555555555555555555',
+      }),
+    ).rejects.toThrow('Select a campus you have access to.');
   });
 
   it('rejects amounts with more than two decimal places', async () => {
     const service = new FinanceOperationsService(makeRepository());
-    await expect(service.createExpense(context, {
-      description: 'Office supplies',
-      category: 'supplies',
-      amount: 100.123,
-      paymentMethod: 'cash',
-      expenseDate: '2026-10-20',
-      campusId,
-    })).rejects.toThrow('Expense amount can have at most two decimal places.');
+    await expect(
+      service.createExpense(context, {
+        description: 'Office supplies',
+        category: 'supplies',
+        amount: 100.123,
+        paymentMethod: 'cash',
+        expenseDate: '2026-10-20',
+        campusId,
+      }),
+    ).rejects.toThrow('Expense amount can have at most two decimal places.');
   });
 
   it('saves a validated monthly expense budget', async () => {
@@ -109,17 +115,23 @@ describe('FinanceOperationsService', () => {
       budgetAmount: 50000,
       campusId,
     });
-    expect(budget).toMatchObject({ category: 'utilities', month: '2026-10', budgetAmount: 50000 });
+    expect(budget).toMatchObject({
+      category: 'utilities',
+      month: '2026-10',
+      budgetAmount: 50000,
+    });
     expect(repository.saveExpenseBudget).toHaveBeenCalledOnce();
   });
 
   it('rejects invalid budget months', async () => {
     const service = new FinanceOperationsService(makeRepository());
-    await expect(service.saveExpenseBudget(context, {
-      category: 'utilities',
-      month: '2026-13',
-      budgetAmount: 50000,
-      campusId,
-    })).rejects.toThrow('Select a valid budget month.');
+    await expect(
+      service.saveExpenseBudget(context, {
+        category: 'utilities',
+        month: '2026-13',
+        budgetAmount: 50000,
+        campusId,
+      }),
+    ).rejects.toThrow('Select a valid budget month.');
   });
 });

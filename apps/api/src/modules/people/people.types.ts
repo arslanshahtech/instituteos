@@ -535,7 +535,11 @@ export interface PeopleServices {
   reviewApplication(
     organizationId: string,
     applicationId: string,
-    input: { status: ApplicationStatus; decisionReason?: string; campusId?: string },
+    input: {
+      status: ApplicationStatus;
+      decisionReason?: string;
+      campusId?: string;
+    },
   ): Promise<{
     application: ApplicationRecord;
     student?: StudentRecord;

@@ -387,29 +387,29 @@ describe('frontend application foundation', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('provides a safe development-only route back to the reference UI preview', () => {
+  it('provides a safe development-only route back to the reference UI preview', async () => {
     renderPath('/admin');
 
     expect(
-      screen.getByRole('link', { name: 'Open reference UI preview' }),
+      await screen.findByRole('link', { name: 'Open reference UI preview' }),
     ).toHaveAttribute('href', '/admin/organizations/preview?preview=demo');
   });
 
-  it('opens the reference module preview scoped to the same organization ID', () => {
+  it('opens the reference module preview scoped to the same organization ID', async () => {
     renderPath(
       '/admin/organizations/650000000000000000000001/preview/students',
     );
 
     expect(
-      screen.getByRole('heading', { name: 'Students' }),
+      await screen.findByRole('heading', { name: 'Students' }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/SAMPLE DATA/)).toBeInTheDocument();
+    expect(await screen.findByText(/SAMPLE DATA/)).toBeInTheDocument();
   });
 
   it('opens mobile navigation and closes it after navigation', async () => {
     const user = userEvent.setup();
     renderPath('/student');
-    const menuButton = screen.getByRole('button', { name: 'Open menu' });
+    const menuButton = await screen.findByRole('button', { name: 'Open menu' });
 
     await user.click(menuButton);
     expect(menuButton).toHaveAttribute('aria-expanded', 'true');
@@ -420,7 +420,7 @@ describe('frontend application foundation', () => {
     expect(
       screen.queryByRole('link', { name: 'UI foundations' }),
     ).not.toBeInTheDocument();
-    await user.click(screen.getByRole('link', { name: 'Overview' }));
+    await user.click(await screen.findByRole('link', { name: 'Overview' }));
     await waitFor(() =>
       expect(menuButton).toHaveAttribute('aria-expanded', 'false'),
     );
@@ -428,7 +428,7 @@ describe('frontend application foundation', () => {
 
   it('provides an accessible dialog and dismissible toast foundation', async () => {
     const user = userEvent.setup();
-    renderPath('/platform/foundations');
+    renderPath('/admin/foundations');
 
     await user.click(
       await screen.findByRole('button', { name: 'Open dialog' }),
@@ -457,7 +457,9 @@ describe('frontend application foundation', () => {
     const user = userEvent.setup();
     renderPath('/admin/foundations');
 
-    await user.click(screen.getByRole('button', { name: 'Validate form' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Validate form' }),
+    );
     expect(
       await screen.findByText('Enter at least two characters.'),
     ).toBeInTheDocument();
@@ -472,10 +474,10 @@ describe('frontend application foundation', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders accessible loading, empty, error, denied, and table empty states', () => {
+  it('renders accessible loading, empty, error, denied, and table empty states', async () => {
     renderPath('/parent/foundations');
 
-    expect(screen.getByText('Loading view…')).toBeInTheDocument();
+    expect(await screen.findByText('Loading view…')).toBeInTheDocument();
     expect(screen.getAllByText('No results yet')).toHaveLength(2);
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Unable to load this view',
@@ -551,7 +553,7 @@ describe('frontend application foundation', () => {
     const user = userEvent.setup();
     renderPath('/register', false);
     await user.type(
-      screen.getByRole('textbox', { name: 'Full name' }),
+      await screen.findByRole('textbox', { name: 'Full name' }),
       'New User',
     );
     await user.type(

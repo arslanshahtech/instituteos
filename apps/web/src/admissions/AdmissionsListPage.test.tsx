@@ -106,10 +106,18 @@ describe('Admissions list page', () => {
   it('shows the simple admission form and recent server-backed applications without inquiry UI', async () => {
     renderAdmissionsPage();
     expect(await screen.findByText('Nora Ali')).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'New Admission Form' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Recent Applications' })).toBeVisible();
-    expect(screen.getByText('Pending', { selector: '.reference-status' })).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Inquiries' })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'New Admission Form' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Recent Applications' }),
+    ).toBeVisible();
+    expect(
+      screen.getByText('Pending', { selector: '.reference-status' }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Inquiries' }),
+    ).not.toBeInTheDocument();
     expect(apiMocks.listApplications).toHaveBeenCalledWith(
       organizationId,
       expect.objectContaining({ page: 1, pageSize: 20 }),
@@ -127,7 +135,9 @@ describe('Admissions list page', () => {
     await user.type(screen.getByLabelText('Class / grade'), 'Year 5');
     await user.type(screen.getByLabelText('Guardian name'), 'Raj Patel');
     await user.type(screen.getByLabelText('Guardian phone'), '03001234567');
-    await user.click(screen.getByRole('button', { name: 'Submit for approval' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Submit for approval' }),
+    );
 
     await waitFor(() =>
       expect(apiMocks.createApplication).toHaveBeenCalledWith(
@@ -153,9 +163,13 @@ describe('Admissions list page', () => {
     const user = userEvent.setup();
     renderAdmissionsPage();
     await screen.findByText('Nora Ali');
-    await user.click(screen.getByRole('button', { name: 'Submit for approval' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Submit for approval' }),
+    );
 
-    expect(await screen.findByText('Enter the student’s full name.')).toBeVisible();
+    expect(
+      await screen.findByText('Enter the student’s full name.'),
+    ).toBeVisible();
     expect(screen.getByText('Select the date of birth.')).toBeVisible();
     expect(screen.getByText('Select a class or grade.')).toBeVisible();
     expect(apiMocks.createApplication).not.toHaveBeenCalled();

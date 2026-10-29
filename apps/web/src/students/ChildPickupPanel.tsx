@@ -48,11 +48,7 @@ export const ChildPickupPanel: React.FC<ChildPickupPanelProps> = ({
     setLoading(true);
     setErrorMessage(null);
     try {
-      const data = await generateGatePass(
-        organizationId,
-        studentId,
-        personId,
-      );
+      const data = await generateGatePass(organizationId, studentId, personId);
       setActivePass(data.pass);
       setStatusMessage('Digital Pass generated successfully.');
     } catch {
@@ -90,7 +86,9 @@ export const ChildPickupPanel: React.FC<ChildPickupPanelProps> = ({
         backgroundColor: '#ffffff',
       }}
     >
-      <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.25rem', fontWeight: 600 }}>
+      <h3
+        style={{ margin: '0 0 1rem 0', fontSize: '1.25rem', fontWeight: 600 }}
+      >
         Safe Child Pickup & Gate-Pass Protocol
       </h3>
 
@@ -111,7 +109,9 @@ export const ChildPickupPanel: React.FC<ChildPickupPanelProps> = ({
           Authorized Pickup Persons
         </h4>
         {persons.length === 0 ? (
-          <p style={{ color: '#64748b' }}>No authorized pickup persons registered.</p>
+          <p style={{ color: '#64748b' }}>
+            No authorized pickup persons registered.
+          </p>
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {persons.map((person) => (
@@ -176,7 +176,13 @@ export const ChildPickupPanel: React.FC<ChildPickupPanelProps> = ({
           >
             {activePass.passCode}
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+          <div
+            style={{
+              fontSize: '0.75rem',
+              color: '#64748b',
+              marginTop: '0.25rem',
+            }}
+          >
             Valid until: {new Date(activePass.validUntil).toLocaleTimeString()}
           </div>
         </div>

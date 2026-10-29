@@ -17,10 +17,11 @@
     "dev:web": "npm run dev --workspace @instituteos/web",
     "build": "npm run build --workspaces --if-present",
     "lint": "eslint .",
-    "format": "prettier --write package.json eslint.config.js tsconfig.base.json .prettierrc.json README.md apps/api apps/web docs",
-    "format:check": "prettier --check package.json eslint.config.js tsconfig.base.json .prettierrc.json README.md apps/api apps/web docs",
+    "format": "prettier --write package.json eslint.config.js tsconfig.base.json .prettierrc.json README.md vercel.json .github/workflows scripts apps/api apps/web docs",
+    "format:check": "prettier --check package.json eslint.config.js tsconfig.base.json .prettierrc.json README.md vercel.json .github/workflows scripts apps/api apps/web docs",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "smoke:staging": "node scripts/staging-smoke.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",

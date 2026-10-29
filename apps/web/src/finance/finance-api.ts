@@ -317,7 +317,6 @@ export function setInvoiceDiscount(
   );
 }
 
-
 export type ExpenseCategory =
   | 'salaries'
   | 'utilities'
@@ -376,7 +375,10 @@ export interface FinanceOperationFilters {
 
 function financeQuery(filters: object) {
   const query = new URLSearchParams(
-    Object.entries(filters).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && Boolean(entry[1])),
+    Object.entries(filters).filter(
+      (entry): entry is [string, string] =>
+        typeof entry[1] === 'string' && Boolean(entry[1]),
+    ),
   );
   return query.size ? `?${query.toString()}` : '';
 }
@@ -417,7 +419,10 @@ export function createFinanceExpense(
   );
 }
 
-export function deleteFinanceExpense(organizationId: string, expenseId: string) {
+export function deleteFinanceExpense(
+  organizationId: string,
+  expenseId: string,
+) {
   return apiRequest<void>(
     `${financePath(organizationId)}/expenses/${encodeURIComponent(expenseId)}`,
     { method: 'DELETE' },
@@ -432,7 +437,6 @@ export function listFinanceConcessions(
     `${financePath(organizationId)}/concessions${financeQuery(filters)}`,
   );
 }
-
 
 export interface FinanceExpenseBudget {
   id: string;
@@ -457,7 +461,12 @@ export function listFinanceExpenseBudgets(
 
 export function saveFinanceExpenseBudget(
   organizationId: string,
-  input: { category: ExpenseCategory; month: string; budgetAmount: number; campusId?: string },
+  input: {
+    category: ExpenseCategory;
+    month: string;
+    budgetAmount: number;
+    campusId?: string;
+  },
 ) {
   return apiRequest<{ budget: FinanceExpenseBudget }>(
     `${financePath(organizationId)}/expenses/budgets`,

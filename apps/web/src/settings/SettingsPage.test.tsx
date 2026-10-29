@@ -57,10 +57,13 @@ describe('SettingsPage tabs', () => {
 
     for (const [tabLabel, heading] of sections) {
       fireEvent.click(screen.getByRole('button', { name: tabLabel }));
-      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
       expect(
-        screen.getByRole('button', { name: tabLabel }),
-      ).toHaveAttribute('aria-pressed', 'true');
+        screen.getByRole('heading', { name: heading }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: tabLabel })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
     }
   });
 });

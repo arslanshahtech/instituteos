@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Suspense } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RouterProvider } from 'react-router-dom';
@@ -77,12 +78,15 @@ function renderStudentRoute(path: string) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  client.setQueryData(['auth', 'current-user'], authMocks.user);
   const router = createAppRouter({ initialEntries: [path] });
   return render(
     <QueryClientProvider client={client}>
       <AuthProvider>
         <ToastProvider>
-          <RouterProvider router={router} />
+          <Suspense fallback={<div role="status">Loading page...</div>}>
+            <RouterProvider router={router} />
+          </Suspense>
         </ToastProvider>
       </AuthProvider>
     </QueryClientProvider>,
@@ -132,7 +136,11 @@ describe('student management pages', () => {
     renderStudentRoute(`/admin/organizations/${organizationId}/students`);
 
     expect(
-      await screen.findByRole('link', { name: 'Ada Lovelace' }),
+      await screen.findByRole(
+        'link',
+        { name: 'Ada Lovelace' },
+        { timeout: 3_000 },
+      ),
     ).toBeVisible();
     expect(document.body).not.toHaveTextContent(studentId);
     await user.type(
@@ -313,6 +321,7 @@ describe('student management pages', () => {
     const readOnlyClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
+    readOnlyClient.setQueryData(['auth', 'current-user'], authMocks.user);
     accessMocks.getOrganizationAccessContext.mockResolvedValueOnce({
       organizationId,
       role: 'teacher',
@@ -326,7 +335,9 @@ describe('student management pages', () => {
       <QueryClientProvider client={readOnlyClient}>
         <AuthProvider>
           <ToastProvider>
-            <RouterProvider router={readOnlyRouter} />
+            <Suspense fallback={<div role="status">Loading page...</div>}>
+              <RouterProvider router={readOnlyRouter} />
+            </Suspense>
           </ToastProvider>
         </AuthProvider>
       </QueryClientProvider>,

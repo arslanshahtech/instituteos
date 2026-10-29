@@ -107,13 +107,22 @@ export function ApplicationReviewPage() {
   const record = application.data.application;
   const canCreateStudent = access.data.permissions.includes('student.create');
   const actions = canReview
-    ? record.status === 'approved' && !record.convertedStudentId && canCreateStudent
-      ? [{ status: 'approved' as ApplicationStatus, label: 'Create missing student record' }]
+    ? record.status === 'approved' &&
+      !record.convertedStudentId &&
+      canCreateStudent
+      ? [
+          {
+            status: 'approved' as ApplicationStatus,
+            label: 'Create missing student record',
+          },
+        ]
       : (reviewActions[record.status] ?? []).filter(
           (action) => action.status !== 'approved' || canCreateStudent,
         )
     : [];
-  const needsCampusForApproval = actions.some((action) => action.status === 'approved');
+  const needsCampusForApproval = actions.some(
+    (action) => action.status === 'approved',
+  );
   const assignedCampusId = selectedCampusId || record.campusId;
   const studentPath = record.convertedStudentId
     ? `/admin/organizations/${encodeURIComponent(organizationId)}/students/${encodeURIComponent(record.convertedStudentId)}`
@@ -123,7 +132,9 @@ export function ApplicationReviewPage() {
     review.mutate(
       {
         status,
-        ...(status === 'approved' && assignedCampusId ? { campusId: assignedCampusId } : {}),
+        ...(status === 'approved' && assignedCampusId
+          ? { campusId: assignedCampusId }
+          : {}),
         ...(decisionReason.trim()
           ? { decisionReason: decisionReason.trim() }
           : {}),
@@ -150,7 +161,7 @@ export function ApplicationReviewPage() {
         eyebrow="Application review"
         title={`${record.firstName} ${record.lastName}`}
         description="Review applicant information and record an admissions decision."
-        aside={(
+        aside={
           <div className="student-page-actions">
             <Link
               className="button button-secondary"
@@ -159,7 +170,7 @@ export function ApplicationReviewPage() {
               Back to admissions
             </Link>
           </div>
-        )}
+        }
       />
 
       <section className="student-detail-panel panel">
@@ -252,11 +263,20 @@ export function ApplicationReviewPage() {
               >
                 <option value="">Select campus</option>
                 {(campuses.data?.campuses ?? []).map((campus) => (
-                  <option key={campus.id} value={campus.id}>{campus.name}</option>
+                  <option key={campus.id} value={campus.id}>
+                    {campus.name}
+                  </option>
                 ))}
               </select>
-              <small className="muted-copy">Approval creates the student record in this campus. Other missing profile details can be completed later.</small>
-              {campuses.isError && <span className="field-error" role="alert">{apiMessage(campuses.error)}</span>}
+              <small className="muted-copy">
+                Approval creates the student record in this campus. Other
+                missing profile details can be completed later.
+              </small>
+              {campuses.isError && (
+                <span className="field-error" role="alert">
+                  {apiMessage(campuses.error)}
+                </span>
+              )}
             </label>
           )}
           <label className="form-field" htmlFor="decisionReason">
@@ -277,7 +297,10 @@ export function ApplicationReviewPage() {
           <div className="button-row">
             {actions.map((action) => (
               <Button
-                disabled={review.isPending || (action.status === 'approved' && !assignedCampusId)}
+                disabled={
+                  review.isPending ||
+                  (action.status === 'approved' && !assignedCampusId)
+                }
                 key={action.status}
                 onClick={() => transition(action.status)}
                 variant={action.status === 'rejected' ? 'danger' : 'primary'}

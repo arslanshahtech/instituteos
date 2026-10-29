@@ -36,24 +36,26 @@ function settingsRecord(
 function repository(overrides: Partial<SettingsRepository> = {}) {
   return {
     findSettings: vi.fn().mockResolvedValue(null),
-    updateSettings: vi.fn().mockImplementation(
-      async (
-        _id: string,
-        input: OrganizationSettingsInput,
-      ): Promise<OrganizationSettingsRecord> => {
-      const current = settingsRecord();
-      return {
-        ...current,
-        branding: { ...current.branding, ...input.branding },
-        contact: { ...current.contact, ...input.contact },
-        localization: { ...current.localization, ...input.localization },
-        notifications: {
-          ...current.notifications,
-          ...input.notifications,
+    updateSettings: vi
+      .fn()
+      .mockImplementation(
+        async (
+          _id: string,
+          input: OrganizationSettingsInput,
+        ): Promise<OrganizationSettingsRecord> => {
+          const current = settingsRecord();
+          return {
+            ...current,
+            branding: { ...current.branding, ...input.branding },
+            contact: { ...current.contact, ...input.contact },
+            localization: { ...current.localization, ...input.localization },
+            notifications: {
+              ...current.notifications,
+              ...input.notifications,
+            },
+          };
         },
-      };
-      },
-    ),
+      ),
     createSettingsAuditLog: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   } as unknown as SettingsRepository;
@@ -61,8 +63,9 @@ function repository(overrides: Partial<SettingsRepository> = {}) {
 
 describe('SettingsService', () => {
   it('returns default settings when the organization has not configured them', async () => {
-    const service = new SettingsService(repository(), () =>
-      new Date('2026-01-01T00:00:00.000Z'),
+    const service = new SettingsService(
+      repository(),
+      () => new Date('2026-01-01T00:00:00.000Z'),
     );
 
     await expect(service.getSettings(organizationId)).resolves.toEqual(

@@ -258,20 +258,30 @@ function ApplicationTable({
   }
 
   return (
-    <div className="admissions-application-list" aria-label="Recent applications">
+    <div
+      className="admissions-application-list"
+      aria-label="Recent applications"
+    >
       {rows.map((row) => (
         <article className="admissions-application-row" key={row.id}>
           <span className="admissions-application-avatar" aria-hidden="true">
             {`${row.firstName.charAt(0)}${row.lastName.charAt(0)}`.toUpperCase()}
           </span>
           <div className="admissions-application-copy">
-            <strong>{row.firstName} {row.lastName}</strong>
+            <strong>
+              {row.firstName} {row.lastName}
+            </strong>
             <small>
-              {row.program || 'Class not specified'} · {campusName(row.campusId, campuses)}
+              {row.program || 'Class not specified'} ·{' '}
+              {campusName(row.campusId, campuses)}
             </small>
-            <small>Applied {new Date(row.createdAt).toLocaleDateString()}</small>
+            <small>
+              Applied {new Date(row.createdAt).toLocaleDateString()}
+            </small>
           </div>
-          <span className={`reference-status ${row.status === 'approved' || row.status === 'admitted' ? 'reference-status-approved' : 'reference-status-pending'}`}>
+          <span
+            className={`reference-status ${row.status === 'approved' || row.status === 'admitted' ? 'reference-status-approved' : 'reference-status-pending'}`}
+          >
             {statusLabel(row.status)}
           </span>
           <Link

@@ -23,7 +23,12 @@ import {
 } from '../components/ui/States.js';
 import { apiMessage, useOrganizationAccess } from '../staff/StaffPageShared.js';
 import { useToast } from '../components/ui/ToastProvider.js';
-import type { AuditLog, AuditLogFilters, ReportRow, ReportType } from './reporting-api.js';
+import type {
+  AuditLog,
+  AuditLogFilters,
+  ReportRow,
+  ReportType,
+} from './reporting-api.js';
 import {
   getReportRows,
   useAuditLogs,
@@ -134,7 +139,8 @@ export function ReportsDashboard() {
     {
       id: 'students-report',
       title: 'Student report',
-      description: 'Preview and export the organization’s current student records.',
+      description:
+        'Preview and export the organization’s current student records.',
       icon: Users,
       type: 'students' as const,
       to: undefined,
@@ -152,7 +158,8 @@ export function ReportsDashboard() {
           {
             id: 'finance-report',
             title: 'Fee collection report',
-            description: 'Preview and export fee and invoice records available to your role.',
+            description:
+              'Preview and export fee and invoice records available to your role.',
             icon: WalletCards,
             type: 'finance' as const,
             to: undefined,
@@ -241,58 +248,58 @@ export function ReportsDashboard() {
         eyebrow="Organization workspace"
         title="Reports & Export"
         description="Preview real organization reports and export the records available to your role."
-        aside={(
+        aside={
           <div className="reporting-toolbar">
-          <label className="reporting-field" htmlFor="report-campus">
-            Campus
-            <select
-              id="report-campus"
-              value={campusFilter}
-              onChange={(event) => {
-                const val = event.target.value;
-                setCampusFilter(val);
-                setFilters((prev) => ({ ...prev, page: 1 }));
-              }}
-            >
-              <option value="">
-                {campusRestricted ? 'All assigned campuses' : 'All campuses'}
-              </option>
-              {availableCampuses.map((campus) => (
-                <option key={campus.id} value={campus.id}>
-                  {campus.name}
+            <label className="reporting-field" htmlFor="report-campus">
+              Campus
+              <select
+                id="report-campus"
+                value={campusFilter}
+                onChange={(event) => {
+                  const val = event.target.value;
+                  setCampusFilter(val);
+                  setFilters((prev) => ({ ...prev, page: 1 }));
+                }}
+              >
+                <option value="">
+                  {campusRestricted ? 'All assigned campuses' : 'All campuses'}
                 </option>
-              ))}
-            </select>
-          </label>
-          <label className="reporting-field" htmlFor="report-type">
-            Export
-            <select
-              id="report-type"
-              value={reportType}
-              onChange={(event) => {
-                const val = event.target.value as ReportType;
-                setReportType(val);
-              }}
+                {availableCampuses.map((campus) => (
+                  <option key={campus.id} value={campus.id}>
+                    {campus.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="reporting-field" htmlFor="report-type">
+              Export
+              <select
+                id="report-type"
+                value={reportType}
+                onChange={(event) => {
+                  const val = event.target.value as ReportType;
+                  setReportType(val);
+                }}
+              >
+                {financeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button
+              className="reporting-export-button"
+              disabled={exportMutation.isPending}
+              onClick={() => void downloadReport()}
+              type="button"
+              variant="primary"
             >
-              {financeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <Button
-            className="reporting-export-button"
-            disabled={exportMutation.isPending}
-            onClick={() => void downloadReport()}
-            type="button"
-            variant="primary"
-          >
-            <Download size={16} aria-hidden="true" />
-            {exportMutation.isPending ? 'Exporting…' : 'Export report'}
-          </Button>
+              <Download size={16} aria-hidden="true" />
+              {exportMutation.isPending ? 'Exporting…' : 'Export report'}
+            </Button>
           </div>
-        )}
+        }
       />
 
       {campuses.error && (
@@ -328,7 +335,10 @@ export function ReportsDashboard() {
             </>
           );
           return (
-            <article className="reporting-shortcut-card reporting-report-card" key={card.id}>
+            <article
+              className="reporting-shortcut-card reporting-report-card"
+              key={card.id}
+            >
               {content}
               <div className="reporting-report-actions">
                 <Button
@@ -567,9 +577,11 @@ export function ReportsDashboard() {
               <tbody>
                 {preview.data.slice(0, 20).map((row, index) => (
                   <tr key={index}>
-                    {Object.keys(preview.data?.[0] as ReportRow).map((column) => (
-                      <td key={column}>{String(row[column] ?? '—')}</td>
-                    ))}
+                    {Object.keys(preview.data?.[0] as ReportRow).map(
+                      (column) => (
+                        <td key={column}>{String(row[column] ?? '—')}</td>
+                      ),
+                    )}
                   </tr>
                 ))}
               </tbody>

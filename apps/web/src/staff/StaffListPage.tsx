@@ -197,27 +197,41 @@ export function StaffListPage() {
                       const name =
                         `${person.firstName} ${person.lastName}`.trim();
                       const profilePath = `/admin/organizations/${encodeURIComponent(organizationId)}/staff/${encodeURIComponent(person.id)}`;
-                      const assignments = academics.assignments.data?.items.filter(
-                        (assignment) => assignment.teacherStaffId === person.id,
-                      ) ?? [];
-                      const classLabels = assignments.map((assignment) => {
-                        const className = academics.classes.data?.items.find(
-                          (item) => item.id === assignment.classId,
-                        )?.name;
-                        const sectionName = academics.sections.data?.items.find(
-                          (item) => item.id === assignment.sectionId,
-                        )?.name;
-                        return className && sectionName ? `${className}-${sectionName}` : '';
-                      }).filter(Boolean);
-                      const assignedSubjects = assignments.map((assignment) =>
-                        academics.subjects.data?.items.find(
-                          (item) => item.id === assignment.subjectId,
-                        )?.name,
-                      ).filter((subject): subject is string => Boolean(subject));
-                      const subjects = [...new Set([
-                        ...(person.subjects ?? []),
-                        ...assignedSubjects,
-                      ])];
+                      const assignments =
+                        academics.assignments.data?.items.filter(
+                          (assignment) =>
+                            assignment.teacherStaffId === person.id,
+                        ) ?? [];
+                      const classLabels = assignments
+                        .map((assignment) => {
+                          const className = academics.classes.data?.items.find(
+                            (item) => item.id === assignment.classId,
+                          )?.name;
+                          const sectionName =
+                            academics.sections.data?.items.find(
+                              (item) => item.id === assignment.sectionId,
+                            )?.name;
+                          return className && sectionName
+                            ? `${className}-${sectionName}`
+                            : '';
+                        })
+                        .filter(Boolean);
+                      const assignedSubjects = assignments
+                        .map(
+                          (assignment) =>
+                            academics.subjects.data?.items.find(
+                              (item) => item.id === assignment.subjectId,
+                            )?.name,
+                        )
+                        .filter((subject): subject is string =>
+                          Boolean(subject),
+                        );
+                      const subjects = [
+                        ...new Set([
+                          ...(person.subjects ?? []),
+                          ...assignedSubjects,
+                        ]),
+                      ];
                       const classes = [...new Set(classLabels)];
                       return (
                         <WorkspaceStaffCard

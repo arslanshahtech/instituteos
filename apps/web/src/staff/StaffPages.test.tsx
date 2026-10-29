@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Suspense } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RouterProvider } from 'react-router-dom';
@@ -82,12 +83,15 @@ function renderStaffRoute(path: string) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  client.setQueryData(['auth', 'current-user'], authMocks.user);
   const router = createAppRouter({ initialEntries: [path] });
   return render(
     <QueryClientProvider client={client}>
       <AuthProvider>
         <ToastProvider>
-          <RouterProvider router={router} />
+          <Suspense fallback={<div role="status">Loading page...</div>}>
+            <RouterProvider router={router} />
+          </Suspense>
         </ToastProvider>
       </AuthProvider>
     </QueryClientProvider>,
@@ -140,7 +144,11 @@ describe('staff management pages', () => {
     const user = userEvent.setup();
     renderStaffRoute(`/admin/organizations/${organizationId}/staff`);
     expect(
-      await screen.findByRole('link', { name: 'Ada Lovelace' }),
+      await screen.findByRole(
+        'link',
+        { name: 'Ada Lovelace' },
+        { timeout: 3_000 },
+      ),
     ).toHaveAttribute(
       'href',
       `/admin/organizations/${organizationId}/staff/${staffId}`,

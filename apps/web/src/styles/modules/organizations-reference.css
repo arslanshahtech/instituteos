@@ -737,7 +737,6 @@
   }
 }
 
-
 /* Reference-aligned polish limited to Invitations and Campus primary actions. */
 .organization-admin-page .invitation-empty-action--centered {
   min-height: 260px;
@@ -758,15 +757,27 @@
   margin: 0;
 }
 
-.organization-admin-page .campus-management .campus-panel-heading > .button-primary,
-.organization-admin-page .campus-management .campus-create-form .button-primary {
+.organization-admin-page
+  .campus-management
+  .campus-panel-heading
+  > .button-primary,
+.organization-admin-page
+  .campus-management
+  .campus-create-form
+  .button-primary {
   background: #090909;
   color: #fff;
   border-color: #090909;
 }
 
-.organization-admin-page .campus-management .campus-panel-heading > .button-primary:hover,
-.organization-admin-page .campus-management .campus-create-form .button-primary:hover {
+.organization-admin-page
+  .campus-management
+  .campus-panel-heading
+  > .button-primary:hover,
+.organization-admin-page
+  .campus-management
+  .campus-create-form
+  .button-primary:hover {
   background: #252525;
   border-color: #252525;
 }

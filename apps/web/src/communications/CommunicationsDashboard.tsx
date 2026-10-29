@@ -136,19 +136,25 @@ export function CommunicationsDashboard() {
 
   const announcements = useAnnouncements(
     organizationId,
-    Boolean(access.data && canManageAnnouncements && activeTab === 'announcements'),
+    Boolean(
+      access.data && canManageAnnouncements && activeTab === 'announcements',
+    ),
     filters,
   );
   const campuses = useQuery({
     queryKey: ['academics', organizationId, 'campuses'],
     queryFn: () => listAcademicCampuses(organizationId),
-    enabled: Boolean(access.data && canManageAnnouncements && activeTab === 'announcements'),
+    enabled: Boolean(
+      access.data && canManageAnnouncements && activeTab === 'announcements',
+    ),
     retry: false,
   });
   const members = useQuery({
     queryKey: ['organization-members', organizationId],
     queryFn: () => getMembers(organizationId),
-    enabled: Boolean(access.data && canManageAnnouncements && activeTab === 'announcements'),
+    enabled: Boolean(
+      access.data && canManageAnnouncements && activeTab === 'announcements',
+    ),
     retry: false,
   });
 
@@ -282,19 +288,18 @@ export function CommunicationsDashboard() {
         eyebrow="Organization workspace"
         title="Communications"
         description="Private, role-scoped conversations between parents, teachers and authorized staff."
-        aside={(
+        aside={
           activeTab === 'announcements' && canManageAnnouncements ? (
             <Button onClick={openCreate} type="button" variant="primary">
               <Plus size={17} aria-hidden="true" />
               Create announcement
             </Button>
           ) : undefined
-        )}
+        }
       />
 
       {/* Workspace Tabs */}
       <div className="communications-workspace-tabs">
-
         {canAccessMessaging && (
           <button
             type="button"

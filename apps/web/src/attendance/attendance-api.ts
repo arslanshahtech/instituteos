@@ -108,7 +108,12 @@ export function placeStudent(
 export function removeStudentFromSection(
   organizationId: string,
   studentId: string,
-  input: { classId: string; sectionId: string; academicYearId: string; campusId: string },
+  input: {
+    classId: string;
+    sectionId: string;
+    academicYearId: string;
+    campusId: string;
+  },
 ) {
   return apiRequest<{ removed: boolean }>(
     `${organizationPath(organizationId)}/attendance/students/placements/${encodeURIComponent(studentId)}`,

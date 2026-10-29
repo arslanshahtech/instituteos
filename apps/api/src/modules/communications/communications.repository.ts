@@ -29,7 +29,8 @@ function announcementRecord(
     ...(record.campusId ? { campusId: String(record.campusId) } : {}),
     title: String(record.title),
     content: String(record.content),
-    targetAudience: record.targetAudience as AnnouncementRecord['targetAudience'],
+    targetAudience:
+      record.targetAudience as AnnouncementRecord['targetAudience'],
     status: record.status as AnnouncementRecord['status'],
     publishDate: iso(record.publishDate as Date),
     authorId: String(record.authorId),
@@ -77,8 +78,7 @@ function dateRange(query: AnnouncementQuery): Record<string, Date> | undefined {
     ...(query.dateTo
       ? {
           $lte: new Date(
-            new Date(`${query.dateTo}T00:00:00.000Z`).getTime() +
-              86_399_999,
+            new Date(`${query.dateTo}T00:00:00.000Z`).getTime() + 86_399_999,
           ),
         }
       : {}),
@@ -136,7 +136,9 @@ export class MongoAnnouncementRepository implements AnnouncementRepository {
       authorId: oid(authorId),
       ...input,
       ...(input.campusId ? { campusId: oid(input.campusId) } : {}),
-      ...(input.publishDate ? { publishDate: new Date(input.publishDate) } : {}),
+      ...(input.publishDate
+        ? { publishDate: new Date(input.publishDate) }
+        : {}),
     });
     return announcementRecord(
       record.toObject() as unknown as Record<string, unknown>,
@@ -151,7 +153,9 @@ export class MongoAnnouncementRepository implements AnnouncementRepository {
     const changes = {
       ...input,
       ...(input.campusId ? { campusId: oid(input.campusId) } : {}),
-      ...(input.publishDate ? { publishDate: new Date(input.publishDate) } : {}),
+      ...(input.publishDate
+        ? { publishDate: new Date(input.publishDate) }
+        : {}),
     };
     const record = await AnnouncementModel.findOneAndUpdate(
       { _id: oid(announcementId), organizationId: oid(organizationId) },
@@ -229,7 +233,9 @@ export class MongoMessagingRepository implements MessagingRepository {
       .sort({ lastMessageAt: -1 })
       .lean();
 
-    return docs.map((d) => threadRecord(d as unknown as Record<string, unknown>));
+    return docs.map((d) =>
+      threadRecord(d as unknown as Record<string, unknown>),
+    );
   }
 
   async addMessage(
@@ -253,7 +259,9 @@ export class MongoMessagingRepository implements MessagingRepository {
       { $set: { lastMessageAt: now, updatedAt: now } },
     );
 
-    return directMessageRecord(doc.toObject() as unknown as Record<string, unknown>);
+    return directMessageRecord(
+      doc.toObject() as unknown as Record<string, unknown>,
+    );
   }
 
   async listMessages(
@@ -269,7 +277,9 @@ export class MongoMessagingRepository implements MessagingRepository {
       .limit(limit)
       .lean();
 
-    return docs.map((d) => directMessageRecord(d as unknown as Record<string, unknown>));
+    return docs.map((d) =>
+      directMessageRecord(d as unknown as Record<string, unknown>),
+    );
   }
 
   async markMessagesRead(

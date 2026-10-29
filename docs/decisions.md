@@ -85,3 +85,9 @@ Organization lifecycle operations are deliberately separate from ordinary tenant
 **Status:** Accepted
 
 Finance structures, invoices, and payment receipts are organization-owned and every read or write is scoped by the active organization membership. Campus assignments restrict both queries and mutations. Finance read/write permissions are granted to organization owners/admins, campus admins, principals/directors, and finance officers; other organization roles do not gain finance access implicitly. Bulk invoices include only active students with an active enrollment and a current active class placement for the academic year. Fee and invoice amounts are persisted as MongoDB Decimal128 and accepted only to cents; optional fee heads are excluded from generated invoice totals. An organization/student/fee-structure/billing-cycle unique index makes generation repeat-safe. Payment collection updates invoice balance and writes its receipt together in a MongoDB transaction, with tenant-scoped conditional balance checks to reject stale or over-balance writes.
+
+## 2026-10-24 — Add required CI checks before school-pilot work
+
+**Status:** Adopted; first hosted GitHub Actions run pending
+
+Every push and pull request runs locked dependency installation, ESLint, TypeScript typecheck, both workspace test suites, and production build on Node.js 22. Formatting is intentionally not a blocking CI check yet because the current repository has broad pre-existing Prettier drift; run a separately reviewed formatting-only change before enabling format:check. CI is a code-quality gate, not a replacement for staging smoke tests, a backup-restore rehearsal, security review, or school-owner acceptance. The release sequence is documented in docs/PRODUCTION_READINESS_PLAN.md.

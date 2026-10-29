@@ -137,11 +137,11 @@ export function TeacherStudentsPage() {
         eyebrow="Teacher workspace"
         title="My classes & students"
         description="Only classes and student rosters assigned to your teacher account are shown here."
-        aside={(
+        aside={
           <Link className="button button-secondary" to={attendanceHref}>
             <CalendarCheck size={16} aria-hidden="true" /> Mark attendance
           </Link>
-        )}
+        }
       />
 
       {assignmentsQuery.isPending ? (

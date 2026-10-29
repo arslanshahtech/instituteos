@@ -46,13 +46,20 @@ describe('PickupService', () => {
   });
 
   it('generates a 6-digit gate-pass for an active authorized person', async () => {
-    vi.mocked(mockRepository.findPickupPersonById!).mockResolvedValue(mockPerson);
+    vi.mocked(mockRepository.findPickupPersonById!).mockResolvedValue(
+      mockPerson,
+    );
     vi.mocked(mockRepository.createPass!).mockResolvedValue(mockPass);
 
-    const result = await service.generateGatePass('org-1', 'student-1', 'user-1', {
-      pickupPersonId: 'person-123',
-      validMinutes: 60,
-    });
+    const result = await service.generateGatePass(
+      'org-1',
+      'student-1',
+      'user-1',
+      {
+        pickupPersonId: 'person-123',
+        validMinutes: 60,
+      },
+    );
 
     expect(result.passCode).toBe('654321');
     expect(mockRepository.createPass).toHaveBeenCalledTimes(1);
@@ -73,7 +80,9 @@ describe('PickupService', () => {
 
   it('successfully verifies pass and logs student release', async () => {
     vi.mocked(mockRepository.findActivePassByCode!).mockResolvedValue(mockPass);
-    vi.mocked(mockRepository.findPickupPersonById!).mockResolvedValue(mockPerson);
+    vi.mocked(mockRepository.findPickupPersonById!).mockResolvedValue(
+      mockPerson,
+    );
     vi.mocked(mockRepository.createLog!).mockResolvedValue({
       id: 'log-1',
       organizationId: 'org-1',
@@ -90,7 +99,11 @@ describe('PickupService', () => {
       passCode: '654321',
     });
 
-    expect(mockRepository.updatePassStatus).toHaveBeenCalledWith('org-1', 'pass-123', 'used');
+    expect(mockRepository.updatePassStatus).toHaveBeenCalledWith(
+      'org-1',
+      'pass-123',
+      'used',
+    );
     expect(result.method).toBe('digital_pass');
     expect(result.releasedByStaffId).toBe('staff-1');
   });
@@ -101,12 +114,20 @@ describe('PickupService', () => {
       validUntil: new Date(Date.now() - 60000).toISOString(),
     };
 
-    vi.mocked(mockRepository.findActivePassByCode!).mockResolvedValue(expiredPass);
+    vi.mocked(mockRepository.findActivePassByCode!).mockResolvedValue(
+      expiredPass,
+    );
 
     await expect(
-      service.verifyAndReleaseStudent('org-1', 'staff-1', { passCode: '654321' }),
+      service.verifyAndReleaseStudent('org-1', 'staff-1', {
+        passCode: '654321',
+      }),
     ).rejects.toThrow('This pass code has expired.');
 
-    expect(mockRepository.updatePassStatus).toHaveBeenCalledWith('org-1', 'pass-123', 'expired');
+    expect(mockRepository.updatePassStatus).toHaveBeenCalledWith(
+      'org-1',
+      'pass-123',
+      'expired',
+    );
   });
 });

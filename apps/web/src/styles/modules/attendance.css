@@ -1445,8 +1445,10 @@
   text-transform: uppercase;
 }
 
-.reference-attendance-page .attendance-roster-table th.attendance-reference-notes-column,
-.reference-attendance-page .attendance-roster-table td[data-label="Notes"] {
+.reference-attendance-page
+  .attendance-roster-table
+  th.attendance-reference-notes-column,
+.reference-attendance-page .attendance-roster-table td[data-label='Notes'] {
   display: none;
 }
 
@@ -1473,25 +1475,33 @@
   font-size: 9px;
 }
 
-.reference-attendance-page .attendance-roster-table .attendance-status-choice-present.is-active {
+.reference-attendance-page
+  .attendance-roster-table
+  .attendance-status-choice-present.is-active {
   border-color: #059669;
   background: #059669;
   color: #fff;
 }
 
-.reference-attendance-page .attendance-roster-table .attendance-status-choice-absent.is-active {
+.reference-attendance-page
+  .attendance-roster-table
+  .attendance-status-choice-absent.is-active {
   border-color: #dc2626;
   background: #dc2626;
   color: #fff;
 }
 
-.reference-attendance-page .attendance-roster-table .attendance-status-choice-late.is-active {
+.reference-attendance-page
+  .attendance-roster-table
+  .attendance-status-choice-late.is-active {
   border-color: #f59e0b;
   background: #f59e0b;
   color: #fff;
 }
 
-.reference-attendance-page .attendance-roster-table .attendance-status-choice-leave.is-active {
+.reference-attendance-page
+  .attendance-roster-table
+  .attendance-status-choice-leave.is-active {
   border-color: #111;
   background: #111;
   color: #fff;

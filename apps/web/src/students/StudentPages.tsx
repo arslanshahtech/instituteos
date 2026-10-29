@@ -115,7 +115,11 @@ function StudentPageHeading({
   return (
     <WorkspacePageHeading
       className="student-page-heading"
-      eyebrow={referenceLayout ? 'College admin · Layout preview' : 'Organization workspace'}
+      eyebrow={
+        referenceLayout
+          ? 'College admin · Layout preview'
+          : 'Organization workspace'
+      }
       title={title}
       description={description}
       aside={
@@ -200,12 +204,19 @@ export function StudentsListPage() {
     retry: false,
     staleTime: 60_000,
   });
-  const attendanceByStudent = new Map<string, { attended: number; recorded: number }>();
+  const attendanceByStudent = new Map<
+    string,
+    { attended: number; recorded: number }
+  >();
   for (const record of attendance.data?.items ?? []) {
-    const counts = attendanceByStudent.get(record.studentId) ?? { attended: 0, recorded: 0 };
+    const counts = attendanceByStudent.get(record.studentId) ?? {
+      attended: 0,
+      recorded: 0,
+    };
     if (record.status !== 'leave') {
       counts.recorded += 1;
-      if (record.status === 'present' || record.status === 'late') counts.attended += 1;
+      if (record.status === 'present' || record.status === 'late')
+        counts.attended += 1;
     }
     attendanceByStudent.set(record.studentId, counts);
   }
@@ -216,7 +227,9 @@ export function StudentsListPage() {
     invoicesByStudent.set(invoice.studentId, current);
   }
   const visibleGuardianIds = Array.from(
-    new Set((students.data?.items ?? []).flatMap((student) => student.guardianIds)),
+    new Set(
+      (students.data?.items ?? []).flatMap((student) => student.guardianIds),
+    ),
   );
   const guardianDetailsQueries = useQueries({
     queries: visibleGuardianIds.map((guardianId) => ({
@@ -232,7 +245,10 @@ export function StudentsListPage() {
     if (!detail) continue;
     for (const relation of detail.students) {
       const guardianName = `${detail.guardian.firstName} ${detail.guardian.lastName}`;
-      if (!primaryGuardianByStudent.has(relation.student.id) || relation.isPrimary) {
+      if (
+        !primaryGuardianByStudent.has(relation.student.id) ||
+        relation.isPrimary
+      ) {
         primaryGuardianByStudent.set(relation.student.id, guardianName);
       }
     }
@@ -332,9 +348,16 @@ export function StudentsListPage() {
                         student.firstName.trim().charAt(0) || 'S'
                       ).toUpperCase() +
                       (student.lastName.trim().charAt(0) || '').toUpperCase();
-                    const studentInvoices = invoicesByStudent.get(student.id) ?? [];
-                    const totalAmount = studentInvoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0);
-                    const paidAmount = studentInvoices.reduce((sum, invoice) => sum + invoice.paidAmount, 0);
+                    const studentInvoices =
+                      invoicesByStudent.get(student.id) ?? [];
+                    const totalAmount = studentInvoices.reduce(
+                      (sum, invoice) => sum + invoice.totalAmount,
+                      0,
+                    );
+                    const paidAmount = studentInvoices.reduce(
+                      (sum, invoice) => sum + invoice.paidAmount,
+                      0,
+                    );
                     const dueAmount = Math.max(0, totalAmount - paidAmount);
                     const feeStatus = !canReadFinance
                       ? student.status
@@ -346,7 +369,9 @@ export function StudentsListPage() {
                             ? 'No fee record'
                             : dueAmount <= 0
                               ? 'Paid'
-                              : studentInvoices.some((invoice) => invoice.status === 'overdue')
+                              : studentInvoices.some(
+                                    (invoice) => invoice.status === 'overdue',
+                                  )
                                 ? 'Due'
                                 : paidAmount > 0
                                   ? 'Partial'
@@ -368,17 +393,44 @@ export function StudentsListPage() {
                                   ? `${student.guardianIds.length} linked guardian${student.guardianIds.length === 1 ? '' : 's'}`
                                   : 'No guardian linked')}
                             </span>
-                            {canReadAttendance && (() => {
-                              const counts = attendanceByStudent.get(student.id);
-                              const percentage = counts && counts.recorded > 0
-                                ? Math.round((counts.attended / counts.recorded) * 100)
-                                : null;
-                              return <span>{attendance.isPending ? 'Attendance loading' : attendance.isError ? 'Attendance unavailable' : percentage === null ? '—' : `${percentage}% attendance`}</span>;
-                            })()}
+                            {canReadAttendance &&
+                              (() => {
+                                const counts = attendanceByStudent.get(
+                                  student.id,
+                                );
+                                const percentage =
+                                  counts && counts.recorded > 0
+                                    ? Math.round(
+                                        (counts.attended / counts.recorded) *
+                                          100,
+                                      )
+                                    : null;
+                                return (
+                                  <span>
+                                    {attendance.isPending
+                                      ? 'Attendance loading'
+                                      : attendance.isError
+                                        ? 'Attendance unavailable'
+                                        : percentage === null
+                                          ? '—'
+                                          : `${percentage}% attendance`}
+                                  </span>
+                                );
+                              })()}
                             {canReadFinance ? (
-                              <b>{invoices.isPending ? 'Loading fees…' : invoices.isError ? 'Fee data unavailable' : money(totalAmount)}</b>
+                              <b>
+                                {invoices.isPending
+                                  ? 'Loading fees…'
+                                  : invoices.isError
+                                    ? 'Fee data unavailable'
+                                    : money(totalAmount)}
+                              </b>
                             ) : (
-                              <b>{student.contactEmail || student.phone || 'Contact not provided'}</b>
+                              <b>
+                                {student.contactEmail ||
+                                  student.phone ||
+                                  'Contact not provided'}
+                              </b>
                             )}
                           </>
                         }

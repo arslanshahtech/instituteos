@@ -321,7 +321,11 @@ export function RoleDemoModulePage() {
         eyebrow={`${role.label} · Layout preview`}
         title={title}
         description="Reference-aligned screen with local sample values for visual review."
-        aside={<span className="reference-preview-note">SAMPLE DATA · NOT SAVED</span>}
+        aside={
+          <span className="reference-preview-note">
+            SAMPLE DATA · NOT SAVED
+          </span>
+        }
       />
 
       {notice && (

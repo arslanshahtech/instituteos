@@ -445,7 +445,14 @@
 }
 
 @media (max-width: 760px) {
-  .communications-page { gap: 16px; }
-  .communications-workspace-tabs { margin-bottom: 10px; }
-  .communications-workspace-tab { padding: 11px 2px 10px; font-size: 12px; }
+  .communications-page {
+    gap: 16px;
+  }
+  .communications-workspace-tabs {
+    margin-bottom: 10px;
+  }
+  .communications-workspace-tab {
+    padding: 11px 2px 10px;
+    font-size: 12px;
+  }
 }

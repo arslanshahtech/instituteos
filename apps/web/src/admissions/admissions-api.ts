@@ -170,7 +170,11 @@ export function getApplication(
 export function reviewApplication(
   organizationId: string,
   applicationId: string,
-  input: { status: ApplicationStatus; decisionReason?: string; campusId?: string },
+  input: {
+    status: ApplicationStatus;
+    decisionReason?: string;
+    campusId?: string;
+  },
 ): Promise<{
   application: ApplicationRecord;
   student?: { id: string; firstName: string; lastName: string };

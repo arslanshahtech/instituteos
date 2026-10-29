@@ -682,18 +682,42 @@ function StudentFamilyPortalPage({ mode }: { mode: PortalMode }) {
                   </p>
                 </div>
               </div>
-              <div className="parent-demo-notice" role="note">
-                <CircleAlert size={16} aria-hidden="true" />
-                <span>
-                  The current marks schema has no publication flag, so marks are
-                  intentionally not exposed here yet. A publish-results workflow
-                  is required before displaying student marks.
-                </span>
-              </div>
-              <EmptyState
-                title="No published results available"
-                description="There are no results that this portal can safely identify as published."
-              />
+              {selectedStudent.resultsAvailable &&
+              selectedStudent.results.length > 0 ? (
+                <div className="parent-fee-list">
+                  {selectedStudent.results.map((result) => (
+                    <div className="parent-fee-row" key={result.id}>
+                      <span className="parent-fee-icon">
+                        <GraduationCap size={18} aria-hidden="true" />
+                      </span>
+                      <div className="parent-fee-copy">
+                        <strong>
+                          {result.examName} · {result.subjectName}
+                        </strong>
+                        <span>
+                          {dateLabel(result.date)} ·{' '}
+                          {result.isAbsent
+                            ? 'Absent'
+                            : `${result.marksObtained ?? '—'} / ${result.totalMarks} marks`}
+                        </span>
+                      </div>
+                      <span className="parent-status">
+                        {result.isAbsent
+                          ? 'Absent'
+                          : (result.grade ??
+                            (result.percentage === null
+                              ? 'Published'
+                              : `${result.percentage}%`))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No published results available"
+                  description="Your school will show your results here after it has reviewed and published them."
+                />
+              )}
             </section>
           )}
 

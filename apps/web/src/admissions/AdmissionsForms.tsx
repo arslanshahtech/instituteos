@@ -31,12 +31,23 @@ const inquirySchema = z.object({
 type InquiryValues = z.infer<typeof inquirySchema>;
 
 const applicationSchema = z.object({
-  fullName: z.string().trim().min(5, 'Enter the student’s full name.').max(160)
-    .refine((value) => value.trim().split(/\s+/).length >= 2, 'Enter first and last name.'),
+  fullName: z
+    .string()
+    .trim()
+    .min(5, 'Enter the student’s full name.')
+    .max(160)
+    .refine(
+      (value) => value.trim().split(/\s+/).length >= 2,
+      'Enter first and last name.',
+    ),
   dateOfBirth: z.string().min(1, 'Select the date of birth.'),
   program: z.string().trim().min(1, 'Select a class or grade.').max(120),
   guardianName: z.string().trim().min(2, 'Enter the guardian’s name.').max(160),
-  guardianPhone: z.string().trim().min(7, 'Enter a valid guardian phone number.').max(40),
+  guardianPhone: z
+    .string()
+    .trim()
+    .min(7, 'Enter a valid guardian phone number.')
+    .max(40),
   feePlan: z.enum(['Standard', 'Scholarship', 'Sibling plan']),
   campusId: z.string(),
 });
@@ -280,7 +291,9 @@ export function ApplicationForm({
       className="student-form reference-admission-form"
       noValidate
       onSubmit={form.handleSubmit((values) => {
-        const [firstName, ...lastNameParts] = values.fullName.trim().split(/\s+/);
+        const [firstName, ...lastNameParts] = values.fullName
+          .trim()
+          .split(/\s+/);
         onSubmit({
           firstName: firstName!,
           lastName: lastNameParts.join(' '),
@@ -328,7 +341,11 @@ export function ApplicationForm({
           type="tel"
           {...form.register('guardianPhone')}
         />
-        <FormField error={form.formState.errors.feePlan?.message} label="Fee plan" name="feePlan">
+        <FormField
+          error={form.formState.errors.feePlan?.message}
+          label="Fee plan"
+          name="feePlan"
+        >
           <select id="feePlan" {...form.register('feePlan')}>
             <option value="Standard">Standard</option>
             <option value="Scholarship">Scholarship</option>

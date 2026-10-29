@@ -121,13 +121,25 @@
   color: #7a7a7a;
 }
 
-.app-frame-live-organization .reference-live-module .reference-metric-card strong,
-.app-frame-live-organization .organization-overview .reference-metric-card strong {
+.app-frame-live-organization
+  .reference-live-module
+  .reference-metric-card
+  strong,
+.app-frame-live-organization
+  .organization-overview
+  .reference-metric-card
+  strong {
   color: #161616;
 }
 
-.app-frame-live-organization .reference-live-module .reference-metric-card small,
-.app-frame-live-organization .organization-overview .reference-metric-card small {
+.app-frame-live-organization
+  .reference-live-module
+  .reference-metric-card
+  small,
+.app-frame-live-organization
+  .organization-overview
+  .reference-metric-card
+  small {
   color: #7a7a7a;
 }
 
@@ -217,7 +229,6 @@
   }
 }
 
-
 /* Consistent editorial page headings across the organization workspace. */
 .app-frame-live-organization .page-heading h1,
 .app-frame-live-organization .organization-heading h1,
@@ -266,7 +277,7 @@
 }
 
 .classes-reference-page .cr-campus-setup-alert p {
-  margin: .35rem 0 0;
+  margin: 0.35rem 0 0;
   color: #78674d;
   font-size: 12px;
   line-height: 1.5;
@@ -280,25 +291,78 @@
   background: #fff;
 }
 
-.class-roster-section .academics-panel-heading { margin-bottom: .75rem; }
-.class-roster-section h3 { margin: 0; font-size: 13px; font-weight: 650; }
-.class-roster-section p { margin: .25rem 0 0; color: var(--color-muted, #71717a); font-size: 12px; }
-.class-roster-count { display: inline-flex; min-width: 28px; height: 28px; align-items: center; justify-content: center; border: 1px solid #e4e4e7; border-radius: 999px; color: #27272a; font-size: 12px; font-weight: 650; }
-.class-roster-section .class-enrollment-student { justify-content: space-between; }
-.class-roster-status { flex: 0 0 auto; padding: .2rem .5rem; border-radius: 999px; background: #f4f4f5; color: #52525b; font-size: 10px; }
-.class-roster-section .class-roster-empty { padding: .75rem; border: 1px dashed #d4d4d8; border-radius: 10px; }
-.class-enrollment-setup-hint { margin-top: 1rem; padding: 1.25rem; border: 1px dashed #d4d4d8; border-radius: 14px; background: #fafaf9; }
-.class-enrollment-setup-hint h3 { margin: 0; font-size: 15px; }
-.class-enrollment-setup-hint p { color: var(--color-muted, #71717a); font-size: 13px; line-height: 1.55; }
-.class-enrollment-setup-hint .button { margin-top: .5rem; }
-
-@media (max-width: 600px) {
-  .classes-reference-page .cr-campus-setup-alert { align-items: stretch; flex-direction: column; }
-  .app-frame-live-organization .page-heading h1,
-  .app-frame-live-organization .organization-heading h1,
-  .app-frame-live-organization .settings-page-heading h1 { font-size: 30px; }
+.class-roster-section .academics-panel-heading {
+  margin-bottom: 0.75rem;
+}
+.class-roster-section h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+.class-roster-section p {
+  margin: 0.25rem 0 0;
+  color: var(--color-muted, #71717a);
+  font-size: 12px;
+}
+.class-roster-count {
+  display: inline-flex;
+  min-width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e4e4e7;
+  border-radius: 999px;
+  color: #27272a;
+  font-size: 12px;
+  font-weight: 650;
+}
+.class-roster-section .class-enrollment-student {
+  justify-content: space-between;
+}
+.class-roster-status {
+  flex: 0 0 auto;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: #f4f4f5;
+  color: #52525b;
+  font-size: 10px;
+}
+.class-roster-section .class-roster-empty {
+  padding: 0.75rem;
+  border: 1px dashed #d4d4d8;
+  border-radius: 10px;
+}
+.class-enrollment-setup-hint {
+  margin-top: 1rem;
+  padding: 1.25rem;
+  border: 1px dashed #d4d4d8;
+  border-radius: 14px;
+  background: #fafaf9;
+}
+.class-enrollment-setup-hint h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.class-enrollment-setup-hint p {
+  color: var(--color-muted, #71717a);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.class-enrollment-setup-hint .button {
+  margin-top: 0.5rem;
 }
 
+@media (max-width: 600px) {
+  .classes-reference-page .cr-campus-setup-alert {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .app-frame-live-organization .page-heading h1,
+  .app-frame-live-organization .organization-heading h1,
+  .app-frame-live-organization .settings-page-heading h1 {
+    font-size: 30px;
+  }
+}
 
 .class-enrollment-shell {
   scroll-margin-top: 24px;
@@ -316,15 +380,29 @@
   margin-bottom: 1rem;
 }
 
-.class-enrollment-shell-heading strong { color: #171715; font-size: 15px; font-weight: 650; }
-.class-enrollment-shell-heading p { margin: .3rem 0 0; color: #77736d; font-size: 12px; line-height: 1.5; }
-.class-enrollment-shell .class-enrollment-panel { margin: 0; }
-
-@media (max-width: 600px) {
-  .class-enrollment-shell { padding: .75rem; }
-  .class-enrollment-shell-heading { align-items: flex-start; }
+.class-enrollment-shell-heading strong {
+  color: #171715;
+  font-size: 15px;
+  font-weight: 650;
+}
+.class-enrollment-shell-heading p {
+  margin: 0.3rem 0 0;
+  color: #77736d;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.class-enrollment-shell .class-enrollment-panel {
+  margin: 0;
 }
 
+@media (max-width: 600px) {
+  .class-enrollment-shell {
+    padding: 0.75rem;
+  }
+  .class-enrollment-shell-heading {
+    align-items: flex-start;
+  }
+}
 
 /* Final typography and class-roster selection polish. */
 .classes-reference-page .cr-header h1 {
@@ -342,18 +420,72 @@
   letter-spacing: 0.005em;
   line-height: 1.14;
 }
-.class-roster-select-toolbar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .65rem; }
-.class-roster-select-toolbar label { display: inline-flex; align-items: center; gap: .5rem; color: #4b4843; font-size: 12px; }
-.class-roster-section .class-enrollment-student { display: flex; align-items: center; gap: .75rem; padding: .65rem .75rem; border-bottom: 1px solid #efeeeb; }
-.class-roster-section .class-enrollment-student:last-child { border-bottom: 0; }
-.class-roster-section .class-enrollment-student input[type='checkbox'] { width: 16px; height: 16px; accent-color: #292720; }
-.class-roster-section .class-enrollment-student > span:first-of-type { flex: 1; min-width: 0; }
-.class-roster-remove-button { border: 1px solid #ead5d3; border-radius: 8px; padding: .4rem .6rem; background: #fff; color: #a13731; font-size: 11px; font-weight: 600; }
-.class-roster-remove-button:disabled { opacity: .55; cursor: not-allowed; }
-.class-roster-section .class-roster-student-name { display: flex; flex-direction: column; gap: .2rem; }
-.class-roster-section .class-roster-student-name strong { color: #27251f; font-size: 12px; font-weight: 650; letter-spacing: .01em; }
-.class-roster-section .class-roster-student-name small { color: #817c73; font-size: 11px; }
+.class-roster-select-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+.class-roster-select-toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #4b4843;
+  font-size: 12px;
+}
+.class-roster-section .class-enrollment-student {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid #efeeeb;
+}
+.class-roster-section .class-enrollment-student:last-child {
+  border-bottom: 0;
+}
+.class-roster-section .class-enrollment-student input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #292720;
+}
+.class-roster-section .class-enrollment-student > span:first-of-type {
+  flex: 1;
+  min-width: 0;
+}
+.class-roster-remove-button {
+  border: 1px solid #ead5d3;
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  background: #fff;
+  color: #a13731;
+  font-size: 11px;
+  font-weight: 600;
+}
+.class-roster-remove-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.class-roster-section .class-roster-student-name {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.class-roster-section .class-roster-student-name strong {
+  color: #27251f;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+.class-roster-section .class-roster-student-name small {
+  color: #817c73;
+  font-size: 11px;
+}
 @media (max-width: 600px) {
-  .class-roster-select-toolbar { flex-wrap: wrap; }
-  .classes-reference-page .cr-header h1 { font-size: 34px; }
+  .class-roster-select-toolbar {
+    flex-wrap: wrap;
+  }
+  .classes-reference-page .cr-header h1 {
+    font-size: 34px;
+  }
 }

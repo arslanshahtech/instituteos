@@ -31,7 +31,11 @@ const optionalTextFields = [
 
 function bodyObject(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'A valid JSON object is required.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'A valid JSON object is required.',
+    );
   }
   return value as Record<string, unknown>;
 }
@@ -106,8 +110,7 @@ function defaultAuthenticate() {
 
 export function createSettingsRouter(
   service = new SettingsService(new MongoSettingsRepository()),
-  accessRepository: OrganizationAccessRepository =
-    new MongoOrganizationAccessRepository(),
+  accessRepository: OrganizationAccessRepository = new MongoOrganizationAccessRepository(),
   authenticate = defaultAuthenticate(),
 ) {
   const router = Router();

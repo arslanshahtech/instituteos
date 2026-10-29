@@ -50,7 +50,10 @@ export function saveTeacherTimetableEntry(
   );
 }
 
-export function deleteTeacherTimetableEntry(organizationId: string, id: string) {
+export function deleteTeacherTimetableEntry(
+  organizationId: string,
+  id: string,
+) {
   return apiRequest<void>(`${path(organizationId)}/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   });

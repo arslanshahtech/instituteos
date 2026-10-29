@@ -12,6 +12,8 @@ export interface ExamRecord {
   campusId: string;
   startDate: string;
   endDate: string;
+  resultsPublishedAt: string | null;
+  resultsPublishedBy: string | null;
 }
 
 export interface ExamSchedule {
@@ -104,8 +106,8 @@ export function listExams(
   filters: { campusId?: string; termId?: string } = {},
 ) {
   const query = new URLSearchParams(
-    Object.entries(filters).filter(
-      (entry): entry is [string, string] => Boolean(entry[1]),
+    Object.entries(filters).filter((entry): entry is [string, string] =>
+      Boolean(entry[1]),
     ),
   );
   return apiRequest<{ items: ExamRecord[] }>(
@@ -131,6 +133,17 @@ export function deleteExam(organizationId: string, id: string) {
   return apiRequest<void>(
     `${examPath(organizationId)}/${encodeURIComponent(id)}`,
     { method: 'DELETE' },
+  );
+}
+
+export function setExamResultsPublication(
+  organizationId: string,
+  examId: string,
+  published: boolean,
+) {
+  return apiRequest<{ exam: ExamRecord }>(
+    `${examPath(organizationId)}/${encodeURIComponent(examId)}/results-publication`,
+    { method: 'PATCH', body: JSON.stringify({ published }) },
   );
 }
 

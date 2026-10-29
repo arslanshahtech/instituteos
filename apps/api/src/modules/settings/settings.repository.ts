@@ -10,7 +10,9 @@ import type {
 const oid = (id: string) => new Types.ObjectId(id);
 const iso = (value: Date) => new Date(value).toISOString();
 
-function settingsRecord(record: Record<string, unknown>): OrganizationSettingsRecord {
+function settingsRecord(
+  record: Record<string, unknown>,
+): OrganizationSettingsRecord {
   return {
     organizationId: String(record.organizationId),
     branding: record.branding as OrganizationSettingsRecord['branding'],
@@ -63,7 +65,12 @@ export class MongoSettingsRepository implements SettingsRepository {
         $set: updateFields(input),
         $setOnInsert: { organizationId: oid(organizationId) },
       },
-      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
+      {
+        new: true,
+        upsert: true,
+        runValidators: true,
+        setDefaultsOnInsert: true,
+      },
     ).lean();
     return settingsRecord(record as unknown as Record<string, unknown>);
   }

@@ -36,7 +36,12 @@ const financeExpenseSchema = new Schema(
     amount: { type: Schema.Types.Decimal128, required: true, min: 0.01 },
     paymentMethod: {
       type: String,
-      enum: ['cash', 'bank_transfer', 'card', 'online'] satisfies PaymentMethod[],
+      enum: [
+        'cash',
+        'bank_transfer',
+        'card',
+        'online',
+      ] satisfies PaymentMethod[],
       required: true,
     },
     expenseDate: { type: Date, required: true },
@@ -55,7 +60,6 @@ financeExpenseSchema.index({
 export const FinanceExpenseModel =
   mongoose.models.FinanceExpense ??
   mongoose.model('FinanceExpense', financeExpenseSchema);
-
 
 const financeExpenseBudgetSchema = new Schema(
   {

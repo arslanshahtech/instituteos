@@ -105,13 +105,13 @@ export function FeeConcessionsPage() {
         eyebrow="Finance workspace"
         title="Fee concessions"
         description="Review students with fee accounts and manage their scholarships, sibling discounts, and approved waivers."
-        aside={(
+        aside={
           <div className="concession-count">
             <BadgePercent size={17} aria-hidden="true" />
             <strong>{students.length}</strong>
             <span>students with fee accounts</span>
           </div>
-        )}
+        }
       />
 
       <section className="panel fee-concessions-panel">

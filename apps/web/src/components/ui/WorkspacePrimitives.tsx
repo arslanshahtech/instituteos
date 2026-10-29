@@ -207,14 +207,20 @@ export function WorkspaceGuardianCard({
   return (
     <Link aria-label={name} className="reference-guardian-card" to={to}>
       <span className="reference-guardian-card-top">
-        <span className="reference-staff-avatar" aria-hidden="true">{initials}</span>
+        <span className="reference-staff-avatar" aria-hidden="true">
+          {initials}
+        </span>
         <span className="reference-guardian-count">
           {childCount} {childCount === 1 ? 'child' : 'children'}
         </span>
       </span>
       <strong>{name}</strong>
-      <span className="reference-guardian-phone">{phone || 'Phone not provided'}</span>
-      <span className="reference-guardian-relation">{relationship || 'Relationship not set'}</span>
+      <span className="reference-guardian-phone">
+        {phone || 'Phone not provided'}
+      </span>
+      <span className="reference-guardian-relation">
+        {relationship || 'Relationship not set'}
+      </span>
       <span className="reference-guardian-children">
         <small>Linked children</small>
         {childrenNames.length > 0

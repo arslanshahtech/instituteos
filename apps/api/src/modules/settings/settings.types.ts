@@ -46,7 +46,9 @@ export interface SettingsActor {
 }
 
 export interface SettingsRepository {
-  findSettings(organizationId: string): Promise<OrganizationSettingsRecord | null>;
+  findSettings(
+    organizationId: string,
+  ): Promise<OrganizationSettingsRecord | null>;
   updateSettings(
     organizationId: string,
     input: OrganizationSettingsInput,

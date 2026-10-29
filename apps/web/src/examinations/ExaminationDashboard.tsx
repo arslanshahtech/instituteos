@@ -35,6 +35,7 @@ import {
   useExaminationWorkspace,
   useSaveExam,
   useSaveExamMarks,
+  useSetExamResultsPublication,
   useSaveExamSchedule,
   useSaveGradingScale,
   useStudentExamReport,
@@ -129,6 +130,15 @@ export function ExaminationDashboard() {
     access.data?.permissions.includes('examination.read') ?? false;
   const canWrite =
     access.data?.permissions.includes('examination.write') ?? false;
+  const canManageExams =
+    canWrite &&
+    [
+      'organization_owner',
+      'organization_admin',
+      'campus_admin',
+      'principal_director',
+      'academic_coordinator',
+    ].includes(access.data?.role ?? '');
   const workspace = useExaminationWorkspace(
     organizationId,
     Boolean(access.data && canRead),
@@ -212,6 +222,7 @@ export function ExaminationDashboard() {
   );
   const saveExam = useSaveExam(organizationId);
   const removeExam = useDeleteExam(organizationId);
+  const setResultsPublication = useSetExamResultsPublication(organizationId);
   const saveSchedule = useSaveExamSchedule(organizationId);
   const removeSchedule = useDeleteExamSchedule(organizationId);
   const saveMarks = useSaveExamMarks(organizationId);
@@ -901,6 +912,47 @@ export function ExaminationDashboard() {
                   <h3 className="examinations-subheading">
                     Schedules · {selectedExam.name}
                   </h3>
+                  <p className="examinations-readonly-note" role="status">
+                    {selectedExam.resultsPublishedAt
+                      ? `Results published on ${new Date(selectedExam.resultsPublishedAt).toLocaleString()}. Unpublish before editing marks or schedules.`
+                      : 'Results are in draft. Parents and students cannot see them until they are published.'}
+                  </p>
+                  {canManageExams && (
+                    <div className="examinations-actions">
+                      <Button
+                        type="button"
+                        variant={
+                          selectedExam.resultsPublishedAt
+                            ? 'secondary'
+                            : 'primary'
+                        }
+                        disabled={
+                          setResultsPublication.isPending ||
+                          (!selectedExam.resultsPublishedAt &&
+                            (examSchedules.isLoading || schedules.length === 0))
+                        }
+                        onClick={() => {
+                          const published = !selectedExam.resultsPublishedAt;
+                          const message = published
+                            ? 'Publish these exam results to linked parent and student portals? This requires marks for every student in every scheduled class.'
+                            : 'Unpublish these results? Parents and students will no longer see them.';
+                          if (!window.confirm(message)) return;
+                          setFormError('');
+                          void setResultsPublication
+                            .mutateAsync({ examId: selectedExam.id, published })
+                            .catch((error: unknown) =>
+                              setFormError(apiMessage(error)),
+                            );
+                        }}
+                      >
+                        {setResultsPublication.isPending
+                          ? 'Updating…'
+                          : selectedExam.resultsPublishedAt
+                            ? 'Unpublish results'
+                            : 'Publish results'}
+                      </Button>
+                    </div>
+                  )}
                   {examSchedules.isLoading ? (
                     <LoadingState message="Loading schedules..." />
                   ) : schedules.length === 0 ? (

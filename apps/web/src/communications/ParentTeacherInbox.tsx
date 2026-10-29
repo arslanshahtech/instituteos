@@ -225,9 +225,9 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
               >
                 Messages
               </h3>
-              <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>
-
-              </p>
+              <p
+                style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}
+              ></p>
             </div>
             {userRole === 'parent_guardian' && (
               <Button

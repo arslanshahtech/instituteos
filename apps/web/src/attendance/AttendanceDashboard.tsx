@@ -70,7 +70,11 @@ function today() {
 function savedAttendanceFilter(organizationId: string, key: string) {
   if (typeof window === 'undefined' || !organizationId) return '';
   try {
-    return window.localStorage.getItem(`instituteos:attendance:${organizationId}:${key}`) ?? '';
+    return (
+      window.localStorage.getItem(
+        `instituteos:attendance:${organizationId}:${key}`,
+      ) ?? ''
+    );
   } catch {
     return '';
   }
@@ -120,19 +124,30 @@ export function AttendanceDashboard() {
   const teacherAssignments = teacherAssignmentsQuery.data?.items ?? [];
   const [view, setView] = useState<'students' | 'staff'>('students');
   const [selectedCampusId, setSelectedCampusId] = useState(
-    () => searchParams.get('campusId') ?? savedAttendanceFilter(organizationId, 'campusId'),
+    () =>
+      searchParams.get('campusId') ??
+      savedAttendanceFilter(organizationId, 'campusId'),
   );
   const [selectedYearId, setSelectedYearId] = useState(
-    () => searchParams.get('academicYearId') ?? savedAttendanceFilter(organizationId, 'academicYearId'),
+    () =>
+      searchParams.get('academicYearId') ??
+      savedAttendanceFilter(organizationId, 'academicYearId'),
   );
   const [selectedClassId, setSelectedClassId] = useState(
-    () => searchParams.get('classId') ?? savedAttendanceFilter(organizationId, 'classId'),
+    () =>
+      searchParams.get('classId') ??
+      savedAttendanceFilter(organizationId, 'classId'),
   );
   const [selectedSectionId, setSelectedSectionId] = useState(
-    () => searchParams.get('sectionId') ?? savedAttendanceFilter(organizationId, 'sectionId'),
+    () =>
+      searchParams.get('sectionId') ??
+      savedAttendanceFilter(organizationId, 'sectionId'),
   );
   const [attendanceDate, setAttendanceDate] = useState(
-    () => searchParams.get('date') || savedAttendanceFilter(organizationId, 'date') || today(),
+    () =>
+      searchParams.get('date') ||
+      savedAttendanceFilter(organizationId, 'date') ||
+      today(),
   );
   const [studentStatusesById, setStudentStatusesById] = useState<
     Record<string, StudentAttendanceStatus | ''>
@@ -247,38 +262,87 @@ export function AttendanceDashboard() {
         ).values(),
       ]
     : (workspace.sections.data?.items ?? [])
-        .filter((item) => classes.some((classItem) => classItem.id === item.classId))
+        .filter((item) =>
+          classes.some((classItem) => classItem.id === item.classId),
+        )
         .map((item) => ({
           classId: item.classId,
-          className: classes.find((classItem) => classItem.id === item.classId)?.name ?? 'Class',
+          className:
+            classes.find((classItem) => classItem.id === item.classId)?.name ??
+            'Class',
           sectionId: item.id,
           sectionName: item.name,
         }));
   useEffect(() => {
     const ready = isTeacher
       ? teacherAssignmentsQuery.isSuccess
-      : workspace.campuses.isSuccess && workspace.years.isSuccess && workspace.classes.isSuccess && workspace.sections.isSuccess;
+      : workspace.campuses.isSuccess &&
+        workspace.years.isSuccess &&
+        workspace.classes.isSuccess &&
+        workspace.sections.isSuccess;
     if (!ready) return;
-    if (selectedCampusId && !campuses.some((item) => item.id === selectedCampusId)) setSelectedCampusId('');
-    if (selectedYearId && !years.some((item) => item.id === selectedYearId)) setSelectedYearId('');
-    if (selectedClassId && !classes.some((item) => item.id === selectedClassId)) setSelectedClassId('');
-    if (selectedSectionId && !sections.some((item) => item.id === selectedSectionId)) setSelectedSectionId('');
-  }, [isTeacher, teacherAssignmentsQuery.isSuccess, workspace.campuses.isSuccess, workspace.years.isSuccess, workspace.classes.isSuccess, workspace.sections.isSuccess, campuses, years, classes, sections, selectedCampusId, selectedYearId, selectedClassId, selectedSectionId]);
+    if (
+      selectedCampusId &&
+      !campuses.some((item) => item.id === selectedCampusId)
+    )
+      setSelectedCampusId('');
+    if (selectedYearId && !years.some((item) => item.id === selectedYearId))
+      setSelectedYearId('');
+    if (selectedClassId && !classes.some((item) => item.id === selectedClassId))
+      setSelectedClassId('');
+    if (
+      selectedSectionId &&
+      !sections.some((item) => item.id === selectedSectionId)
+    )
+      setSelectedSectionId('');
+  }, [
+    isTeacher,
+    teacherAssignmentsQuery.isSuccess,
+    workspace.campuses.isSuccess,
+    workspace.years.isSuccess,
+    workspace.classes.isSuccess,
+    workspace.sections.isSuccess,
+    campuses,
+    years,
+    classes,
+    sections,
+    selectedCampusId,
+    selectedYearId,
+    selectedClassId,
+    selectedSectionId,
+  ]);
 
   useEffect(() => {
     const next = new URLSearchParams(searchParams);
-    if (campusId) next.set('campusId', campusId); else next.delete('campusId');
-    if (academicYearId) next.set('academicYearId', academicYearId); else next.delete('academicYearId');
-    if (classId) next.set('classId', classId); else next.delete('classId');
-    if (sectionId) next.set('sectionId', sectionId); else next.delete('sectionId');
-    if (attendanceDate) next.set('date', attendanceDate); else next.delete('date');
-    if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
-  }, [campusId, academicYearId, classId, sectionId, attendanceDate, searchParams, setSearchParams]);
+    if (campusId) next.set('campusId', campusId);
+    else next.delete('campusId');
+    if (academicYearId) next.set('academicYearId', academicYearId);
+    else next.delete('academicYearId');
+    if (classId) next.set('classId', classId);
+    else next.delete('classId');
+    if (sectionId) next.set('sectionId', sectionId);
+    else next.delete('sectionId');
+    if (attendanceDate) next.set('date', attendanceDate);
+    else next.delete('date');
+    if (next.toString() !== searchParams.toString())
+      setSearchParams(next, { replace: true });
+  }, [
+    campusId,
+    academicYearId,
+    classId,
+    sectionId,
+    attendanceDate,
+    searchParams,
+    setSearchParams,
+  ]);
 
   useEffect(() => {
     const filtersReady = isTeacher
       ? teacherAssignmentsQuery.isSuccess
-      : workspace.campuses.isSuccess && workspace.years.isSuccess && workspace.classes.isSuccess && workspace.sections.isSuccess;
+      : workspace.campuses.isSuccess &&
+        workspace.years.isSuccess &&
+        workspace.classes.isSuccess &&
+        workspace.sections.isSuccess;
     if (!filtersReady || !organizationId) return;
     try {
       const values: Record<string, string> = {
@@ -289,8 +353,15 @@ export function AttendanceDashboard() {
         date: attendanceDate,
       };
       for (const [key, value] of Object.entries(values)) {
-        if (value) window.localStorage.setItem(`instituteos:attendance:${organizationId}:${key}`, value);
-        else window.localStorage.removeItem(`instituteos:attendance:${organizationId}:${key}`);
+        if (value)
+          window.localStorage.setItem(
+            `instituteos:attendance:${organizationId}:${key}`,
+            value,
+          );
+        else
+          window.localStorage.removeItem(
+            `instituteos:attendance:${organizationId}:${key}`,
+          );
       }
     } catch {
       // Keep attendance usable if browser storage is unavailable.
@@ -465,7 +536,8 @@ export function AttendanceDashboard() {
             Class
             <select
               onChange={(event) => {
-                const [nextClassId, nextSectionId] = event.target.value.split('::');
+                const [nextClassId, nextSectionId] =
+                  event.target.value.split('::');
                 setSelectedClassId(nextClassId ?? '');
                 setSelectedSectionId(nextSectionId ?? '');
               }}
@@ -771,10 +843,7 @@ export function AttendanceDashboard() {
                       Marked: {markedCount}
                     </span>
                   </div>
-                  <span
-                    aria-live="polite"
-                    className="attendance-summary-rate"
-                  >
+                  <span aria-live="polite" className="attendance-summary-rate">
                     Overall{' '}
                     <strong>
                       {attendancePercent === null
@@ -803,9 +872,21 @@ export function AttendanceDashboard() {
                     <table className="attendance-roster-table">
                       <thead>
                         <tr>
-                          <th scope="col">Student · {classes.find((item) => item.id === classId)?.name ?? 'Class'}-{sections.find((item) => item.id === sectionId)?.name ?? 'Section'}</th>
+                          <th scope="col">
+                            Student ·{' '}
+                            {classes.find((item) => item.id === classId)
+                              ?.name ?? 'Class'}
+                            -
+                            {sections.find((item) => item.id === sectionId)
+                              ?.name ?? 'Section'}
+                          </th>
                           <th scope="col">Mark attendance</th>
-                          <th className="attendance-reference-notes-column" scope="col">Notes</th>
+                          <th
+                            className="attendance-reference-notes-column"
+                            scope="col"
+                          >
+                            Notes
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
