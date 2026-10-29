@@ -6,12 +6,17 @@ export const SESSION_COOKIE = 'instituteos_session';
 export const CSRF_COOKIE = 'instituteos_csrf';
 const COOKIE_PATH = '/api/v1';
 
-function cookieOptions(httpOnly: boolean, path: string): CookieOptions {
+function cookieOptions(
+  httpOnly: boolean,
+  path: string,
+  domain?: string,
+): CookieOptions {
   return {
     httpOnly,
     secure: env.authCookieSecure,
     sameSite: 'strict',
     path,
+    ...(domain ? { domain } : {}),
   };
 }
 
@@ -41,7 +46,7 @@ export function setAuthCookies(
     expires: session.expiresAt,
   });
   response.cookie(CSRF_COOKIE, session.csrfToken, {
-    ...cookieOptions(false, '/'),
+    ...cookieOptions(false, '/', env.authCsrfCookieDomain),
     maxAge,
     expires: session.expiresAt,
   });
@@ -49,5 +54,8 @@ export function setAuthCookies(
 
 export function clearAuthCookies(response: Response): void {
   response.clearCookie(SESSION_COOKIE, cookieOptions(true, COOKIE_PATH));
-  response.clearCookie(CSRF_COOKIE, cookieOptions(false, '/'));
+  response.clearCookie(
+    CSRF_COOKIE,
+    cookieOptions(false, '/', env.authCsrfCookieDomain),
+  );
 }

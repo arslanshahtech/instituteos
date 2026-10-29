@@ -572,6 +572,7 @@ class MemoryPeopleRepository implements PeopleRepository {
     organizationId: string,
     applicationId: string,
     decisionReason?: string,
+    campusId?: string,
   ): Promise<{
     application: ApplicationRecord;
     student: StudentRecord;
@@ -586,14 +587,14 @@ class MemoryPeopleRepository implements PeopleRepository {
       lastName: application.lastName,
       contactEmail: application.email,
       phone: application.phone,
-      campusId: application.campusId,
+      campusId: campusId ?? application.campusId,
       status: 'active',
     });
     const enrollment: EnrollmentRecord = {
       id: `enrollment-${student.id}`,
       organizationId,
       studentId: student.id,
-      campusId: application.campusId,
+      campusId: campusId ?? application.campusId,
       gradeLevel: 'New admission',
       status: 'active',
       createdAt: new Date().toISOString(),
@@ -602,6 +603,7 @@ class MemoryPeopleRepository implements PeopleRepository {
     const approved = {
       ...application,
       status: 'approved',
+      campusId: campusId ?? application.campusId,
       decisionReason: decisionReason ?? 'Approved by admissions review',
       updatedAt: new Date().toISOString(),
     } as ApplicationRecord;
@@ -1069,6 +1071,7 @@ describe('people domain services', () => {
     const result = await service.reviewApplication('org-1', application.id, {
       status: 'approved',
       decisionReason: 'Qualified',
+      campusId: 'campus-1',
     });
 
     expect(result.student).toMatchObject({
@@ -1080,6 +1083,37 @@ describe('people domain services', () => {
       status: 'active',
     });
     expect(result.application.status).toBe('approved');
+  });
+
+  it('repairs a legacy approved application that has no converted student record', async () => {
+    const repository = new MemoryPeopleRepository();
+    const service = new PeopleService(repository);
+    const application = await service.createApplication('org-1', {
+      firstName: 'Nora',
+      lastName: 'Ali',
+      status: 'submitted',
+    });
+
+    // Simulate records approved by an older workflow that only changed status.
+    await repository.updateApplication('org-1', application.id, {
+      status: 'approved',
+    });
+
+    const result = await service.reviewApplication('org-1', application.id, {
+      status: 'approved',
+      campusId: 'campus-1',
+    });
+
+    expect(result.application.status).toBe('approved');
+    expect(result.student).toMatchObject({
+      firstName: 'Nora',
+      lastName: 'Ali',
+      status: 'active',
+    });
+    expect(result.enrollment).toMatchObject({
+      studentId: result.student?.id,
+      status: 'active',
+    });
   });
 
   it('supports inquiry search filters, closed status, linked applications, and campus isolation', async () => {

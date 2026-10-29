@@ -1,16 +1,39 @@
-import {
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-} from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
-import { ChevronDown } from 'lucide-react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import {
+  ArrowUpRight,
+  BarChart3,
+  CalendarCheck,
+  ChevronDown,
+  GraduationCap,
+  MapPin,
+  Mail,
+  Phone,
+  Plus,
+  Eye,
+  ReceiptText,
+  UserCheck,
+  UserPlus,
+  Users,
+  WalletCards,
+  X,
+} from 'lucide-react';
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import { ApiError } from '../../api/client.js';
+import {
+  WorkspaceMetricCard,
+  WorkspacePageHeading,
+  WorkspaceQuickAction,
+} from '../../components/ui/WorkspacePrimitives.js';
+import { listApplications } from '../../admissions/admissions-api.js';
+import type { ApplicationRecord } from '../../admissions/admissions-api.js';
+import { listStudentAttendance } from '../../attendance/attendance-api.js';
 import { useAuth } from '../../auth/AuthProvider.js';
 import { Button } from '../../components/ui/Button.js';
 import { Dialog } from '../../components/ui/Dialog.js';
@@ -24,7 +47,6 @@ import {
   acceptOrganizationInvitation,
   archiveOrganization,
   createCampus,
-  createOrganization,
   deleteOrganization,
   getAccessibleOrganizations,
   getCampuses,
@@ -39,6 +61,11 @@ import {
   updateOrganization,
 } from '../../organizations/organizations-api.js';
 import { getOrganizationAccessContext } from '../../tenancy/tenancy-api.js';
+import { listGuardians } from '../../guardians/guardians-api.js';
+import { listDailyCollections } from '../../finance/finance-api.js';
+import type { GuardianListResponse } from '../../guardians/guardians-api.js';
+import { useOrganizationSummary } from '../../reporting/reporting-api.js';
+import type { OrganizationSummary } from '../../reporting/reporting-api.js';
 import type {
   AccessibleOrganization,
   Campus,
@@ -135,11 +162,16 @@ export function MyOrganizationsPage({
   });
 
   useEffect(() => {
-    const active = (organizations.data?.organizations ?? []).filter(
+    const records = organizations.data?.organizations ?? [];
+    const active = records.filter(
       (organization) => organization.status === 'active',
     );
-    if (redirectSingle && active.length === 1)
-      navigate(`/admin/organizations/${active[0]!.id}`, { replace: true });
+    const hasArchived = records.some(
+      (organization) => organization.status === 'archived',
+    );
+    if (redirectSingle && active.length === 1 && !hasArchived) {
+      navigate('/admin/organizations/' + active[0]!.id, { replace: true });
+    }
   }, [navigate, organizations.data, redirectSingle]);
 
   if (organizations.isPending)
@@ -160,7 +192,11 @@ export function MyOrganizationsPage({
   const archivedOrganizations = accessible.filter(
     (organization) => organization.status === 'archived',
   );
-  if (redirectSingle && activeOrganizations.length === 1)
+  if (
+    redirectSingle &&
+    activeOrganizations.length === 1 &&
+    archivedOrganizations.length === 0
+  )
     return <LoadingState message="Opening your organization…" />;
 
   return (
@@ -170,29 +206,16 @@ export function MyOrganizationsPage({
           <p className="eyebrow">Workspace</p>
           <h1>Organizations</h1>
           <p className="page-description">
-            Open an organization you belong to or create a new workspace.
+            Open an organization assigned to your account. Contact your platform
+            administrator if you need access.
           </p>
         </div>
-        <Link
-          className="button button-primary"
-          to="/admin/organizations/onboarding"
-        >
-          Create organization
-        </Link>
       </section>
       {activeOrganizations.length === 0 &&
       archivedOrganizations.length === 0 ? (
         <EmptyState
-          title="No organizations yet"
-          description="Create an organization to set up your InstituteOS workspace."
-          action={
-            <Link
-              className="button button-primary"
-              to="/admin/organizations/onboarding"
-            >
-              Create organization
-            </Link>
-          }
+          title="No organization assigned"
+          description="Your account has not been assigned to an organization yet. Contact your InstituteOS platform administrator."
         />
       ) : activeOrganizations.length > 0 ? (
         <section
@@ -368,104 +391,117 @@ function roleLabel(role: string): string {
   return role.replaceAll('_', ' ');
 }
 
-export function OrganizationOnboardingPage() {
-  const navigate = useNavigate();
-  const [error, setError] = useState('');
-  const create = useMutation({
-    mutationFn: createOrganization,
-    onSuccess: ({ organization }) =>
-      navigate(`/admin/organizations/${organization.id}`),
-    onError: (reason) => setError(apiMessage(reason)),
-  });
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const name = String(form.get('name') ?? '').trim();
-    const campusName = String(form.get('campusName') ?? '').trim();
-    if (name.length < 2)
-      return setError('Organization name must be at least 2 characters.');
-    if (campusName && campusName.length < 2)
-      return setError('Campus name must be at least 2 characters.');
-    setError('');
-    create.mutate({
-      name,
-      contactEmail: String(form.get('contactEmail') ?? '').trim() || undefined,
-      phone: String(form.get('phone') ?? '').trim() || undefined,
-      timezone: String(form.get('timezone') ?? '').trim() || undefined,
-      ...(campusName ? { initialCampus: { name: campusName } } : {}),
-    });
-  }
-  return (
-    <main className="page-stack organization-admin-page">
-      <section className="page-heading">
-        <div>
-          <p className="eyebrow">Organization setup</p>
-          <h1>Create your organization</h1>
-          <p className="page-description">
-            You will become its first organization owner.
-          </p>
-        </div>
-      </section>
-      <form className="organization-form" onSubmit={submit}>
-        <label>
-          Organization name
-          <input name="name" required minLength={2} maxLength={160} />
-        </label>
-        <label>
-          Contact email
-          <input name="contactEmail" type="email" maxLength={254} />
-        </label>
-        <label>
-          Phone
-          <input name="phone" maxLength={40} />
-        </label>
-        <label>
-          Timezone
-          <input name="timezone" placeholder="UTC" maxLength={80} />
-        </label>
-        <label>
-          Initial campus name <span className="field-hint">Optional</span>
-          <input name="campusName" maxLength={160} />
-        </label>
-        {error && (
-          <p role="alert" className="form-error">
-            {error}
-          </p>
-        )}
-        <Button type="submit" disabled={create.isPending}>
-          {create.isPending ? 'Creating…' : 'Create organization'}
-        </Button>
-      </form>
-    </main>
-  );
-}
-
 type AdminTab =
   'overview' | 'settings' | 'campuses' | 'members' | 'invitations';
 
+function parseAdminTab(value: string | null): AdminTab {
+  return value === 'settings' ||
+    value === 'campuses' ||
+    value === 'members' ||
+    value === 'invitations'
+    ? value
+    : 'overview';
+}
+
 export function OrganizationAdminPage() {
   const { organizationId = '' } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const auth = useAuth();
-  const [tab, setTab] = useState<AdminTab>('overview');
+  const [tab, setTab] = useState<AdminTab>(() =>
+    parseAdminTab(searchParams.get('tab')),
+  );
   const [notice, setNotice] = useState('');
+  useEffect(() => {
+    setTab(parseAdminTab(searchParams.get('tab')));
+  }, [searchParams]);
   const access = useQuery({
     queryKey: ['organization-context', organizationId],
     queryFn: () => getOrganizationAccessContext(organizationId),
     enabled: Boolean(organizationId),
     retry: false,
   });
-  const accessibleOrganizations = useQuery({
-    queryKey: ['accessible-organizations'],
-    queryFn: getAccessibleOrganizations,
-    enabled: Boolean(access.data),
-    retry: false,
-  });
+
   const dashboard = useQuery({
     queryKey: ['organization-dashboard', organizationId],
     queryFn: () => getOrganizationDashboard(organizationId),
     enabled: Boolean(organizationId && access.data),
+    retry: false,
+  });
+  const summary = useOrganizationSummary(
+    organizationId,
+    undefined,
+    Boolean(organizationId && access.data && tab === 'overview'),
+  );
+  const guardians = useQuery({
+    queryKey: ['organization-guardian-count', organizationId],
+    queryFn: () => listGuardians(organizationId, { page: 1, pageSize: 1 }),
+    enabled: Boolean(
+      organizationId &&
+      access.data?.permissions.includes('guardian.read') &&
+      tab === 'overview',
+    ),
+    retry: false,
+  });
+  const collectionRange = useMemo(() => {
+    const now = new Date();
+    const key = (date: Date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { dateFrom: key(monthStart), dateTo: key(now) };
+  }, []);
+  const monthlyCollections = useQuery({
+    queryKey: [
+      'organization-dashboard-monthly-collections',
+      organizationId,
+      collectionRange.dateFrom,
+      collectionRange.dateTo,
+    ],
+    queryFn: () => listDailyCollections(organizationId, collectionRange),
+    enabled: Boolean(
+      organizationId &&
+      access.data?.permissions.includes('finance.read') &&
+      tab === 'overview',
+    ),
+    retry: false,
+  });
+  const attendanceRange = useMemo(() => {
+    const dateTo = new Date();
+    const dateFrom = new Date(dateTo);
+    dateFrom.setDate(dateTo.getDate() - 6);
+    const toKey = (date: Date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return { dateFrom: toKey(dateFrom), dateTo: toKey(dateTo) };
+  }, []);
+  const recentAdmissions = useQuery({
+    queryKey: ['organization-dashboard-recent-admissions', organizationId],
+    queryFn: () =>
+      listApplications(organizationId, {
+        search: '',
+        page: 1,
+        pageSize: 3,
+      }),
+    enabled: Boolean(
+      organizationId &&
+      access.data?.permissions.includes('admission.read') &&
+      tab === 'overview',
+    ),
+    retry: false,
+  });
+  const weeklyAttendance = useQuery({
+    queryKey: [
+      'organization-dashboard-weekly-attendance',
+      organizationId,
+      attendanceRange.dateFrom,
+      attendanceRange.dateTo,
+    ],
+    queryFn: () => listStudentAttendance(organizationId, attendanceRange),
+    enabled: Boolean(
+      organizationId &&
+      access.data?.permissions.includes('attendance.read') &&
+      tab === 'overview',
+    ),
     retry: false,
   });
   const campuses = useQuery({
@@ -529,6 +565,7 @@ export function OrganizationAdminPage() {
     access.data?.permissions.includes('member.read') ?? false;
   const canInvite = access.data?.permissions.includes('member.invite') ?? false;
   const canAssignOwner = access.data?.role === 'organization_owner';
+  const organizationPath = `/admin/organizations/${encodeURIComponent(organizationId)}`;
 
   useEffect(() => {
     const accessUnavailable =
@@ -552,64 +589,96 @@ export function OrganizationAdminPage() {
 
   return (
     <main className="page-stack organization-admin-page">
-      <section className="page-heading organization-heading">
-        <div>
-          <p className="eyebrow">
-            Organization workspace · {access.data.role.replaceAll('_', ' ')}
-          </p>
-          <h1>{dashboard.data?.organization.name ?? 'Organization'}</h1>
-          <p className="page-description organization-user-meta">
-            Signed in as {auth.user?.displayName ?? 'current user'}.
-          </p>
-          {accessibleOrganizations.data?.organizations.some(
-            (organization) => organization.id === organizationId,
-          ) && (
-            <label
-              className="organization-switcher"
-              htmlFor="organization-switcher"
-            >
-              <span>Current organization</span>
-              <div className="organization-switcher-control">
-                <select
-                  id="organization-switcher"
-                  aria-label="Current organization"
-                  value={organizationId}
-                  onChange={(event) =>
-                    navigate(
-                      `/admin/organizations/${encodeURIComponent(event.target.value)}`,
-                    )
-                  }
-                >
-                  {accessibleOrganizations.data.organizations
-                    .filter((organization) => organization.status === 'active')
-                    .map((organization) => (
-                      <option key={organization.id} value={organization.id}>
-                        {organization.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-            </label>
-          )}
-        </div>
-        <div className="organization-heading-actions">
-          <Link
-            className="button button-secondary"
-            to="/admin/organizations/onboarding"
+      <WorkspacePageHeading
+        className="organization-heading"
+        eyebrow={`Organization workspace · ${access.data.role.replaceAll('_', ' ')}`}
+        title="Institute Overview"
+        description={`${dashboard.data?.organization.name ?? 'Your college'} · Welcome back, ${auth.user?.displayName ?? 'there'}.`}
+      />
+      {tab === 'overview' && (
+        <nav
+          aria-label="College quick actions"
+          className="reference-quick-actions"
+        >
+          {(
+            [
+              {
+                label: 'Add Student',
+                to: `${organizationPath}/students/new`,
+                permission: 'student.create',
+                icon: UserPlus,
+              },
+              {
+                label: 'Collect Fee',
+                to: `${organizationPath}/finance`,
+                permission: 'finance.write',
+                icon: WalletCards,
+              },
+              {
+                label: 'Mark Attendance',
+                to: `${organizationPath}/attendance`,
+                permission: 'attendance.write',
+                icon: CalendarCheck,
+              },
+              {
+                label: 'Generate Report',
+                to: `${organizationPath}/reports`,
+                permission: 'reporting.read',
+                icon: BarChart3,
+              },
+            ] as const
+          ).map((action) => {
+            const Icon = action.icon;
+            const permitted = access.data.permissions.includes(
+              action.permission,
+            );
+            return permitted ? (
+              <WorkspaceQuickAction key={action.label} {...action} />
+            ) : (
+              <span
+                aria-disabled="true"
+                className="organization-dashboard-action reference-quick-action is-unavailable"
+                key={action.label}
+                title={`Your current role does not have permission to: ${action.label.toLowerCase()}.`}
+              >
+                <Icon size={14} aria-hidden="true" />
+                {action.label}
+              </span>
+            );
+          })}
+        </nav>
+      )}
+      <>
+        <label className="organization-section-selector">
+          <span>Organization section</span>
+          <select
+            aria-label="Organization section"
+            value={tab}
+            onChange={(event) => {
+              const nextTab = event.target.value as AdminTab;
+              setTab(nextTab);
+              setSearchParams(nextTab === 'overview' ? {} : { tab: nextTab });
+              setNotice('');
+            }}
           >
-            Add organization
-          </Link>
-        </div>
-      </section>
-      <label className="organization-section-selector">
-        <span>Organization section</span>
-        <select
-          aria-label="Organization section"
-          value={tab}
-          onChange={(event) => {
-            setTab(event.target.value as AdminTab);
-            setNotice('');
-          }}
+            {(
+              [
+                'overview',
+                'settings',
+                'campuses',
+                'members',
+                'invitations',
+              ] as const
+            ).map((item) => (
+              <option key={item} value={item}>
+                {item[0]!.toUpperCase() + item.slice(1)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <nav
+          className="organization-tabs"
+          aria-label="Organization administration"
         >
           {(
             [
@@ -620,44 +689,38 @@ export function OrganizationAdminPage() {
               'invitations',
             ] as const
           ).map((item) => (
-            <option key={item} value={item}>
-              {item[0]!.toUpperCase() + item.slice(1)}
-            </option>
+            <button
+              key={item}
+              type="button"
+              aria-current={tab === item ? 'page' : undefined}
+              onClick={() => {
+                setTab(item);
+                setSearchParams(item === 'overview' ? {} : { tab: item });
+                setNotice('');
+              }}
+            >
+              {item}
+            </button>
           ))}
-        </select>
-      </label>
-      <nav
-        className="organization-tabs"
-        aria-label="Organization administration"
-      >
-        {(
-          [
-            'overview',
-            'settings',
-            'campuses',
-            'members',
-            'invitations',
-          ] as const
-        ).map((item) => (
-          <button
-            key={item}
-            type="button"
-            aria-current={tab === item ? 'page' : undefined}
-            onClick={() => {
-              setTab(item);
-              setNotice('');
-            }}
-          >
-            {item}
-          </button>
-        ))}
-      </nav>
+        </nav>
+      </>
       {notice && (
         <p role="status" className="success-note">
           {notice}
         </p>
       )}
-      {tab === 'overview' && <OverviewPanel dashboard={dashboard} />}
+      {tab === 'overview' && (
+        <OverviewPanel
+          dashboard={dashboard}
+          summary={summary}
+          guardians={guardians}
+          recentAdmissions={recentAdmissions}
+          weeklyAttendance={weeklyAttendance}
+          attendanceRange={attendanceRange}
+          monthlyCollections={monthlyCollections}
+          collectionRange={collectionRange}
+        />
+      )}
       {tab === 'settings' && (
         <SettingsPanel
           organizationId={organizationId}
@@ -691,51 +754,325 @@ export function OrganizationAdminPage() {
       )}
       {tab === 'invitations' && !canManageMembers && <PermissionDeniedState />}
       {tab === 'invitations' && canManageMembers && (
-        <InvitationsPanel query={invitations} canInvite={canInvite} />
+        <InvitationsPanel
+          organizationId={organizationId}
+          query={invitations}
+          canInvite={canInvite}
+        />
       )}
     </main>
   );
 }
 
+function formatPKR(value: string | number | undefined): string {
+  if (value === undefined || value === null || value === '') return '—';
+  const amount = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(amount)) return '—';
+  return `Rs ${new Intl.NumberFormat('en-PK', { maximumFractionDigits: 0 }).format(amount)}`;
+}
+
+function getWeekDays(endDate: string) {
+  const anchor = new Date(`${endDate}T12:00:00`);
+  const days: Array<{ key: string; label: string; fullLabel: string }> = [];
+  for (let daysBack = 6; daysBack >= 0; daysBack -= 1) {
+    const date = new Date(anchor);
+    date.setDate(anchor.getDate() - daysBack);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    days.push({
+      key,
+      label: date.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1),
+      fullLabel: date.toLocaleDateString('en-PK', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'short',
+      }),
+    });
+  }
+  return days;
+}
+
+function formatDateShort(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? 'Date unavailable'
+    : date.toLocaleDateString('en-PK', { day: 'numeric', month: 'short' });
+}
+
+function formatApplicationStatus(value: ApplicationRecord['status']) {
+  const labels: Record<ApplicationRecord['status'], string> = {
+    draft: 'Draft',
+    submitted: 'Pending',
+    in_review: 'In review',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    admitted: 'Enrolled',
+  };
+  return labels[value];
+}
+
 function OverviewPanel({
   dashboard,
+  summary,
+  guardians,
+  recentAdmissions,
+  weeklyAttendance,
+  attendanceRange,
+  monthlyCollections,
+  collectionRange,
 }: {
   dashboard: UseQueryResult<OrganizationDashboard>;
+  summary: UseQueryResult<{ summary: OrganizationSummary }>;
+  guardians: UseQueryResult<GuardianListResponse>;
+  recentAdmissions: UseQueryResult<
+    Awaited<ReturnType<typeof listApplications>>
+  >;
+  weeklyAttendance: UseQueryResult<
+    Awaited<ReturnType<typeof listStudentAttendance>>
+  >;
+  attendanceRange: { dateFrom: string; dateTo: string };
+  monthlyCollections: UseQueryResult<
+    Awaited<ReturnType<typeof listDailyCollections>>
+  >;
+  collectionRange: { dateFrom: string; dateTo: string };
 }) {
   const data = dashboard.data;
   if (dashboard.isPending)
-    return <LoadingState message="Loading organization data…" />;
+    return <LoadingState message="Loading college overview…" />;
   if (dashboard.isError || !data)
     return (
       <ErrorState
-        title="Dashboard unavailable"
-        description="Organization information could not be loaded."
+        title="College overview unavailable"
+        description="Your college information could not be loaded."
         onRetry={() => void dashboard.refetch()}
       />
     );
+
+  const totals = summary.data?.summary;
+  const monthlyCollectionTotal = (monthlyCollections.data?.items ?? []).reduce(
+    (sum, item) => sum + item.amountCollected,
+    0,
+  );
+  const weekDays = getWeekDays(attendanceRange.dateTo);
+  const attendanceItems = weeklyAttendance.data?.items ?? [];
+  const dailyAttendance = weekDays.map((day) => {
+    const records = attendanceItems.filter(
+      (record) => record.date.slice(0, 10) === day.key,
+    );
+    const attended = records.filter(
+      (record) => record.status === 'present',
+    ).length;
+    return {
+      ...day,
+      rate: records.length ? Math.round((attended / records.length) * 100) : 0,
+      count: records.length,
+    };
+  });
+  const recordedDays = dailyAttendance.filter((day) => day.count > 0);
+  const weeklyRate = recordedDays.length
+    ? Math.round(
+        recordedDays.reduce((sum, day) => sum + day.rate, 0) /
+          recordedDays.length,
+      )
+    : null;
+
   return (
     <section
-      className="organization-overview"
-      aria-label="Organization overview"
+      className="organization-overview admin-dashboard reference-dashboard-preview"
+      aria-label="College overview"
     >
-      <div className="organization-facts">
-        <article>
-          <span>Active campuses</span>
-          <strong>{data.counts.campuses}</strong>
-        </article>
-        <article>
-          <span>Active members</span>
-          <strong>{data.counts.members}</strong>
-        </article>
-        <article>
-          <span>Setup</span>
-          <strong>{data.setupComplete ? 'Ready' : 'Add a campus'}</strong>
-        </article>
+      <div className="admin-metrics-grid reference-metrics-grid">
+        {[
+          {
+            label: 'Active students',
+            value: totals
+              ? totals.activeStudentCount.toLocaleString('en-PK')
+              : '—',
+            detail: 'Currently enrolled learners',
+            icon: Users,
+          },
+          {
+            label: 'Staff & teachers',
+            value: totals
+              ? totals.activeStaffCount.toLocaleString('en-PK')
+              : '—',
+            detail: 'Active college staff',
+            icon: GraduationCap,
+          },
+          {
+            label: 'Guardians',
+            value: guardians.data
+              ? guardians.data.total.toLocaleString('en-PK')
+              : '—',
+            detail: 'Guardian records in your college',
+            icon: UserCheck,
+          },
+          {
+            label: 'Monthly collection',
+            value:
+              monthlyCollections.isPending || monthlyCollections.isError
+                ? '—'
+                : formatPKR(monthlyCollectionTotal),
+            detail: monthlyCollections.isError
+              ? 'Monthly receipts unavailable'
+              : `${collectionRange.dateFrom} to ${collectionRange.dateTo}`,
+            icon: ReceiptText,
+          },
+          {
+            label: 'Outstanding dues',
+            value: formatPKR(totals?.finance.totalPending),
+            detail: totals
+              ? 'Overdue: ' + formatPKR(totals.finance.totalOverdue)
+              : 'Dues load from college finance records',
+            icon: WalletCards,
+          },
+          {
+            label: 'Today’s attendance',
+            value:
+              typeof totals?.attendance.todayAttendanceRate === 'number'
+                ? String(totals.attendance.todayAttendanceRate) + '%'
+                : '—',
+            detail: totals
+              ? String(totals.attendance.recordsCount.toLocaleString('en-PK')) +
+                ' attendance records'
+              : 'Attendance summary',
+            icon: CalendarCheck,
+          },
+        ].map((metric) => (
+          <WorkspaceMetricCard key={metric.label} metric={metric} />
+        ))}
       </div>
-      {!data.setupComplete && (
-        <p className="setup-note">
-          Organization setup is ready. Add an initial campus to complete the
-          basics.
+      <div className="admin-overview-bottom reference-dashboard-bottom">
+        <section
+          aria-labelledby="admin-recent-admissions-title"
+          className="admin-activity-panel reference-dashboard-panel"
+        >
+          <div className="admin-panel-heading reference-panel-heading">
+            <div>
+              <h2 id="admin-recent-admissions-title">Recent admissions</h2>
+              <p>Latest applications received by the college</p>
+            </div>
+            {data.organization.id && (
+              <Link
+                className="admin-panel-link reference-view-all"
+                to={`/admin/organizations/${encodeURIComponent(data.organization.id)}/admissions`}
+              >
+                View all <ArrowUpRight size={14} aria-hidden="true" />
+              </Link>
+            )}
+          </div>
+          {recentAdmissions.isPending ? (
+            <LoadingState message="Loading recent applications…" />
+          ) : recentAdmissions.isError ? (
+            <p className="admin-inline-message" role="status">
+              Recent applications are temporarily unavailable.
+            </p>
+          ) : (recentAdmissions.data?.items.length ?? 0) === 0 ? (
+            <div className="admin-inline-empty">
+              <span className="admin-inline-empty-mark" aria-hidden="true">
+                <GraduationCap size={17} />
+              </span>
+              <div>
+                <strong>No recent applications</strong>
+                <p>
+                  New applicants will appear here when the college receives
+                  them.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="admin-recent-list reference-activity-list">
+              {recentAdmissions.data!.items.slice(0, 3).map((application) => (
+                <Link
+                  className="admin-recent-row reference-activity-row"
+                  key={application.id}
+                  to={`/admin/organizations/${encodeURIComponent(data.organization.id)}/admissions/applications/${encodeURIComponent(application.id)}`}
+                >
+                  <span className="admin-recent-avatar" aria-hidden="true">
+                    {(
+                      application.firstName.trim().charAt(0) || 'A'
+                    ).toUpperCase()}
+                    {(
+                      application.lastName.trim().charAt(0) || ''
+                    ).toUpperCase()}
+                  </span>
+                  <span className="admin-recent-copy reference-activity-copy">
+                    <strong>
+                      {application.firstName} {application.lastName}
+                    </strong>
+                    <small>
+                      {application.program || 'Application'} ·{' '}
+                      {formatDateShort(application.createdAt)}
+                    </small>
+                  </span>
+                  <span
+                    className={`admin-status-pill admin-status-${application.status} reference-status reference-status-${application.status === 'admitted' ? 'enrolled' : application.status === 'approved' ? 'approved' : application.status === 'rejected' ? 'info' : 'pending'}`}
+                  >
+                    {formatApplicationStatus(application.status)}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section
+          aria-labelledby="admin-weekly-attendance-title"
+          className="admin-activity-panel admin-attendance-panel reference-dashboard-panel"
+        >
+          <div className="admin-panel-heading reference-panel-heading">
+            <div>
+              <h2 id="admin-weekly-attendance-title">Attendance · This week</h2>
+              <p>Daily student attendance records</p>
+            </div>
+          </div>
+          {weeklyAttendance.isPending ? (
+            <LoadingState message="Loading attendance…" />
+          ) : weeklyAttendance.isError ? (
+            <p className="admin-inline-message" role="status">
+              Weekly attendance is temporarily unavailable.
+            </p>
+          ) : (
+            <>
+              <div
+                aria-label="Daily student attendance rate for the last seven days"
+                className="admin-weekly-bars reference-chart-bars"
+                role="img"
+              >
+                {dailyAttendance.map((day) => (
+                  <div
+                    className="admin-weekly-day reference-chart-day"
+                    key={day.key}
+                  >
+                    <div
+                      className="admin-weekly-track reference-chart-track"
+                      title={`${day.fullLabel}: ${day.count ? `${day.rate}% attendance` : 'No records'}`}
+                    >
+                      <span
+                        className="admin-weekly-fill reference-chart-fill"
+                        style={{ height: `${day.rate}%` }}
+                      />
+                    </div>
+                    <span className="admin-weekly-label">{day.label}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="admin-weekly-summary reference-chart-summary">
+                <span
+                  className="admin-weekly-summary-dot reference-chart-status-dot"
+                  aria-hidden="true"
+                />
+                {weeklyRate === null
+                  ? `No attendance records from ${attendanceRange.dateFrom} to ${attendanceRange.dateTo}`
+                  : `${weeklyRate}% average · ${recordedDays.length} day${recordedDays.length === 1 ? '' : 's'} with records`}
+              </div>
+            </>
+          )}
+        </section>
+      </div>
+      {(summary.isError || guardians.isError) && (
+        <p className="admin-data-note" role="status">
+          Some overview totals are temporarily unavailable. No sample figures
+          are being substituted; open the relevant module to review its records.
         </p>
       )}
     </section>
@@ -756,11 +1093,16 @@ function SettingsPanel({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [logoDataUrl, setLogoDataUrl] = useState('');
+  const [logoError, setLogoError] = useState('');
   const query = useQuery({
     queryKey: ['organization-profile', organizationId],
     queryFn: () => getOrganizationDashboard(organizationId),
     retry: false,
   });
+  useEffect(() => {
+    if (query.data) setLogoDataUrl(query.data.organization.logoDataUrl ?? '');
+  }, [query.data]);
   const save = useMutation({
     mutationFn: (input: Parameters<typeof updateOrganization>[1]) =>
       updateOrganization(organizationId, input),
@@ -797,8 +1139,16 @@ function SettingsPanel({
         onSubmit={(event) => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
+          setLogoError('');
           save.mutate({
             name: String(form.get('name')),
+            adminName: String(form.get('adminName') || '').trim() || undefined,
+            shortCode:
+              String(form.get('shortCode') || '')
+                .trim()
+                .toUpperCase() || undefined,
+            tagline: String(form.get('tagline') || '').trim() || undefined,
+            logoDataUrl,
             contactEmail: String(form.get('contactEmail')) || undefined,
             phone: String(form.get('phone')) || undefined,
             timezone: String(form.get('timezone')) || undefined,
@@ -820,6 +1170,106 @@ function SettingsPanel({
             maxLength={160}
           />
         </label>
+        <label>
+          Organization admin name
+          <input
+            name="adminName"
+            defaultValue={organization.adminName ?? ''}
+            placeholder="Person responsible for this institute"
+            maxLength={120}
+          />
+        </label>
+        <label>
+          Organization short code
+          <input
+            name="shortCode"
+            defaultValue={organization.shortCode ?? ''}
+            placeholder="e.g. BFA"
+            maxLength={24}
+            pattern="[A-Za-z0-9-]+"
+            title="Use letters, numbers or hyphens."
+          />
+        </label>
+        <label>
+          Tagline
+          <input
+            name="tagline"
+            defaultValue={organization.tagline ?? ''}
+            placeholder="A short line about your institution"
+            maxLength={180}
+          />
+        </label>
+        <div className="organization-logo-field">
+          <span className="organization-logo-label">Organization logo</span>
+          <div className="organization-logo-control">
+            <div
+              className="organization-logo-preview"
+              aria-label="Organization logo preview"
+            >
+              {logoDataUrl ? (
+                <img src={logoDataUrl} alt="Organization logo preview" />
+              ) : (
+                <GraduationCap size={24} aria-hidden="true" />
+              )}
+            </div>
+            <div className="organization-logo-actions">
+              <label className="button button-secondary organization-logo-upload">
+                Choose image
+                <input
+                  aria-label="Upload organization logo"
+                  accept="image/png,image/jpeg,image/webp"
+                  type="file"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    if (
+                      !['image/png', 'image/jpeg', 'image/webp'].includes(
+                        file.type,
+                      )
+                    ) {
+                      setLogoError('Choose a PNG, JPG or WebP image.');
+                      event.target.value = '';
+                      return;
+                    }
+                    if (file.size > 350 * 1024) {
+                      setLogoError('Logo must be 350 KB or smaller.');
+                      event.target.value = '';
+                      return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      if (typeof reader.result === 'string')
+                        setLogoDataUrl(reader.result);
+                    };
+                    reader.onerror = () =>
+                      setLogoError(
+                        'Could not read this image. Please try another file.',
+                      );
+                    reader.readAsDataURL(file);
+                    setLogoError('');
+                  }}
+                />
+              </label>
+              <span className="organization-logo-help">
+                PNG, JPG or WebP · up to 350 KB
+              </span>
+              {logoDataUrl && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setLogoDataUrl('')}
+                >
+                  Remove logo
+                </Button>
+              )}
+            </div>
+          </div>
+          {logoError && (
+            <p className="form-error" role="alert">
+              {logoError}
+            </p>
+          )}
+        </div>
         <label>
           Contact email
           <input
@@ -950,7 +1400,8 @@ function CampusesPanel({
   onDone: (message: string) => Promise<void>;
 }) {
   const [name, setName] = useState('');
-  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [createOpen, setCreateOpen] = useState(false);
+  const [selectedCampusId, setSelectedCampusId] = useState<string | null>(null);
   const create = useMutation({
     mutationFn: (input: {
       name: string;
@@ -960,6 +1411,7 @@ function CampusesPanel({
     }) => createCampus(organizationId, input),
     onSuccess: async () => {
       setName('');
+      setCreateOpen(false);
       await onDone('Campus created.');
     },
   });
@@ -996,24 +1448,36 @@ function CampusesPanel({
         onRetry={() => void query.refetch()}
       />
     );
-  const list = query.data?.campuses;
+  const list = query.data?.campuses ?? [];
+  const selectedCampus = list.find((campus) => campus.id === selectedCampusId);
   return (
-    <section className="organization-section">
-      <div className="section-heading">
+    <section className="organization-section campus-management">
+      <div className="campus-panel-heading">
         <div>
+          <p className="eyebrow">Organization locations</p>
           <h2>Campuses</h2>
-          <p>Manage the locations attached to this organization.</p>
+          <p>Manage each campus and its contact details in one place.</p>
         </div>
+        {canCreate && (
+          <Button
+            variant="primary"
+            onClick={() => setCreateOpen((open) => !open)}
+            type="button"
+          >
+            <Plus size={16} aria-hidden="true" />
+            {createOpen ? 'Cancel' : 'New campus'}
+          </Button>
+        )}
       </div>
-      {canCreate && (
+      {createOpen && canCreate && (
         <form
-          className="inline-form"
+          className="campus-create-form"
           onSubmit={(event) => {
             event.preventDefault();
             if (name.trim().length >= 2) {
               const form = new FormData(event.currentTarget);
               create.mutate({
-                name,
+                name: name.trim(),
                 phone: String(form.get('phone') || '') || undefined,
                 email: String(form.get('email') || '') || undefined,
                 address: {
@@ -1025,173 +1489,282 @@ function CampusesPanel({
             }
           }}
         >
-          <label htmlFor="campus-name">
-            New campus
-            <input
-              id="campus-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              minLength={2}
-              maxLength={160}
-            />
-          </label>
-          <label>
-            Contact phone
-            <input name="phone" maxLength={40} />
-          </label>
-          <label>
-            Contact email
-            <input name="email" type="email" maxLength={254} />
-          </label>
-          <label>
-            Address
-            <input name="line1" maxLength={160} />
-          </label>
-          <label>
-            City
-            <input name="city" maxLength={100} />
-          </label>
-          <label>
-            Country
-            <input name="country" maxLength={100} />
-          </label>
-          <Button type="submit" disabled={create.isPending}>
-            Add campus
-          </Button>
+          <div className="campus-form-grid">
+            <label htmlFor="campus-name">
+              Campus name
+              <input
+                id="campus-name"
+                name="name"
+                required
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                minLength={2}
+                maxLength={160}
+              />
+            </label>
+            <label>
+              Contact email
+              <input name="email" type="email" maxLength={254} />
+            </label>
+            <label>
+              Contact phone
+              <input name="phone" maxLength={40} />
+            </label>
+            <label>
+              Address
+              <input name="line1" maxLength={160} />
+            </label>
+            <label>
+              City
+              <input name="city" maxLength={100} />
+            </label>
+            <label>
+              Country
+              <input name="country" maxLength={100} />
+            </label>
+          </div>
+          {create.isError && (
+            <p className="form-error" role="alert">
+              {apiMessage(create.error)}
+            </p>
+          )}
+          <div className="campus-form-actions">
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => setCreateOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={create.isPending}>
+              {create.isPending ? 'Creating…' : 'Add campus'}
+            </Button>
+          </div>
         </form>
       )}
-      {!list?.length ? (
+      {!list.length ? (
         <EmptyState
           title="No campuses yet"
-          description="Add a campus when you are ready to organize locations."
+          description="Create a campus when your organization needs another location."
         />
       ) : (
-        <div className="organization-list">
-          {list.map((campus) => (
-            <article key={campus.id} className="organization-row">
-              <div>
-                <strong>{campus.name}</strong>
-                <span>{campus.status}</span>
-              </div>
-              <div className="member-controls">
-                {canUpdate && (
-                  <>
-                    <input
-                      aria-label={`Name for ${campus.name}`}
-                      value={edits[campus.id] ?? campus.name}
-                      onChange={(event) =>
-                        setEdits({ ...edits, [campus.id]: event.target.value })
-                      }
-                    />
-                    <Button
-                      variant="secondary"
-                      onClick={() =>
-                        rename.mutate({
-                          campus,
-                          nextName: edits[campus.id] ?? campus.name,
-                        })
-                      }
+        <div className="campus-list" aria-label="Organization campuses">
+          {list.map((campus) => {
+            const location = [
+              campus.address?.line1,
+              campus.address?.city,
+              campus.address?.country,
+            ]
+              .filter(Boolean)
+              .join(', ');
+            return (
+              <article key={campus.id} className="campus-list-row">
+                <span className="campus-list-mark" aria-hidden="true">
+                  <GraduationCap size={19} />
+                </span>
+                <div className="campus-list-main">
+                  <div className="campus-list-title">
+                    <h3>{campus.name}</h3>
+                    <span
+                      className={`campus-status-pill ${campus.status === 'active' ? 'is-active' : 'is-inactive'}`}
                     >
-                      Save
-                    </Button>
-                    <details>
-                      <summary>Contact details</summary>
-                      <form
-                        className="organization-form"
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          const form = new FormData(event.currentTarget);
-                          updateContact.mutate({
-                            campus,
-                            changes: {
-                              phone:
-                                String(form.get('phone') || '') || undefined,
-                              email:
-                                String(form.get('email') || '') || undefined,
-                              address: {
-                                line1: String(form.get('line1') || ''),
-                                city: String(form.get('city') || ''),
-                                country: String(form.get('country') || ''),
-                              },
-                            },
-                          });
-                        }}
-                      >
-                        <label>
-                          Phone
-                          <input
-                            name="phone"
-                            defaultValue={campus.phone ?? ''}
-                            maxLength={40}
-                          />
-                        </label>
-                        <label>
-                          Email
-                          <input
-                            name="email"
-                            type="email"
-                            defaultValue={campus.email ?? ''}
-                            maxLength={254}
-                          />
-                        </label>
-                        <label>
-                          Address
-                          <input
-                            name="line1"
-                            defaultValue={campus.address?.line1 ?? ''}
-                            maxLength={160}
-                          />
-                        </label>
-                        <label>
-                          City
-                          <input
-                            name="city"
-                            defaultValue={campus.address?.city ?? ''}
-                            maxLength={100}
-                          />
-                        </label>
-                        <label>
-                          Country
-                          <input
-                            name="country"
-                            defaultValue={campus.address?.country ?? ''}
-                            maxLength={100}
-                          />
-                        </label>
-                        <Button type="submit">Save contact details</Button>
-                      </form>
-                    </details>
-                  </>
-                )}
-                {canChangeStatus && (
+                      {campus.status}
+                    </span>
+                  </div>
+                  <p className="campus-list-location">
+                    <MapPin size={14} aria-hidden="true" />
+                    {location || 'Location not added'}
+                  </p>
+                  <div className="campus-list-contact">
+                    {campus.email && (
+                      <span>
+                        <Mail size={13} aria-hidden="true" />
+                        {campus.email}
+                      </span>
+                    )}
+                    {campus.phone && (
+                      <span>
+                        <Phone size={13} aria-hidden="true" />
+                        {campus.phone}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="campus-list-actions">
                   <Button
                     variant="secondary"
-                    onClick={() =>
-                      save.mutate({
-                        campus,
-                        status:
-                          campus.status === 'active' ? 'inactive' : 'active',
-                      })
-                    }
+                    onClick={() => setSelectedCampusId(campus.id)}
+                    type="button"
                   >
-                    {campus.status === 'active' ? 'Deactivate' : 'Activate'}
+                    <Eye size={15} aria-hidden="true" />
+                    View
                   </Button>
-                )}
-              </div>
-            </article>
-          ))}
+                  {canChangeStatus && (
+                    <Button
+                      variant="quiet"
+                      onClick={() =>
+                        save.mutate({
+                          campus,
+                          status:
+                            campus.status === 'active' ? 'inactive' : 'active',
+                        })
+                      }
+                      type="button"
+                    >
+                      {campus.status === 'active' ? 'Deactivate' : 'Activate'}
+                    </Button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
-      {(create.isError ||
-        save.isError ||
-        rename.isError ||
-        updateContact.isError) && (
+      {(save.isError || rename.isError || updateContact.isError) && (
         <p role="alert" className="form-error">
-          {apiMessage(
-            create.error ?? save.error ?? rename.error ?? updateContact.error,
-          )}
+          {apiMessage(save.error ?? rename.error ?? updateContact.error)}
         </p>
       )}
+      <Dialog
+        open={Boolean(selectedCampus)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedCampusId(null);
+        }}
+        title={selectedCampus?.name ?? 'Campus details'}
+        description="Review campus details and update its name or contact information."
+      >
+        {selectedCampus && (
+          <div className="campus-detail-dialog">
+            <div className="campus-detail-summary">
+              <span
+                className={`campus-status-pill ${selectedCampus.status === 'active' ? 'is-active' : 'is-inactive'}`}
+              >
+                {selectedCampus.status}
+              </span>
+              <p>
+                <MapPin size={15} aria-hidden="true" />
+                {[
+                  selectedCampus.address?.line1,
+                  selectedCampus.address?.city,
+                  selectedCampus.address?.country,
+                ]
+                  .filter(Boolean)
+                  .join(', ') || 'Location not added'}
+              </p>
+              {selectedCampus.email && (
+                <p>
+                  <Mail size={15} aria-hidden="true" />
+                  {selectedCampus.email}
+                </p>
+              )}
+              {selectedCampus.phone && (
+                <p>
+                  <Phone size={15} aria-hidden="true" />
+                  {selectedCampus.phone}
+                </p>
+              )}
+            </div>
+            {canUpdate && (
+              <form
+                className="campus-edit-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const form = new FormData(event.currentTarget);
+                  const nextName = String(form.get('name') || '').trim();
+                  const changes = {
+                    phone: String(form.get('phone') || '') || undefined,
+                    email: String(form.get('email') || '') || undefined,
+                    address: {
+                      line1: String(form.get('line1') || ''),
+                      city: String(form.get('city') || ''),
+                      country: String(form.get('country') || ''),
+                    },
+                  };
+                  if (nextName && nextName !== selectedCampus.name)
+                    rename.mutate({ campus: selectedCampus, nextName });
+                  updateContact.mutate({ campus: selectedCampus, changes });
+                }}
+              >
+                <label>
+                  Campus name
+                  <input
+                    name="name"
+                    defaultValue={selectedCampus.name}
+                    required
+                    minLength={2}
+                    maxLength={160}
+                  />
+                </label>
+                <label>
+                  Contact email
+                  <input
+                    name="email"
+                    type="email"
+                    defaultValue={selectedCampus.email ?? ''}
+                    maxLength={254}
+                  />
+                </label>
+                <label>
+                  Contact phone
+                  <input
+                    name="phone"
+                    defaultValue={selectedCampus.phone ?? ''}
+                    maxLength={40}
+                  />
+                </label>
+                <label>
+                  Address
+                  <input
+                    name="line1"
+                    defaultValue={selectedCampus.address?.line1 ?? ''}
+                    maxLength={160}
+                  />
+                </label>
+                <label>
+                  City
+                  <input
+                    name="city"
+                    defaultValue={selectedCampus.address?.city ?? ''}
+                    maxLength={100}
+                  />
+                </label>
+                <label>
+                  Country
+                  <input
+                    name="country"
+                    defaultValue={selectedCampus.address?.country ?? ''}
+                    maxLength={100}
+                  />
+                </label>
+                {(rename.isError || updateContact.isError) && (
+                  <p role="alert" className="form-error">
+                    {apiMessage(rename.error ?? updateContact.error)}
+                  </p>
+                )}
+                <div className="campus-form-actions">
+                  <Button
+                    type="submit"
+                    disabled={rename.isPending || updateContact.isPending}
+                  >
+                    {rename.isPending || updateContact.isPending
+                      ? 'Saving…'
+                      : 'Save changes'}
+                  </Button>
+                </div>
+              </form>
+            )}
+            <div className="dialog-actions">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => setSelectedCampusId(null)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
     </section>
   );
 }
@@ -1399,11 +1972,37 @@ function MembersPanel({
                       selectedCampusIds={draft.campusIds}
                     />
                     <Button
-                      variant="secondary"
+                      variant="primary"
                       onClick={() => save.mutate({ id: member.id, draft })}
+                      disabled={save.isPending}
                     >
                       Save access
                     </Button>
+                    {member.role !== 'organization_owner' &&
+                      member.status !== 'revoked' && (
+                        <Button
+                          variant="secondary"
+                          iconOnly
+                          type="button"
+                          aria-label={`Remove ${member.user?.displayName ?? member.user?.email ?? 'member'} access`}
+                          title="Remove member access"
+                          disabled={save.isPending}
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Remove organization access for ${member.user?.displayName ?? member.user?.email ?? 'this member'}?`,
+                              )
+                            ) {
+                              save.mutate({
+                                id: member.id,
+                                draft: { ...draft, status: 'revoked' },
+                              });
+                            }
+                          }}
+                        >
+                          <X size={16} aria-hidden="true" />
+                        </Button>
+                      )}
                   </div>
                 )}
               </article>
@@ -1421,12 +2020,15 @@ function MembersPanel({
 }
 
 function InvitationsPanel({
+  organizationId,
   query,
   canInvite,
 }: {
+  organizationId: string;
   query: UseQueryResult<{ invitations: OrganizationInvitation[] }>;
   canInvite: boolean;
 }) {
+  const navigate = useNavigate();
   if (query.isPending) return <LoadingState message="Loading invitations…" />;
   if (query.isError)
     return (
@@ -1437,10 +2039,26 @@ function InvitationsPanel({
     );
   const list = query.data?.invitations;
   return (
-    <section className="organization-section">
+    <section className="organization-section invitation-management">
       <h2>Pending invitations</h2>
       {canInvite && (
-        <p className="muted-copy">Send invitations from the Members section.</p>
+        <div className="invitation-empty-action invitation-empty-action--centered">
+          <p className="muted-copy">
+            Invite a colleague and set their role and campus access from
+            Members.
+          </p>
+          <Button
+            onClick={() =>
+              navigate(
+                `/admin/organizations/${encodeURIComponent(organizationId)}?tab=members`,
+              )
+            }
+            type="button"
+          >
+            <UserPlus size={15} aria-hidden="true" />
+            Invite member
+          </Button>
+        </div>
       )}
       {!list?.length ? (
         <EmptyState title="No pending invitations" />

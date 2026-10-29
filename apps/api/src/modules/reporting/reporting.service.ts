@@ -38,7 +38,11 @@ function normalizedAuditQuery(query: AuditLogQuery): AuditLogQuery {
   const page = query.page ?? 1;
   const pageSize = query.pageSize ?? 20;
   if (!Number.isInteger(page) || page < 1) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Page must be a positive integer.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Page must be a positive integer.',
+    );
   }
   if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) {
     throw new AppError(
@@ -117,23 +121,19 @@ export class ReportingService {
       attendance: {
         todayAttendanceRate:
           attendance.total > 0
-            ? Number(((attendance.attended / attendance.total) * 100).toFixed(2))
+            ? Number(
+                ((attendance.attended / attendance.total) * 100).toFixed(2),
+              )
             : 0,
         recordsCount: attendance.total,
       },
     };
   }
 
-  async listAuditLogs(
-    organizationId: string,
-    query: AuditLogQuery,
-  ) {
+  async listAuditLogs(organizationId: string, query: AuditLogQuery) {
     validateOrganizationId(organizationId);
     const normalized = normalizedAuditQuery(query);
-    const campusIds = authorizedCampuses(
-      query.campusIds,
-      normalized.campusId,
-    );
+    const campusIds = authorizedCampuses(query.campusIds, normalized.campusId);
     return this.repository.listAuditLogs(organizationId, normalized, campusIds);
   }
 
@@ -145,7 +145,11 @@ export class ReportingService {
   ): Promise<ReportDataRow[]> {
     validateOrganizationId(organizationId);
     if (!reportTypes.includes(reportType)) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid report type.');
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Select a valid report type.',
+      );
     }
     return this.repository.exportReportData(
       organizationId,

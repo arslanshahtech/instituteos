@@ -4,6 +4,7 @@ export interface ExaminationsContext {
   organizationId: string;
   campusIds: string[];
   role: string;
+  userId?: string;
 }
 
 export interface ExamInput {
@@ -19,6 +20,8 @@ export interface ExamInput {
 export interface ExamRecord extends ExamInput {
   id: string;
   organizationId: string;
+  resultsPublishedAt: string | null;
+  resultsPublishedBy: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -103,6 +106,16 @@ export interface StudentExamReport {
 }
 
 export interface ExaminationsRepository {
+  isTeacherAssignedToSection(
+    organizationId: string,
+    userId: string,
+    input: {
+      classId: string;
+      sectionId: string;
+      academicYearId: string;
+      subjectId: string;
+    },
+  ): Promise<boolean>;
   validateCampus(organizationId: string, campusId: string): Promise<boolean>;
   validateAcademicYear(organizationId: string, id: string): Promise<boolean>;
   validateTerm(
@@ -136,6 +149,12 @@ export interface ExaminationsRepository {
     input: Partial<ExamInput>,
   ): Promise<ExamRecord | null>;
   deleteExam(organizationId: string, id: string): Promise<boolean>;
+  setResultsPublication(
+    organizationId: string,
+    examId: string,
+    publishedAt: string | null,
+    publishedByUserId: string | null,
+  ): Promise<ExamRecord | null>;
   hasSchedules(organizationId: string, examId: string): Promise<boolean>;
   listSchedules(
     organizationId: string,

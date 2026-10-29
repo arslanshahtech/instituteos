@@ -1,6 +1,7 @@
 export type InvoiceStatus = 'unpaid' | 'partial' | 'paid' | 'overdue';
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'card' | 'online';
-export type ConcessionType = 'sibling' | 'staff_child' | 'scholarship' | 'need_based' | 'special';
+export type ConcessionType =
+  'sibling' | 'staff_child' | 'scholarship' | 'need_based' | 'special';
 export type DiscountType = 'percentage' | 'fixed';
 export interface FinanceContext {
   organizationId: string;
@@ -37,6 +38,12 @@ export interface InvoiceQuery {
   status?: InvoiceStatus;
   dateFrom?: string;
   dateTo?: string;
+}
+
+export interface DailyCollectionRecord {
+  date: string;
+  amountCollected: number;
+  paymentCount: number;
 }
 
 export interface StudentInvoiceRecord {
@@ -142,6 +149,12 @@ export interface FinanceRepository {
     query: InvoiceQuery,
     campusIds?: string[],
   ): Promise<StudentInvoiceRecord[]>;
+  listDailyCollections(
+    organizationId: string,
+    dateFrom: string,
+    dateTo: string,
+    campusIds?: string[],
+  ): Promise<DailyCollectionRecord[]>;
   getInvoice(
     organizationId: string,
     id: string,
@@ -187,10 +200,7 @@ export interface FinanceRepository {
     id?: string,
   ): Promise<FeeConcessionRecord>;
 
-  deleteFeeConcession(
-    organizationId: string,
-    id: string,
-  ): Promise<boolean>;
+  deleteFeeConcession(organizationId: string, id: string): Promise<boolean>;
 
   requestInvoiceDeleteOtp(
     organizationId: string,
@@ -199,10 +209,7 @@ export interface FinanceRepository {
     ownerPhone?: string,
   ): Promise<InvoiceDeleteOtpChallenge>;
 
-  deleteInvoice(
-    organizationId: string,
-    invoiceId: string,
-  ): Promise<boolean>;
+  deleteInvoice(organizationId: string, invoiceId: string): Promise<boolean>;
 
   setInvoiceDiscount(
     organizationId: string,
@@ -226,8 +233,8 @@ export interface StudentLedgerEntry {
   type: 'invoice' | 'payment';
   referenceNumber: string;
   description: string;
-  debit: number;   // Fee charge hui
-  credit: number;  // Payment aayi
+  debit: number; // Fee charge hui
+  credit: number; // Payment aayi
   balance: number; // Running balance
 }
 

@@ -92,6 +92,7 @@ function organizationContext(response: {
       organizationId: string;
       campusIds?: string[];
       role?: string;
+      userId?: string;
     };
   };
 }): AttendanceContext {
@@ -107,6 +108,7 @@ function organizationContext(response: {
     organizationId: context.organizationId,
     campusIds: context.campusIds ?? [],
     role: context.role ?? '',
+    userId: context.userId,
   };
 }
 
@@ -149,6 +151,12 @@ export function createAttendanceRouter(
     requireOrganizationRole(studentAttendanceRoles),
   ] as const;
 
+  const protectTeacherAttendance = [
+    authenticate,
+    resolveOrganization,
+    requireOrganizationRole(['teacher']),
+  ] as const;
+
   // Management & Staff Attendance: Accessible only by Admin/Managers
   const protectStaffAttendance = [
     authenticate,
@@ -157,6 +165,17 @@ export function createAttendanceRouter(
   ] as const;
 
   const base = '/:organizationId';
+
+  router.get(
+    `${base}/attendance/teacher-assignments`,
+    ...protectTeacherAttendance,
+    asyncHandler(async (_request, response) => {
+      const assignments = await service.listTeacherAssignments(
+        organizationContext(response),
+      );
+      response.status(200).json({ items: assignments });
+    }),
+  );
 
   router.get(
     `${base}/attendance/students/roster`,
@@ -179,7 +198,7 @@ export function createAttendanceRouter(
 
   router.get(
     `${base}/attendance/students/eligible`,
-    ...protectStudentAttendance,
+    ...protectStaffAttendance,
     asyncHandler(async (request, response) => {
       const query = request.query as Record<string, unknown>;
       const items = await service.listEligibleStudents(
@@ -212,6 +231,103 @@ export function createAttendanceRouter(
     }),
   );
 
+  router.delete(
+    `${base}/attendance/students/placements/:studentId`,
+    ...protectStaffAttendance,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const body = bodyObject(request.body);
+      const result = await service.removeStudentFromSection(
+        organizationContext(response),
+        {
+          studentId: objectId(request.params.studentId, 'student'),
+          classId: objectId(body.classId, 'class'),
+          sectionId: objectId(body.sectionId, 'section'),
+          academicYearId: objectId(body.academicYearId, 'academic year'),
+          campusId: objectId(body.campusId, 'campus'),
+        },
+      );
+      response.status(200).json(result);
+    }),
+  );
+
+  router.post(
+    `${base}/attendance/students/placements/bulk`,
+    ...protectStaffAttendance,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const body = bodyObject(request.body);
+      if (
+        !Array.isArray(body.studentIds) ||
+        body.studentIds.length === 0 ||
+        body.studentIds.length > 500
+      ) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Select between 1 and 500 students to add.',
+        );
+      }
+      const studentIds = [
+        ...new Set(body.studentIds.map((value) => objectId(value, 'student'))),
+      ];
+      const context = organizationContext(response);
+      const classId = objectId(body.classId, 'class');
+      const sectionId = objectId(body.sectionId, 'section');
+      const academicYearId = objectId(body.academicYearId, 'academic year');
+      const campusId = objectId(body.campusId, 'campus');
+      const eligible = await service.listEligibleStudents(
+        context,
+        campusId,
+        academicYearId,
+      );
+      const eligibleIds = new Set(eligible.map((student) => student.id));
+      const added: string[] = [];
+      const skipped: string[] = [];
+      const failed: Array<{ studentId: string; message: string }> = [];
+      for (const studentId of studentIds) {
+        if (!eligibleIds.has(studentId)) {
+          skipped.push(studentId);
+          continue;
+        }
+        try {
+          await service.placeStudent(context, {
+            studentId,
+            classId,
+            sectionId,
+            academicYearId,
+            campusId,
+          });
+          added.push(studentId);
+        } catch (error) {
+          console.error(
+            JSON.stringify({
+              level: 'error',
+              event: 'student.placement.bulk_item_failed',
+              requestId: response.locals.requestId,
+              studentId,
+              errorName: error instanceof Error ? error.name : 'UnknownError',
+              errorMessage:
+                error instanceof Error ? error.message : String(error),
+              databaseCode:
+                typeof error === 'object' && error !== null && 'code' in error
+                  ? String(error.code)
+                  : undefined,
+            }),
+          );
+          failed.push({
+            studentId,
+            message:
+              error instanceof AppError
+                ? error.message
+                : 'A server error prevented this student from being added. Contact the administrator with the request ID.',
+          });
+        }
+      }
+      response.status(201).json({ added, skipped, failed });
+    }),
+  );
+
   router.put(
     `${base}/attendance/students/bulk`,
     ...protectStudentAttendance,
@@ -225,24 +341,78 @@ export function createAttendanceRouter(
           'Attendance records are required.',
         );
       }
-      const records = body.records.map((entry) => {
-        const record = bodyObject(entry);
-        const status = text(record.status, 'student attendance status', 20);
-        if (!['present', 'absent', 'late', 'excused'].includes(status)) {
-          throw new AppError(
-            400,
-            'VALIDATION_ERROR',
-            'Select a valid student attendance status.',
-          );
+      const rowErrors: Array<{ row: number; field: string; message: string }> =
+        [];
+      const records = body.records.map((entry, index) => {
+        if (
+          typeof entry !== 'object' ||
+          entry === null ||
+          Array.isArray(entry)
+        ) {
+          rowErrors.push({
+            row: index + 1,
+            field: 'record',
+            message: 'A student attendance record is required.',
+          });
+          return null;
         }
-        return {
-          studentId: objectId(record.studentId, 'student'),
-          status: status as StudentAttendanceStatus,
-          ...(optionalText(record.remarks, 'remarks')
-            ? { remarks: optionalText(record.remarks, 'remarks') }
-            : {}),
-        };
+        const record = entry as Record<string, unknown>;
+        let studentId = '';
+        let status: StudentAttendanceStatus = 'present';
+        let remarks: string | undefined;
+        try {
+          studentId = objectId(record.studentId, 'student');
+        } catch {
+          rowErrors.push({
+            row: index + 1,
+            field: 'studentId',
+            message: 'Select a valid student.',
+          });
+        }
+        if (
+          typeof record.status !== 'string' ||
+          !['present', 'absent', 'leave', 'late'].includes(record.status)
+        ) {
+          rowErrors.push({
+            row: index + 1,
+            field: 'status',
+            message: 'Choose Present, Absent, Late, or Leave.',
+          });
+        } else {
+          status = record.status as StudentAttendanceStatus;
+        }
+        if (
+          record.remarks !== undefined &&
+          record.remarks !== '' &&
+          (typeof record.remarks !== 'string' ||
+            record.remarks.trim().length > 500)
+        ) {
+          rowErrors.push({
+            row: index + 1,
+            field: 'remarks',
+            message: 'Remarks must be 500 characters or fewer.',
+          });
+        } else if (
+          typeof record.remarks === 'string' &&
+          record.remarks.trim()
+        ) {
+          remarks = record.remarks.trim();
+        }
+        return studentId
+          ? { studentId, status, ...(remarks ? { remarks } : {}) }
+          : null;
       });
+      if (rowErrors.length) {
+        throw new AppError(
+          400,
+          'ATTENDANCE_ROW_VALIDATION_FAILED',
+          'Fix the attendance errors listed for the affected rows. No records were saved.',
+          { rows: rowErrors },
+        );
+      }
+      const validRecords = records.filter(
+        (record): record is NonNullable<typeof record> => record !== null,
+      );
       const attendance = await service.saveStudentAttendance(
         organizationContext(response),
         {
@@ -251,7 +421,7 @@ export function createAttendanceRouter(
           academicYearId: objectId(body.academicYearId, 'academic year'),
           campusId: objectId(body.campusId, 'campus'),
           date: text(body.date, 'date', 10),
-          records,
+          records: validRecords,
         },
       );
       response.status(200).json({ items: attendance });

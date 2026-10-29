@@ -1,8 +1,4 @@
-export type AnnouncementAudience =
-  | 'all'
-  | 'staff'
-  | 'students'
-  | 'guardians';
+export type AnnouncementAudience = 'all' | 'staff' | 'students' | 'guardians';
 export type AnnouncementStatus = 'draft' | 'published' | 'archived';
 
 export interface AnnouncementContext {

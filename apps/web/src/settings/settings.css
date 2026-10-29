@@ -187,3 +187,43 @@
     gap: 1.25rem;
   }
 }
+
+/* Compact reference-style navigation across organization settings. */
+.settings-tabs {
+  display: flex;
+  min-width: 0;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0.2rem 0 0.7rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-tab {
+  min-height: 38px;
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  padding: 0.55rem 0.9rem;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.settings-tab:hover {
+  border-color: var(--color-border);
+  color: var(--color-ink);
+}
+
+.settings-tab.is-active {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: #fff;
+}
+
+.settings-tab:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

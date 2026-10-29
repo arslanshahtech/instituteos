@@ -301,9 +301,27 @@ export class MongoPeopleRepository {
         .lean(),
       GuardianModel.countDocuments(filters),
     ]);
+    const studentCounts = items.length
+      ? await StudentGuardianLinkModel.aggregate<{
+          _id: Types.ObjectId;
+          count: number;
+        }>([
+          {
+            $match: {
+              organizationId: idObject(organizationId),
+              guardianId: { $in: items.map((record) => record._id) },
+            },
+          },
+          { $group: { _id: '$guardianId', count: { $sum: 1 } } },
+        ])
+      : [];
+    const studentCountByGuardian = new Map(
+      studentCounts.map((entry) => [String(entry._id), entry.count]),
+    );
     return {
       items: items.map((record) => ({
         id: String(record._id),
+        studentCount: studentCountByGuardian.get(String(record._id)) ?? 0,
         organizationId: String(record.organizationId),
         firstName: String(record.firstName),
         lastName: String(record.lastName),
@@ -1129,6 +1147,18 @@ export class MongoPeopleRepository {
         phone: record.phone ? String(record.phone) : undefined,
         source: record.source ? String(record.source) : undefined,
         program: record.program ? String(record.program) : undefined,
+        dateOfBirth: record.dateOfBirth
+          ? String(record.dateOfBirth)
+          : undefined,
+        guardianName: record.guardianName
+          ? String(record.guardianName)
+          : undefined,
+        guardianPhone: record.guardianPhone
+          ? String(record.guardianPhone)
+          : undefined,
+        feePlan: record.feePlan
+          ? (record.feePlan as ApplicationRecord['feePlan'])
+          : undefined,
         status: (record.status as ApplicationRecord['status']) ?? 'draft',
         convertedStudentId: studentIdsByApplication.get(String(record._id)),
         notes: record.notes ? String(record.notes) : undefined,
@@ -1170,6 +1200,16 @@ export class MongoPeopleRepository {
       phone: record.phone ? String(record.phone) : undefined,
       source: record.source ? String(record.source) : undefined,
       program: record.program ? String(record.program) : undefined,
+      dateOfBirth: record.dateOfBirth ? String(record.dateOfBirth) : undefined,
+      guardianName: record.guardianName
+        ? String(record.guardianName)
+        : undefined,
+      guardianPhone: record.guardianPhone
+        ? String(record.guardianPhone)
+        : undefined,
+      feePlan: record.feePlan
+        ? (record.feePlan as ApplicationRecord['feePlan'])
+        : undefined,
       status: (record.status as ApplicationRecord['status']) ?? 'draft',
       convertedStudentId: convertedStudent
         ? String(convertedStudent._id)
@@ -1199,6 +1239,10 @@ export class MongoPeopleRepository {
       phone: input.phone,
       source: input.source,
       program: input.program,
+      dateOfBirth: input.dateOfBirth,
+      guardianName: input.guardianName,
+      guardianPhone: input.guardianPhone,
+      feePlan: input.feePlan,
       status: input.status ?? 'draft',
       notes: input.notes,
     });
@@ -1213,6 +1257,16 @@ export class MongoPeopleRepository {
       phone: record.phone ? String(record.phone) : undefined,
       source: record.source ? String(record.source) : undefined,
       program: record.program ? String(record.program) : undefined,
+      dateOfBirth: record.dateOfBirth ? String(record.dateOfBirth) : undefined,
+      guardianName: record.guardianName
+        ? String(record.guardianName)
+        : undefined,
+      guardianPhone: record.guardianPhone
+        ? String(record.guardianPhone)
+        : undefined,
+      feePlan: record.feePlan
+        ? (record.feePlan as ApplicationRecord['feePlan'])
+        : undefined,
       status: (record.status as ApplicationRecord['status']) ?? 'draft',
       notes: record.notes ? String(record.notes) : undefined,
       decisionReason: record.decisionReason
@@ -1255,6 +1309,16 @@ export class MongoPeopleRepository {
       phone: record.phone ? String(record.phone) : undefined,
       source: record.source ? String(record.source) : undefined,
       program: record.program ? String(record.program) : undefined,
+      dateOfBirth: record.dateOfBirth ? String(record.dateOfBirth) : undefined,
+      guardianName: record.guardianName
+        ? String(record.guardianName)
+        : undefined,
+      guardianPhone: record.guardianPhone
+        ? String(record.guardianPhone)
+        : undefined,
+      feePlan: record.feePlan
+        ? (record.feePlan as ApplicationRecord['feePlan'])
+        : undefined,
       status: (record.status as ApplicationRecord['status']) ?? 'draft',
       notes: record.notes ? String(record.notes) : undefined,
       decisionReason: record.decisionReason
@@ -1268,6 +1332,7 @@ export class MongoPeopleRepository {
     organizationId: string,
     applicationId: string,
     decisionReason?: string,
+    campusId?: string,
   ): Promise<{
     application: ApplicationRecord;
     student: StudentRecord;
@@ -1300,6 +1365,17 @@ export class MongoPeopleRepository {
           );
         }
 
+        const assignedCampusId =
+          campusId ??
+          (application.campusId ? String(application.campusId) : undefined);
+        if (!assignedCampusId) {
+          throw new AppError(
+            400,
+            'CAMPUS_REQUIRED',
+            'Assign a campus before approving this application.',
+          );
+        }
+
         const existingStudent = await StudentModel.findOne({
           organizationId: idObject(organizationId),
           sourceApplicationId: idObject(applicationId),
@@ -1317,6 +1393,9 @@ export class MongoPeopleRepository {
                 {
                   firstName: String(application.firstName),
                   lastName: String(application.lastName),
+                  dateOfBirth: application.dateOfBirth
+                    ? String(application.dateOfBirth)
+                    : undefined,
                   status: 'active',
                   contactEmail: application.email
                     ? String(application.email)
@@ -1324,9 +1403,7 @@ export class MongoPeopleRepository {
                   phone: application.phone
                     ? String(application.phone)
                     : undefined,
-                  campusId: application.campusId
-                    ? String(application.campusId)
-                    : undefined,
+                  campusId: assignedCampusId,
                 },
                 applicationId,
               ),
@@ -1335,6 +1412,20 @@ export class MongoPeopleRepository {
           );
 
           studentDocument = createdStudent;
+        } else if (
+          String(existingStudent.campusId ?? '') !== assignedCampusId
+        ) {
+          await StudentModel.updateOne(
+            {
+              _id: existingStudent._id,
+              organizationId: idObject(organizationId),
+            },
+            { $set: { campusId: idObject(assignedCampusId) } },
+            { session },
+          );
+          studentDocument = await StudentModel.findById(existingStudent._id)
+            .session(session)
+            .lean();
         }
 
         let enrollmentDocument = await EnrollmentModel.findOne({
@@ -1351,9 +1442,7 @@ export class MongoPeopleRepository {
               {
                 organizationId: idObject(organizationId),
                 studentId: studentDocument._id,
-                campusId: application.campusId
-                  ? idObject(String(application.campusId))
-                  : null,
+                campusId: idObject(assignedCampusId),
                 sourceApplicationId: idObject(applicationId),
                 status: 'active',
                 gradeLevel: application.program
@@ -1365,6 +1454,22 @@ export class MongoPeopleRepository {
           );
 
           enrollmentDocument = createdEnrollment;
+        } else if (
+          String(enrollmentDocument.campusId ?? '') !== assignedCampusId
+        ) {
+          await EnrollmentModel.updateOne(
+            {
+              _id: enrollmentDocument._id,
+              organizationId: idObject(organizationId),
+            },
+            { $set: { campusId: idObject(assignedCampusId) } },
+            { session },
+          );
+          enrollmentDocument = await EnrollmentModel.findById(
+            enrollmentDocument._id,
+          )
+            .session(session)
+            .lean();
         }
 
         const approved = await AdmissionApplicationModel.findOneAndUpdate(
@@ -1375,6 +1480,7 @@ export class MongoPeopleRepository {
           {
             $set: {
               status: 'approved',
+              campusId: idObject(assignedCampusId),
               decisionReason: decisionReason ?? 'Approved by admissions review',
             },
           },
@@ -1407,6 +1513,18 @@ export class MongoPeopleRepository {
             phone: approved.phone ? String(approved.phone) : undefined,
             source: approved.source ? String(approved.source) : undefined,
             program: approved.program ? String(approved.program) : undefined,
+            dateOfBirth: approved.dateOfBirth
+              ? String(approved.dateOfBirth)
+              : undefined,
+            guardianName: approved.guardianName
+              ? String(approved.guardianName)
+              : undefined,
+            guardianPhone: approved.guardianPhone
+              ? String(approved.guardianPhone)
+              : undefined,
+            feePlan: approved.feePlan
+              ? (approved.feePlan as ApplicationRecord['feePlan'])
+              : undefined,
             status:
               (approved.status as ApplicationRecord['status']) ?? 'approved',
             notes: approved.notes ? String(approved.notes) : undefined,

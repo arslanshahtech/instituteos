@@ -48,8 +48,7 @@ export const ORGANIZATION_PERMISSIONS = [
   'audit.read',
 ] as const;
 
-export type OrganizationPermission =
-  (typeof ORGANIZATION_PERMISSIONS)[number];
+export type OrganizationPermission = (typeof ORGANIZATION_PERMISSIONS)[number];
 
 const rolePermissions: Record<
   OrganizationRole,

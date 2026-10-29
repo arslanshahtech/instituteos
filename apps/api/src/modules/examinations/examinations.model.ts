@@ -1,8 +1,5 @@
 import mongoose, { Schema } from 'mongoose';
-import type {
-  ExamType,
-  GradeBreakdown,
-} from './examinations.types.js';
+import type { ExamType, GradeBreakdown } from './examinations.types.js';
 
 const examSchema = new Schema(
   {
@@ -23,9 +20,19 @@ const examSchema = new Schema(
       ref: 'AcademicYear',
       required: true,
     },
-    termId: { type: Schema.Types.ObjectId, ref: 'AcademicTerm', required: true },
+    termId: {
+      type: Schema.Types.ObjectId,
+      ref: 'AcademicTerm',
+      required: true,
+    },
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
+    resultsPublishedAt: { type: Date, default: null },
+    resultsPublishedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'AuthUser',
+      default: null,
+    },
   },
   { timestamps: true, versionKey: false },
 );

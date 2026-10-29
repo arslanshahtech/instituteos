@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError } from '../api/client.js';
 import { Button } from '../components/ui/Button.js';
+import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 import {
   ErrorState,
   LoadingState,
@@ -58,6 +59,7 @@ export function ApplicationReviewPage() {
   const { organizationId = '', applicationId = '' } = useParams();
   const { showToast } = useToast();
   const [decisionReason, setDecisionReason] = useState('');
+  const [selectedCampusId, setSelectedCampusId] = useState('');
   const access = useQuery({
     queryKey: ['organization-context', organizationId],
     queryFn: () => getOrganizationAccessContext(organizationId),
@@ -105,10 +107,23 @@ export function ApplicationReviewPage() {
   const record = application.data.application;
   const canCreateStudent = access.data.permissions.includes('student.create');
   const actions = canReview
-    ? (reviewActions[record.status] ?? []).filter(
-        (action) => action.status !== 'approved' || canCreateStudent,
-      )
+    ? record.status === 'approved' &&
+      !record.convertedStudentId &&
+      canCreateStudent
+      ? [
+          {
+            status: 'approved' as ApplicationStatus,
+            label: 'Create missing student record',
+          },
+        ]
+      : (reviewActions[record.status] ?? []).filter(
+          (action) => action.status !== 'approved' || canCreateStudent,
+        )
     : [];
+  const needsCampusForApproval = actions.some(
+    (action) => action.status === 'approved',
+  );
+  const assignedCampusId = selectedCampusId || record.campusId;
   const studentPath = record.convertedStudentId
     ? `/admin/organizations/${encodeURIComponent(organizationId)}/students/${encodeURIComponent(record.convertedStudentId)}`
     : undefined;
@@ -117,6 +132,9 @@ export function ApplicationReviewPage() {
     review.mutate(
       {
         status,
+        ...(status === 'approved' && assignedCampusId
+          ? { campusId: assignedCampusId }
+          : {}),
         ...(decisionReason.trim()
           ? { decisionReason: decisionReason.trim() }
           : {}),
@@ -137,26 +155,23 @@ export function ApplicationReviewPage() {
   }
 
   return (
-    <main className="page-stack student-management-page">
-      <section className="page-heading student-page-heading">
-        <div>
-          <p className="eyebrow">Application review</p>
-          <h1>
-            {record.firstName} {record.lastName}
-          </h1>
-          <p className="page-description">
-            Review applicant information and record an admissions decision.
-          </p>
-        </div>
-        <div className="student-page-actions">
-          <Link
-            className="button button-secondary"
-            to={`/admin/organizations/${encodeURIComponent(organizationId)}/admissions`}
-          >
-            Back to admissions
-          </Link>
-        </div>
-      </section>
+    <main className="page-stack student-management-page reference-live-module">
+      <WorkspacePageHeading
+        className="student-page-heading"
+        eyebrow="Application review"
+        title={`${record.firstName} ${record.lastName}`}
+        description="Review applicant information and record an admissions decision."
+        aside={
+          <div className="student-page-actions">
+            <Link
+              className="button button-secondary"
+              to={`/admin/organizations/${encodeURIComponent(organizationId)}/admissions`}
+            >
+              Back to admissions
+            </Link>
+          </div>
+        }
+      />
 
       <section className="student-detail-panel panel">
         <div className="student-detail-heading">
@@ -181,6 +196,22 @@ export function ApplicationReviewPage() {
           <div>
             <dt>Program / grade</dt>
             <dd>{record.program ?? '—'}</dd>
+          </div>
+          <div>
+            <dt>Date of birth</dt>
+            <dd>{record.dateOfBirth ?? '—'}</dd>
+          </div>
+          <div>
+            <dt>Guardian</dt>
+            <dd>{record.guardianName ?? '—'}</dd>
+          </div>
+          <div>
+            <dt>Guardian phone</dt>
+            <dd>{record.guardianPhone ?? '—'}</dd>
+          </div>
+          <div>
+            <dt>Fee plan</dt>
+            <dd>{record.feePlan ?? '—'}</dd>
           </div>
           <div>
             <dt>Campus</dt>
@@ -221,6 +252,33 @@ export function ApplicationReviewPage() {
           <div className="student-detail-heading">
             <h2>Review decision</h2>
           </div>
+          {needsCampusForApproval && (
+            <label className="form-field" htmlFor="approvalCampusId">
+              <span>Assign campus before approval</span>
+              <select
+                id="approvalCampusId"
+                value={assignedCampusId ?? ''}
+                onChange={(event) => setSelectedCampusId(event.target.value)}
+                required
+              >
+                <option value="">Select campus</option>
+                {(campuses.data?.campuses ?? []).map((campus) => (
+                  <option key={campus.id} value={campus.id}>
+                    {campus.name}
+                  </option>
+                ))}
+              </select>
+              <small className="muted-copy">
+                Approval creates the student record in this campus. Other
+                missing profile details can be completed later.
+              </small>
+              {campuses.isError && (
+                <span className="field-error" role="alert">
+                  {apiMessage(campuses.error)}
+                </span>
+              )}
+            </label>
+          )}
           <label className="form-field" htmlFor="decisionReason">
             <span>Decision note (optional)</span>
             <textarea
@@ -239,7 +297,10 @@ export function ApplicationReviewPage() {
           <div className="button-row">
             {actions.map((action) => (
               <Button
-                disabled={review.isPending}
+                disabled={
+                  review.isPending ||
+                  (action.status === 'approved' && !assignedCampusId)
+                }
                 key={action.status}
                 onClick={() => transition(action.status)}
                 variant={action.status === 'rejected' ? 'danger' : 'primary'}

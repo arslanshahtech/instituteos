@@ -111,7 +111,9 @@
     border-radius: 14px;
     padding: 1.125rem 1.25rem;
     margin-bottom: 1rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+    box-shadow:
+      0 4px 6px -1px rgba(0, 0, 0, 0.04),
+      0 2px 4px -2px rgba(0, 0, 0, 0.03);
   }
 
   /* Stacked Row Layout (Label Upar, Value Niche) */

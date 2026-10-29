@@ -10,6 +10,11 @@ import type {
   CreatePickupPersonInput,
   PickupPassStatus,
 } from './pickup.types.js';
+import type {
+  AuthorizedPickupPersonDocument,
+  PickupPassDocument,
+  PickupLogDocument,
+} from './pickup.model.js';
 
 export class MongoPickupRepository {
   async createPickupPerson(
@@ -131,7 +136,9 @@ export class MongoPickupRepository {
     return docs.map((doc) => this.mapLog(doc));
   }
 
-  private mapPerson(doc: any): AuthorizedPickupPerson {
+  private mapPerson(
+    doc: AuthorizedPickupPersonDocument,
+  ): AuthorizedPickupPerson {
     return {
       id: doc._id.toString(),
       organizationId: doc.organizationId,
@@ -143,12 +150,12 @@ export class MongoPickupRepository {
       photoUrl: doc.photoUrl,
       status: doc.status,
       notes: doc.notes,
-      createdAt: doc.createdAt?.toISOString() ?? new Date().toISOString(),
-      updatedAt: doc.updatedAt?.toISOString() ?? new Date().toISOString(),
+      createdAt: new Date(doc.createdAt ?? Date.now()).toISOString(),
+      updatedAt: new Date(doc.updatedAt ?? Date.now()).toISOString(),
     };
   }
 
-  private mapPass(doc: any): PickupPass {
+  private mapPass(doc: PickupPassDocument): PickupPass {
     return {
       id: doc._id.toString(),
       organizationId: doc.organizationId,
@@ -159,12 +166,12 @@ export class MongoPickupRepository {
       validUntil: doc.validUntil,
       status: doc.status,
       generatedByUserId: doc.generatedByUserId,
-      createdAt: doc.createdAt?.toISOString() ?? new Date().toISOString(),
-      updatedAt: doc.updatedAt?.toISOString() ?? new Date().toISOString(),
+      createdAt: new Date(doc.createdAt ?? Date.now()).toISOString(),
+      updatedAt: new Date(doc.updatedAt ?? Date.now()).toISOString(),
     };
   }
 
-  private mapLog(doc: any): PickupLog {
+  private mapLog(doc: PickupLogDocument): PickupLog {
     return {
       id: doc._id.toString(),
       organizationId: doc.organizationId,
@@ -177,7 +184,7 @@ export class MongoPickupRepository {
       method: doc.method,
       overrideReason: doc.overrideReason,
       notes: doc.notes,
-      createdAt: doc.createdAt?.toISOString() ?? new Date().toISOString(),
+      createdAt: new Date(doc.createdAt ?? Date.now()).toISOString(),
     };
   }
 }

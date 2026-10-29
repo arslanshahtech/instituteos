@@ -265,6 +265,13 @@ const applicationSchema = new Schema(
     phone: { type: String, trim: true, maxlength: 40 },
     source: { type: String, trim: true, maxlength: 80 },
     program: { type: String, trim: true, maxlength: 120 },
+    dateOfBirth: { type: String, trim: true, maxlength: 10 },
+    guardianName: { type: String, trim: true, maxlength: 160 },
+    guardianPhone: { type: String, trim: true, maxlength: 40 },
+    feePlan: {
+      type: String,
+      enum: ['Standard', 'Scholarship', 'Sibling plan'],
+    },
     status: {
       type: String,
       enum: [

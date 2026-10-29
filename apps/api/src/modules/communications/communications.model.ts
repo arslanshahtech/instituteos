@@ -23,7 +23,12 @@ const announcementSchema = new Schema(
     content: { type: String, required: true, maxlength: 5000 },
     targetAudience: {
       type: String,
-      enum: ['all', 'staff', 'students', 'guardians'] satisfies AnnouncementAudience[],
+      enum: [
+        'all',
+        'staff',
+        'students',
+        'guardians',
+      ] satisfies AnnouncementAudience[],
       default: 'all',
       required: true,
     },
@@ -151,7 +156,11 @@ const directMessageSchema = new Schema(
     },
     senderRole: {
       type: String,
-      enum: ['parent_guardian', 'teacher', 'admin'] satisfies MessageSenderRole[],
+      enum: [
+        'parent_guardian',
+        'teacher',
+        'admin',
+      ] satisfies MessageSenderRole[],
       required: true,
     },
     content: {

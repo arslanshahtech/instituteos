@@ -7,22 +7,22 @@ import type {
   FinanceRepository,
   InvoiceQuery,
   InvoiceStatus,
+  DailyCollectionRecord,
   PaymentInput,
   FeeConcessionInput,
   ConcessionType,
   DiscountType,
 } from './finance.types.js';
-import { StudentSectionPlacementModel } from '../attendance/attendance.model.js';
-import { StudentModel } from '../people/people.model.js';
 
-const paymentMethods = [
-  'cash',
-  'bank_transfer',
-  'card',
-  'online',
-] as const;
+const paymentMethods = ['cash', 'bank_transfer', 'card', 'online'] as const;
 const invoiceStatuses = ['unpaid', 'partial', 'paid', 'overdue'] as const;
-const concessionTypes = ['sibling', 'staff_child', 'scholarship', 'need_based', 'special'] as const;
+const concessionTypes = [
+  'sibling',
+  'staff_child',
+  'scholarship',
+  'need_based',
+  'special',
+] as const;
 const discountTypes = ['percentage', 'fixed'] as const;
 
 function objectId(value: string, field: string): string {
@@ -37,7 +37,10 @@ function validDate(value: string, field: string): string {
     throw new AppError(400, 'VALIDATION_ERROR', `Enter a valid ${field}.`);
   }
   const date = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== value
+  ) {
     throw new AppError(400, 'VALIDATION_ERROR', `Enter a valid ${field}.`);
   }
   return value;
@@ -145,7 +148,11 @@ function normalizeInvoiceQuery(query: InvoiceQuery): InvoiceQuery {
     query.status &&
     !invoiceStatuses.includes(query.status as InvoiceStatus)
   ) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid invoice status.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Select a valid invoice status.',
+    );
   }
   const dateFrom = query.dateFrom
     ? validDate(query.dateFrom, 'start date')
@@ -161,21 +168,41 @@ function normalizeInvoiceQuery(query: InvoiceQuery): InvoiceQuery {
   return { ...query, dateFrom, dateTo };
 }
 
-function validateConcessionInput(input: FeeConcessionInput): FeeConcessionInput {
+function validateConcessionInput(
+  input: FeeConcessionInput,
+): FeeConcessionInput {
   const studentId = objectId(input.studentId, 'student');
-  const academicYearId = input.academicYearId ? objectId(input.academicYearId, 'academic year') : undefined;
+  const academicYearId = input.academicYearId
+    ? objectId(input.academicYearId, 'academic year')
+    : undefined;
 
   if (!concessionTypes.includes(input.concessionType as ConcessionType)) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid concession type.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Select a valid concession type.',
+    );
   }
 
   if (!discountTypes.includes(input.discountType as DiscountType)) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid discount type (percentage or fixed).');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Select a valid discount type (percentage or fixed).',
+    );
   }
 
   if (input.discountType === 'percentage') {
-    if (!Number.isFinite(input.discountValue) || input.discountValue <= 0 || input.discountValue > 100) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Percentage discount must be between 1 and 100.');
+    if (
+      !Number.isFinite(input.discountValue) ||
+      input.discountValue <= 0 ||
+      input.discountValue > 100
+    ) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Percentage discount must be between 1 and 100.',
+      );
     }
   } else {
     moneyCents(input.discountValue, 'discount value');
@@ -187,7 +214,9 @@ function validateConcessionInput(input: FeeConcessionInput): FeeConcessionInput 
     concessionType: input.concessionType,
     discountType: input.discountType,
     discountValue: input.discountValue,
-    reason: input.reason?.trim() ? input.reason.trim().slice(0, 160) : undefined,
+    reason: input.reason?.trim()
+      ? input.reason.trim().slice(0, 160)
+      : undefined,
     isActive: typeof input.isActive === 'boolean' ? input.isActive : true,
   };
 }
@@ -261,7 +290,9 @@ export class FinanceService {
       throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Fee structure not found.');
     }
     assertCampus(context, existing.campusId);
-    if (!(await this.repository.deleteFeeStructure(context.organizationId, id))) {
+    if (
+      !(await this.repository.deleteFeeStructure(context.organizationId, id))
+    ) {
       throw new AppError(
         409,
         'FEE_STRUCTURE_IN_USE',
@@ -276,6 +307,27 @@ export class FinanceService {
     return this.repository.listInvoices(
       context.organizationId,
       query,
+      scopedCampusIds(context),
+    );
+  }
+
+  async listDailyCollections(
+    context: FinanceContext,
+    input: { dateFrom: string; dateTo: string },
+  ): Promise<DailyCollectionRecord[]> {
+    const dateFrom = validDate(input.dateFrom, 'start date');
+    const dateTo = validDate(input.dateTo, 'end date');
+    if (dateFrom > dateTo) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Start date must not be after end date.',
+      );
+    }
+    return this.repository.listDailyCollections(
+      context.organizationId,
+      dateFrom,
+      dateTo,
       scopedCampusIds(context),
     );
   }
@@ -321,33 +373,10 @@ export class FinanceService {
     const totalCents = feeStructure.feeHeads
       .filter((head) => !head.isOptional)
       .reduce((sum, head) => sum + moneyCents(head.amount, head.title), 0);
-    let studentIds = await this.repository.listActiveClassStudents(
+    const studentIds = await this.repository.listActiveClassStudents(
       context.organizationId,
       input,
     );
-    if (studentIds.length === 0) {
-      const organizationObjectId = new mongoose.Types.ObjectId(
-        context.organizationId,
-      );
-      const placements = await StudentSectionPlacementModel.find({
-        organizationId: organizationObjectId,
-        campusId: new mongoose.Types.ObjectId(feeStructure.campusId),
-        classId: new mongoose.Types.ObjectId(input.classId),
-        academicYearId: new mongoose.Types.ObjectId(input.academicYearId),
-        status: 'active',
-      })
-        .select({ studentId: 1 })
-        .lean();
-      const placedStudentIds = placements.map((placement) => placement.studentId);
-      const activeStudents = await StudentModel.find({
-        organizationId: organizationObjectId,
-        status: 'active',
-        _id: { $in: placedStudentIds },
-      })
-        .select({ _id: 1 })
-        .lean();
-      studentIds = activeStudents.map((student) => String(student._id));
-    }
     const invoices = await this.repository.createInvoices(
       context.organizationId,
       input,
@@ -382,11 +411,19 @@ export class FinanceService {
         raw.paymentMethod as (typeof paymentMethods)[number],
       )
     ) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid payment method.');
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Select a valid payment method.',
+      );
     }
     const paymentDate = validDate(raw.paymentDate, 'payment date');
     if (paymentDate > new Date().toISOString().slice(0, 10)) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Payment date cannot be in the future.');
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Payment date cannot be in the future.',
+      );
     }
     const transactionReference = raw.transactionReference?.trim();
     if (transactionReference && transactionReference.length > 160) {
@@ -443,7 +480,11 @@ export class FinanceService {
       studentId,
     );
     if (!ledger) {
-      throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Student record not found.');
+      throw new AppError(
+        404,
+        'RESOURCE_NOT_FOUND',
+        'Student record not found.',
+      );
     }
     return ledger;
   }
@@ -454,7 +495,9 @@ export class FinanceService {
     rawAcademicYearId?: string,
   ) {
     const studentId = objectId(rawStudentId, 'student');
-    const academicYearId = rawAcademicYearId ? objectId(rawAcademicYearId, 'academic year') : undefined;
+    const academicYearId = rawAcademicYearId
+      ? objectId(rawAcademicYearId, 'academic year')
+      : undefined;
     return this.repository.listActiveStudentConcessions(
       context.organizationId,
       [studentId],
@@ -488,12 +531,20 @@ export class FinanceService {
       id,
     );
     if (!deleted) {
-      throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Fee concession not found.');
+      throw new AppError(
+        404,
+        'RESOURCE_NOT_FOUND',
+        'Fee concession not found.',
+      );
     }
     return { success: true };
   }
 
-  async requestInvoiceDeleteOtp(context: FinanceContext, rawInvoiceId: string, ownerPhone?: string) {
+  async requestInvoiceDeleteOtp(
+    context: FinanceContext,
+    rawInvoiceId: string,
+    ownerPhone?: string,
+  ) {
     const invoiceId = objectId(rawInvoiceId, 'invoice');
     const invoice = await this.repository.getInvoice(
       context.organizationId,

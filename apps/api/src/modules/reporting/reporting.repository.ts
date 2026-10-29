@@ -6,10 +6,7 @@ import {
 } from '../attendance/attendance.model.js';
 import { AcademicClassModel } from '../academics/academics.model.js';
 import { StudentInvoiceModel } from '../finance/finance.model.js';
-import {
-  StaffMemberModel,
-  StudentModel,
-} from '../people/people.model.js';
+import { StaffMemberModel, StudentModel } from '../people/people.model.js';
 import type {
   AuditLogPage,
   AuditLogQuery,
@@ -28,10 +25,13 @@ const campusFilter = (campusIds?: string[]) =>
 function decimalAmount(value: unknown): string {
   const amount = String(value ?? '0');
   const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(amount);
-  if (!match) throw new Error('A finance aggregate returned an invalid amount.');
+  if (!match)
+    throw new Error('A finance aggregate returned an invalid amount.');
   const fraction = match[3] ?? '';
   if (fraction.length > 2 && /[1-9]/.test(fraction.slice(2))) {
-    throw new Error('A finance aggregate returned more than two decimal places.');
+    throw new Error(
+      'A finance aggregate returned more than two decimal places.',
+    );
   }
   return `${match[1]}${match[2]}.${fraction.slice(0, 2).padEnd(2, '0')}`;
 }
@@ -43,7 +43,9 @@ function auditLogRecord(
   const normalizedMetadata =
     metadata instanceof Map
       ? Object.fromEntries(metadata)
-      : typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)
+      : typeof metadata === 'object' &&
+          metadata !== null &&
+          !Array.isArray(metadata)
         ? (metadata as Record<string, unknown>)
         : undefined;
   return {
@@ -69,8 +71,7 @@ function dateFilter(query: AuditLogQuery): Record<string, Date> | undefined {
     ...(query.dateTo
       ? {
           $lt: new Date(
-            new Date(`${query.dateTo}T00:00:00.000Z`).getTime() +
-              86_400_000,
+            new Date(`${query.dateTo}T00:00:00.000Z`).getTime() + 86_400_000,
           ),
         }
       : {}),
@@ -196,23 +197,19 @@ export class MongoReportingRepository implements ReportingRepository {
       date: { $gte: today, $lt: tomorrow },
       ...campusFilter(campusIds),
     };
-    const [
-      studentTotal,
-      studentAttended,
-      staffTotal,
-      staffAttended,
-    ] = await Promise.all([
-      StudentAttendanceModel.countDocuments(baseFilter),
-      StudentAttendanceModel.countDocuments({
-        ...baseFilter,
-        status: { $in: ['present', 'late'] },
-      }),
-      StaffAttendanceModel.countDocuments(baseFilter),
-      StaffAttendanceModel.countDocuments({
-        ...baseFilter,
-        status: { $in: ['present', 'half-day'] },
-      }),
-    ]);
+    const [studentTotal, studentAttended, staffTotal, staffAttended] =
+      await Promise.all([
+        StudentAttendanceModel.countDocuments(baseFilter),
+        StudentAttendanceModel.countDocuments({
+          ...baseFilter,
+          status: 'present',
+        }),
+        StaffAttendanceModel.countDocuments(baseFilter),
+        StaffAttendanceModel.countDocuments({
+          ...baseFilter,
+          status: { $in: ['present', 'half-day'] },
+        }),
+      ]);
     return {
       total: studentTotal + staffTotal,
       attended: studentAttended + staffAttended,

@@ -631,6 +631,7 @@ export class MongoAcademicsRepository implements AcademicsRepository {
     const filter: Record<string, unknown> = {
       organizationId: oid(organizationId),
       teacherStaffId: oid(input.teacherStaffId),
+      subjectId: oid(input.subjectId),
       classId: oid(input.classId),
       sectionId: oid(input.sectionId),
       academicYearId: oid(input.academicYearId),

@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Suspense } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RouterProvider } from 'react-router-dom';
@@ -102,12 +103,15 @@ function renderRoute(path: string) {
       mutations: { retry: false },
     },
   });
+  queryClient.setQueryData(['auth', 'current-user'], authMocks.user);
   const router = createAppRouter({ initialEntries: [path] });
   return render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ToastProvider>
-          <RouterProvider router={router} />
+          <Suspense fallback={<div role="status">Loading page...</div>}>
+            <RouterProvider router={router} />
+          </Suspense>
         </ToastProvider>
       </AuthProvider>
     </QueryClientProvider>,
@@ -168,7 +172,11 @@ describe('guardian management pages', () => {
     renderRoute(`/admin/organizations/${organizationId}/guardians`);
 
     expect(
-      await screen.findByRole('link', { name: 'Leela Rao' }),
+      await screen.findByRole(
+        'link',
+        { name: 'Leela Rao' },
+        { timeout: 3_000 },
+      ),
     ).toBeVisible();
     expect(document.body).not.toHaveTextContent(guardianId);
     await user.type(

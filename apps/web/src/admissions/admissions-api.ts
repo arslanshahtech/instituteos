@@ -31,6 +31,10 @@ export interface ApplicationRecord {
   phone?: string;
   source?: string;
   program?: string;
+  dateOfBirth?: string;
+  guardianName?: string;
+  guardianPhone?: string;
+  feePlan?: 'Standard' | 'Scholarship' | 'Sibling plan';
   status: ApplicationStatus;
   notes?: string;
   decisionReason?: string;
@@ -65,6 +69,10 @@ export interface ApplicationInput {
   source?: string;
   preferredCampusId?: string;
   program?: string;
+  dateOfBirth?: string;
+  guardianName?: string;
+  guardianPhone?: string;
+  feePlan?: 'Standard' | 'Scholarship' | 'Sibling plan';
   status?: ApplicationStatus;
   notes?: string;
 }
@@ -162,7 +170,11 @@ export function getApplication(
 export function reviewApplication(
   organizationId: string,
   applicationId: string,
-  input: { status: ApplicationStatus; decisionReason?: string },
+  input: {
+    status: ApplicationStatus;
+    decisionReason?: string;
+    campusId?: string;
+  },
 ): Promise<{
   application: ApplicationRecord;
   student?: { id: string; firstName: string; lastName: string };

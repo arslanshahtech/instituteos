@@ -210,6 +210,23 @@ feeConcessionSchema.index(
   { name: 'idx_student_active_concessions' },
 );
 
+const financeSequenceSchema = new Schema(
+  {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: true,
+    },
+    name: { type: String, required: true, trim: true, maxlength: 40 },
+    value: { type: Number, required: true, min: 0, default: 0 },
+  },
+  { timestamps: true, versionKey: false },
+);
+financeSequenceSchema.index(
+  { organizationId: 1, name: 1 },
+  { unique: true, name: 'uniq_finance_sequence_per_organization' },
+);
+
 export const FeeStructureModel =
   mongoose.models.FeeStructure ??
   mongoose.model('FeeStructure', feeStructureSchema);
@@ -222,3 +239,6 @@ export const PaymentReceiptModel =
 export const FeeConcessionModel =
   mongoose.models.FeeConcession ??
   mongoose.model('FeeConcession', feeConcessionSchema);
+export const FinanceSequenceModel =
+  mongoose.models.FinanceSequence ??
+  mongoose.model('FinanceSequence', financeSequenceSchema);

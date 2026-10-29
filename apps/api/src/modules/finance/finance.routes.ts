@@ -32,7 +32,11 @@ import type {
 
 function bodyObject(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'A valid JSON object is required.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'A valid JSON object is required.',
+    );
   }
   return value as Record<string, unknown>;
 }
@@ -59,7 +63,11 @@ function objectId(value: unknown, field: string): string {
 
 function amount(value: unknown, field: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new AppError(400, 'VALIDATION_ERROR', `Enter a valid ${field} amount.`);
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      `Enter a valid ${field} amount.`,
+    );
   }
   return value;
 }
@@ -107,7 +115,11 @@ function organizationContext(response: {
 }): FinanceContext {
   const context = response.locals?.organizationContext;
   if (!context) {
-    throw new AppError(404, 'ORGANIZATION_NOT_FOUND', 'Organization not found.');
+    throw new AppError(
+      404,
+      'ORGANIZATION_NOT_FOUND',
+      'Organization not found.',
+    );
   }
   return {
     organizationId: context.organizationId,
@@ -131,7 +143,11 @@ function invoiceQuery(query: Record<string, unknown>): InvoiceQuery {
     status !== 'paid' &&
     status !== 'overdue'
   ) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid invoice status.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Select a valid invoice status.',
+    );
   }
   return {
     campusId: queryId(query.campusId, 'campus'),
@@ -155,14 +171,23 @@ function paymentInput(body: Record<string, unknown>): PaymentInput {
     method !== 'card' &&
     method !== 'online'
   ) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid payment method.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Select a valid payment method.',
+    );
   }
   return {
     amountPaid: amount(body.amountPaid, 'payment'),
     paymentMethod: method as PaymentMethod,
     paymentDate: date(body.paymentDate, 'payment date'),
     ...(optionalText(body.transactionReference, 'transaction reference')
-      ? { transactionReference: text(body.transactionReference, 'transaction reference') }
+      ? {
+          transactionReference: text(
+            body.transactionReference,
+            'transaction reference',
+          ),
+        }
       : {}),
   };
 }
@@ -178,16 +203,26 @@ function feeConcessionInput(body: Record<string, unknown>): FeeConcessionInput {
     concessionType !== 'need_based' &&
     concessionType !== 'special'
   ) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid concession type.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Select a valid concession type.',
+    );
   }
 
   if (discountType !== 'percentage' && discountType !== 'fixed') {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid discount type.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Select a valid discount type.',
+    );
   }
 
   return {
     studentId: objectId(body.studentId, 'student'),
-    academicYearId: body.academicYearId ? objectId(body.academicYearId, 'academic year') : undefined,
+    academicYearId: body.academicYearId
+      ? objectId(body.academicYearId, 'academic year')
+      : undefined,
     concessionType: concessionType as ConcessionType,
     discountType: discountType as DiscountType,
     discountValue: amount(body.discountValue, 'discount value'),
@@ -211,8 +246,7 @@ function defaultAuthenticate() {
 
 export function createFinanceRouter(
   service = new FinanceService(new MongoFinanceRepository()),
-  accessRepository: OrganizationAccessRepository =
-    new MongoOrganizationAccessRepository(),
+  accessRepository: OrganizationAccessRepository = new MongoOrganizationAccessRepository(),
   authenticate = defaultAuthenticate(),
 ) {
   const router = Router();
@@ -289,6 +323,24 @@ export function createFinanceRouter(
       });
     }),
   );
+  router.get(
+    `${base}/collections/daily`,
+    ...read,
+    asyncHandler(async (request, response) => {
+      const dateFrom = date(request.query.dateFrom, 'start date');
+      const dateTo = date(request.query.dateTo, 'end date');
+      response.status(200).json({
+        items: await service.listDailyCollections(
+          organizationContext(response),
+          {
+            dateFrom,
+            dateTo,
+          },
+        ),
+      });
+    }),
+  );
+
   router.post(
     `${base}/invoices/generate`,
     ...write,
@@ -312,13 +364,15 @@ export function createFinanceRouter(
     csrfProtection,
     asyncHandler(async (request, response) => {
       const invoiceId = objectId(request.params.invoiceId, 'invoice');
-      response.status(201).json(
-        await service.recordPayment(
-          organizationContext(response),
-          invoiceId,
-          paymentInput(bodyObject(request.body)),
-        ),
-      );
+      response
+        .status(201)
+        .json(
+          await service.recordPayment(
+            organizationContext(response),
+            invoiceId,
+            paymentInput(bodyObject(request.body)),
+          ),
+        );
     }),
   );
 
@@ -327,21 +381,26 @@ export function createFinanceRouter(
     ...read,
     asyncHandler(async (request, response) => {
       const studentId = objectId(request.params.studentId, 'student');
-      response.status(200).json(
-        await service.getStudentFeeLedger(
-          organizationContext(response),
-          studentId,
-        ),
-      );
+      response
+        .status(200)
+        .json(
+          await service.getStudentFeeLedger(
+            organizationContext(response),
+            studentId,
+          ),
+        );
     }),
   );
-  
+
   router.get(
     `${base}/students/:studentId/concessions`,
     ...read,
     asyncHandler(async (request, response) => {
       const studentId = objectId(request.params.studentId, 'student');
-      const academicYearId = queryId(request.query.academicYearId, 'academic year');
+      const academicYearId = queryId(
+        request.query.academicYearId,
+        'academic year',
+      );
       response.status(200).json({
         items: await service.listStudentConcessions(
           organizationContext(response),
@@ -358,9 +417,14 @@ export function createFinanceRouter(
     csrfProtection,
     asyncHandler(async (request, response) => {
       const input = feeConcessionInput(bodyObject(request.body));
-      const concessionId = request.body && typeof request.body === 'object' && 'id' in request.body
-        ? optionalText((request.body as Record<string, unknown>).id, 'concession id', 24)
-        : undefined;
+      const concessionId =
+        request.body && typeof request.body === 'object' && 'id' in request.body
+          ? optionalText(
+              (request.body as Record<string, unknown>).id,
+              'concession id',
+              24,
+            )
+          : undefined;
 
       response.status(201).json({
         concession: await service.saveFeeConcession(
@@ -378,7 +442,10 @@ export function createFinanceRouter(
     csrfProtection,
     asyncHandler(async (request, response) => {
       const concessionId = objectId(request.params.concessionId, 'concession');
-      await service.deleteFeeConcession(organizationContext(response), concessionId);
+      await service.deleteFeeConcession(
+        organizationContext(response),
+        concessionId,
+      );
       response.status(204).end();
     }),
   );
@@ -389,12 +456,14 @@ export function createFinanceRouter(
     csrfProtection,
     asyncHandler(async (request, response) => {
       const invoiceId = objectId(request.params.invoiceId, 'invoice');
-      response.status(200).json(
-        await service.requestInvoiceDeleteOtp(
-          organizationContext(response),
-          invoiceId,
-        ),
-      );
+      response
+        .status(200)
+        .json(
+          await service.requestInvoiceDeleteOtp(
+            organizationContext(response),
+            invoiceId,
+          ),
+        );
     }),
   );
 

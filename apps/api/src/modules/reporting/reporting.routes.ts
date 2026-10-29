@@ -4,9 +4,7 @@ import { env } from '../../config/env.js';
 import { AppError } from '../../errors/app-error.js';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { authEmailDelivery } from '../auth/auth.email.js';
-import {
-  createAuthenticationMiddleware,
-} from '../auth/auth.middleware.js';
+import { createAuthenticationMiddleware } from '../auth/auth.middleware.js';
 import { MongoAuthRepository } from '../auth/auth.repository.js';
 import { AuthService } from '../auth/auth.service.js';
 import { MongoOrganizationAccessRepository } from '../tenancy/tenancy.repository.js';
@@ -17,10 +15,7 @@ import {
 } from '../tenancy/tenant-context.middleware.js';
 import { MongoReportingRepository } from './reporting.repository.js';
 import { ReportingService } from './reporting.service.js';
-import type {
-  AuditLogQuery,
-  ReportType,
-} from './reporting.types.js';
+import type { AuditLogQuery, ReportType } from './reporting.types.js';
 
 interface ReportingContext {
   organizationId: string;
@@ -33,7 +28,11 @@ function reportingContext(response: {
 }): ReportingContext {
   const context = response.locals?.organizationContext;
   if (!context) {
-    throw new AppError(404, 'ORGANIZATION_NOT_FOUND', 'Organization not found.');
+    throw new AppError(
+      404,
+      'ORGANIZATION_NOT_FOUND',
+      'Organization not found.',
+    );
   }
   return context;
 }
@@ -68,11 +67,7 @@ function queryInteger(
     Number(value) < 1 ||
     Number(value) > max
   ) {
-    throw new AppError(
-      400,
-      'VALIDATION_ERROR',
-      `Enter a valid ${field}.`,
-    );
+    throw new AppError(400, 'VALIDATION_ERROR', `Enter a valid ${field}.`);
   }
   return Number(value);
 }
@@ -98,8 +93,7 @@ function defaultAuthenticate() {
 
 export function createReportingRouter(
   service = new ReportingService(new MongoReportingRepository()),
-  accessRepository: OrganizationAccessRepository =
-    new MongoOrganizationAccessRepository(),
+  accessRepository: OrganizationAccessRepository = new MongoOrganizationAccessRepository(),
   authenticate = defaultAuthenticate(),
 ) {
   const router = Router();
@@ -180,7 +174,12 @@ export function createReportingRouter(
     asyncHandler(async (request, response) => {
       const context = reportingContext(response);
       const query: AuditLogQuery = {
-        page: queryInteger(request.query.page, 'page', 1, Number.MAX_SAFE_INTEGER),
+        page: queryInteger(
+          request.query.page,
+          'page',
+          1,
+          Number.MAX_SAFE_INTEGER,
+        ),
         pageSize: queryInteger(request.query.pageSize, 'page size', 20, 100),
         action: queryText(request.query.action, 'action'),
         entityType: queryText(request.query.entityType, 'entity type'),

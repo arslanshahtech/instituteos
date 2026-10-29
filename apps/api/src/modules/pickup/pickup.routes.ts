@@ -29,7 +29,11 @@ import type {
 
 function bodyObject(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'A valid JSON object is required.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'A valid JSON object is required.',
+    );
   }
   return value as Record<string, unknown>;
 }
@@ -66,7 +70,11 @@ function organizationContext(response: {
 }) {
   const context = response.locals?.organizationContext;
   if (!context) {
-    throw new AppError(404, 'ORGANIZATION_NOT_FOUND', 'Organization not found.');
+    throw new AppError(
+      404,
+      'ORGANIZATION_NOT_FOUND',
+      'Organization not found.',
+    );
   }
   return {
     organizationId: context.organizationId,
@@ -102,7 +110,8 @@ export function createPickupRouter(
   authenticate = defaultAuthenticate(),
 ) {
   const router = Router();
-  const resolveOrganization = createOrganizationContextMiddleware(accessRepository);
+  const resolveOrganization =
+    createOrganizationContextMiddleware(accessRepository);
 
   const base = '/:organizationId/pickup';
 
@@ -134,14 +143,22 @@ export function createPickupRouter(
 
       const input: CreatePickupPersonInput = {
         fullName: stringField(body, 'fullName', 120)!,
-        relationship: stringField(body, 'relationship', 30) as PickupPersonRelationship,
+        relationship: stringField(
+          body,
+          'relationship',
+          30,
+        ) as PickupPersonRelationship,
         cnic: stringField(body, 'cnic', 20, true),
         phone: stringField(body, 'phone', 30)!,
         photoUrl: stringField(body, 'photoUrl', 500, true),
         notes: stringField(body, 'notes', 500, true),
       };
 
-      const person = await service.registerPickupPerson(organizationId, studentId, input);
+      const person = await service.registerPickupPerson(
+        organizationId,
+        studentId,
+        input,
+      );
       response.status(201).json({ person });
     }),
   );
@@ -160,10 +177,18 @@ export function createPickupRouter(
       const status = stringField(body, 'status', 20)!;
 
       if (status !== 'active' && status !== 'suspended') {
-        throw new AppError(400, 'VALIDATION_ERROR', 'Status must be active or suspended.');
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Status must be active or suspended.',
+        );
       }
 
-      const person = await service.setPersonStatus(organizationId, personId, status);
+      const person = await service.setPersonStatus(
+        organizationId,
+        personId,
+        status,
+      );
       response.status(200).json({ person });
     }),
   );
@@ -182,10 +207,16 @@ export function createPickupRouter(
 
       const input: CreatePickupPassInput = {
         pickupPersonId: objectId(body.pickupPersonId, 'pickup person'),
-        validMinutes: typeof body.validMinutes === 'number' ? body.validMinutes : undefined,
+        validMinutes:
+          typeof body.validMinutes === 'number' ? body.validMinutes : undefined,
       };
 
-      const pass = await service.generateGatePass(organizationId, studentId, userId, input);
+      const pass = await service.generateGatePass(
+        organizationId,
+        studentId,
+        userId,
+        input,
+      );
       response.status(201).json({ pass });
     }),
   );
@@ -208,8 +239,14 @@ export function createPickupRouter(
         notes: stringField(body, 'notes', 500, true),
       };
 
-      const log = await service.verifyAndReleaseStudent(organizationId, staffId, input);
-      response.status(200).json({ log, message: 'Student successfully released.' });
+      const log = await service.verifyAndReleaseStudent(
+        organizationId,
+        staffId,
+        input,
+      );
+      response
+        .status(200)
+        .json({ log, message: 'Student successfully released.' });
     }),
   );
 
@@ -227,14 +264,23 @@ export function createPickupRouter(
 
       const input: ManualOverridePickupInput = {
         studentId: objectId(body.studentId, 'student'),
-        pickupPersonId: typeof body.pickupPersonId === 'string' ? body.pickupPersonId : undefined,
+        pickupPersonId:
+          typeof body.pickupPersonId === 'string'
+            ? body.pickupPersonId
+            : undefined,
         campusId: typeof body.campusId === 'string' ? body.campusId : undefined,
         overrideReason: stringField(body, 'overrideReason', 500)!,
         notes: stringField(body, 'notes', 500, true),
       };
 
-      const log = await service.manualOverrideRelease(organizationId, staffId, input);
-      response.status(200).json({ log, message: 'Emergency release recorded.' });
+      const log = await service.manualOverrideRelease(
+        organizationId,
+        staffId,
+        input,
+      );
+      response
+        .status(200)
+        .json({ log, message: 'Emergency release recorded.' });
     }),
   );
 
@@ -247,7 +293,10 @@ export function createPickupRouter(
     asyncHandler(async (request, response) => {
       const { organizationId } = organizationContext(response);
       const studentId = objectId(request.params.studentId, 'student');
-      const items = await service.getStudentPickupHistory(organizationId, studentId);
+      const items = await service.getStudentPickupHistory(
+        organizationId,
+        studentId,
+      );
       response.status(200).json({ items });
     }),
   );

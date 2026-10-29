@@ -319,3 +319,100 @@
     gap: 0.625rem;
   }
 }
+
+/* Reference-PDF report/workspace shortcuts: compact, monochrome, and clickable. */
+.reporting-shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.reporting-shortcut-card {
+  display: grid;
+  min-width: 0;
+  min-height: 104px;
+  grid-template-columns: 32px minmax(0, 1fr) 16px;
+  align-items: start;
+  gap: 8px;
+  border: 1px solid var(--color-border, #e5e1d9);
+  border-radius: 9px;
+  background: #fff;
+  padding: 13px;
+  color: var(--color-ink, #20252d);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.reporting-shortcut-card:hover {
+  border-color: #b9b5ad;
+  background: #fbfaf7;
+}
+
+.reporting-shortcut-card:focus-visible {
+  outline: 2px solid var(--color-accent, #315b57);
+  outline-offset: 2px;
+}
+
+.reporting-shortcut-card:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.reporting-shortcut-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--color-border, #e5e1d9);
+  border-radius: 8px;
+  background: #f7f6f3;
+  color: #252932;
+}
+
+.reporting-shortcut-copy {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.reporting-shortcut-copy strong {
+  color: #242831;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.reporting-shortcut-copy small {
+  color: #6b7078;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.reporting-shortcut-arrow {
+  display: grid;
+  place-items: center;
+  padding-top: 2px;
+  color: #747982;
+}
+
+@media (max-width: 900px) {
+  .reporting-shortcuts-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .reporting-shortcuts-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reporting-shortcut-card {
+    min-height: 78px;
+    padding: 10px;
+  }
+}

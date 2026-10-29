@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, ArrowLeft, MessageSquare, Send, ShieldCheck, Clock, AlertCircle } from 'lucide-react';
+import {
+  Plus,
+  ArrowLeft,
+  MessageSquare,
+  Send,
+  ShieldCheck,
+  Clock,
+  AlertCircle,
+} from 'lucide-react';
 import { Button } from '../components/ui/Button.js';
 import { Dialog } from '../components/ui/Dialog.js';
 import {
@@ -7,6 +15,7 @@ import {
   useThreadDetail,
   useSendReply,
   useStartConversation,
+  useMessagingContacts,
 } from './communications-api.js';
 
 interface ParentTeacherInboxProps {
@@ -18,6 +27,7 @@ interface ParentTeacherInboxProps {
 export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
   organizationId,
   currentUserId,
+  userRole,
 }) => {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
@@ -33,18 +43,27 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Dropdown Form States
-  const [studentName, setStudentName] = useState('Ali Khan (Grade 5-A)');
-  const [teacherName, setTeacherName] = useState('Usman Tariq (Class Teacher)');
+  // Parent contact choices come from the authenticated account's linked students
+  // and the teachers actually assigned to those students' active sections.
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [selectedTeacherUserId, setSelectedTeacherUserId] = useState('');
   const [subjectTitle, setSubjectTitle] = useState('');
   const [initialMessage, setInitialMessage] = useState('');
   const [formError, setFormError] = useState('');
 
-  const { data: threadsData, isLoading: loadingThreads } = useThreads(organizationId);
-  const { data: activeThreadData, isLoading: loadingMessages } = useThreadDetail(
+  const { data: threadsData, isLoading: loadingThreads } =
+    useThreads(organizationId);
+  const contactsQuery = useMessagingContacts(
     organizationId,
-    selectedThreadId,
+    userRole === 'parent_guardian',
   );
+  const contacts = contactsQuery.data?.items ?? [];
+  const selectedStudent = contacts.find(
+    (contact) => contact.studentId === selectedStudentId,
+  );
+  const availableTeachers = selectedStudent?.teachers ?? [];
+  const { data: activeThreadData, isLoading: loadingMessages } =
+    useThreadDetail(organizationId, selectedThreadId);
 
   const replyMutation = useSendReply(organizationId, selectedThreadId ?? '');
   const startMutation = useStartConversation(organizationId);
@@ -52,6 +71,23 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
   const threads = threadsData?.items ?? [];
   const messages = activeThreadData?.messages ?? [];
   const currentThread = activeThreadData?.thread;
+
+  useEffect(() => {
+    if (userRole !== 'parent_guardian' || contacts.length === 0) return;
+    const contact =
+      contacts.find((item) => item.studentId === selectedStudentId) ??
+      contacts[0]!;
+    if (selectedStudentId !== contact.studentId) {
+      setSelectedStudentId(contact.studentId);
+    }
+    if (
+      !contact.teachers.some(
+        (teacher) => teacher.userId === selectedTeacherUserId,
+      )
+    ) {
+      setSelectedTeacherUserId(contact.teachers[0]?.userId ?? '');
+    }
+  }, [contacts, userRole, selectedStudentId, selectedTeacherUserId]);
 
   // Auto-scroll to latest message
   useEffect(() => {
@@ -74,9 +110,13 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
     try {
       setReplyText('');
       await replyMutation.mutateAsync(textToSend);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setReplyText(textToSend);
-      setReplyError(err.message || 'Message send failed. Check connection or authorization.');
+      setReplyError(
+        err instanceof Error
+          ? err.message
+          : 'Message send failed. Check connection or authorization.',
+      );
     }
   };
 
@@ -91,16 +131,34 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
     e.preventDefault();
     setFormError('');
 
-    if (!subjectTitle.trim() || !initialMessage.trim()) {
-      setFormError('Please fill in all fields.');
+    if (
+      !selectedStudentId ||
+      !selectedTeacherUserId ||
+      !subjectTitle.trim() ||
+      !initialMessage.trim()
+    ) {
+      setFormError(
+        'Select a linked student and assigned teacher, then enter a subject and message.',
+      );
+      return;
+    }
+    if (
+      !selectedStudent ||
+      !availableTeachers.some(
+        (teacher) => teacher.userId === selectedTeacherUserId,
+      )
+    ) {
+      setFormError(
+        'The selected teacher is not available for this linked student. Refresh contacts and try again.',
+      );
       return;
     }
 
     try {
       const result = await startMutation.mutateAsync({
-        studentId: '64c911e5a7c736302904df70',
-        teacherUserId: '64c911e5a7c736302904df71',
-        subjectTitle: `[${studentName}] ${subjectTitle.trim()}`,
+        studentId: selectedStudentId,
+        teacherUserId: selectedTeacherUserId,
+        subjectTitle: `[${selectedStudent.studentName}] ${subjectTitle.trim()}`,
         initialMessage: initialMessage.trim(),
       });
 
@@ -110,8 +168,10 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
       if (result.thread?.id) {
         setSelectedThreadId(result.thread.id);
       }
-    } catch (err: any) {
-      setFormError(err.message || 'Failed to start conversation.');
+    } catch (err: unknown) {
+      setFormError(
+        err instanceof Error ? err.message : 'Failed to start conversation.',
+      );
     }
   };
 
@@ -120,6 +180,7 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
 
   return (
     <div
+      className="parent-teacher-inbox"
       style={{
         display: 'flex',
         flexDirection: 'row',
@@ -154,37 +215,63 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
             }}
           >
             <div>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  color: '#0f172a',
+                }}
+              >
                 Messages
               </h3>
-              <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}>
-                Parent-Teacher Desk
-              </p>
+              <p
+                style={{ margin: 0, fontSize: '0.72rem', color: '#64748b' }}
+              ></p>
             </div>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => setNewChatOpen(true)}
-              style={{
-                padding: '0.35rem 0.65rem',
-                fontSize: '0.78rem',
-                borderRadius: '0.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-              }}
-            >
-              <Plus size={14} /> New
-            </Button>
+            {userRole === 'parent_guardian' && (
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => setNewChatOpen(true)}
+                disabled={
+                  contactsQuery.isPending ||
+                  !contacts.some((contact) => contact.teachers.length > 0)
+                }
+                style={{
+                  padding: '0.35rem 0.65rem',
+                  fontSize: '0.78rem',
+                  borderRadius: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                }}
+              >
+                <Plus size={14} /> New Message
+              </Button>
+            )}
           </div>
 
           <div style={{ flexGrow: 1, overflowY: 'auto' }}>
             {loadingThreads ? (
-              <div style={{ padding: '1.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+              <div
+                style={{
+                  padding: '1.5rem',
+                  textAlign: 'center',
+                  color: '#94a3b8',
+                  fontSize: '0.85rem',
+                }}
+              >
                 Loading...
               </div>
             ) : threads.length === 0 ? (
-              <div style={{ padding: '2rem 1.25rem', textAlign: 'center', color: '#64748b' }}>
+              <div
+                style={{
+                  padding: '2rem 1.25rem',
+                  textAlign: 'center',
+                  color: '#64748b',
+                }}
+              >
                 <div
                   style={{
                     width: '42px',
@@ -200,9 +287,39 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
                 >
                   <MessageSquare size={20} />
                 </div>
-                <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#1e293b' }}>No conversations yet</div>
-                <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
-                  Tap <strong>New</strong> to start a conversation.
+                <div
+                  style={{
+                    fontWeight: 600,
+                    fontSize: '0.9rem',
+                    color: '#1e293b',
+                  }}
+                >
+                  No conversations yet
+                </div>
+                <div
+                  style={{
+                    fontSize: '0.75rem',
+                    color: '#64748b',
+                    marginTop: '0.25rem',
+                  }}
+                >
+                  {userRole !== 'parent_guardian' ? (
+                    'Messages will appear here after a linked parent starts a conversation.'
+                  ) : contactsQuery.isPending ? (
+                    'Checking linked children and assigned teachers…'
+                  ) : contactsQuery.isError ? (
+                    'Contact list could not be loaded. Refresh this page and try again.'
+                  ) : contacts.length === 0 ? (
+                    'No active children are linked to this guardian account yet. Contact the college office.'
+                  ) : !contacts.some(
+                      (contact) => contact.teachers.length > 0,
+                    ) ? (
+                    'No linked child has an assigned teacher account for the active academic year yet.'
+                  ) : (
+                    <>
+                      Select <strong>New</strong> to start a conversation.
+                    </>
+                  )}
                 </div>
               </div>
             ) : (
@@ -223,14 +340,28 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
                       border: 'none',
                       borderBottom: '1px solid #f1f5f9',
                       backgroundColor: isSelected ? '#f8fafc' : '#ffffff',
-                      borderLeft: isSelected ? '3px solid #2563eb' : '3px solid transparent',
+                      borderLeft: isSelected
+                        ? '3px solid #2563eb'
+                        : '3px solid transparent',
                       cursor: 'pointer',
                     }}
                   >
-                    <div style={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a' }}>
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        fontSize: '0.85rem',
+                        color: '#0f172a',
+                      }}
+                    >
                       {thread.subjectTitle}
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem' }}>
+                    <div
+                      style={{
+                        fontSize: '0.72rem',
+                        color: '#94a3b8',
+                        marginTop: '0.2rem',
+                      }}
+                    >
                       {new Date(thread.lastMessageAt).toLocaleDateString([], {
                         month: 'short',
                         day: 'numeric',
@@ -283,10 +414,25 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
                   </button>
                 )}
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: '#0f172a' }}>
+                  <h4
+                    style={{
+                      margin: 0,
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      color: '#0f172a',
+                    }}
+                  >
                     {currentThread.subjectTitle}
                   </h4>
-                  <div style={{ fontSize: '0.7rem', color: '#059669', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <div
+                    style={{
+                      fontSize: '0.7rem',
+                      color: '#059669',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                    }}
+                  >
                     <ShieldCheck size={12} /> Contact privacy protected
                   </div>
                 </div>
@@ -307,7 +453,8 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
               >
                 <Clock size={13} />
                 <span>
-                  <strong>Office Hours:</strong> Teachers reply between <strong>2:00 PM – 3:30 PM</strong> to protect teaching time.
+                  <strong>Office Hours:</strong> Teachers reply between{' '}
+                  <strong>2:00 PM – 3:30 PM</strong> to protect teaching time.
                 </span>
               </div>
 
@@ -323,11 +470,25 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
                 }}
               >
                 {loadingMessages ? (
-                  <div style={{ color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center', margin: 'auto' }}>
+                  <div
+                    style={{
+                      color: '#94a3b8',
+                      fontSize: '0.8rem',
+                      textAlign: 'center',
+                      margin: 'auto',
+                    }}
+                  >
                     Loading messages...
                   </div>
                 ) : messages.length === 0 ? (
-                  <div style={{ color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center', margin: 'auto' }}>
+                  <div
+                    style={{
+                      color: '#94a3b8',
+                      fontSize: '0.8rem',
+                      textAlign: 'center',
+                      margin: 'auto',
+                    }}
+                  >
                     No messages yet in this conversation.
                   </div>
                 ) : (
@@ -347,14 +508,40 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
                           border: isSelf ? 'none' : '1px solid #e2e8f0',
                         }}
                       >
-                        <div style={{ fontSize: '0.65rem', opacity: 0.8, marginBottom: '0.15rem' }}>
-                          {isSelf ? 'You' : msg.senderRole === 'teacher' ? 'Class Teacher' : 'Parent'}
+                        <div
+                          style={{
+                            fontSize: '0.65rem',
+                            opacity: 0.8,
+                            marginBottom: '0.15rem',
+                          }}
+                        >
+                          {isSelf
+                            ? 'You'
+                            : msg.senderRole === 'teacher'
+                              ? 'Class Teacher'
+                              : 'Parent'}
                         </div>
-                        <div style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                        <div
+                          style={{
+                            fontSize: '0.85rem',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                          }}
+                        >
                           {msg.content}
                         </div>
-                        <div style={{ fontSize: '0.6rem', marginTop: '0.2rem', textAlign: 'right', opacity: 0.7 }}>
-                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        <div
+                          style={{
+                            fontSize: '0.6rem',
+                            marginTop: '0.2rem',
+                            textAlign: 'right',
+                            opacity: 0.7,
+                          }}
+                        >
+                          {new Date(msg.createdAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
                         </div>
                       </div>
                     );
@@ -446,38 +633,101 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
           if (!open) setNewChatOpen(false);
         }}
       >
-        <form onSubmit={handleStartConversation} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        <form
+          onSubmit={handleStartConversation}
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}
+        >
           <div>
-            <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+            <label
+              style={{
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                display: 'block',
+                marginBottom: '0.25rem',
+              }}
+            >
               Select Student
             </label>
             <select
-              value={studentName}
-              onChange={(e) => setStudentName(e.target.value)}
-              style={{ width: '100%', padding: '0.45rem', border: '1px solid #cbd5e1', borderRadius: '0.35rem', fontSize: '0.85rem' }}
+              aria-label="Select linked student"
+              required
+              value={selectedStudentId}
+              onChange={(event) => {
+                const nextStudentId = event.target.value;
+                const nextStudent = contacts.find(
+                  (item) => item.studentId === nextStudentId,
+                );
+                setSelectedStudentId(nextStudentId);
+                setSelectedTeacherUserId(
+                  nextStudent?.teachers[0]?.userId ?? '',
+                );
+              }}
+              disabled={contactsQuery.isPending || contacts.length === 0}
+              style={{
+                width: '100%',
+                padding: '0.45rem',
+                border: '1px solid #cbd5e1',
+                borderRadius: '0.35rem',
+                fontSize: '0.85rem',
+              }}
             >
-              <option value="Ali Khan (Grade 5-A)">Ali Khan (Grade 5-A)</option>
-              <option value="Zainab Khan (Grade 2-B)">Zainab Khan (Grade 2-B)</option>
+              <option value="">Select a linked student</option>
+              {contacts.map((contact) => (
+                <option key={contact.studentId} value={contact.studentId}>
+                  {contact.studentName} · {contact.className}{' '}
+                  {contact.sectionName}
+                </option>
+              ))}
             </select>
           </div>
 
           <div>
-            <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+            <label
+              style={{
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                display: 'block',
+                marginBottom: '0.25rem',
+              }}
+            >
               Select Assigned Teacher
             </label>
             <select
-              value={teacherName}
-              onChange={(e) => setTeacherName(e.target.value)}
-              style={{ width: '100%', padding: '0.45rem', border: '1px solid #cbd5e1', borderRadius: '0.35rem', fontSize: '0.85rem' }}
+              aria-label="Select assigned teacher"
+              required
+              value={selectedTeacherUserId}
+              onChange={(event) => setSelectedTeacherUserId(event.target.value)}
+              disabled={
+                contactsQuery.isPending || availableTeachers.length === 0
+              }
+              style={{
+                width: '100%',
+                padding: '0.45rem',
+                border: '1px solid #cbd5e1',
+                borderRadius: '0.35rem',
+                fontSize: '0.85rem',
+              }}
             >
-              <option value="Usman Tariq (Class Teacher)">Usman Tariq (Class Teacher)</option>
-              <option value="Sara Ahmed (Mathematics)">Sara Ahmed (Mathematics)</option>
-              <option value="Bilal Qureshi (Science)">Bilal Qureshi (Science)</option>
+              <option value="">
+                Select a teacher assigned to this section
+              </option>
+              {availableTeachers.map((teacher) => (
+                <option key={teacher.userId} value={teacher.userId}>
+                  {teacher.displayName}
+                </option>
+              ))}
             </select>
           </div>
 
           <div>
-            <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+            <label
+              style={{
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                display: 'block',
+                marginBottom: '0.25rem',
+              }}
+            >
               Subject
             </label>
             <input
@@ -486,12 +736,25 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
               placeholder="e.g. Mathematics Progress / Leave Inquiry"
               value={subjectTitle}
               onChange={(e) => setSubjectTitle(e.target.value)}
-              style={{ width: '100%', padding: '0.45rem', border: '1px solid #cbd5e1', borderRadius: '0.35rem', fontSize: '0.85rem' }}
+              style={{
+                width: '100%',
+                padding: '0.45rem',
+                border: '1px solid #cbd5e1',
+                borderRadius: '0.35rem',
+                fontSize: '0.85rem',
+              }}
             />
           </div>
 
           <div>
-            <label style={{ fontSize: '0.78rem', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+            <label
+              style={{
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                display: 'block',
+                marginBottom: '0.25rem',
+              }}
+            >
               Initial Message
             </label>
             <textarea
@@ -500,19 +763,42 @@ export const ParentTeacherInbox: React.FC<ParentTeacherInboxProps> = ({
               placeholder="Write your note..."
               value={initialMessage}
               onChange={(e) => setInitialMessage(e.target.value)}
-              style={{ width: '100%', padding: '0.45rem', border: '1px solid #cbd5e1', borderRadius: '0.35rem', fontSize: '0.85rem' }}
+              style={{
+                width: '100%',
+                padding: '0.45rem',
+                border: '1px solid #cbd5e1',
+                borderRadius: '0.35rem',
+                fontSize: '0.85rem',
+              }}
             />
           </div>
 
           {formError && (
-            <div style={{ color: '#dc2626', fontSize: '0.78rem' }}>{formError}</div>
+            <div style={{ color: '#dc2626', fontSize: '0.78rem' }}>
+              {formError}
+            </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.4rem' }}>
-            <Button type="button" variant="quiet" onClick={() => setNewChatOpen(false)}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '0.5rem',
+              marginTop: '0.4rem',
+            }}
+          >
+            <Button
+              type="button"
+              variant="quiet"
+              onClick={() => setNewChatOpen(false)}
+            >
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={startMutation.isPending}>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={startMutation.isPending}
+            >
               {startMutation.isPending ? 'Sending...' : 'Send Message'}
             </Button>
           </div>

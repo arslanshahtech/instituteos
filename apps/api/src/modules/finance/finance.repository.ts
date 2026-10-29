@@ -1,8 +1,9 @@
-import { randomUUID } from 'node:crypto';
-import mongoose, { Types } from 'mongoose';
-import { AcademicClassModel, AcademicYearModel } from '../academics/academics.model.js';
+import mongoose, { Types, type PipelineStage } from 'mongoose';
 import {
-  EnrollmentModel,
+  AcademicClassModel,
+  AcademicYearModel,
+} from '../academics/academics.model.js';
+import {
   StudentModel,
   GuardianModel,
   StudentGuardianLinkModel,
@@ -13,6 +14,7 @@ import type {
   FeeStructureRecord,
   FinanceRepository,
   InvoiceQuery,
+  DailyCollectionRecord,
   PaymentInput,
   PaymentReceiptRecord,
   PaymentNotificationPayload,
@@ -29,6 +31,7 @@ import {
   PaymentReceiptModel,
   StudentInvoiceModel,
   FeeConcessionModel,
+  FinanceSequenceModel,
 } from './finance.model.js';
 
 const oid = (id: string) => new Types.ObjectId(id);
@@ -36,10 +39,9 @@ const money = (amount: number) =>
   mongoose.Types.Decimal128.fromString(amount.toFixed(2));
 const decimalNumber = (value: unknown) => Number(value?.toString() ?? 0);
 const iso = (value: Date | string) => new Date(value).toISOString();
-const randomNumber = (prefix: string) =>
-  `${prefix}-${randomUUID().replaceAll('-', '').slice(0, 16).toUpperCase()}`;
-
-function feeStructureRecord(record: Record<string, unknown>): FeeStructureRecord {
+function feeStructureRecord(
+  record: Record<string, unknown>,
+): FeeStructureRecord {
   const heads = record.feeHeads as Array<Record<string, unknown>>;
   return {
     id: String(record._id),
@@ -58,13 +60,18 @@ function feeStructureRecord(record: Record<string, unknown>): FeeStructureRecord
   };
 }
 
-function feeConcessionRecord(record: Record<string, unknown>): FeeConcessionRecord {
+function feeConcessionRecord(
+  record: Record<string, unknown>,
+): FeeConcessionRecord {
   return {
     id: String(record._id),
     organizationId: String(record.organizationId),
     studentId: String(record.studentId),
-    academicYearId: record.academicYearId ? String(record.academicYearId) : undefined,
-    concessionType: record.concessionType as FeeConcessionRecord['concessionType'],
+    academicYearId: record.academicYearId
+      ? String(record.academicYearId)
+      : undefined,
+    concessionType:
+      record.concessionType as FeeConcessionRecord['concessionType'],
     discountType: record.discountType as FeeConcessionRecord['discountType'],
     discountValue: decimalNumber(record.discountValue),
     reason: record.reason ? String(record.reason) : undefined,
@@ -76,23 +83,27 @@ function feeConcessionRecord(record: Record<string, unknown>): FeeConcessionReco
 
 function invoiceRecord(record: Record<string, unknown>): StudentInvoiceRecord {
   const student = record.studentId as
-    | Record<string, unknown>
-    | Types.ObjectId
-    | undefined;
+    Record<string, unknown> | Types.ObjectId | undefined;
   const structure = record.feeStructureId as
-    | Record<string, unknown>
-    | Types.ObjectId
-    | undefined;
+    Record<string, unknown> | Types.ObjectId | undefined;
   const studentObject =
     student && !(student instanceof Types.ObjectId) ? student : undefined;
   const structureObject =
     structure && !(structure instanceof Types.ObjectId) ? structure : undefined;
   const paidAmount = decimalNumber(record.paidAmount);
   const totalAmount = decimalNumber(record.totalAmount);
-  const arrearsAmount = record.arrearsAmount ? decimalNumber(record.arrearsAmount) : 0;
-  const currentAmount = record.currentAmount ? decimalNumber(record.currentAmount) : totalAmount;
-  const discountAmount = record.discountAmount ? decimalNumber(record.discountAmount) : 0;
-  const discountReason = record.discountReason ? String(record.discountReason) : undefined;
+  const arrearsAmount = record.arrearsAmount
+    ? decimalNumber(record.arrearsAmount)
+    : 0;
+  const currentAmount = record.currentAmount
+    ? decimalNumber(record.currentAmount)
+    : totalAmount;
+  const discountAmount = record.discountAmount
+    ? decimalNumber(record.discountAmount)
+    : 0;
+  const discountReason = record.discountReason
+    ? String(record.discountReason)
+    : undefined;
   const dueDate = iso(record.dueDate as Date);
   const calculatedStatus =
     paidAmount >= totalAmount
@@ -103,7 +114,10 @@ function invoiceRecord(record: Record<string, unknown>): StudentInvoiceRecord {
           ? 'partial'
           : 'unpaid';
 
-  const rawPhone = studentObject && typeof studentObject.phone === 'string' ? studentObject.phone : '';
+  const rawPhone =
+    studentObject && typeof studentObject.phone === 'string'
+      ? studentObject.phone
+      : '';
 
   return {
     id: String(record._id),
@@ -253,7 +267,7 @@ export class MongoFinanceRepository implements FinanceRepository {
     const now = new Date();
     const statusFilter =
       query.status === 'overdue'
-        ? { status: { $ne: 'paid' }, dueDate: {$lt: now } }
+        ? { status: { $ne: 'paid' }, dueDate: { $lt: now } }
         : query.status
           ? {
               status: query.status,
@@ -289,6 +303,62 @@ export class MongoFinanceRepository implements FinanceRepository {
     return records.map((record) =>
       invoiceRecord(record as unknown as Record<string, unknown>),
     );
+  }
+
+  async listDailyCollections(
+    organizationId: string,
+    dateFrom: string,
+    dateTo: string,
+    campusIds?: string[],
+  ): Promise<DailyCollectionRecord[]> {
+    if (campusIds && campusIds.length === 0) return [];
+    const start = new Date(`${dateFrom}T00:00:00.000Z`);
+    const end = new Date(`${dateTo}T00:00:00.000Z`);
+    end.setUTCDate(end.getUTCDate() + 1);
+    const pipeline: PipelineStage[] = [
+      {
+        $match: {
+          organizationId: oid(organizationId),
+          paymentDate: { $gte: start, $lt: end },
+        },
+      },
+      {
+        $lookup: {
+          from: StudentInvoiceModel.collection.name,
+          localField: 'invoiceId',
+          foreignField: '_id',
+          as: 'invoice',
+        },
+      },
+      { $unwind: '$invoice' },
+      ...(campusIds
+        ? [{ $match: { 'invoice.campusId': { $in: campusIds.map(oid) } } }]
+        : []),
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: '%Y-%m-%d',
+              date: '$paymentDate',
+              timezone: 'UTC',
+            },
+          },
+          amountCollected: { $sum: { $toDouble: '$amountPaid' } },
+          paymentCount: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ];
+    const records = await PaymentReceiptModel.aggregate<{
+      _id: string;
+      amountCollected: number;
+      paymentCount: number;
+    }>(pipeline).exec();
+    return records.map((record) => ({
+      date: record._id,
+      amountCollected: Number(record.amountCollected ?? 0),
+      paymentCount: Number(record.paymentCount ?? 0),
+    }));
   }
 
   async getInvoice(
@@ -330,19 +400,14 @@ export class MongoFinanceRepository implements FinanceRepository {
       .select({ studentId: 1 })
       .lean();
     const placedIds = placements.map((placement) => placement.studentId);
-    const enrolled = await EnrollmentModel.find({
-      organizationId: oid(organizationId),
-      studentId: { $in: placedIds },
-      campusId: academicClass.campusId,
-      status: 'active',
-    })
-      .select({ studentId: 1 })
-      .lean();
-    const enrolledIds = enrolled.map((item) => item.studentId);
+    // Class placement for the selected academic year is the source of truth
+    // for class membership. Do not require a second active Enrollment record:
+    // legacy students may have a valid placement but an absent/stale enrollment.
+    if (!placedIds.length) return [];
     const students = await StudentModel.find({
       organizationId: oid(organizationId),
       status: 'active',
-      _id: { $in: enrolledIds },
+      _id: { $in: placedIds },
     })
       .select({ _id: 1 })
       .lean();
@@ -418,14 +483,25 @@ export class MongoFinanceRepository implements FinanceRepository {
     const issued = new Date(`${issueDate}T00:00:00.000Z`);
     const status = due < issued ? 'overdue' : 'unpaid';
 
-    const documents = targetStudentIds.map((studentId) => {
+    if (!targetStudentIds.length) return [];
+
+    const sequence = await FinanceSequenceModel.findOneAndUpdate(
+      { organizationId: oid(organizationId), name: 'invoice' },
+      { $inc: { value: targetStudentIds.length } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ).lean();
+    const sequenceEnd = Number(sequence?.value ?? targetStudentIds.length);
+    const sequenceStart = sequenceEnd - targetStudentIds.length + 1;
+    const year = String(new Date().getFullYear()).slice(-2);
+
+    const documents = targetStudentIds.map((studentId, index) => {
       const conc = concessionMap.get(studentId);
       const discount = conc ? conc.discountAmount : 0;
       const netTotal = Math.max(0, totalAmount - discount);
 
       return {
         organizationId: oid(organizationId),
-        invoiceNumber: randomNumber('INV'),
+        invoiceNumber: `INV-${year}-${String(sequenceStart + index).padStart(6, '0')}`,
         studentId: oid(studentId),
         feeStructureId: oid(feeStructure.id),
         classId: oid(input.classId),
@@ -476,6 +552,15 @@ export class MongoFinanceRepository implements FinanceRepository {
       calculatedStatus = 'partial';
     }
 
+    const receiptSequence = await FinanceSequenceModel.findOneAndUpdate(
+      { organizationId: oid(organizationId), name: 'receipt' },
+      { $inc: { value: 1 } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ).lean();
+    const receiptNumber = `RCT-${String(new Date().getFullYear()).slice(-2)}-${String(
+      Number(receiptSequence?.value ?? 1),
+    ).padStart(6, '0')}`;
+
     const record = await StudentInvoiceModel.findOneAndUpdate(
       {
         _id: oid(invoice.id),
@@ -499,7 +584,7 @@ export class MongoFinanceRepository implements FinanceRepository {
     const [receiptRecord] = await PaymentReceiptModel.create([
       {
         organizationId: oid(organizationId),
-        receiptNumber: randomNumber('RCT'),
+        receiptNumber,
         invoiceId: oid(invoice.id),
         studentId: oid(invoice.studentId),
         amountPaid: amount,
@@ -520,7 +605,9 @@ export class MongoFinanceRepository implements FinanceRepository {
     }).lean();
 
     if (guardianLink) {
-      const guardian = await GuardianModel.findById(guardianLink.guardianId).lean();
+      const guardian = await GuardianModel.findById(
+        guardianLink.guardianId,
+      ).lean();
       if (guardian && guardian.phone) {
         recipientPhone = guardian.phone;
         recipientName = `${guardian.firstName} ${guardian.lastName}`.trim();
@@ -528,14 +615,21 @@ export class MongoFinanceRepository implements FinanceRepository {
     }
 
     if (!recipientPhone) {
-      const studentDoc = await StudentModel.findById(oid(invoice.studentId)).lean();
+      const studentDoc = await StudentModel.findById(
+        oid(invoice.studentId),
+      ).lean();
       if (studentDoc && studentDoc.phone) {
         recipientPhone = studentDoc.phone;
       }
     }
 
-    const remainingBalance = Math.max(0, invoice.totalAmount - newPaidAmountNum);
-    const invoiceData = invoiceRecord(record as unknown as Record<string, unknown>);
+    const remainingBalance = Math.max(
+      0,
+      invoice.totalAmount - newPaidAmountNum,
+    );
+    const invoiceData = invoiceRecord(
+      record as unknown as Record<string, unknown>,
+    );
 
     let notification: PaymentNotificationPayload | undefined;
     if (recipientPhone) {
@@ -617,10 +711,15 @@ export class MongoFinanceRepository implements FinanceRepository {
 
     for (const inv of invoices) {
       const amount = Number(String(inv.totalAmount ?? 0));
-      const discount = inv.discountAmount ? decimalNumber(inv.discountAmount) : 0;
+      const discount = inv.discountAmount
+        ? decimalNumber(inv.discountAmount)
+        : 0;
       totalBilled += amount;
-      const dateStr = inv.issueDate ? new Date(inv.issueDate).toISOString().slice(0, 10) : '';
-      const discountNote = discount > 0 ? ` — Discount: Rs. ${discount.toFixed(2)}` : '';
+      const dateStr = inv.issueDate
+        ? new Date(inv.issueDate).toISOString().slice(0, 10)
+        : '';
+      const discountNote =
+        discount > 0 ? ` — Discount: Rs. ${discount.toFixed(2)}` : '';
       rawEntries.push({
         date: dateStr,
         timestamp: inv.issueDate ? new Date(inv.issueDate).getTime() : 0,
@@ -635,7 +734,9 @@ export class MongoFinanceRepository implements FinanceRepository {
     for (const rec of receipts) {
       const amount = Number(String(rec.amountPaid ?? 0));
       totalPaid += amount;
-      const dateStr = rec.paymentDate ? new Date(rec.paymentDate).toISOString().slice(0, 10) : '';
+      const dateStr = rec.paymentDate
+        ? new Date(rec.paymentDate).toISOString().slice(0, 10)
+        : '';
       rawEntries.push({
         date: dateStr,
         timestamp: rec.paymentDate ? new Date(rec.paymentDate).getTime() : 0,
@@ -784,7 +885,9 @@ export class MongoFinanceRepository implements FinanceRepository {
         {
           ...input,
           studentId: oid(input.studentId),
-          academicYearId: input.academicYearId ? oid(input.academicYearId) : undefined,
+          academicYearId: input.academicYearId
+            ? oid(input.academicYearId)
+            : undefined,
           discountValue: money(input.discountValue),
         },
         { new: true, runValidators: true },
@@ -792,7 +895,10 @@ export class MongoFinanceRepository implements FinanceRepository {
       if (!record) {
         throw new Error('Concession record not found');
       }
-      await this.recalculateOpenInvoicesForStudent(organizationId, input.studentId);
+      await this.recalculateOpenInvoicesForStudent(
+        organizationId,
+        input.studentId,
+      );
       return feeConcessionRecord(record as unknown as Record<string, unknown>);
     }
 
@@ -801,11 +907,16 @@ export class MongoFinanceRepository implements FinanceRepository {
         ...input,
         organizationId: oid(organizationId),
         studentId: oid(input.studentId),
-        academicYearId: input.academicYearId ? oid(input.academicYearId) : undefined,
+        academicYearId: input.academicYearId
+          ? oid(input.academicYearId)
+          : undefined,
         discountValue: money(input.discountValue),
       },
     ]);
-    await this.recalculateOpenInvoicesForStudent(organizationId, input.studentId);
+    await this.recalculateOpenInvoicesForStudent(
+      organizationId,
+      input.studentId,
+    );
     return feeConcessionRecord(created.toObject() as Record<string, unknown>);
   }
 

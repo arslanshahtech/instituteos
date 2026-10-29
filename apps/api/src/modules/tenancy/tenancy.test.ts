@@ -279,7 +279,17 @@ describe('organization authorization and tenant isolation', () => {
     expect(teacherContext.body).toMatchObject({
       organizationId: organizationB,
       role: 'teacher',
-      permissions: ['organization.read', 'student.read', 'guardian.read'],
+      permissions: [
+        'organization.read',
+        'student.read',
+        'guardian.read',
+        'academics.read',
+        'attendance.read',
+        'attendance.write',
+        'examination.read',
+        'examination.write',
+        'communication.read',
+      ],
     });
   });
 
@@ -407,7 +417,13 @@ describe('organization authorization and tenant isolation', () => {
     expect(permissionsForOrganizationRole('teacher')).toEqual([
       'organization.read',
       'student.read',
-      'guardian.read'
+      'guardian.read',
+      'academics.read',
+      'attendance.read',
+      'attendance.write',
+      'examination.read',
+      'examination.write',
+      'communication.read',
     ]);
   });
 
@@ -452,6 +468,10 @@ describe('organization authorization and tenant isolation', () => {
     );
     expect(permissionsForOrganizationRole('student')).toEqual([
       'organization.read',
+      'academics.read',
+      'attendance.read',
+      'examination.read',
+      'communication.read',
     ]);
   });
 

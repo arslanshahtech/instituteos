@@ -25,6 +25,18 @@ describe('API foundation', () => {
     });
   });
 
+  it('prevents caching API responses and does not return body-less 304 responses', async () => {
+    const response = await request(app)
+      .get('/api/v1/health')
+      .set('If-None-Match', '"stale-browser-cache"');
+
+    expect(response.status).toBe(200);
+    expect(response.headers['cache-control']).toContain('no-store');
+    expect(response.headers.pragma).toBe('no-cache');
+    expect(response.headers.etag).toBeUndefined();
+    expect(response.body.status).toBe('ok');
+  });
+
   it('returns not ready while the database is disconnected', async () => {
     const response = await request(app).get('/api/v1/ready');
 

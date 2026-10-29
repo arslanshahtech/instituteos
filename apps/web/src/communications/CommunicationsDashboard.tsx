@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Megaphone, MessageSquare, Pin, Plus, Trash2 } from 'lucide-react';
+import { MessageSquare, Pin, Plus, Trash2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { listAcademicCampuses } from '../academics/academics-api.js';
@@ -14,10 +14,7 @@ import {
   PermissionDeniedState,
 } from '../components/ui/States.js';
 import { useToast } from '../components/ui/ToastProvider.js';
-import {
-  apiMessage,
-  useOrganizationAccess,
-} from '../staff/StaffPageShared.js';
+import { apiMessage, useOrganizationAccess } from '../staff/StaffPageShared.js';
 import { getMembers } from '../organizations/organizations-api.js';
 import type { OrganizationMember } from '../organizations/organizations-api.js';
 import type {
@@ -33,6 +30,7 @@ import {
   useUpdateAnnouncement,
 } from './communications-api.js';
 import { ParentTeacherInbox } from './ParentTeacherInbox.js';
+import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 
 const managerRoles = [
   'organization_owner',
@@ -118,10 +116,12 @@ export function CommunicationsDashboard() {
   const canAccessMessaging = messagingRoles.includes(currentRole);
 
   const [activeTab, setActiveTab] = useState<'announcements' | 'messaging'>(
-    canManageAnnouncements ? 'announcements' : 'messaging',
+    'messaging',
   );
 
-  const [audienceFilter, setAudienceFilter] = useState<AnnouncementAudience | ''>('');
+  const [audienceFilter, setAudienceFilter] = useState<
+    AnnouncementAudience | ''
+  >('');
   const [statusFilter, setStatusFilter] = useState<AnnouncementStatus | ''>('');
   const [campusFilter, setCampusFilter] = useState('');
 
@@ -136,19 +136,25 @@ export function CommunicationsDashboard() {
 
   const announcements = useAnnouncements(
     organizationId,
-    Boolean(access.data && canManageAnnouncements),
+    Boolean(
+      access.data && canManageAnnouncements && activeTab === 'announcements',
+    ),
     filters,
   );
   const campuses = useQuery({
     queryKey: ['academics', organizationId, 'campuses'],
     queryFn: () => listAcademicCampuses(organizationId),
-    enabled: Boolean(access.data && canManageAnnouncements),
+    enabled: Boolean(
+      access.data && canManageAnnouncements && activeTab === 'announcements',
+    ),
     retry: false,
   });
   const members = useQuery({
     queryKey: ['organization-members', organizationId],
     queryFn: () => getMembers(organizationId),
-    enabled: Boolean(access.data && canManageAnnouncements),
+    enabled: Boolean(
+      access.data && canManageAnnouncements && activeTab === 'announcements',
+    ),
     retry: false,
   });
 
@@ -170,9 +176,7 @@ export function CommunicationsDashboard() {
     access.data?.role === 'campus_admin' ||
     Boolean(access.data?.campusIds.length);
   const availableCampuses = campusRestricted
-    ? campusList.filter((campus) =>
-        access.data?.campusIds.includes(campus.id),
-      )
+    ? campusList.filter((campus) => access.data?.campusIds.includes(campus.id))
     : campusList;
   const memberList = members.data?.members ?? [];
   const memberByUserId = new Map(
@@ -278,82 +282,32 @@ export function CommunicationsDashboard() {
   const saving = create.isPending || update.isPending;
 
   return (
-    <main className="communications-page">
-      <header className="page-heading communications-heading">
-        <div className="communications-heading-text">
-          <p className="eyebrow">
-            <Megaphone size={15} aria-hidden="true" />
-            Organization workspace
-          </p>
-          <h1>Communications</h1>
-          <p className="page-description">
-            School-wide announcements and scoped, private parent-teacher messaging.
-          </p>
-        </div>
-
-        {activeTab === 'announcements' && canManageAnnouncements && (
-          <Button onClick={openCreate} type="button" variant="primary">
-            <Plus size={17} aria-hidden="true" />
-            Create announcement
-          </Button>
-        )}
-      </header>
+    <main className="communications-page reference-live-module">
+      <WorkspacePageHeading
+        className="communications-heading"
+        eyebrow="Organization workspace"
+        title="Communications"
+        description="Private, role-scoped conversations between parents, teachers and authorized staff."
+        aside={
+          activeTab === 'announcements' && canManageAnnouncements ? (
+            <Button onClick={openCreate} type="button" variant="primary">
+              <Plus size={17} aria-hidden="true" />
+              Create announcement
+            </Button>
+          ) : undefined
+        }
+      />
 
       {/* Workspace Tabs */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '0.5rem',
-          borderBottom: '1px solid #e2e8f0',
-          marginBottom: '1rem',
-          overflowX: 'auto',
-          whiteSpace: 'nowrap',
-          paddingBottom: '0.25rem',
-        }}
-      >
-        {canManageAnnouncements && (
-          <button
-            type="button"
-            onClick={() => setActiveTab('announcements')}
-            style={{
-              padding: '0.5rem 0.85rem',
-              border: 'none',
-              borderRadius: '0.375rem',
-              background: activeTab === 'announcements' ? '#2563eb' : 'transparent',
-              color: activeTab === 'announcements' ? '#ffffff' : '#64748b',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-            }}
-          >
-            <Megaphone size={15} />
-            Announcements
-          </button>
-        )}
-
+      <div className="communications-workspace-tabs">
         {canAccessMessaging && (
           <button
             type="button"
             onClick={() => setActiveTab('messaging')}
-            style={{
-              padding: '0.5rem 0.85rem',
-              border: 'none',
-              borderRadius: '0.375rem',
-              background: activeTab === 'messaging' ? '#2563eb' : 'transparent',
-              color: activeTab === 'messaging' ? '#ffffff' : '#64748b',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-            }}
+            className={`communications-workspace-tab${activeTab === 'messaging' ? ' is-active' : ''}`}
           >
             <MessageSquare size={15} />
-            Parent-Teacher Messages
+            Messages
           </button>
         )}
       </div>
@@ -376,7 +330,9 @@ export function CommunicationsDashboard() {
                 void members.refetch();
               }}
             />
-          ) : announcements.isPending || campuses.isPending || members.isPending ? (
+          ) : announcements.isPending ||
+            campuses.isPending ||
+            members.isPending ? (
             <LoadingState message="Loading announcements..." />
           ) : (
             <section
@@ -389,7 +345,8 @@ export function CommunicationsDashboard() {
                   <p>Published notices, drafts, and archived announcements.</p>
                 </div>
                 <span className="communications-count">
-                  {items.length} {items.length === 1 ? 'announcement' : 'announcements'}
+                  {items.length}{' '}
+                  {items.length === 1 ? 'announcement' : 'announcements'}
                 </span>
               </div>
 
@@ -405,13 +362,13 @@ export function CommunicationsDashboard() {
                     }
                   >
                     <option value="">All audiences</option>
-                    {(Object.keys(audienceLabels) as AnnouncementAudience[]).map(
-                      (audience) => (
-                        <option key={audience} value={audience}>
-                          {audienceLabels[audience]}
-                        </option>
-                      ),
-                    )}
+                    {(
+                      Object.keys(audienceLabels) as AnnouncementAudience[]
+                    ).map((audience) => (
+                      <option key={audience} value={audience}>
+                        {audienceLabels[audience]}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label className="communications-field">
@@ -461,7 +418,11 @@ export function CommunicationsDashboard() {
                   title="No announcements found"
                   description="Create an announcement or adjust the selected filters."
                   action={
-                    <Button onClick={openCreate} type="button" variant="secondary">
+                    <Button
+                      onClick={openCreate}
+                      type="button"
+                      variant="secondary"
+                    >
                       <Plus size={16} aria-hidden="true" />
                       Create announcement
                     </Button>
@@ -507,9 +468,9 @@ export function CommunicationsDashboard() {
                           <dt>Campus</dt>
                           <dd>
                             {item.campusId
-                              ? campusList.find(
+                              ? (campusList.find(
                                   (campus) => campus.id === item.campusId,
-                                )?.name ?? 'Assigned campus'
+                                )?.name ?? 'Assigned campus')
                               : 'Organization-wide'}
                           </dd>
                         </div>

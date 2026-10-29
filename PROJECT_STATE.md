@@ -1,5 +1,7 @@
 # InstituteOS — Project State & Execution Truth
 
+> **Historical baseline notice (24 October 2026):** The module matrix and production-readiness statements below reflect the 14 October implementation snapshot. They are not a live deployment/security/UAT sign-off. The current release gate is tracked in [docs/PRODUCTION_READINESS_PLAN.md](docs/PRODUCTION_READINESS_PLAN.md), with deployment steps in [docs/DEPLOYMENT_RUNBOOK.md](docs/DEPLOYMENT_RUNBOOK.md). As of this notice, production hosting, backup restoration, and school-owner acceptance have not been verified.
+
 **Last Updated:** October 14, 2026  
 **Status Baseline:** All Core Modules, Phase A, Phase B, Phase C, Phase D, and Finance Anti-Fraud Hardening Completed (Full-Stack Verified & All Tests Green)
 

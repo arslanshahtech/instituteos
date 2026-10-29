@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { MessagingService, type VerificationAdapters } from './communications.service.js';
-import type { MessagingRepository, ConversationThread, DirectMessage } from './communications.types.js';
+import {
+  MessagingService,
+  type VerificationAdapters,
+} from './communications.service.js';
+import type {
+  MessagingRepository,
+  ConversationThread,
+  DirectMessage,
+} from './communications.types.js';
 
 describe('MessagingService (Parent-Teacher Scoped Messaging)', () => {
   let mockRepo: Partial<MessagingRepository>;
@@ -71,7 +78,9 @@ describe('MessagingService (Parent-Teacher Scoped Messaging)', () => {
     });
 
     expect(result.thread.id).toBe(threadId);
-    expect(result.message.content).toBe('Hello teacher, I wanted to discuss the homework.');
+    expect(result.message.content).toBe(
+      'Hello teacher, I wanted to discuss the homework.',
+    );
     expect(mockRepo.createThread).toHaveBeenCalledTimes(1);
     expect(mockRepo.addMessage).toHaveBeenCalledTimes(1);
   });
@@ -86,7 +95,9 @@ describe('MessagingService (Parent-Teacher Scoped Messaging)', () => {
         subjectTitle: 'Math Progress Query',
         initialMessage: 'Hello teacher',
       }),
-    ).rejects.toThrow('You can only initiate conversations regarding your linked children.');
+    ).rejects.toThrow(
+      'You can only initiate conversations regarding your linked children.',
+    );
 
     expect(mockRepo.createThread).not.toHaveBeenCalled();
   });
@@ -112,7 +123,12 @@ describe('MessagingService (Parent-Teacher Scoped Messaging)', () => {
     vi.mocked(mockRepo.findThreadById!).mockResolvedValue(mockThread);
 
     await expect(
-      service.getThreadMessages(validOrgId, unassociatedUserId, 'teacher', threadId),
+      service.getThreadMessages(
+        validOrgId,
+        unassociatedUserId,
+        'teacher',
+        threadId,
+      ),
     ).rejects.toThrow('Access to this conversation is denied.');
 
     expect(mockRepo.listMessages).not.toHaveBeenCalled();

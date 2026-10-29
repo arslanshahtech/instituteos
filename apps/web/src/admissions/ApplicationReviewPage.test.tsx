@@ -18,9 +18,13 @@ const apiMocks = vi.hoisted(() => ({
 const accessMocks = vi.hoisted(() => ({
   getOrganizationAccessContext: vi.fn(),
 }));
+const campusMocks = vi.hoisted(() => ({
+  getCampuses: vi.fn(),
+}));
 
 vi.mock('./admissions-api.js', () => apiMocks);
 vi.mock('../tenancy/tenancy-api.js', () => accessMocks);
+vi.mock('../organizations/organizations-api.js', () => campusMocks);
 
 const organizationId = '650000000000000000000001';
 const applicationId = '650000000000000000000002';
@@ -61,8 +65,16 @@ describe('application review page', () => {
     accessMocks.getOrganizationAccessContext.mockResolvedValue({
       organizationId,
       role: 'organization_admin',
-      permissions: ['admission.read', 'admission.review', 'student.create'],
+      permissions: [
+        'admission.read',
+        'admission.review',
+        'student.create',
+        'campus.read',
+      ],
       campusIds: [],
+    });
+    campusMocks.getCampuses.mockResolvedValue({
+      campuses: [{ id: '650000000000000000000004', name: 'Main Campus' }],
     });
     apiMocks.getApplication.mockImplementation(async () => ({
       application: {
@@ -70,6 +82,7 @@ describe('application review page', () => {
         firstName: 'Nora',
         lastName: 'Ali',
         status: reviewCompleted ? 'approved' : 'submitted',
+        campusId: '650000000000000000000004',
         ...(reviewCompleted ? { convertedStudentId: studentId } : {}),
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-01T00:00:00.000Z',
@@ -102,7 +115,7 @@ describe('application review page', () => {
     expect(apiMocks.reviewApplication).toHaveBeenCalledWith(
       organizationId,
       applicationId,
-      { status: 'approved' },
+      { status: 'approved', campusId: '650000000000000000000004' },
     );
     expect(
       await screen.findByText(
@@ -116,6 +129,43 @@ describe('application review page', () => {
       `/admin/organizations/${organizationId}/students/${studentId}`,
     );
     expect(document.body).not.toHaveTextContent(studentId);
+  });
+
+  it('repairs an already-approved application when its student record is missing', async () => {
+    apiMocks.getApplication.mockImplementation(async () => ({
+      application: {
+        id: applicationId,
+        firstName: 'Nora',
+        lastName: 'Ali',
+        status: 'approved',
+        ...(reviewCompleted ? { convertedStudentId: studentId } : {}),
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    }));
+    const user = userEvent.setup();
+    renderReviewPage();
+
+    await user.selectOptions(
+      await screen.findByRole('combobox', {
+        name: /Assign campus before approval/,
+      }),
+      '650000000000000000000004',
+    );
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Create missing student record',
+      }),
+    );
+
+    expect(apiMocks.reviewApplication).toHaveBeenCalledWith(
+      organizationId,
+      applicationId,
+      { status: 'approved', campusId: '650000000000000000000004' },
+    );
+    expect(
+      await screen.findByRole('link', { name: 'View converted student' }),
+    ).toBeVisible();
   });
 
   it('does not show review actions to a read-only admissions user', async () => {

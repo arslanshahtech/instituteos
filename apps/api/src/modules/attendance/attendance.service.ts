@@ -14,8 +14,8 @@ import type {
 const studentStatuses: readonly StudentAttendanceStatus[] = [
   'present',
   'absent',
+  'leave',
   'late',
-  'excused',
 ];
 const staffStatuses = ['present', 'absent', 'half-day', 'on-leave'] as const;
 
@@ -86,6 +86,33 @@ function assertCampus(context: AttendanceContext, campusId: string): void {
 
 export class AttendanceService {
   constructor(private readonly repository: AttendanceRepository) {}
+
+  async listTeacherAssignments(context: AttendanceContext) {
+    if (context.role !== 'teacher') {
+      throw new AppError(
+        403,
+        'ROLE_REQUIRED',
+        'Only teachers can access assigned teaching sections.',
+      );
+    }
+    if (!context.userId) {
+      throw new AppError(
+        403,
+        'TEACHER_ACCOUNT_UNLINKED',
+        'Your teacher account is not linked to an active staff record. Contact the college administrator.',
+      );
+    }
+    const assignments = await this.repository.listTeacherAssignmentsForUser(
+      context.organizationId,
+      context.userId,
+    );
+    const inCampusScope = assignments.filter(
+      (assignment) =>
+        context.campusIds.length === 0 ||
+        context.campusIds.includes(assignment.campusId),
+    );
+    return inCampusScope;
+  }
 
   async listStudentRoster(
     context: AttendanceContext,
@@ -166,6 +193,35 @@ export class AttendanceService {
       context.organizationId,
       normalized,
     );
+  }
+
+  async removeStudentFromSection(
+    context: AttendanceContext,
+    input: StudentPlacementInput,
+  ) {
+    const normalized = {
+      studentId: objectId(input.studentId, 'student'),
+      classId: objectId(input.classId, 'class'),
+      sectionId: objectId(input.sectionId, 'section'),
+      academicYearId: objectId(input.academicYearId, 'academic year'),
+      campusId: objectId(input.campusId, 'campus'),
+    };
+    assertCampus(context, normalized.campusId);
+    await this.validateSectionContext(context, {
+      ...normalized,
+      date: undefined,
+    });
+    const removed = await this.repository.deactivateStudentPlacement(
+      context.organizationId,
+      normalized,
+    );
+    if (!removed)
+      throw new AppError(
+        404,
+        'STUDENT_PLACEMENT_NOT_FOUND',
+        'This student is not currently assigned to the selected class section.',
+      );
+    return { removed: true };
   }
 
   async saveStudentAttendance(
@@ -273,6 +329,35 @@ export class AttendanceService {
         : {}),
     };
     if (normalized.campusId) assertCampus(context, normalized.campusId);
+    if (context.role === 'teacher') {
+      if (!context.userId || !normalized.sectionId) {
+        throw new AppError(
+          400,
+          'ATTENDANCE_SCOPE_REQUIRED',
+          'Select one of your assigned class sections to view attendance.',
+        );
+      }
+      const assignments = await this.repository.listTeacherAssignmentsForUser(
+        context.organizationId,
+        context.userId,
+      );
+      const hasAccess = assignments.some(
+        (assignment) =>
+          assignment.sectionId === normalized.sectionId &&
+          (!normalized.classId || assignment.classId === normalized.classId) &&
+          (!normalized.campusId ||
+            assignment.campusId === normalized.campusId) &&
+          (context.campusIds.length === 0 ||
+            context.campusIds.includes(assignment.campusId)),
+      );
+      if (!hasAccess) {
+        throw new AppError(
+          403,
+          'TEACHER_ASSIGNMENT_REQUIRED',
+          'You can only view attendance for your assigned class sections.',
+        );
+      }
+    }
     return this.repository.listStudentAttendance(
       context.organizationId,
       normalized,
@@ -415,6 +500,26 @@ export class AttendanceService {
         'DATE_OUTSIDE_ACADEMIC_YEAR',
         'Attendance date must fall within the selected active academic year.',
       );
+    }
+    if (context.role === 'teacher') {
+      if (
+        !context.userId ||
+        !(await this.repository.isTeacherAssignedToSection(
+          context.organizationId,
+          context.userId,
+          {
+            classId: input.classId,
+            sectionId: input.sectionId,
+            academicYearId: input.academicYearId,
+          },
+        ))
+      ) {
+        throw new AppError(
+          403,
+          'TEACHER_ASSIGNMENT_REQUIRED',
+          'You can only take attendance for your assigned class sections and active academic years.',
+        );
+      }
     }
   }
 }

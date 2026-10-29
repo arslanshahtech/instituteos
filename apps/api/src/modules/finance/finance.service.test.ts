@@ -82,55 +82,60 @@ function repository(
     updateFeeStructure: vi.fn(),
     deleteFeeStructure: vi.fn(),
     listInvoices: vi.fn().mockResolvedValue([]),
+    listDailyCollections: vi.fn().mockResolvedValue([]),
     getInvoice: vi.fn().mockResolvedValue(invoice()),
     listActiveClassStudents: vi.fn().mockResolvedValue([studentId, userId]),
-    createInvoices: vi.fn().mockImplementation(
-      async (
-        orgId: string,
-        _input,
-        structure: FeeStructureRecord,
-        ids: string[],
-        _issueDate: string,
-        totalAmount: number,
-      ) =>
-        ids.slice(0, 1).map((id) =>
-          invoice({
+    createInvoices: vi
+      .fn()
+      .mockImplementation(
+        async (
+          orgId: string,
+          _input,
+          structure: FeeStructureRecord,
+          ids: string[],
+          _issueDate: string,
+          totalAmount: number,
+        ) =>
+          ids.slice(0, 1).map((id) =>
+            invoice({
+              organizationId: orgId,
+              studentId: id,
+              feeStructureId: structure.id,
+              totalAmount,
+            }),
+          ),
+      ),
+    recordPayment: vi
+      .fn()
+      .mockImplementation(
+        async (
+          orgId: string,
+          current: StudentInvoiceRecord,
+          payment: PaymentInput,
+          recordedBy: string,
+        ) => ({
+          invoice: {
+            ...current,
             organizationId: orgId,
-            studentId: id,
-            feeStructureId: structure.id,
-            totalAmount,
-          }),
-        ),
-    ),
-    recordPayment: vi.fn().mockImplementation(
-      async (
-        orgId: string,
-        current: StudentInvoiceRecord,
-        payment: PaymentInput,
-        recordedBy: string,
-      ) => ({
-        invoice: {
-          ...current,
-          organizationId: orgId,
-          paidAmount: current.paidAmount + payment.amountPaid,
-          status:
-            current.paidAmount + payment.amountPaid >= current.totalAmount
-              ? 'paid'
-              : 'partial',
-        },
-        receipt: {
-          id: 'receipt',
-          receiptNumber: 'RCT-001',
-          invoiceId: current.id,
-          studentId: current.studentId,
-          ...payment,
-          recordedBy,
-          organizationId: orgId,
-          createdAt: '',
-        },
-      }),
-    ),
-  getStudentFeeLedger: vi.fn().mockResolvedValue(null),
+            paidAmount: current.paidAmount + payment.amountPaid,
+            status:
+              current.paidAmount + payment.amountPaid >= current.totalAmount
+                ? 'paid'
+                : 'partial',
+          },
+          receipt: {
+            id: 'receipt',
+            receiptNumber: 'RCT-001',
+            invoiceId: current.id,
+            studentId: current.studentId,
+            ...payment,
+            recordedBy,
+            organizationId: orgId,
+            createdAt: '',
+          },
+        }),
+      ),
+    getStudentFeeLedger: vi.fn().mockResolvedValue(null),
     listActiveStudentConcessions: vi.fn().mockResolvedValue([]),
     saveFeeConcession: vi.fn(),
     deleteFeeConcession: vi.fn().mockResolvedValue(true),
@@ -163,20 +168,60 @@ describe('FinanceService', () => {
     expect(result).toMatchObject({ createdCount: 1, skippedCount: 1 });
   });
 
-  it('records a partial payment and passes the active tenant and operator', async () => {
-    const repo = repository();
-    const result = await new FinanceService(repo).recordPayment(context, invoiceId, {
-      amountPaid: 250.25,
-      paymentMethod: 'bank_transfer',
-      transactionReference: 'TRX-1',
-      paymentDate: new Date().toISOString().slice(0, 10),
+  it('lists daily collections for the active tenant and campus scope', async () => {
+    const repo = repository({
+      listDailyCollections: vi
+        .fn()
+        .mockResolvedValue([
+          { date: '2026-10-17', amountCollected: 250, paymentCount: 2 },
+        ]),
     });
+    const result = await new FinanceService(repo).listDailyCollections(
+      context,
+      {
+        dateFrom: '2026-10-11',
+        dateTo: '2026-10-17',
+      },
+    );
 
-    expect(repo.getInvoice).toHaveBeenCalledWith(
+    expect(repo.listDailyCollections).toHaveBeenCalledWith(
       organizationId,
-      invoiceId,
+      '2026-10-11',
+      '2026-10-17',
       [campusId],
     );
+    expect(result).toEqual([
+      { date: '2026-10-17', amountCollected: 250, paymentCount: 2 },
+    ]);
+  });
+
+  it('rejects an inverted daily collection date range', async () => {
+    const repo = repository();
+    await expect(
+      new FinanceService(repo).listDailyCollections(context, {
+        dateFrom: '2026-10-18',
+        dateTo: '2026-10-17',
+      }),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    expect(repo.listDailyCollections).not.toHaveBeenCalled();
+  });
+
+  it('records a partial payment and passes the active tenant and operator', async () => {
+    const repo = repository();
+    const result = await new FinanceService(repo).recordPayment(
+      context,
+      invoiceId,
+      {
+        amountPaid: 250.25,
+        paymentMethod: 'bank_transfer',
+        transactionReference: 'TRX-1',
+        paymentDate: new Date().toISOString().slice(0, 10),
+      },
+    );
+
+    expect(repo.getInvoice).toHaveBeenCalledWith(organizationId, invoiceId, [
+      campusId,
+    ]);
     expect(repo.recordPayment).toHaveBeenCalledWith(
       organizationId,
       expect.anything(),
@@ -194,16 +239,20 @@ describe('FinanceService', () => {
 
   it('marks the invoice paid when the exact remaining balance is collected', async () => {
     const repo = repository({
-      getInvoice: vi.fn().mockResolvedValue(
-        invoice({ paidAmount: 1325.5, status: 'partial' }),
-      ),
+      getInvoice: vi
+        .fn()
+        .mockResolvedValue(invoice({ paidAmount: 1325.5, status: 'partial' })),
     });
 
-    const result = await new FinanceService(repo).recordPayment(context, invoiceId, {
-      amountPaid: 0.25,
-      paymentMethod: 'cash',
-      paymentDate: new Date().toISOString().slice(0, 10),
-    });
+    const result = await new FinanceService(repo).recordPayment(
+      context,
+      invoiceId,
+      {
+        amountPaid: 0.25,
+        paymentMethod: 'cash',
+        paymentDate: new Date().toISOString().slice(0, 10),
+      },
+    );
 
     expect(repo.recordPayment).toHaveBeenCalledWith(
       organizationId,

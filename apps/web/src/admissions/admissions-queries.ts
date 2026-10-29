@@ -8,6 +8,7 @@ import {
   reviewApplication,
   updateInquiryStatus,
 } from './admissions-api.js';
+import { studentsQueryKey } from '../students/student-queries.js';
 import type {
   AdmissionsQuery,
   ApplicationInput,
@@ -103,6 +104,7 @@ export function useReviewApplication(
     mutationFn: (input: {
       status: ApplicationStatus;
       decisionReason?: string;
+      campusId?: string;
     }) => reviewApplication(organizationId, applicationId, input),
     onSuccess: async () => {
       await invalidateAdmissions(queryClient, organizationId);
@@ -112,6 +114,11 @@ export function useReviewApplication(
           'application',
           applicationId,
         ],
+      });
+      // Approval creates (or repairs) the student record, so refresh any
+      // open Students list/detail queries immediately.
+      await queryClient.invalidateQueries({
+        queryKey: studentsQueryKey(organizationId),
       });
     },
   });

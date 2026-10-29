@@ -8,6 +8,7 @@ export interface ApiErrorBody {
     code?: string;
     message?: string;
     requestId?: string;
+    details?: { rows?: Array<{ row: number; field: string; message: string }> };
   };
 }
 
@@ -17,6 +18,11 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code?: string,
     readonly requestId?: string,
+    readonly details?: ApiErrorBody['error'] extends infer E
+      ? E extends { details?: infer D }
+        ? D
+        : never
+      : never,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -36,6 +42,8 @@ export async function apiRequest<T>(
   const response = await fetch(`${API_BASE_URL}${normalizedPath}`, {
     ...init,
     credentials: 'include',
+    // Session and tenant-scoped API data must always be freshly validated.
+    cache: 'no-store',
     headers: {
       Accept: 'application/json',
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
@@ -57,6 +65,7 @@ export async function apiRequest<T>(
       errorBody?.error?.requestId ??
         response.headers.get('x-request-id') ??
         undefined,
+      errorBody?.error?.details,
     );
   }
 

@@ -106,16 +106,19 @@ export function LoginPage() {
     mode: 'onBlur',
   });
   if (auth.status === 'authenticated')
-    return <Navigate to="/platform" replace />;
+    return <Navigate to="/dashboard" replace />;
 
   const submit = form.handleSubmit(async (values) => {
     setError('');
     try {
       await auth.login(values);
       const destination = (location.state as { from?: string } | null)?.from;
-      navigate(destination?.startsWith('/') ? destination : '/platform', {
-        replace: true,
-      });
+      navigate(
+        destination?.startsWith('/') && !destination.startsWith('//')
+          ? destination
+          : '/dashboard',
+        { replace: true },
+      );
     } catch (cause) {
       setError(errorMessage(cause));
     }
@@ -125,7 +128,7 @@ export function LoginPage() {
     <AuthFrame
       eyebrow="Welcome back"
       title="Sign in to InstituteOS"
-      description="Use your account email and password to continue."
+      description="Use your account email and password. InstituteOS will open the workspace your account has actually been authorized to access."
       footer={
         <>
           New to InstituteOS? <Link to="/register">Create an account</Link>
@@ -147,9 +150,6 @@ export function LoginPage() {
           {...form.register('password')}
           error={form.formState.errors.password?.message}
         />
-        <div className="auth-inline-link">
-          <Link to="/forgot-password">Forgot password?</Link>
-        </div>
         <FormStatus error={error} />
         {searchParams.get('registration') === 'complete' && (
           <FormStatus success="If registration was completed, you can sign in. If you already have an account, sign in or use Forgot password." />
@@ -164,6 +164,9 @@ export function LoginPage() {
         >
           {form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}
         </Button>
+        <div className="auth-inline-link">
+          <Link to="/forgot-password">Forgot password?</Link>
+        </div>
       </form>
     </AuthFrame>
   );
@@ -178,7 +181,7 @@ export function RegistrationPage() {
     mode: 'onBlur',
   });
   if (auth.status === 'authenticated')
-    return <Navigate to="/platform" replace />;
+    return <Navigate to="/dashboard" replace />;
   const submit = form.handleSubmit(async (values) => {
     setError('');
     try {
@@ -360,7 +363,7 @@ export function VerifyEmailPage() {
     setError('');
     try {
       await auth.verifyEmail(token);
-      navigate('/platform', { replace: true });
+      navigate('/dashboard', { replace: true });
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {

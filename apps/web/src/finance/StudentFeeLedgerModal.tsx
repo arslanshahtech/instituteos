@@ -22,11 +22,11 @@ export function StudentFeeLedgerModal({
   const [isMaximized, setIsMaximized] = useState(false);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
 
-  const { data: ledger, isLoading, isError } = useStudentFeeLedger(
-    organizationId,
-    studentId,
-    isOpen,
-  );
+  const {
+    data: ledger,
+    isLoading,
+    isError,
+  } = useStudentFeeLedger(organizationId, studentId, isOpen);
 
   if (!isOpen) return null;
 
@@ -90,11 +90,15 @@ export function StudentFeeLedgerModal({
 
   return (
     <div className="finance-ledger-backdrop" role="dialog" aria-modal="true">
-      <div className={`finance-ledger-window ${isMaximized ? 'is-maximized' : ''}`}>
+      <div
+        className={`finance-ledger-window ${isMaximized ? 'is-maximized' : ''}`}
+      >
         {/* Header */}
         <header className="finance-ledger-head">
           <div className="finance-ledger-title">
-            <h2>Fee Ledger · {ledger?.studentName ?? studentName ?? 'Student'}</h2>
+            <h2>
+              Fee Ledger · {ledger?.studentName ?? studentName ?? 'Student'}
+            </h2>
             <p>Complete debit, credit & balance statement</p>
           </div>
 
@@ -165,7 +169,9 @@ export function StudentFeeLedgerModal({
                   </div>
                 </div>
                 <div className="finance-metric-card balance">
-                  <div className="finance-metric-card-lbl">Outstanding Baqaya</div>
+                  <div className="finance-metric-card-lbl">
+                    Outstanding Baqaya
+                  </div>
                   <div className="finance-metric-card-val">
                     {formatMoney(ledger.outstandingBalance)}
                   </div>
@@ -200,14 +206,23 @@ export function StudentFeeLedgerModal({
                   <tbody>
                     {ledger.entries.length === 0 ? (
                       <tr>
-                        <td colSpan={8} style={{ textAlign: 'center', padding: '3.5rem', color: '#94a3b8' }}>
+                        <td
+                          colSpan={8}
+                          style={{
+                            textAlign: 'center',
+                            padding: '3.5rem',
+                            color: '#94a3b8',
+                          }}
+                        >
                           No fee transactions recorded for this student yet.
                         </td>
                       </tr>
                     ) : (
                       ledger.entries.map((entry, idx) => (
                         <tr key={`${entry.referenceNumber}-${idx}`}>
-                          <td style={{ color: '#64748b', whiteSpace: 'nowrap' }}>
+                          <td
+                            style={{ color: '#64748b', whiteSpace: 'nowrap' }}
+                          >
                             {entry.date || '—'}
                           </td>
                           <td>
@@ -218,26 +233,54 @@ export function StudentFeeLedgerModal({
                           <td>
                             <button
                               type="button"
-                              onClick={() => copyToClipboard(entry.referenceNumber)}
+                              onClick={() =>
+                                copyToClipboard(entry.referenceNumber)
+                              }
                               className="finance-ref-tag"
                               title={`Full: ${entry.referenceNumber} (Click to copy)`}
                             >
-                              <span>{formatReference(entry.referenceNumber)}</span>
-                              <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>
-                                {copiedRef === entry.referenceNumber ? '✓' : '⧉'}
+                              <span>
+                                {formatReference(entry.referenceNumber)}
+                              </span>
+                              <span
+                                style={{ fontSize: '0.7rem', opacity: 0.6 }}
+                              >
+                                {copiedRef === entry.referenceNumber
+                                  ? '✓'
+                                  : '⧉'}
                               </span>
                             </button>
                           </td>
                           <td style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>
                             {cleanDescription(entry.description)}
                           </td>
-                          <td style={{ textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                          <td
+                            style={{
+                              textAlign: 'right',
+                              fontWeight: 600,
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
                             {entry.debit > 0 ? formatMoney(entry.debit) : '—'}
                           </td>
-                          <td style={{ textAlign: 'right', fontWeight: 600, color: '#16a34a', whiteSpace: 'nowrap' }}>
+                          <td
+                            style={{
+                              textAlign: 'right',
+                              fontWeight: 600,
+                              color: '#16a34a',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
                             {entry.credit > 0 ? formatMoney(entry.credit) : '—'}
                           </td>
-                          <td style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                          <td
+                            style={{
+                              textAlign: 'right',
+                              fontWeight: 700,
+                              color: '#0f172a',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
                             {formatMoney(entry.balance)}
                           </td>
                           <td style={{ textAlign: 'center' }}>
@@ -260,14 +303,25 @@ export function StudentFeeLedgerModal({
               {/* Mobile View: Vertical Cards */}
               <div className="finance-mobile-ledger-view">
                 {ledger.entries.length === 0 ? (
-                  <p style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                  <p
+                    style={{
+                      textAlign: 'center',
+                      padding: '2rem',
+                      color: '#94a3b8',
+                    }}
+                  >
                     No fee transactions found.
                   </p>
                 ) : (
                   ledger.entries.map((entry, idx) => (
-                    <article className="finance-tx-card" key={`m-${entry.referenceNumber}-${idx}`}>
+                    <article
+                      className="finance-tx-card"
+                      key={`m-${entry.referenceNumber}-${idx}`}
+                    >
                       <div className="finance-tx-card-header">
-                        <span className="finance-tx-card-date">{entry.date || 'No Date'}</span>
+                        <span className="finance-tx-card-date">
+                          {entry.date || 'No Date'}
+                        </span>
                         <span className={`finance-badge ${entry.type}`}>
                           {entry.type === 'invoice' ? 'Invoice' : 'Payment'}
                         </span>
@@ -277,13 +331,17 @@ export function StudentFeeLedgerModal({
                         <div>
                           <button
                             type="button"
-                            onClick={() => copyToClipboard(entry.referenceNumber)}
+                            onClick={() =>
+                              copyToClipboard(entry.referenceNumber)
+                            }
                             className="finance-ref-tag"
                             title="Click to copy full reference"
                           >
                             <span>{entry.referenceNumber}</span>
                             <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>
-                              {copiedRef === entry.referenceNumber ? '✓ Copied' : '⧉'}
+                              {copiedRef === entry.referenceNumber
+                                ? '✓ Copied'
+                                : '⧉'}
                             </span>
                           </button>
                         </div>
@@ -293,15 +351,30 @@ export function StudentFeeLedgerModal({
                       <div className="finance-tx-card-amounts">
                         <div>
                           <small style={{ color: '#64748b', display: 'block' }}>
-                            {entry.type === 'invoice' ? 'Debit (Billed)' : 'Credit (Paid)'}
+                            {entry.type === 'invoice'
+                              ? 'Debit (Billed)'
+                              : 'Credit (Paid)'}
                           </small>
-                          <strong style={{ color: entry.type === 'invoice' ? '#0f172a' : '#16a34a' }}>
-                            {entry.type === 'invoice' ? formatMoney(entry.debit) : formatMoney(entry.credit)}
+                          <strong
+                            style={{
+                              color:
+                                entry.type === 'invoice'
+                                  ? '#0f172a'
+                                  : '#16a34a',
+                            }}
+                          >
+                            {entry.type === 'invoice'
+                              ? formatMoney(entry.debit)
+                              : formatMoney(entry.credit)}
                           </strong>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <small style={{ color: '#64748b', display: 'block' }}>Running Baqaya</small>
-                          <strong style={{ color: '#dc2626' }}>{formatMoney(entry.balance)}</strong>
+                          <small style={{ color: '#64748b', display: 'block' }}>
+                            Running Baqaya
+                          </small>
+                          <strong style={{ color: '#dc2626' }}>
+                            {formatMoney(entry.balance)}
+                          </strong>
                         </div>
                       </div>
 

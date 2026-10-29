@@ -1,6 +1,18 @@
 import { apiRequest } from '../api/client.js';
 
-export type StudentAttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
+export interface TeacherAttendanceAssignment {
+  id: string;
+  classId: string;
+  className: string;
+  sectionId: string;
+  sectionName: string;
+  academicYearId: string;
+  academicYearName: string;
+  campusId: string;
+  campusName: string;
+}
+
+export type StudentAttendanceStatus = 'present' | 'absent' | 'leave' | 'late';
 export type StaffAttendanceStatus =
   'present' | 'absent' | 'half-day' | 'on-leave';
 
@@ -12,6 +24,8 @@ export interface AttendancePerson {
 }
 
 export interface StudentRosterMember extends AttendancePerson {
+  contactEmail?: string;
+  phone?: string;
   status?: StudentAttendanceStatus;
   remarks?: string;
 }
@@ -39,6 +53,12 @@ export interface StaffAttendanceRecord {
 
 const organizationPath = (organizationId: string) =>
   `/organizations/${encodeURIComponent(organizationId)}`;
+
+export function listTeacherAttendanceAssignments(organizationId: string) {
+  return apiRequest<{ items: TeacherAttendanceAssignment[] }>(
+    `${organizationPath(organizationId)}/attendance/teacher-assignments`,
+  );
+}
 
 function queryString(values: Record<string, string>) {
   return new URLSearchParams(values).toString();
@@ -81,6 +101,42 @@ export function placeStudent(
 ) {
   return apiRequest(
     `${organizationPath(organizationId)}/attendance/students/placements`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+}
+
+export function removeStudentFromSection(
+  organizationId: string,
+  studentId: string,
+  input: {
+    classId: string;
+    sectionId: string;
+    academicYearId: string;
+    campusId: string;
+  },
+) {
+  return apiRequest<{ removed: boolean }>(
+    `${organizationPath(organizationId)}/attendance/students/placements/${encodeURIComponent(studentId)}`,
+    { method: 'DELETE', body: JSON.stringify(input) },
+  );
+}
+
+export function bulkPlaceStudents(
+  organizationId: string,
+  input: {
+    studentIds: string[];
+    classId: string;
+    sectionId: string;
+    academicYearId: string;
+    campusId: string;
+  },
+) {
+  return apiRequest<{
+    added: string[];
+    skipped: string[];
+    failed: Array<{ studentId: string; message: string }>;
+  }>(
+    `${organizationPath(organizationId)}/attendance/students/placements/bulk`,
     { method: 'POST', body: JSON.stringify(input) },
   );
 }

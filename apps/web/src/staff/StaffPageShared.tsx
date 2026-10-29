@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 import { ApiError } from '../api/client.js';
 import {
   ErrorState,
@@ -14,7 +15,13 @@ import type { OrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import type { StaffStatus } from './staff-api.js';
 
 export function apiMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
+  if (error instanceof ApiError) {
+    const rows = error.details?.rows ?? [];
+    if (rows.length) {
+      return `${error.message} ${rows.map((row) => `Row ${row.row} (${row.field}): ${row.message}`).join(' ')}`;
+    }
+    return error.message;
+  }
   return 'The request could not be completed. Try again.';
 }
 
@@ -77,29 +84,32 @@ export function StaffHeading({
   description,
   organizationId,
   action,
+  eyebrow = 'Organization workspace',
 }: {
   title: string;
   description: string;
   organizationId: string;
   action?: ReactNode;
+  eyebrow?: string;
 }) {
   return (
-    <section className="page-heading student-page-heading">
-      <div>
-        <p className="eyebrow">Organization workspace</p>
-        <h1>{title}</h1>
-        <p className="page-description">{description}</p>
-      </div>
-      <div className="student-page-actions">
-        <Link
-          className="button button-secondary"
-          to={`/admin/organizations/${encodeURIComponent(organizationId)}/staff`}
-        >
-          Staff directory
-        </Link>
-        {action}
-      </div>
-    </section>
+    <WorkspacePageHeading
+      className="student-page-heading"
+      eyebrow={eyebrow}
+      title={title}
+      description={description}
+      aside={
+        <div className="student-page-actions">
+          <Link
+            className="button button-secondary"
+            to={`/admin/organizations/${encodeURIComponent(organizationId)}/staff`}
+          >
+            Staff directory
+          </Link>
+          {action}
+        </div>
+      }
+    />
   );
 }
 

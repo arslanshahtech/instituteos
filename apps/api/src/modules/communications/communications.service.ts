@@ -75,16 +75,28 @@ function validateCreateInput(
     !input.content.trim() ||
     input.content.trim().length > 5000
   ) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Enter valid announcement content.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Enter valid announcement content.',
+    );
   }
   if (
     input.targetAudience !== undefined &&
     !audiences.includes(input.targetAudience)
   ) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid target audience.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Select a valid target audience.',
+    );
   }
   if (input.status !== undefined && !statuses.includes(input.status)) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid announcement status.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Select a valid announcement status.',
+    );
   }
   if (input.isPinned !== undefined && typeof input.isPinned !== 'boolean') {
     throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid pinned value.');
@@ -132,25 +144,41 @@ function validateUpdateInput(
       !input.content.trim() ||
       input.content.trim().length > 5000
     ) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Enter valid announcement content.');
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Enter valid announcement content.',
+      );
     }
     output.content = input.content.trim();
   }
   if (input.targetAudience !== undefined) {
     if (!audiences.includes(input.targetAudience)) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid target audience.');
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Select a valid target audience.',
+      );
     }
     output.targetAudience = input.targetAudience;
   }
   if (input.status !== undefined) {
     if (!statuses.includes(input.status)) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid announcement status.');
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Select a valid announcement status.',
+      );
     }
     output.status = input.status;
   }
   if (input.isPinned !== undefined) {
     if (typeof input.isPinned !== 'boolean') {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid pinned value.');
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Select a valid pinned value.',
+      );
     }
     output.isPinned = input.isPinned;
   }
@@ -177,7 +205,11 @@ function assertRecordCampus(
   record: AnnouncementRecord | null,
 ): asserts record is AnnouncementRecord {
   if (!record) {
-    throw new AppError(404, 'ANNOUNCEMENT_NOT_FOUND', 'Announcement not found.');
+    throw new AppError(
+      404,
+      'ANNOUNCEMENT_NOT_FOUND',
+      'Announcement not found.',
+    );
   }
   if (record.campusId) assertCampus(context, record.campusId);
 }
@@ -187,13 +219,21 @@ function validatedQuery(
   query: AnnouncementQuery,
 ): { query: AnnouncementQuery; campusIds?: string[] } {
   if (query.status !== undefined && !statuses.includes(query.status)) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid announcement status.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Select a valid announcement status.',
+    );
   }
   if (
     query.targetAudience !== undefined &&
     !audiences.includes(query.targetAudience)
   ) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid target audience.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Select a valid target audience.',
+    );
   }
   const campusId = query.campusId
     ? objectId(query.campusId, 'campus')
@@ -202,7 +242,9 @@ function validatedQuery(
   const dateFrom = query.dateFrom
     ? validateDate(query.dateFrom, 'start date')
     : undefined;
-  const dateTo = query.dateTo ? validateDate(query.dateTo, 'end date') : undefined;
+  const dateTo = query.dateTo
+    ? validateDate(query.dateTo, 'end date')
+    : undefined;
   if (dateFrom && dateTo && dateFrom > dateTo) {
     throw new AppError(
       400,
@@ -236,10 +278,7 @@ export class CommunicationsService {
     );
   }
 
-  async getAnnouncement(
-    context: AnnouncementContext,
-    announcementId: string,
-  ) {
+  async getAnnouncement(context: AnnouncementContext, announcementId: string) {
     const id = objectId(announcementId, 'announcement');
     const announcement = await this.repository.getAnnouncement(
       context.organizationId,
@@ -279,21 +318,34 @@ export class CommunicationsService {
       normalized,
     );
     if (!updated) {
-      throw new AppError(404, 'ANNOUNCEMENT_NOT_FOUND', 'Announcement not found.');
+      throw new AppError(
+        404,
+        'ANNOUNCEMENT_NOT_FOUND',
+        'Announcement not found.',
+      );
     }
     assertRecordCampus(context, updated);
     return updated;
   }
 
-  async deleteAnnouncement(context: AnnouncementContext, announcementId: string) {
+  async deleteAnnouncement(
+    context: AnnouncementContext,
+    announcementId: string,
+  ) {
     const id = objectId(announcementId, 'announcement');
     const current = await this.repository.getAnnouncement(
       context.organizationId,
       id,
     );
     assertRecordCampus(context, current);
-    if (!(await this.repository.deleteAnnouncement(context.organizationId, id))) {
-      throw new AppError(404, 'ANNOUNCEMENT_NOT_FOUND', 'Announcement not found.');
+    if (
+      !(await this.repository.deleteAnnouncement(context.organizationId, id))
+    ) {
+      throw new AppError(
+        404,
+        'ANNOUNCEMENT_NOT_FOUND',
+        'Announcement not found.',
+      );
     }
   }
 }
@@ -331,9 +383,16 @@ export class MessagingService {
     const teacherUserId = objectId(input.teacherUserId, 'teacher');
 
     if (!input.subjectTitle?.trim() || input.subjectTitle.trim().length > 120) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Enter a valid conversation subject.');
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Enter a valid conversation subject.',
+      );
     }
-    if (!input.initialMessage?.trim() || input.initialMessage.trim().length > 2000) {
+    if (
+      !input.initialMessage?.trim() ||
+      input.initialMessage.trim().length > 2000
+    ) {
       throw new AppError(400, 'VALIDATION_ERROR', 'Enter a valid message.');
     }
 
@@ -404,22 +463,40 @@ export class MessagingService {
     role: string,
     threadId: string,
   ): Promise<{ thread: ConversationThread; messages: DirectMessage[] }> {
-    const thread = await this.repository.findThreadById(organizationId, threadId);
+    const thread = await this.repository.findThreadById(
+      organizationId,
+      threadId,
+    );
     if (!thread) {
-      throw new AppError(404, 'THREAD_NOT_FOUND', 'Conversation thread not found.');
+      throw new AppError(
+        404,
+        'THREAD_NOT_FOUND',
+        'Conversation thread not found.',
+      );
     }
 
     // Tenant and participation scoping check
     const isParticipant =
       thread.guardianUserId === userId ||
       thread.teacherUserId === userId ||
-      ['organization_owner', 'organization_admin', 'principal_director'].includes(role);
+      [
+        'organization_owner',
+        'organization_admin',
+        'principal_director',
+      ].includes(role);
 
     if (!isParticipant) {
-      throw new AppError(403, 'FORBIDDEN', 'Access to this conversation is denied.');
+      throw new AppError(
+        403,
+        'FORBIDDEN',
+        'Access to this conversation is denied.',
+      );
     }
 
-    const messages = await this.repository.listMessages(organizationId, threadId);
+    const messages = await this.repository.listMessages(
+      organizationId,
+      threadId,
+    );
 
     // Mark as read for this participant
     await this.repository.markMessagesRead(organizationId, threadId, userId);
@@ -438,13 +515,24 @@ export class MessagingService {
       throw new AppError(400, 'VALIDATION_ERROR', 'Enter a valid message.');
     }
 
-    const thread = await this.repository.findThreadById(organizationId, threadId);
+    const thread = await this.repository.findThreadById(
+      organizationId,
+      threadId,
+    );
     if (!thread) {
-      throw new AppError(404, 'THREAD_NOT_FOUND', 'Conversation thread not found.');
+      throw new AppError(
+        404,
+        'THREAD_NOT_FOUND',
+        'Conversation thread not found.',
+      );
     }
 
     if (thread.status !== 'active') {
-      throw new AppError(400, 'THREAD_CLOSED', 'This conversation thread is closed.');
+      throw new AppError(
+        400,
+        'THREAD_CLOSED',
+        'This conversation thread is closed.',
+      );
     }
 
     const isParticipant =
@@ -453,7 +541,11 @@ export class MessagingService {
       ['organization_owner', 'organization_admin'].includes(role);
 
     if (!isParticipant) {
-      throw new AppError(403, 'FORBIDDEN', 'You cannot send messages to this thread.');
+      throw new AppError(
+        403,
+        'FORBIDDEN',
+        'You cannot send messages to this thread.',
+      );
     }
 
     return this.repository.addMessage(

@@ -92,6 +92,7 @@ export interface GuardianRecord {
   email?: string;
   communicationPreference?: 'sms' | 'email' | 'both';
   address?: AddressInput;
+  studentCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -211,6 +212,10 @@ export interface ApplicationInput {
   source?: string;
   preferredCampusId?: string;
   program?: string;
+  dateOfBirth?: string;
+  guardianName?: string;
+  guardianPhone?: string;
+  feePlan?: 'Standard' | 'Scholarship' | 'Sibling plan';
   status?: ApplicationStatus;
   notes?: string;
 }
@@ -226,6 +231,10 @@ export interface ApplicationRecord {
   phone?: string;
   source?: string;
   program?: string;
+  dateOfBirth?: string;
+  guardianName?: string;
+  guardianPhone?: string;
+  feePlan?: 'Standard' | 'Scholarship' | 'Sibling plan';
   status: ApplicationStatus;
   convertedStudentId?: string;
   notes?: string;
@@ -407,6 +416,7 @@ export interface PeopleRepository {
     organizationId: string,
     applicationId: string,
     decisionReason?: string,
+    campusId?: string,
   ): Promise<{
     application: ApplicationRecord;
     student: StudentRecord;
@@ -525,7 +535,11 @@ export interface PeopleServices {
   reviewApplication(
     organizationId: string,
     applicationId: string,
-    input: { status: ApplicationStatus; decisionReason?: string },
+    input: {
+      status: ApplicationStatus;
+      decisionReason?: string;
+      campusId?: string;
+    },
   ): Promise<{
     application: ApplicationRecord;
     student?: StudentRecord;

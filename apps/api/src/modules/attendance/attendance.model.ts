@@ -34,8 +34,8 @@ const studentAttendanceSchema = new Schema(
       enum: [
         'present',
         'absent',
+        'leave',
         'late',
-        'excused',
       ] satisfies StudentAttendanceStatus[],
       required: true,
     },

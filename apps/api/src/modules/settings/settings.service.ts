@@ -67,7 +67,11 @@ function validateInput(input: OrganizationSettingsInput): void {
     for (const [key, value] of Object.entries(values)) {
       hasValue = true;
       if (!allowed.includes(key)) {
-        throw new AppError(400, 'VALIDATION_ERROR', 'Settings contain an unsupported field.');
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Settings contain an unsupported field.',
+        );
       }
       if (section === 'notifications') {
         if (typeof value !== 'boolean') {
@@ -83,7 +87,11 @@ function validateInput(input: OrganizationSettingsInput): void {
     }
   }
   if (!hasValue) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'Provide at least one settings value.');
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Provide at least one settings value.',
+    );
   }
 }
 
@@ -117,7 +125,9 @@ export class SettingsService {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  async getSettings(organizationId: string): Promise<OrganizationSettingsRecord> {
+  async getSettings(
+    organizationId: string,
+  ): Promise<OrganizationSettingsRecord> {
     validateOrganizationId(organizationId);
     return (
       (await this.repository.findSettings(organizationId)) ??
@@ -132,7 +142,11 @@ export class SettingsService {
   ): Promise<OrganizationSettingsRecord> {
     validateOrganizationId(organizationId);
     if (!mongoose.isValidObjectId(actor.userId)) {
-      throw new AppError(401, 'AUTHENTICATION_REQUIRED', 'Sign in to continue.');
+      throw new AppError(
+        401,
+        'AUTHENTICATION_REQUIRED',
+        'Sign in to continue.',
+      );
     }
     if (!managerRoles.includes(actor.role)) {
       throw new AppError(

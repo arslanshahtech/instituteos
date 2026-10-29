@@ -18,8 +18,19 @@ import {
   requestInvoiceDeleteOtp,
   deleteInvoice,
   setInvoiceDiscount,
+  listFinancePayments,
+  listFinanceExpenses,
+  listFinanceExpenseBudgets,
+  saveFinanceExpenseBudget,
+  listFinanceConcessions,
+  createFinanceExpense,
+  deleteFinanceExpense,
 } from './finance-api.js';
-import type { InvoiceFilters, FeeConcessionInput } from './finance-api.js';
+import type {
+  InvoiceFilters,
+  FeeConcessionInput,
+  FinanceOperationFilters,
+} from './finance-api.js';
 
 export const financeQueryKey = (organizationId: string) =>
   ['finance', organizationId] as const;
@@ -28,6 +39,7 @@ export function useFinanceWorkspace(
   organizationId: string,
   enabled: boolean,
   filters: InvoiceFilters,
+  operationFilters: FinanceOperationFilters = filters,
 ) {
   const key = financeQueryKey(organizationId);
   return {
@@ -44,7 +56,87 @@ export function useFinanceWorkspace(
       retry: false,
       placeholderData: keepPreviousData,
     }),
+    allInvoices: useQuery({
+      queryKey: [...key, 'all-invoices'],
+      queryFn: () => listInvoices(organizationId),
+      enabled,
+      retry: false,
+      placeholderData: keepPreviousData,
+    }),
+    payments: useQuery({
+      queryKey: [...key, 'payments', operationFilters],
+      queryFn: () => listFinancePayments(organizationId, operationFilters),
+      enabled,
+      retry: false,
+      placeholderData: keepPreviousData,
+    }),
+    expenses: useQuery({
+      queryKey: [...key, 'expenses', operationFilters],
+      queryFn: () => listFinanceExpenses(organizationId, operationFilters),
+      enabled,
+      retry: false,
+      placeholderData: keepPreviousData,
+    }),
+    expenseBudgets: useQuery({
+      queryKey: [
+        ...key,
+        'expense-budgets',
+        operationFilters.month,
+        operationFilters.campusId,
+      ],
+      queryFn: () =>
+        listFinanceExpenseBudgets(organizationId, {
+          month: operationFilters.month ?? new Date().toISOString().slice(0, 7),
+          campusId: operationFilters.campusId,
+        }),
+      enabled,
+      retry: false,
+      placeholderData: keepPreviousData,
+    }),
+    concessions: useQuery({
+      queryKey: [
+        ...key,
+        'all-concessions',
+        operationFilters.campusId,
+        operationFilters.academicYearId,
+      ],
+      queryFn: () =>
+        listFinanceConcessions(organizationId, {
+          campusId: operationFilters.campusId,
+          academicYearId: operationFilters.academicYearId,
+        }),
+      enabled,
+      retry: false,
+      placeholderData: keepPreviousData,
+    }),
   };
+}
+
+export function useCreateFinanceExpense(organizationId: string) {
+  const invalidate = useInvalidateFinance(organizationId);
+  return useMutation({
+    mutationFn: (input: Parameters<typeof createFinanceExpense>[1]) =>
+      createFinanceExpense(organizationId, input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteFinanceExpense(organizationId: string) {
+  const invalidate = useInvalidateFinance(organizationId);
+  return useMutation({
+    mutationFn: (expenseId: string) =>
+      deleteFinanceExpense(organizationId, expenseId),
+    onSuccess: invalidate,
+  });
+}
+
+export function useSaveFinanceExpenseBudget(organizationId: string) {
+  const invalidate = useInvalidateFinance(organizationId);
+  return useMutation({
+    mutationFn: (input: Parameters<typeof saveFinanceExpenseBudget>[1]) =>
+      saveFinanceExpenseBudget(organizationId, input),
+    onSuccess: invalidate,
+  });
 }
 
 export function useStudentFeeLedger(
@@ -64,7 +156,9 @@ export function useStudentFeeLedger(
 function useInvalidateFinance(organizationId: string) {
   const queryClient = useQueryClient();
   return () =>
-    queryClient.invalidateQueries({ queryKey: financeQueryKey(organizationId) });
+    queryClient.invalidateQueries({
+      queryKey: financeQueryKey(organizationId),
+    });
 }
 
 export function useSaveFeeStructure(organizationId: string) {
@@ -115,7 +209,8 @@ export function useStudentConcessions(
   const key = financeQueryKey(organizationId);
   return useQuery({
     queryKey: [...key, 'concessions', studentId, academicYearId],
-    queryFn: () => listStudentConcessions(organizationId, studentId, academicYearId),
+    queryFn: () =>
+      listStudentConcessions(organizationId, studentId, academicYearId),
     enabled: Boolean(organizationId && studentId && enabled),
     retry: false,
   });

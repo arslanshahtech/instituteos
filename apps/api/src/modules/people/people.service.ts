@@ -64,6 +64,23 @@ function normalizeOptionalDate(value: string | undefined): string | undefined {
   return date.toISOString();
 }
 
+function normalizeOptionalDateOnly(
+  value: string | undefined,
+): string | undefined {
+  if (!value) return undefined;
+  if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Enter a valid birth date.');
+  }
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== value
+  ) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'Enter a valid birth date.');
+  }
+  return value;
+}
+
 function normalizeStatus(
   value: string | undefined,
   allowed: readonly string[],
@@ -722,13 +739,20 @@ export class PeopleService {
         'application status',
       ) as ApplicationRecord['status'],
       email: normalizeOptionalEmail(input.email),
+      dateOfBirth: normalizeOptionalDateOnly(input.dateOfBirth),
+      guardianName: input.guardianName?.trim() || undefined,
+      guardianPhone: input.guardianPhone?.trim() || undefined,
     });
   }
 
   async reviewApplication(
     organizationId: string,
     applicationId: string,
-    input: { status: ApplicationStatus; decisionReason?: string },
+    input: {
+      status: ApplicationStatus;
+      decisionReason?: string;
+      campusId?: string;
+    },
     context?: { organizationId: string; campusIds?: string[]; role?: string },
   ): Promise<{
     application: ApplicationRecord;
@@ -746,7 +770,14 @@ export class PeopleService {
       context,
     );
     const allowed = TRANSITIONS[existing.status] ?? [];
-    if (!allowed.includes(input.status)) {
+    // Approval is intentionally idempotent when an older application was
+    // marked approved before its student record was created. The repository
+    // repairs missing student/enrollment records without creating duplicates.
+    const repairingApprovedApplication =
+      existing.status === 'approved' &&
+      input.status === 'approved' &&
+      !existing.convertedStudentId;
+    if (!allowed.includes(input.status) && !repairingApprovedApplication) {
       throw new AppError(
         400,
         'INVALID_TRANSITION',
@@ -754,10 +785,20 @@ export class PeopleService {
       );
     }
     if (input.status === 'approved') {
+      const campusId = input.campusId ?? existing.campusId;
+      if (!campusId) {
+        throw new AppError(
+          400,
+          'CAMPUS_REQUIRED',
+          'Assign a campus before approving this application so the student is placed in the correct campus roster.',
+        );
+      }
+      assertCampusScope(context ?? { organizationId }, campusId);
       const result = await this.repository.approveApplication(
         organizationId,
         applicationId,
         input.decisionReason,
+        campusId,
       );
       return {
         application: result.application,

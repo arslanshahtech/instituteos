@@ -39,10 +39,7 @@ export interface AuditLogPage {
   total: number;
 }
 
-export type ReportDataRow = Record<
-  string,
-  string | number | null
->;
+export type ReportDataRow = Record<string, string | number | null>;
 
 export interface ReportingRepository {
   countActiveStudents(

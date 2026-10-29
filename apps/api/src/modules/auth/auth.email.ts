@@ -13,9 +13,34 @@ const transport =
       })
     : null;
 
+function logDeliveryFailure(purpose: string, error?: unknown): void {
+  const details =
+    typeof error === 'object' && error !== null
+      ? (error as Record<string, unknown>)
+      : {};
+  console.warn(
+    JSON.stringify({
+      level: 'warn',
+      event: 'auth.email.delivery.failed',
+      purpose,
+      ...(!transport || !env.smtpFrom ? { reason: 'smtp_not_configured' } : {}),
+      ...(typeof details.code === 'string' ? { code: details.code } : {}),
+      ...(typeof details.responseCode === 'number'
+        ? { responseCode: details.responseCode }
+        : {}),
+      ...(typeof details.command === 'string'
+        ? { command: details.command }
+        : {}),
+    }),
+  );
+}
+
 export class SmtpAuthEmailDelivery implements AuthEmailDelivery {
   async sendVerification(email: string, token: string): Promise<boolean> {
-    if (!transport || !env.smtpFrom) return false;
+    if (!transport || !env.smtpFrom) {
+      logDeliveryFailure('verification');
+      return false;
+    }
     const url = `${env.authWebAppUrl.replace(/\/$/, '')}/verify-email#token=${encodeURIComponent(token)}`;
     try {
       await transport.sendMail({
@@ -25,13 +50,17 @@ export class SmtpAuthEmailDelivery implements AuthEmailDelivery {
         text: `Verify your account using this link: ${url}`,
       });
       return true;
-    } catch {
+    } catch (error) {
+      logDeliveryFailure('verification', error);
       return false;
     }
   }
 
   async sendPasswordReset(email: string, token: string): Promise<boolean> {
-    if (!transport || !env.smtpFrom) return false;
+    if (!transport || !env.smtpFrom) {
+      logDeliveryFailure('password_reset');
+      return false;
+    }
     const url = `${env.authWebAppUrl.replace(/\/$/, '')}/reset-password#token=${encodeURIComponent(token)}`;
     try {
       await transport.sendMail({
@@ -41,7 +70,8 @@ export class SmtpAuthEmailDelivery implements AuthEmailDelivery {
         text: `Reset your password using this link: ${url}`,
       });
       return true;
-    } catch {
+    } catch (error) {
+      logDeliveryFailure('password_reset', error);
       return false;
     }
   }
@@ -51,7 +81,10 @@ export class SmtpAuthEmailDelivery implements AuthEmailDelivery {
     token: string,
     organizationName: string,
   ): Promise<boolean> {
-    if (!transport || !env.smtpFrom) return false;
+    if (!transport || !env.smtpFrom) {
+      logDeliveryFailure('invitation');
+      return false;
+    }
     const url = `${env.authWebAppUrl.replace(/\/$/, '')}/invitations/accept#token=${encodeURIComponent(token)}`;
     try {
       await transport.sendMail({
@@ -61,7 +94,8 @@ export class SmtpAuthEmailDelivery implements AuthEmailDelivery {
         text: `You have been invited to join ${organizationName}. Sign in or create an account, then accept this invitation: ${url}`,
       });
       return true;
-    } catch {
+    } catch (error) {
+      logDeliveryFailure('invitation', error);
       return false;
     }
   }

@@ -67,6 +67,6 @@ Copy the root `.env.example` to `.env` for local configuration. The API validate
 
 The root npm workspace provides shared linting and formatting. Each application provides build, test, and typecheck scripts; root scripts run those across applicable workspaces.
 
-## Deferred capabilities
+## Implemented capabilities and deferred work
 
-Phase 05 adds organization and campus administration, invitations, membership management, and organization audit events. Admissions, students and guardians, academics, attendance, finance, communication, documents, billing, and AI remain deferred to their assigned phases.
+The current repository has modules for organization/campus administration, memberships and permissions, admissions, people records, academics, attendance, examinations/homework, fee operations and concessions, communications, reporting, settings, and student pickup. Code presence does not automatically mean production acceptance; use tests and school-level end-to-end evidence for each workflow. The permission-aware AI assistant, SaaS subscription billing, automated external messaging/payment integrations, and any unsupported document-management workflow remain planned or unverified. See docs/PRODUCTION_READINESS_PLAN.md for the release gates and rollout sequence.
