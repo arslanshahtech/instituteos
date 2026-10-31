@@ -149,6 +149,16 @@ export interface AttendanceRepository {
     studentId: string,
     campusId: string,
   ): Promise<boolean>;
+  getSectionCapacity(
+    organizationId: string,
+    sectionId: string,
+  ): Promise<number | null>;
+  countActiveSectionPlacements(
+    organizationId: string,
+    sectionId: string,
+    academicYearId: string,
+    excludingStudentId?: string,
+  ): Promise<number>;
   validateStaff(
     organizationId: string,
     staffId: string,

@@ -447,3 +447,129 @@
     padding: 0 7px;
   }
 }
+
+.platform-manage-button {
+  min-height: 32px;
+  padding: 6px 11px;
+  font-size: 11px;
+}
+.platform-manage-row > td {
+  padding: 0 !important;
+  background: #f8fafc;
+}
+.platform-manage-panel {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+.platform-manage-panel > div:first-child p,
+.platform-manage-note {
+  margin-top: 5px;
+  color: var(--color-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+.platform-manage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.platform-manage-actions .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.platform-manage-note {
+  flex-basis: 100%;
+  margin-top: 0;
+}
+.platform-detail-panel,
+.platform-delete-panel {
+  padding: 20px;
+}
+.platform-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding-top: 8px;
+}
+.platform-detail-grid > div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: #fff;
+}
+.platform-detail-grid dt {
+  color: var(--color-muted);
+  font-size: 10px;
+  margin-bottom: 5px;
+}
+.platform-detail-grid dd {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.platform-edit-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.platform-edit-form label,
+.platform-delete-panel label {
+  display: grid;
+  gap: 6px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.platform-edit-form input,
+.platform-delete-panel input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--color-ink);
+  background: #fff;
+}
+.platform-edit-form .platform-create-actions {
+  grid-column: 1 / -1;
+}
+.platform-delete-warning {
+  margin: 14px 0;
+  color: #8a4b10;
+  font-size: 11px;
+  line-height: 1.55;
+}
+@media (max-width: 760px) {
+  .platform-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .platform-edit-form {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 480px) {
+  .platform-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .platform-manage-panel {
+    padding: 15px;
+  }
+  .platform-manage-actions {
+    width: 100%;
+  }
+  .platform-manage-actions .button {
+    flex: 1 1 140px;
+    justify-content: center;
+  }
+}

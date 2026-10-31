@@ -40,10 +40,14 @@ export interface TermRecord extends TermInput {
   updatedAt: string;
 }
 
+export type AcademicStudyLevel = 'first_year' | 'second_year' | 'other';
+
 export interface ClassInput {
   name: string;
   code: string;
   campusId: string;
+  studyLevel?: AcademicStudyLevel;
+  programName?: string;
 }
 
 export interface ClassRecord extends ClassInput {
@@ -71,6 +75,7 @@ export interface SubjectInput {
   name: string;
   code: string;
   department?: string;
+  classIds?: string[];
 }
 
 export interface SubjectRecord extends SubjectInput {
@@ -126,6 +131,13 @@ export interface AcademicsRepository {
     academicYearId?: string,
   ): Promise<TermRecord[]>;
   getTerm(organizationId: string, id: string): Promise<TermRecord | null>;
+  hasOverlappingTerm(
+    organizationId: string,
+    academicYearId: string,
+    startDate: string,
+    endDate: string,
+    exceptId?: string,
+  ): Promise<boolean>;
   createTerm(organizationId: string, input: TermInput): Promise<TermRecord>;
   updateTerm(
     organizationId: string,
@@ -207,7 +219,13 @@ export interface AcademicsRepository {
   deleteTeacherAssignment(organizationId: string, id: string): Promise<boolean>;
   hasReference(
     organizationId: string,
-    resource: 'academicYear' | 'class' | 'section' | 'subject',
+    resource:
+      | 'academicYear'
+      | 'term'
+      | 'class'
+      | 'section'
+      | 'subject'
+      | 'teacherAssignment',
     id: string,
   ): Promise<boolean>;
   validateAcademicYear(organizationId: string, id: string): Promise<boolean>;

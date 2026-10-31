@@ -78,6 +78,10 @@ function makeRepository(assigned: boolean) {
         }),
       ),
     listRoster: vi.fn().mockResolvedValue([]),
+    validateSubject: vi.fn().mockResolvedValue(true),
+    getClassCampus: vi.fn().mockResolvedValue(campusId),
+    validateSection: vi.fn().mockResolvedValue(true),
+    createSchedule: vi.fn().mockResolvedValue(schedule),
   } as unknown as ExaminationsRepository;
 }
 
@@ -104,6 +108,32 @@ const markedStudent: ExamRosterStudent = {
     updatedAt: '2026-01-01T00:00:00.000Z',
   },
 };
+
+describe('ExaminationsService class-specific subjects', () => {
+  it('rejects scheduling a subject outside its assigned class/group', async () => {
+    const repo = makeRepository(true);
+    vi.mocked(repo.validateSubject).mockResolvedValue(false);
+    const service = new ExaminationsService(repo);
+    await expect(
+      service.createSchedule(managerContext, examId, {
+        subjectId,
+        classId,
+        sectionId,
+        date: '2026-10-10',
+        startTime: '09:00',
+        durationMinutes: 60,
+        totalMarks: 100,
+        passingMarks: 40,
+      }),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    expect(repo.validateSubject).toHaveBeenCalledWith(
+      organizationId,
+      subjectId,
+      classId,
+    );
+    expect(repo.createSchedule).not.toHaveBeenCalled();
+  });
+});
 
 describe('ExaminationsService result publication', () => {
   it('refuses to publish while a scheduled class has missing student marks', async () => {

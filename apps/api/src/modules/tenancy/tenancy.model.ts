@@ -10,6 +10,11 @@ import { PLATFORM_ROLES } from './authorization.js';
 const organizationSchema = new Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 160 },
+    institutionType: {
+      type: String,
+      enum: ['school', 'college'],
+      required: false,
+    },
     adminName: { type: String, trim: true, maxlength: 120 },
     shortCode: { type: String, trim: true, uppercase: true, maxlength: 24 },
     tagline: { type: String, trim: true, maxlength: 180 },

@@ -12,6 +12,15 @@ import {
   StudentAttendanceModel,
   StudentSectionPlacementModel,
 } from '../modules/attendance/attendance.model.js';
+import {
+  AcademicClassModel,
+  AcademicSectionModel,
+  AcademicYearModel,
+  SubjectModel,
+  TeacherAssignmentModel,
+  TeacherTimetableModel,
+  TermModel,
+} from '../modules/academics/academics.model.js';
 
 let tenancyModelsInitialized = false;
 
@@ -35,6 +44,13 @@ export async function connectDatabase(
       StudentAttendanceModel.init(),
       StaffAttendanceModel.init(),
       StudentSectionPlacementModel.init(),
+      AcademicYearModel.init(),
+      TermModel.init(),
+      AcademicClassModel.init(),
+      AcademicSectionModel.init(),
+      SubjectModel.init(),
+      TeacherAssignmentModel.init(),
+      TeacherTimetableModel.init(),
     ]);
     tenancyModelsInitialized = true;
   } catch (error) {

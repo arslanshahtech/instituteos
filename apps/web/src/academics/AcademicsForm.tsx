@@ -23,21 +23,25 @@ interface FormValues {
   teacherStaffId: string;
   subjectId: string;
   sectionId: string;
+  studyLevel: '' | 'first_year' | 'second_year' | 'other';
+  programName: string;
+  classIds: string[];
 }
 
 interface Choice {
   value: string;
   label: string;
+  classIds?: string[];
 }
 
 interface Field {
   name: keyof FormValues;
   label: string;
-  type?: 'date' | 'number' | 'select';
+  type?: 'date' | 'number' | 'select' | 'multiselect';
   choices?: Choice[];
 }
 
-function schemaForResource(resource: AcademicsResource) {
+function schemaForResource(resource: AcademicsResource, isEditing: boolean) {
   return z
     .object({
       name: z.string().trim().max(120, 'Use 120 characters or fewer.'),
@@ -62,6 +66,9 @@ function schemaForResource(resource: AcademicsResource) {
       teacherStaffId: z.string(),
       subjectId: z.string(),
       sectionId: z.string(),
+      studyLevel: z.enum(['', 'first_year', 'second_year', 'other']),
+      programName: z.string().trim().max(120, 'Use 120 characters or fewer.'),
+      classIds: z.array(z.string()),
     })
     .superRefine((values, context) => {
       const requiredByResource: Record<
@@ -81,6 +88,22 @@ function schemaForResource(resource: AcademicsResource) {
           'academicYearId',
         ],
       };
+      if (resource === 'subjects' && !isEditing && values.classIds.length === 0)
+        context.addIssue({
+          code: 'custom',
+          path: ['classIds'],
+          message: 'Choose at least one class or college group.',
+        });
+      if (
+        resource === 'classes' &&
+        values.studyLevel &&
+        !values.programName.trim()
+      )
+        context.addIssue({
+          code: 'custom',
+          path: ['programName'],
+          message: 'Enter the college program/group name.',
+        });
       for (const key of requiredByResource[resource] ?? []) {
         if (typeof values[key] !== 'string' || !values[key].trim())
           context.addIssue({
@@ -144,8 +167,19 @@ const fieldsByResource: Record<AcademicsResource, Field[]> = {
     { name: 'endDate', label: 'End date', type: 'date' },
   ],
   classes: [
-    { name: 'name', label: 'Class name' },
+    { name: 'name', label: 'Class / study level name (e.g. First Year)' },
     { name: 'code', label: 'Class code' },
+    {
+      name: 'studyLevel',
+      label: 'Study level',
+      type: 'select',
+      choices: [
+        { value: 'first_year', label: 'First Year' },
+        { value: 'second_year', label: 'Second Year' },
+        { value: 'other', label: 'Other' },
+      ],
+    },
+    { name: 'programName', label: 'Program name (e.g. FSc Pre-Medical)' },
     { name: 'campusId', label: 'Campus', type: 'select' },
   ],
   sections: [
@@ -157,6 +191,11 @@ const fieldsByResource: Record<AcademicsResource, Field[]> = {
     { name: 'name', label: 'Subject name' },
     { name: 'code', label: 'Subject code' },
     { name: 'department', label: 'Department' },
+    {
+      name: 'classIds',
+      label: 'Available for classes / groups',
+      type: 'multiselect',
+    },
   ],
   'teacher-assignments': [
     { name: 'teacherStaffId', label: 'Teacher', type: 'select' },
@@ -181,6 +220,9 @@ const emptyValues: FormValues = {
   teacherStaffId: '',
   subjectId: '',
   sectionId: '',
+  studyLevel: '',
+  programName: '',
+  classIds: [],
 };
 
 export function AcademicsForm({
@@ -199,8 +241,10 @@ export function AcademicsForm({
   onSubmit: (input: AcademicsFormPayload) => void;
 }) {
   const initialValues = useMemo(() => {
-    const value = (key: keyof FormValues) =>
-      record?.[key] == null ? emptyValues[key] : String(record[key]);
+    const value = (key: Exclude<keyof FormValues, 'classIds'>): string =>
+      record?.[key] == null
+        ? (emptyValues[key] as string)
+        : String(record[key]);
     return {
       name: value('name'),
       code: value('code'),
@@ -222,6 +266,11 @@ export function AcademicsForm({
       teacherStaffId: value('teacherStaffId'),
       subjectId: value('subjectId'),
       sectionId: value('sectionId'),
+      studyLevel: value('studyLevel') as FormValues['studyLevel'],
+      programName: value('programName'),
+      classIds: Array.isArray(record?.classIds)
+        ? record.classIds.map(String)
+        : [],
     };
   }, [
     record,
@@ -230,11 +279,32 @@ export function AcademicsForm({
     choices.campusId?.[0]?.value,
   ]);
   const form = useForm<FormValues>({
-    resolver: zodResolver(schemaForResource(resource)),
+    resolver: zodResolver(schemaForResource(resource, Boolean(record))),
     defaultValues: initialValues,
     mode: 'onBlur',
   });
   const { reset } = form;
+  const selectedClassId = form.watch('classId');
+  const selectedSubjectId = form.watch('subjectId');
+  useEffect(() => {
+    if (
+      resource !== 'teacher-assignments' ||
+      !selectedSubjectId ||
+      !selectedClassId
+    )
+      return;
+    const selectedSubject = choices.subjectId?.find(
+      (choice) => choice.value === selectedSubjectId,
+    );
+    if (
+      selectedSubject?.classIds?.length &&
+      !selectedSubject.classIds.includes(selectedClassId)
+    )
+      form.setValue('subjectId', '', {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+  }, [choices.subjectId, form, resource, selectedClassId, selectedSubjectId]);
   useEffect(() => {
     reset(initialValues);
   }, [initialValues, resource, reset]);
@@ -244,7 +314,14 @@ export function AcademicsForm({
     if (resource === 'sections')
       input.capacity = values.capacity ? Number(values.capacity) : '';
     else delete input.capacity;
-    if (resource !== 'subjects') delete input.department;
+    if (resource !== 'subjects') {
+      delete input.department;
+      delete input.classIds;
+    } else if (record && values.classIds.length === 0) delete input.classIds;
+    if (resource !== 'classes') {
+      delete input.studyLevel;
+      delete input.programName;
+    }
     if (resource !== 'academic-years') delete input.status;
     for (const [key, value] of Object.entries(input)) {
       if (
@@ -267,6 +344,61 @@ export function AcademicsForm({
         {fieldsByResource[resource].map((field) => {
           const error = form.formState.errors[field.name]?.message;
           const fieldChoices = choices[field.name] ?? field.choices ?? [];
+          const visibleChoices =
+            field.name === 'subjectId' && selectedClassId
+              ? fieldChoices.filter(
+                  (choice) =>
+                    !choice.classIds?.length ||
+                    choice.classIds.includes(selectedClassId),
+                )
+              : fieldChoices;
+          if (field.type === 'multiselect') {
+            const selectedClassIds = form.watch('classIds');
+            return (
+              <FormField
+                error={error}
+                key={field.name}
+                label={field.label}
+                name={field.name}
+              >
+                <div className="academics-class-choice-list">
+                  {fieldChoices.map((choice) => (
+                    <label
+                      key={choice.value}
+                      className="academics-class-choice"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedClassIds.includes(choice.value)}
+                        onChange={(event) =>
+                          form.setValue(
+                            'classIds',
+                            event.target.checked
+                              ? [...selectedClassIds, choice.value]
+                              : selectedClassIds.filter(
+                                  (id) => id !== choice.value,
+                                ),
+                            { shouldDirty: true, shouldValidate: true },
+                          )
+                        }
+                      />
+                      <span>{choice.label}</span>
+                    </label>
+                  ))}
+                  {!fieldChoices.length && (
+                    <p className="form-help-text">
+                      Pehle Classes mein college groups create karein.
+                    </p>
+                  )}
+                </div>
+                <p className="form-help-text">
+                  Subject sirf selected classes/groups mein teacher assignment
+                  aur exams ke liye available hoga. Purane global subjects
+                  existing records ke liye compatible rahenge.
+                </p>
+              </FormField>
+            );
+          }
           if (field.type === 'select') {
             return (
               <FormField
@@ -277,7 +409,7 @@ export function AcademicsForm({
               >
                 <select id={field.name} {...form.register(field.name)}>
                   <option value="">Select {field.label.toLowerCase()}</option>
-                  {fieldChoices.map((choice) => (
+                  {visibleChoices.map((choice) => (
                     <option key={choice.value} value={choice.value}>
                       {choice.label}
                     </option>

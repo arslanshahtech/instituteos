@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import mongoose from 'mongoose';
 import { AppError } from '../../errors/app-error.js';
 import { asyncHandler } from '../../middleware/async-handler.js';
@@ -113,6 +113,17 @@ function organizationContext(response: {
   };
 }
 
+function assertAcademicYearLifecycleAuthority(response: Response): void {
+  const { role } = organizationContext(response);
+  if (role !== 'organization_owner' && role !== 'organization_admin') {
+    throw new AppError(
+      403,
+      'ACADEMIC_YEAR_LIFECYCLE_FORBIDDEN',
+      'Only the Organization Owner or Organization Admin can activate, archive, or delete an academic year.',
+    );
+  }
+}
+
 function defaultAuthenticate() {
   const service = new AuthService(
     new MongoAuthRepository(),
@@ -164,6 +175,8 @@ export function createAcademicsRouter(
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
+      if (body.status !== undefined)
+        assertAcademicYearLifecycleAuthority(response);
       const input: AcademicYearInput = {
         name: requiredString(body, 'name', 100),
         startDate: requiredString(body, 'startDate', 10),
@@ -198,6 +211,8 @@ export function createAcademicsRouter(
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
+      if (body.status !== undefined)
+        assertAcademicYearLifecycleAuthority(response);
       const input: Partial<AcademicYearInput> = {
         ...(body.name === undefined
           ? {}
@@ -226,6 +241,7 @@ export function createAcademicsRouter(
     ...protect,
     csrfProtection,
     asyncHandler(async (request, response) => {
+      assertAcademicYearLifecycleAuthority(response);
       await service.deleteAcademicYear(
         organizationContext(response),
         routeId(request.params.id!, 'Academic year'),
@@ -336,10 +352,26 @@ export function createAcademicsRouter(
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
+      const studyLevel = body.studyLevel;
+      if (
+        studyLevel !== undefined &&
+        !['first_year', 'second_year', 'other'].includes(String(studyLevel))
+      )
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Select a valid study level.',
+        );
       const input: ClassInput = {
         name: requiredString(body, 'name', 100),
         code: requiredString(body, 'code', 30),
         campusId: requiredString(body, 'campusId', 24),
+        ...(studyLevel
+          ? { studyLevel: studyLevel as ClassInput['studyLevel'] }
+          : {}),
+        ...(body.programName === undefined
+          ? {}
+          : { programName: requiredString(body, 'programName', 120) }),
       };
       response.status(201).json({
         class: await service.createClass(organizationContext(response), input),
@@ -374,6 +406,17 @@ export function createAcademicsRouter(
         ...(body.campusId === undefined
           ? {}
           : { campusId: requiredString(body, 'campusId', 24) }),
+        ...(body.studyLevel === undefined
+          ? {}
+          : { studyLevel: body.studyLevel as ClassInput['studyLevel'] }),
+        ...(body.programName === undefined
+          ? {}
+          : {
+              programName:
+                body.programName === ''
+                  ? ''
+                  : requiredString(body, 'programName', 120),
+            }),
       };
       response.status(200).json({
         class: await service.updateClass(
@@ -507,10 +550,26 @@ export function createAcademicsRouter(
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
       const department = optionalString(body, 'department', 100);
+      if (
+        body.classIds !== undefined &&
+        (!Array.isArray(body.classIds) ||
+          body.classIds.length > 100 ||
+          body.classIds.some(
+            (id) => typeof id !== 'string' || !mongoose.isValidObjectId(id),
+          ))
+      )
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Choose valid classes for this subject.',
+        );
       const input: SubjectInput = {
         name: requiredString(body, 'name', 120),
         code: requiredString(body, 'code', 30),
         ...(department ? { department } : {}),
+        ...(body.classIds !== undefined
+          ? { classIds: body.classIds as string[] }
+          : {}),
       };
       response.status(201).json({
         subject: await service.createSubject(
@@ -553,6 +612,24 @@ export function createAcademicsRouter(
                   ? ''
                   : requiredString(body, 'department', 100),
             }),
+        ...(body.classIds === undefined
+          ? {}
+          : (() => {
+              if (
+                !Array.isArray(body.classIds) ||
+                body.classIds.length > 100 ||
+                body.classIds.some(
+                  (id) =>
+                    typeof id !== 'string' || !mongoose.isValidObjectId(id),
+                )
+              )
+                throw new AppError(
+                  400,
+                  'VALIDATION_ERROR',
+                  'Choose valid classes for this subject.',
+                );
+              return { classIds: body.classIds as string[] };
+            })()),
       };
       response.status(200).json({
         subject: await service.updateSubject(

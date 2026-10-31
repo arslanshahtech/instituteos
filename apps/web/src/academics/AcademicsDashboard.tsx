@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Search } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiMessage, useOrganizationAccess } from '../staff/StaffPageShared.js';
 import { listStaff } from '../staff/staff-api.js';
@@ -31,6 +32,8 @@ import { AcademicsForm } from './AcademicsForm.js';
 import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 import { ClassEnrollmentPanel } from './ClassEnrollmentPanel.js';
 import { ClassesSectionsReferenceView } from './ClassesSectionsReferenceView.js';
+import { AcademicOverview } from './AcademicOverview.js';
+import { AcademicTimetable } from './AcademicTimetable.js';
 
 const managerRoles = [
   'organization_owner',
@@ -107,12 +110,23 @@ export function AcademicsDashboard() {
   const save = useSaveAcademicsResource(organizationId);
   const remove = useDeleteAcademicsResource(organizationId);
   const [resource, setResource] = useState<AcademicsResource>('classes');
+  const [resourceSearch, setResourceSearch] = useState('');
+  const [activeArea, setActiveArea] = useState<
+    | 'overview'
+    | 'academic-years'
+    | 'terms'
+    | 'classes'
+    | 'subjects'
+    | 'teacher-assignments'
+    | 'timetable'
+  >('overview');
   const [editing, setEditing] = useState<AcademicsRow>();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showEnrollment, setShowEnrollment] = useState(false);
-  const [enrollmentView, setEnrollmentView] = useState<'students' | 'teacher'>(
-    'students',
-  );
+  const [enrollmentView, setEnrollmentView] = useState<
+    'students' | 'add-students' | 'teacher'
+  >('students');
+  const [enrollmentFocusRequest, setEnrollmentFocusRequest] = useState(0);
   const [subjectDialogOpen, setSubjectDialogOpen] = useState(false);
   const [enrollmentSectionId, setEnrollmentSectionId] = useState<
     string | undefined
@@ -145,7 +159,7 @@ export function AcademicsDashboard() {
   const classNames = new Map(
     (workspace.classes.data?.items ?? []).map((item) => [
       item.id,
-      `${item.name} (${item.code})`,
+      `${item.name}${item.programName ? ` · ${item.programName}` : ''} (${item.code})`,
     ]),
   );
   const sectionNames = new Map(
@@ -188,7 +202,7 @@ export function AcademicsDashboard() {
             row(
               item,
               item.name,
-              `${item.code} · ${campusNames.get(item.campusId) ?? 'Assigned campus'}`,
+              `${item.code} · ${item.studyLevel === 'first_year' ? 'First Year' : item.studyLevel === 'second_year' ? 'Second Year' : item.studyLevel === 'other' ? 'Other level' : 'Study level not set'}${item.programName ? ` · ${item.programName}` : ''} · ${campusNames.get(item.campusId) ?? 'Assigned campus'}`,
             ),
         );
       case 'sections':
@@ -241,11 +255,16 @@ export function AcademicsDashboard() {
     })),
     classId: (workspace.classes.data?.items ?? []).map((item) => ({
       value: item.id,
-      label: `${item.name} (${item.code})`,
+      label: `${item.name}${item.programName ? ` · ${item.programName}` : ''} (${item.code})`,
+    })),
+    classIds: (workspace.classes.data?.items ?? []).map((item) => ({
+      value: item.id,
+      label: `${item.name}${item.programName ? ` · ${item.programName}` : ''} (${item.code})`,
     })),
     subjectId: (workspace.subjects.data?.items ?? []).map((item) => ({
       value: item.id,
       label: item.name,
+      classIds: item.classIds ?? [],
     })),
     sectionId: (workspace.sections.data?.items ?? []).map((item) => ({
       value: item.id,
@@ -295,7 +314,147 @@ export function AcademicsDashboard() {
   }
   if (!canManage) return <PermissionDeniedState />;
 
-  if (resource === 'classes' || resource === 'sections') {
+  const areaNavigation = (
+    <nav aria-label="Academic centre navigation" className="academics-tabs">
+      {(
+        [
+          ['overview', 'Overview'],
+          ['academic-years', 'Academic Years'],
+          ['terms', 'Terms'],
+          ['classes', 'Classes & Sections'],
+          ['subjects', 'Subjects'],
+          ['teacher-assignments', 'Teacher Assignments'],
+          ['timetable', 'Timetable'],
+        ] as const
+      ).map(([area, label]) => (
+        <button
+          aria-current={activeArea === area ? 'page' : undefined}
+          className={`academics-tab${activeArea === area ? ' academics-tab-active' : ''}`}
+          key={area}
+          onClick={() => {
+            save.reset();
+            remove.reset();
+            setActiveArea(area);
+            setResourceSearch('');
+            // Returning to Classes & Sections must always open its overview,
+            // never a previously opened student/teacher assignment panel.
+            setShowEnrollment(false);
+            setEnrollmentSectionId(undefined);
+            setEnrollmentClassId(undefined);
+            setEnrollmentView('students');
+            if (area === 'classes') setResource('classes');
+            else if (
+              area === 'academic-years' ||
+              area === 'terms' ||
+              area === 'subjects' ||
+              area === 'teacher-assignments'
+            )
+              setResource(area);
+          }}
+          type="button"
+        >
+          {label}
+        </button>
+      ))}
+    </nav>
+  );
+
+  if (activeArea === 'overview') {
+    return (
+      <main className="page-stack academics-page">
+        <WorkspacePageHeading
+          eyebrow="Organization workspace"
+          title="Academics"
+          description="Institute ke academic centre ki overall situation aur setup."
+        />
+        {areaNavigation}
+        <AcademicOverview
+          years={workspace.years.data?.items ?? []}
+          terms={workspace.terms.data?.items ?? []}
+          classes={workspace.classes.data?.items ?? []}
+          sections={workspace.sections.data?.items ?? []}
+          subjects={workspace.subjects.data?.items ?? []}
+          assignments={workspace.assignments.data?.items ?? []}
+          campuses={workspace.campuses.data?.campuses ?? []}
+          onOpen={(area) => {
+            setShowEnrollment(false);
+            setEnrollmentSectionId(undefined);
+            setEnrollmentClassId(undefined);
+            setEnrollmentView('students');
+            setActiveArea(area);
+            setResource(area);
+            setResourceSearch('');
+          }}
+        />
+      </main>
+    );
+  }
+
+  if (activeArea === 'timetable') {
+    return (
+      <main className="page-stack academics-page">
+        <WorkspacePageHeading
+          eyebrow="Academic centre"
+          title="Timetable"
+          description="Teacher-wise weekly periods and assignment schedule."
+        />
+        {areaNavigation}
+        <AcademicTimetable
+          organizationId={organizationId}
+          teachers={(staff.data?.items ?? []).map(
+            ({ id, firstName, lastName }) => ({ id, firstName, lastName }),
+          )}
+          assignments={workspace.assignments.data?.items ?? []}
+          classes={workspace.classes.data?.items ?? []}
+          sections={workspace.sections.data?.items ?? []}
+          subjects={workspace.subjects.data?.items ?? []}
+          years={workspace.years.data?.items ?? []}
+        />
+        {staff.isError && (
+          <p className="form-error" role="alert">
+            Teacher list unavailable: {apiMessage(staff.error)}
+          </p>
+        )}
+      </main>
+    );
+  }
+
+  if (activeArea === 'classes') {
+    const classWorkspaceQueries = [
+      { label: 'classes', query: workspace.classes },
+      { label: 'sections', query: workspace.sections },
+      { label: 'academic years', query: workspace.years },
+      { label: 'campuses', query: workspace.campuses },
+      { label: 'subjects', query: workspace.subjects },
+      { label: 'teacher assignments', query: workspace.assignments },
+    ];
+    const failedClassQuery = classWorkspaceQueries.find(
+      ({ query }) => query.isError,
+    );
+    if (classWorkspaceQueries.some(({ query }) => query.isPending)) {
+      return (
+        <main className="page-stack academics-page">
+          {areaNavigation}
+          <LoadingState message="Loading classes, sections and academic records…" />
+        </main>
+      );
+    }
+    if (failedClassQuery) {
+      return (
+        <main className="page-stack academics-page">
+          {areaNavigation}
+          <ErrorState
+            title={`Could not load ${failedClassQuery.label}`}
+            description={apiMessage(failedClassQuery.query.error)}
+            onRetry={() =>
+              void Promise.all(
+                classWorkspaceQueries.map(({ query }) => query.refetch()),
+              )
+            }
+          />
+        </main>
+      );
+    }
     const openCreate = (
       targetResource: 'classes' | 'sections',
       targetClassId?: string,
@@ -333,7 +492,13 @@ export function AcademicsDashboard() {
     };
 
     return (
-      <>
+      <div className="page-stack academics-page">
+        <WorkspacePageHeading
+          eyebrow="Organization workspace"
+          title="Academics"
+          description="Manage classes, sections, student placement and subject-teacher assignments."
+        />
+        {areaNavigation}
         <ClassesSectionsReferenceView
           classes={workspace.classes.data?.items ?? []}
           sections={workspace.sections.data?.items ?? []}
@@ -360,6 +525,8 @@ export function AcademicsDashboard() {
             setEnrollmentClassId(classId);
             setEnrollmentView(view);
             setShowEnrollment(true);
+            // Re-trigger the inner panel scroll even when the same view is already open.
+            setEnrollmentFocusRequest((request) => request + 1);
           }}
           onOpenCampusSetup={() =>
             navigate(
@@ -407,13 +574,20 @@ export function AcademicsDashboard() {
                   lastName,
                 }),
               )}
-              teachersLoading={staff.isPending}
+              teachersLoading={staff.isFetching}
               teachersError={
                 staff.isError ? apiMessage(staff.error) : undefined
+              }
+              onRetryTeachers={() => void staff.refetch()}
+              onManageStaff={() =>
+                navigate(
+                  `/admin/organizations/${encodeURIComponent(organizationId)}/staff`,
+                )
               }
               initialSectionId={enrollmentSectionId}
               initialClassId={enrollmentClassId}
               initialView={enrollmentView}
+              focusRequest={enrollmentFocusRequest}
               onViewChange={setEnrollmentView}
               onCreateSection={(classId) => openCreate('sections', classId)}
             />
@@ -458,11 +632,16 @@ export function AcademicsDashboard() {
             saveError={save.error ? apiMessage(save.error) : undefined}
           />
         </Dialog>
-      </>
+      </div>
     );
   }
 
   const rows = recordsByResource();
+  const filteredRows = rows.filter((item) =>
+    `${item.title} ${item.details}`
+      .toLocaleLowerCase()
+      .includes(resourceSearch.trim().toLocaleLowerCase()),
+  );
   const columns: TableColumn<AcademicsRow>[] = [
     { header: 'Name', render: (item) => <strong>{item.title}</strong> },
     { header: 'Details', render: (item) => item.details },
@@ -500,32 +679,35 @@ export function AcademicsDashboard() {
         }
       />
 
-      <nav aria-label="Academic management areas" className="academics-tabs">
-        {tabs.map((tab) => (
-          <button
-            aria-current={resource === tab.resource ? 'page' : undefined}
-            className={`academics-tab${resource === tab.resource ? ' academics-tab-active' : ''}`}
-            key={tab.resource}
-            onClick={() => {
-              save.reset();
-              remove.reset();
-              setResource(tab.resource);
-            }}
-            type="button"
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+      {areaNavigation}
 
       <section className="panel student-list-panel academics-panel">
         <div className="academics-panel-heading">
           <div>
             <h2>{selectedTab.label}</h2>
             <p>
-              {rows.length} {rows.length === 1 ? 'record' : 'records'}
+              Manage {selectedTab.label.toLocaleLowerCase()} for this
+              organization.
             </p>
           </div>
+          <span className="academic-resource-count">
+            {rows.length} {rows.length === 1 ? 'record' : 'records'}
+          </span>
+        </div>
+        <div className="academic-resource-toolbar">
+          <label className="academic-resource-search">
+            <Search size={16} aria-hidden="true" />
+            <input
+              aria-label={`Search ${selectedTab.label.toLocaleLowerCase()}`}
+              onChange={(event) => setResourceSearch(event.target.value)}
+              placeholder={`Search ${resourceNames[resource]}...`}
+              type="search"
+              value={resourceSearch}
+            />
+          </label>
+          <span>
+            {filteredRows.length} of {rows.length} shown
+          </span>
         </div>
         {activeQuery.isPending ? (
           <LoadingState
@@ -541,10 +723,18 @@ export function AcademicsDashboard() {
           <DataTable
             caption={selectedTab.label}
             columns={columns}
-            emptyDescription={`Add the first ${selectedTab.label.toLowerCase()} record for this organization.`}
-            emptyTitle={`No ${selectedTab.label.toLowerCase()} yet`}
+            emptyDescription={
+              resourceSearch.trim()
+                ? `No ${resourceNames[resource]} matches “${resourceSearch.trim()}”. Try another search.`
+                : `Add the first ${selectedTab.label.toLowerCase()} record for this organization.`
+            }
+            emptyTitle={
+              resourceSearch.trim()
+                ? 'No matching records'
+                : `No ${selectedTab.label.toLowerCase()} yet`
+            }
             rowKey={(item) => item.id}
-            rows={rows}
+            rows={filteredRows}
           />
         )}
         {resource === 'teacher-assignments' && staff.isError && (

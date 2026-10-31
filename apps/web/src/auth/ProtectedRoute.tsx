@@ -18,7 +18,7 @@ export function ProtectedRoute() {
       <main className="auth-bootstrap">
         <ErrorState
           title="Unable to check your session"
-          description="The account service could not be reached. Try again."
+          description="Session check failed after a few attempts. Check that the API and database services are running, then retry."
           onRetry={() => void auth.retryBootstrap()}
         />
       </main>

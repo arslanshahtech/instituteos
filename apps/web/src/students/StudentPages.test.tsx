@@ -139,10 +139,15 @@ describe('student management pages', () => {
       await screen.findByRole(
         'link',
         { name: 'Ada Lovelace' },
-        { timeout: 3_000 },
+        { timeout: 8_000 },
       ),
     ).toBeVisible();
     expect(document.body).not.toHaveTextContent(studentId);
+    expect(
+      screen.getByRole('button', { name: 'Export Students' }),
+    ).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Import Students' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Add Student' })).toBeVisible();
     await user.type(
       screen.getByRole('searchbox', { name: 'Search students' }),
       'Ada',

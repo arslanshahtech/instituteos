@@ -4,8 +4,10 @@ import type {
   ApplicationRecord,
   ApplicationStatus,
   GuardianInput,
+  GuardianRelationshipType,
   GuardianStudentRelation,
   GuardianRecord,
+  StudentImportGuardianInput,
   PeopleAccessContext,
   InquiryInput,
   InquiryRecord,
@@ -13,6 +15,11 @@ import type {
   QuerySummary,
   StaffInput,
   StaffRecord,
+  StudentImportMatchCandidate,
+  StudentImportPreviewResponse,
+  StudentImportResult,
+  StudentImportRowInput,
+  StudentImportPreviewRow,
   StudentInput,
   StudentRecord,
   StudentGuardianRelation,
@@ -120,6 +127,277 @@ function assertCampusScope(
   }
 }
 
+const MAX_STUDENT_IMPORT_ROWS = 1000;
+
+function importText(
+  data: Record<string, unknown>,
+  field: string,
+  label: string,
+  maxLength: number,
+  errors: string[],
+): string | undefined {
+  const value = data[field];
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value !== 'string') {
+    errors.push(`${label} must be text.`);
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.length > maxLength) {
+    errors.push(`${label} must be ${maxLength} characters or fewer.`);
+    return trimmed.slice(0, maxLength);
+  }
+  return trimmed;
+}
+
+function normalizeImportRow(
+  row: StudentImportRowInput,
+  campusId: string | undefined,
+): StudentImportPreviewRow {
+  const errors: string[] = [];
+  const issues: string[] = [];
+  const data = row.data;
+  let firstName = importText(data, 'firstName', 'First name', 80, errors);
+  let lastName = importText(data, 'lastName', 'Last name', 80, errors);
+  const fullName = importText(data, 'fullName', 'Full name', 160, errors);
+
+  if ((!firstName || !lastName) && fullName) {
+    const parts = fullName.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      firstName ??= parts[0];
+      lastName ??= parts.slice(1).join(' ');
+      issues.push('Full name was split automatically; please verify it.');
+    } else {
+      errors.push('A full name must contain both first and last names.');
+    }
+  }
+  if (!firstName || firstName.length < 2)
+    errors.push('First name must contain at least 2 characters.');
+  if (!lastName || lastName.length < 2)
+    errors.push('Last name must contain at least 2 characters.');
+
+  const preferredName = importText(
+    data,
+    'preferredName',
+    'Preferred name',
+    80,
+    errors,
+  );
+  const dateOfBirthInput = importText(
+    data,
+    'dateOfBirth',
+    'Date of birth',
+    40,
+    errors,
+  );
+  let dateOfBirth: string | undefined;
+  if (dateOfBirthInput) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirthInput)) {
+      errors.push(
+        'Date of birth must use YYYY-MM-DD. Ambiguous dates are not guessed.',
+      );
+    } else {
+      const date = new Date(`${dateOfBirthInput}T00:00:00.000Z`);
+      if (
+        Number.isNaN(date.getTime()) ||
+        date.toISOString().slice(0, 10) !== dateOfBirthInput
+      ) {
+        errors.push('Date of birth is not a valid calendar date.');
+      } else {
+        dateOfBirth = dateOfBirthInput;
+      }
+    }
+  } else {
+    issues.push('Date of birth is blank.');
+  }
+
+  const gender = importText(data, 'gender', 'Gender', 40, errors);
+  const contactEmail = importText(
+    data,
+    'contactEmail',
+    'Email',
+    254,
+    errors,
+  )?.toLowerCase();
+  if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+    errors.push('Email address is not valid.');
+  }
+  const phone = importText(data, 'phone', 'Phone', 40, errors);
+  const statusInput = importText(data, 'status', 'Status', 30, errors);
+  let status: StudentStatus = 'active';
+  if (statusInput) {
+    const normalizedStatus = statusInput.toLowerCase();
+    if (
+      normalizedStatus === 'active' ||
+      normalizedStatus === 'inactive' ||
+      normalizedStatus === 'withdrawn'
+    ) {
+      status = normalizedStatus;
+    } else {
+      errors.push('Status must be Active, Inactive or Withdrawn.');
+    }
+  }
+  if (!dateOfBirth && !phone)
+    issues.push(
+      'Date of birth and phone are blank. Exact-name matches will be treated as possible duplicates; verify this row carefully.',
+    );
+
+  const guardianName = importText(
+    data,
+    'guardianName',
+    'Parent / guardian name',
+    160,
+    errors,
+  );
+  const guardianPhone = importText(
+    data,
+    'guardianPhone',
+    'Parent / guardian phone',
+    40,
+    errors,
+  );
+  const guardianEmailInput = importText(
+    data,
+    'guardianEmail',
+    'Parent / guardian email',
+    254,
+    errors,
+  );
+  const guardianEmail = guardianEmailInput?.toLowerCase();
+  if (guardianEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guardianEmail)) {
+    errors.push('Parent / guardian email address is not valid.');
+  }
+  const relationshipInput = importText(
+    data,
+    'guardianRelationship',
+    'Parent / guardian relationship',
+    30,
+    errors,
+  )?.toLowerCase();
+  let guardianRelationship: GuardianRelationshipType = 'guardian';
+  if (relationshipInput) {
+    if (['father', 'mother', 'guardian', 'other'].includes(relationshipInput)) {
+      guardianRelationship = relationshipInput as GuardianRelationshipType;
+    } else {
+      errors.push(
+        'Parent / guardian relationship must be father, mother, guardian or other.',
+      );
+    }
+  }
+  let guardian: StudentImportGuardianInput | undefined;
+  const hasGuardianDetails = Boolean(
+    guardianName || guardianPhone || guardianEmail || relationshipInput,
+  );
+  if (guardianName) {
+    const guardianParts = guardianName.split(/\s+/).filter(Boolean);
+    if (guardianParts.length < 2) {
+      errors.push('Parent / guardian name must contain first and last names.');
+    } else {
+      guardian = {
+        firstName: guardianParts[0]!,
+        lastName: guardianParts.slice(1).join(' '),
+        phone: guardianPhone,
+        email: guardianEmail,
+        relationship: guardianRelationship,
+      };
+    }
+  } else if (hasGuardianDetails) {
+    errors.push(
+      'Add the parent / guardian full name when providing guardian details.',
+    );
+  }
+
+  const input: StudentInput | undefined =
+    errors.length === 0 && firstName && lastName
+      ? {
+          firstName,
+          lastName,
+          preferredName,
+          dateOfBirth,
+          gender,
+          contactEmail,
+          phone,
+          status,
+          campusId,
+        }
+      : undefined;
+  return {
+    rowNumber: row.rowNumber,
+    status: errors.length ? 'error' : issues.length ? 'warning' : 'ready',
+    input,
+    guardian,
+    firstName,
+    lastName,
+    issues: [...errors, ...issues],
+  };
+}
+
+function duplicateKey(input: StudentInput): string | undefined {
+  const nameKey = `${input.firstName.normalize('NFC').trim().toLocaleLowerCase()}|${input.lastName.normalize('NFC').trim().toLocaleLowerCase()}`;
+  if (input.dateOfBirth)
+    return `dob|${nameKey}|${input.dateOfBirth.slice(0, 10)}`;
+  if (input.phone) return `phone|${nameKey}|${input.phone.trim()}`;
+  return `name-only|${nameKey}`;
+}
+
+function matchesExistingImportStudent(
+  input: StudentInput,
+  match: {
+    firstName: string;
+    lastName: string;
+    dateOfBirth?: string;
+    phone?: string;
+  },
+): boolean {
+  const sameName =
+    input.firstName.normalize('NFC').trim().toLocaleLowerCase() ===
+      match.firstName.normalize('NFC').trim().toLocaleLowerCase() &&
+    input.lastName.normalize('NFC').trim().toLocaleLowerCase() ===
+      match.lastName.normalize('NFC').trim().toLocaleLowerCase();
+  if (!sameName) return false;
+  if (input.dateOfBirth) {
+    if (match.dateOfBirth)
+      return match.dateOfBirth.slice(0, 10) === input.dateOfBirth.slice(0, 10);
+    return Boolean(
+      match.phone && input.phone && input.phone.trim() === match.phone.trim(),
+    );
+  }
+  if (input.phone)
+    return Boolean(match.phone && input.phone.trim() === match.phone.trim());
+  // Without a stable identifier, an exact name match is flagged for manual review
+  // and skipped by default instead of risking a duplicate on repeated imports.
+  return true;
+}
+
+const importLocks = new Map<string, Promise<void>>();
+
+// Serializes student imports within one organization in this process, so
+// two concurrent imports cannot both pass the duplicate checks and then
+// create the same guardian (or student). Different organizations are
+// unaffected. This is a single-process guard: a multi-instance deployment
+// still needs a database-level guardian identity key, which requires a
+// product decision (no national-ID field exists today), so it stays a
+// documented post-pilot item.
+function withOrganizationImportLock<T>(
+  organizationId: string,
+  task: () => Promise<T>,
+): Promise<T> {
+  const previous = importLocks.get(organizationId) ?? Promise.resolve();
+  const run = previous.then(task, task);
+  const settled = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  importLocks.set(organizationId, settled);
+  settled.then(() => {
+    if (importLocks.get(organizationId) === settled) {
+      importLocks.delete(organizationId);
+    }
+  });
+  return run;
+}
+
 export class PeopleService {
   constructor(private readonly repository: PeopleRepository) {}
 
@@ -171,6 +449,261 @@ export class PeopleService {
       preferredName: input.preferredName?.trim() || undefined,
       contactEmail: normalizeOptionalEmail(input.contactEmail),
     });
+  }
+
+  async previewStudentImport(
+    context: {
+      organizationId: string;
+      campusIds?: string[];
+      role?: string;
+    },
+    rows: StudentImportRowInput[],
+    campusId?: string,
+  ): Promise<StudentImportPreviewResponse> {
+    if (rows.length === 0 || rows.length > MAX_STUDENT_IMPORT_ROWS) {
+      throw new AppError(
+        400,
+        'STUDENT_IMPORT_ROW_LIMIT',
+        `Choose between 1 and ${MAX_STUDENT_IMPORT_ROWS} non-empty rows to import.`,
+      );
+    }
+    const rowNumbers = new Set<number>();
+    for (const row of rows) {
+      if (
+        !Number.isInteger(row.rowNumber) ||
+        row.rowNumber < 1 ||
+        rowNumbers.has(row.rowNumber)
+      ) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Every imported row must have a unique positive row number.',
+        );
+      }
+      rowNumbers.add(row.rowNumber);
+    }
+    if (context.role === 'campus_admin' && !campusId) {
+      throw new AppError(
+        403,
+        'CAMPUS_FORBIDDEN',
+        'Choose one of your assigned campuses before importing students.',
+      );
+    }
+    if (campusId) {
+      assertCampusScope(context, campusId);
+      if (
+        !(await this.repository.campusBelongsToOrganization(
+          context.organizationId,
+          campusId,
+        ))
+      ) {
+        throw new AppError(404, 'CAMPUS_NOT_FOUND', 'Campus not found.');
+      }
+    }
+
+    const previewRows = rows.map((row) => normalizeImportRow(row, campusId));
+    const seenInFile = new Set<string>();
+    for (const row of previewRows) {
+      if (!row.input) continue;
+      const key = duplicateKey(row.input);
+      if (!key) continue;
+      if (seenInFile.has(key)) {
+        row.status = 'duplicate';
+        row.duplicateOf = 'another row in this file';
+        row.issues.push('This row duplicates an earlier row in the file.');
+      } else {
+        seenInFile.add(key);
+      }
+    }
+
+    const duplicateCandidates: StudentImportMatchCandidate[] = previewRows
+      .filter(
+        (row) =>
+          row.input && row.status !== 'duplicate' && duplicateKey(row.input),
+      )
+      .map((row) => ({
+        firstName: row.input!.firstName,
+        lastName: row.input!.lastName,
+        dateOfBirth: row.input!.dateOfBirth,
+        phone: row.input!.phone,
+      }));
+    const existingMatches = await this.repository.findStudentImportDuplicates(
+      context.organizationId,
+      duplicateCandidates,
+    );
+    for (const row of previewRows) {
+      if (!row.input || row.status === 'error' || row.status === 'duplicate')
+        continue;
+      const match = existingMatches.find((candidate) =>
+        matchesExistingImportStudent(row.input!, candidate),
+      );
+      if (match) {
+        row.status = 'duplicate';
+        row.duplicateOf = `${match.firstName} ${match.lastName}`;
+        row.issues.push(
+          'A matching student already exists; this row will be skipped to prevent duplicates.',
+        );
+      }
+    }
+
+    // Flag likely shared parents during preview. Contact identifiers are used
+    // rather than names alone, because two different guardians can share a name.
+    const guardianContactRows = new Map<string, number>();
+    for (const row of previewRows) {
+      if (
+        !row.guardian ||
+        row.status === 'error' ||
+        row.status === 'duplicate'
+      ) {
+        continue;
+      }
+      const phone = row.guardian.phone?.replace(/\D/g, '');
+      const email = row.guardian.email?.trim().toLowerCase();
+      const keys = [
+        ...(phone ? [`phone:${phone}`] : []),
+        ...(email ? [`email:${email}`] : []),
+      ];
+      const matchingRow = keys
+        .map((key) => guardianContactRows.get(key))
+        .find((rowNumber) => rowNumber !== undefined);
+      if (matchingRow !== undefined) {
+        row.issues.push(
+          `Guardian contact matches row ${matchingRow}; one guardian record will be reused if the identity details agree.`,
+        );
+        if (row.status === 'ready') row.status = 'warning';
+      }
+      for (const key of keys) {
+        if (!guardianContactRows.has(key)) {
+          guardianContactRows.set(key, matchingRow ?? row.rowNumber);
+        }
+      }
+    }
+
+    const summary = {
+      total: previewRows.length,
+      ready: previewRows.filter((row) => row.status === 'ready').length,
+      warnings: previewRows.filter((row) => row.status === 'warning').length,
+      duplicates: previewRows.filter((row) => row.status === 'duplicate')
+        .length,
+      errors: previewRows.filter((row) => row.status === 'error').length,
+      importable: previewRows.filter(
+        (row) => row.status === 'ready' || row.status === 'warning',
+      ).length,
+    };
+    return { rows: previewRows, summary };
+  }
+
+  async importStudents(
+    context: {
+      organizationId: string;
+      campusIds?: string[];
+      role?: string;
+    },
+    rows: StudentImportRowInput[],
+    campusId?: string,
+  ): Promise<StudentImportResult> {
+    return withOrganizationImportLock(context.organizationId, () =>
+      this.importStudentsLocked(context, rows, campusId),
+    );
+  }
+
+  private async importStudentsLocked(
+    context: {
+      organizationId: string;
+      campusIds?: string[];
+      role?: string;
+    },
+    rows: StudentImportRowInput[],
+    campusId?: string,
+  ): Promise<StudentImportResult> {
+    // Re-run validation and duplicate checks at commit time; the preview is not trusted.
+    const preview = await this.previewStudentImport(context, rows, campusId);
+    const results: StudentImportResult['rows'] = [];
+    for (const row of preview.rows) {
+      if (row.status === 'error' || !row.input) {
+        results.push({
+          rowNumber: row.rowNumber,
+          outcome: 'failed',
+          message: row.issues.join(' '),
+        });
+        continue;
+      }
+      if (row.status === 'duplicate') {
+        results.push({
+          rowNumber: row.rowNumber,
+          outcome: 'skipped',
+          message:
+            row.issues[row.issues.length - 1] ?? 'Duplicate row skipped.',
+        });
+        continue;
+      }
+      try {
+        assertCampusScope(context, row.input.campusId);
+        const normalizedStudent: StudentInput = {
+          ...row.input,
+          firstName: normalizeName(row.input.firstName, 'first name'),
+          lastName: normalizeName(row.input.lastName, 'last name'),
+          preferredName: row.input.preferredName?.trim() || undefined,
+          contactEmail: normalizeOptionalEmail(row.input.contactEmail),
+        };
+        if (row.guardian) {
+          const imported = await this.repository.createStudentWithGuardian(
+            context.organizationId,
+            normalizedStudent,
+            {
+              ...row.guardian,
+              firstName: normalizeName(
+                row.guardian.firstName,
+                'guardian first name',
+              ),
+              lastName: normalizeName(
+                row.guardian.lastName,
+                'guardian last name',
+              ),
+              email: normalizeOptionalEmail(row.guardian.email),
+            },
+            row.guardian.relationship ?? 'guardian',
+          );
+          results.push({
+            rowNumber: row.rowNumber,
+            outcome: 'created',
+            message: imported.guardianCreated
+              ? 'Student profile and new guardian created.'
+              : 'Student profile created and linked to an existing guardian.',
+            studentId: imported.student.id,
+          });
+        } else {
+          const student = await this.repository.createStudent(
+            context.organizationId,
+            normalizedStudent,
+          );
+          results.push({
+            rowNumber: row.rowNumber,
+            outcome: 'created',
+            message:
+              'Student profile created; no guardian details were provided.',
+            studentId: student.id,
+          });
+        }
+      } catch {
+        // Keep database and internal exception details out of the response.
+        results.push({
+          rowNumber: row.rowNumber,
+          outcome: 'failed',
+          message:
+            'Student could not be imported. Review the row and try again.',
+        });
+      }
+    }
+    return {
+      rows: results,
+      summary: {
+        total: results.length,
+        created: results.filter((row) => row.outcome === 'created').length,
+        skipped: results.filter((row) => row.outcome === 'skipped').length,
+        failed: results.filter((row) => row.outcome === 'failed').length,
+      },
+    };
   }
 
   async getStudent(

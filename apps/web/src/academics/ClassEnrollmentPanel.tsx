@@ -27,10 +27,13 @@ interface Props {
   teachers: Array<{ id: string; firstName: string; lastName: string }>;
   teachersLoading?: boolean;
   teachersError?: string;
+  onRetryTeachers?: () => void;
+  onManageStaff?: () => void;
   initialSectionId?: string;
   initialClassId?: string;
-  initialView?: 'students' | 'teacher';
-  onViewChange?: (view: 'students' | 'teacher') => void;
+  initialView?: 'students' | 'add-students' | 'teacher';
+  focusRequest?: number;
+  onViewChange?: (view: 'students' | 'add-students' | 'teacher') => void;
   onCreateSection?: (classId: string) => void;
 }
 
@@ -43,15 +46,18 @@ export function ClassEnrollmentPanel({
   teachers,
   teachersLoading = false,
   teachersError,
+  onRetryTeachers,
+  onManageStaff,
   initialSectionId,
   initialClassId,
   initialView = 'students',
+  focusRequest = 0,
   onViewChange,
   onCreateSection,
 }: Props) {
-  const [activeView, setActiveView] = useState<'students' | 'teacher'>(
-    initialView,
-  );
+  const [activeView, setActiveView] = useState<
+    'students' | 'add-students' | 'teacher'
+  >(initialView);
   // Keep the rendered tab synchronized when the parent opens this panel in a different view.
   useEffect(() => {
     setActiveView(initialView);
@@ -59,6 +65,7 @@ export function ClassEnrollmentPanel({
   const [rosterSelectionMode, setRosterSelectionMode] = useState(false);
   const teacherViewRef = useRef<HTMLElement | null>(null);
   const studentsViewRef = useRef<HTMLDivElement | null>(null);
+  const addStudentsViewRef = useRef<HTMLDivElement | null>(null);
   const [rosterSearch, setRosterSearch] = useState('');
   const [selectedClassId, setSelectedClassId] = useState(
     initialClassId ??
@@ -80,6 +87,7 @@ export function ClassEnrollmentPanel({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedRosterIds, setSelectedRosterIds] = useState<string[]>([]);
   const [teacherStaffId, setTeacherStaffId] = useState('');
+  const [teacherSearch, setTeacherSearch] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [showNewStudent, setShowNewStudent] = useState(false);
   const [newFirstName, setNewFirstName] = useState('');
@@ -87,9 +95,13 @@ export function ClassEnrollmentPanel({
   const [newPhone, setNewPhone] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const queryClient = useQueryClient();
-  const scrollToView = (view: 'students' | 'teacher') => {
+  const scrollToView = (view: 'students' | 'add-students' | 'teacher') => {
     const target =
-      view === 'teacher' ? teacherViewRef.current : studentsViewRef.current;
+      view === 'teacher'
+        ? teacherViewRef.current
+        : view === 'add-students'
+          ? addStudentsViewRef.current
+          : studentsViewRef.current;
     if (target && typeof target.scrollIntoView === 'function') {
       target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -99,7 +111,22 @@ export function ClassEnrollmentPanel({
     const frame = window.requestAnimationFrame(() => scrollToView(activeView));
     return () => window.cancelAnimationFrame(frame);
   }, [activeView]);
-  const navigateToView = (view: 'students' | 'teacher') => {
+  useEffect(() => {
+    // The parent can request the same destination repeatedly. Wait two paint
+    // frames so the parent shell and the selected panel are both laid out
+    // before scrolling (including repeat clicks while this panel is already open).
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() =>
+        scrollToView(initialView),
+      );
+    });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [focusRequest, initialView]);
+  const navigateToView = (view: 'students' | 'add-students' | 'teacher') => {
     setActiveView(view);
     onViewChange?.(view);
     // The target is conditional; wait for React to commit the selected panel.
@@ -114,6 +141,22 @@ export function ClassEnrollmentPanel({
   const classSections = sections.filter(
     (item) => item.classId === selectedClassId,
   );
+  const availableSubjects = useMemo(
+    () =>
+      subjects.filter(
+        (subject) =>
+          !subject.classIds?.length ||
+          subject.classIds.includes(selectedClassId),
+      ),
+    [subjects, selectedClassId],
+  );
+  useEffect(() => {
+    if (
+      subjectId &&
+      !availableSubjects.some((subject) => subject.id === subjectId)
+    )
+      setSubjectId('');
+  }, [availableSubjects, subjectId]);
   useEffect(() => {
     if (
       !sections.some(
@@ -190,6 +233,19 @@ export function ClassEnrollmentPanel({
         )
       : students;
   }, [students, search]);
+  const filteredTeachers = useMemo(() => {
+    const term = teacherSearch.trim().toLocaleLowerCase();
+    return term
+      ? teachers.filter((teacher) =>
+          `${teacher.firstName} ${teacher.lastName}`
+            .toLocaleLowerCase()
+            .includes(term),
+        )
+      : teachers;
+  }, [teachers, teacherSearch]);
+  const selectedTeacher = teachers.find(
+    (teacher) => teacher.id === teacherStaffId,
+  );
   const allShownSelected =
     filteredStudents.length > 0 &&
     filteredStudents.every((student) => selectedIds.includes(student.id));
@@ -229,8 +285,11 @@ export function ClassEnrollmentPanel({
       }
       return { removed: studentIds.length };
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       setSelectedRosterIds([]);
+    },
+    onSettled: async () => {
+      // Refresh even after a partial bulk removal so the roster never stays stale.
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: ['academics', organizationId],
@@ -254,13 +313,29 @@ export function ClassEnrollmentPanel({
         campusId: selectedClass.campusId,
         status: 'active',
       });
-      await placeStudent(organizationId, {
-        studentId: created.student.id,
-        classId: section.classId,
-        sectionId,
-        academicYearId,
-        campusId: selectedClass.campusId,
-      });
+      try {
+        await placeStudent(organizationId, {
+          studentId: created.student.id,
+          classId: section.classId,
+          sectionId,
+          academicYearId,
+          campusId: selectedClass.campusId,
+        });
+      } catch (error) {
+        // The student profile is already saved. Refresh the eligible list and
+        // guide the operator to enroll that same record instead of creating a duplicate.
+        setSearch(`${created.student.firstName} ${created.student.lastName}`);
+        setShowNewStudent(false);
+        setNewFirstName('');
+        setNewLastName('');
+        setNewPhone('');
+        setNewEmail('');
+        await queryClient.invalidateQueries({
+          queryKey: ['academics', organizationId, 'eligible-students'],
+        });
+        await studentsQuery.refetch();
+        throw error;
+      }
       return created.student;
     },
     onSuccess: async () => {
@@ -353,6 +428,15 @@ export function ClassEnrollmentPanel({
         <button
           type="button"
           role="tab"
+          aria-selected={activeView === 'add-students'}
+          className={activeView === 'add-students' ? 'active' : ''}
+          onClick={() => navigateToView('add-students')}
+        >
+          Add Student
+        </button>
+        <button
+          type="button"
+          role="tab"
           aria-selected={activeView === 'teacher'}
           className={activeView === 'teacher' ? 'active' : ''}
           onClick={() => navigateToView('teacher')}
@@ -380,7 +464,8 @@ export function ClassEnrollmentPanel({
             <option value="">Choose class</option>
             {classes.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.name} · {item.code}
+                {item.name}
+                {item.programName ? ` · ${item.programName}` : ''} · {item.code}
               </option>
             ))}
           </select>
@@ -440,29 +525,109 @@ export function ClassEnrollmentPanel({
             >
               <h3>Assign teacher</h3>
               <div className="form-grid">
-                <label>
-                  Subject teacher
-                  <select
-                    value={teacherStaffId}
-                    onChange={(event) => setTeacherStaffId(event.target.value)}
-                  >
-                    <option value="">Choose teacher</option>
-                    {teachers.map((teacher) => (
-                      <option key={teacher.id} value={teacher.id}>
-                        {teacher.firstName} {teacher.lastName}
-                      </option>
-                    ))}
-                  </select>
-                  {teachersLoading && <small>Loading active teachers...</small>}
-                  {!teachersLoading &&
-                    !teachersError &&
-                    teachers.length === 0 && (
+                <div className="class-teacher-picker">
+                  <label className="form-field" htmlFor="class-teacher-search">
+                    Search and choose teacher
+                    <input
+                      id="class-teacher-search"
+                      type="search"
+                      autoComplete="off"
+                      value={teacherSearch}
+                      onChange={(event) => setTeacherSearch(event.target.value)}
+                      placeholder="Search teacher by name"
+                      disabled={teachersLoading || Boolean(teachersError)}
+                    />
+                  </label>
+                  {selectedTeacher && (
+                    <p className="class-teacher-selected" role="status">
+                      Selected:{' '}
+                      <strong>
+                        {selectedTeacher.firstName} {selectedTeacher.lastName}
+                      </strong>
+                    </p>
+                  )}
+                  {teachersLoading ? (
+                    <p className="class-teacher-picker-status" role="status">
+                      Loading active teachers…
+                    </p>
+                  ) : teachersError ? (
+                    <div className="class-teacher-picker-error" role="alert">
+                      <p>Teacher list could not be loaded. {teachersError}</p>
+                      <div className="class-enrollment-actions">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={onRetryTeachers}
+                        >
+                          Retry teacher list
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="quiet"
+                          onClick={onManageStaff}
+                        >
+                          Open Teachers &amp; Staff
+                        </Button>
+                      </div>
+                    </div>
+                  ) : teachers.length === 0 ? (
+                    <div className="class-teacher-picker-empty" role="status">
+                      <p>No active staff members are available to assign.</p>
                       <small>
-                        No active staff found. Add/activate a teacher in
-                        Teachers &amp; Staff first.
+                        Add a teacher or activate an existing staff profile
+                        first.
                       </small>
-                    )}
-                </label>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={onManageStaff}
+                      >
+                        Open Teachers &amp; Staff
+                      </Button>
+                    </div>
+                  ) : filteredTeachers.length ? (
+                    <div
+                      className="class-teacher-choice-list"
+                      role="group"
+                      aria-label="Available teachers"
+                    >
+                      {filteredTeachers.map((teacher) => (
+                        <button
+                          className={
+                            teacherStaffId === teacher.id
+                              ? 'class-teacher-choice is-selected'
+                              : 'class-teacher-choice'
+                          }
+                          type="button"
+                          key={teacher.id}
+                          aria-pressed={teacherStaffId === teacher.id}
+                          onClick={() => setTeacherStaffId(teacher.id)}
+                        >
+                          <span className="class-teacher-choice-avatar">
+                            {teacher.firstName.slice(0, 1).toUpperCase()}
+                            {teacher.lastName.slice(0, 1).toUpperCase()}
+                          </span>
+                          <span>
+                            {teacher.firstName} {teacher.lastName}
+                          </span>
+                          <span
+                            className="class-teacher-choice-check"
+                            aria-hidden="true"
+                          >
+                            {teacherStaffId === teacher.id
+                              ? 'Selected'
+                              : 'Choose'}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="class-teacher-picker-status" role="status">
+                      No teachers match “{teacherSearch.trim()}”. Try another
+                      name.
+                    </p>
+                  )}
+                </div>
                 <label>
                   Subject
                   <select
@@ -470,16 +635,17 @@ export function ClassEnrollmentPanel({
                     onChange={(event) => setSubjectId(event.target.value)}
                   >
                     <option value="">Choose subject</option>
-                    {subjects.map((subject) => (
+                    {availableSubjects.map((subject) => (
                       <option key={subject.id} value={subject.id}>
                         {subject.name} ({subject.code})
                       </option>
                     ))}
                   </select>
-                  {subjects.length === 0 && (
+                  {availableSubjects.length === 0 && (
                     <small>
-                      Add a subject from the class details panel before
-                      assigning a subject teacher.
+                      Is class/group ke liye abhi koi subject mapped nahi hai.
+                      Class details mein subject create ya edit karke is group
+                      ko select karein.
                     </small>
                   )}
                 </label>
@@ -510,11 +676,6 @@ export function ClassEnrollmentPanel({
                   </Button>
                 </div>
               </div>
-              {teachersError && (
-                <p className="form-error" role="alert">
-                  Teacher list could not be loaded: {teachersError}
-                </p>
-              )}
               {assignTeacher.isError && (
                 <p className="form-error" role="alert">
                   {apiMessage(assignTeacher.error)}
@@ -527,7 +688,7 @@ export function ClassEnrollmentPanel({
               )}
             </section>
           )}
-          {activeView === 'students' && (
+          {activeView !== 'teacher' && (
             <>
               <div
                 ref={studentsViewRef}
@@ -703,7 +864,10 @@ export function ClassEnrollmentPanel({
                     </p>
                   )}
                 </section>
-                <div className="academics-panel-heading class-enrollment-actions">
+                <div
+                  ref={addStudentsViewRef}
+                  className="academics-panel-heading class-enrollment-actions class-enrollment-anchor"
+                >
                   <div>
                     <h3>Add students</h3>
                     <p>
@@ -791,6 +955,14 @@ export function ClassEnrollmentPanel({
                       </Button>
                     </div>
                   </form>
+                )}
+                {addNewStudent.isError && !showNewStudent && (
+                  <p className="form-error" role="alert">
+                    {apiMessage(addNewStudent.error)}. If the student was
+                    created but enrollment failed, the eligible list has been
+                    refreshed and the same student is selected below. Add that
+                    existing record instead of creating another one.
+                  </p>
                 )}
                 <label className="form-field">
                   Search eligible students to add
@@ -923,8 +1095,9 @@ export function ClassEnrollmentPanel({
         <div className="class-enrollment-setup-hint">
           <h3>This class needs a section first</h3>
           <p>
-            Students are added to a section inside the class. Create a section
-            (for example, A) and then return here to add students.
+            {activeView === 'teacher'
+              ? 'Teacher assignments are linked to a class section. Create a section first, then return here to assign its subject teacher.'
+              : 'Students are added to a section inside the class. Create a section (for example, A) and then return here to add students.'}
           </p>
           <Button
             type="button"

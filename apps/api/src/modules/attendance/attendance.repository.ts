@@ -288,6 +288,36 @@ export class MongoAttendanceRepository implements AttendanceRepository {
     );
   }
 
+  async getSectionCapacity(
+    organizationId: string,
+    sectionId: string,
+  ): Promise<number | null> {
+    const section = await AcademicSectionModel.findOne({
+      _id: oid(sectionId),
+      organizationId: oid(organizationId),
+    })
+      .select({ capacity: 1 })
+      .lean();
+    return typeof section?.capacity === 'number' ? section.capacity : null;
+  }
+
+  async countActiveSectionPlacements(
+    organizationId: string,
+    sectionId: string,
+    academicYearId: string,
+    excludingStudentId?: string,
+  ): Promise<number> {
+    return StudentSectionPlacementModel.countDocuments({
+      organizationId: oid(organizationId),
+      sectionId: oid(sectionId),
+      academicYearId: oid(academicYearId),
+      status: 'active',
+      ...(excludingStudentId
+        ? { studentId: { $ne: oid(excludingStudentId) } }
+        : {}),
+    });
+  }
+
   async validateStudentEnrollment(
     organizationId: string,
     studentId: string,

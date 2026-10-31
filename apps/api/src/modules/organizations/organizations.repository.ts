@@ -82,6 +82,7 @@ export class MongoOrganizationRepository implements OrganizationRepository {
           [
             {
               name: input.name,
+              institutionType: input.institutionType,
               contactEmail: input.contactEmail,
               phone: input.phone,
               address: input.address,
@@ -363,19 +364,6 @@ export class MongoOrganizationRepository implements OrganizationRepository {
             404,
             'ORGANIZATION_NOT_FOUND',
             'Organization not found.',
-          );
-
-        const owner = await MembershipModel.exists({
-          organizationId: idObject(organizationId),
-          userId: idObject(actorUserId),
-          role: 'organization_owner',
-          status: 'active',
-        }).session(session);
-        if (!owner)
-          throw new AppError(
-            403,
-            'ORGANIZATION_OWNER_REQUIRED',
-            'Only an active organization owner can permanently delete this organization.',
           );
         if (organization.status !== 'archived')
           throw new AppError(

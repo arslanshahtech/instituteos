@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClassEnrollmentPanel } from './ClassEnrollmentPanel.js';
@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   getStudentRoster: vi.fn(),
   removeStudentFromSection: vi.fn(),
   bulkPlaceStudents: vi.fn(),
+  placeStudent: vi.fn(),
+  createStudent: vi.fn(),
   saveAcademicsResource: vi.fn(),
 }));
 
@@ -17,6 +19,10 @@ vi.mock('../attendance/attendance-api.js', () => ({
   getStudentRoster: mocks.getStudentRoster,
   removeStudentFromSection: mocks.removeStudentFromSection,
   bulkPlaceStudents: mocks.bulkPlaceStudents,
+  placeStudent: mocks.placeStudent,
+}));
+vi.mock('../students/students-api.js', () => ({
+  createStudent: mocks.createStudent,
 }));
 vi.mock('../staff/StaffPageShared.js', () => ({
   apiMessage: () => 'Request failed.',
@@ -26,7 +32,16 @@ vi.mock('./academics-api.js', async (importOriginal) => ({
   saveAcademicsResource: mocks.saveAcademicsResource,
 }));
 
-function renderPanel(initialView: 'students' | 'teacher' = 'students') {
+function renderPanel(
+  initialView: 'students' | 'teacher' = 'students',
+  teacherOptions: {
+    teachersError?: string;
+    teachersLoading?: boolean;
+    onRetryTeachers?: () => void;
+    onManageStaff?: () => void;
+    focusRequest?: number;
+  } = {},
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -76,9 +91,23 @@ function renderPanel(initialView: 'students' | 'teacher' = 'students') {
             createdAt: '',
             updatedAt: '',
           },
+          {
+            id: 'subject-2',
+            organizationId: 'org-1',
+            name: 'Biology',
+            code: 'BIO',
+            classIds: ['class-2'],
+            createdAt: '',
+            updatedAt: '',
+          },
         ]}
         teachers={[{ id: 'teacher-1', firstName: 'Ayesha', lastName: 'Khan' }]}
+        teachersError={teacherOptions.teachersError}
+        teachersLoading={teacherOptions.teachersLoading}
+        onRetryTeachers={teacherOptions.onRetryTeachers}
+        onManageStaff={teacherOptions.onManageStaff}
         initialView={initialView}
+        focusRequest={teacherOptions.focusRequest ?? 0}
       />
     </QueryClientProvider>,
   );
@@ -94,12 +123,163 @@ beforeEach(() => {
     skipped: [],
     failed: [],
   });
+  mocks.placeStudent.mockResolvedValue({ placed: true });
+  mocks.createStudent.mockResolvedValue({
+    student: { id: 'student-new', firstName: 'New', lastName: 'Learner' },
+  });
   mocks.saveAcademicsResource.mockResolvedValue({
     assignment: { id: 'assignment-1' },
   });
 });
 
 describe('ClassEnrollmentPanel', () => {
+  it('shows a teacher-list error with retry and staff-directory actions', () => {
+    const retry = vi.fn();
+    const manageStaff = vi.fn();
+    renderPanel('teacher', {
+      teachersError: 'You do not have permission to view staff.',
+      onRetryTeachers: retry,
+      onManageStaff: manageStaff,
+    });
+
+    expect(
+      screen.getByText(/Teacher list could not be loaded/),
+    ).toHaveTextContent('You do not have permission to view staff.');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry teacher list' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Open Teachers & Staff' }),
+    );
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(manageStaff).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the Add Student destination and keeps it selected when requested', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(screen.getByRole('tab', { name: 'Add Student' }));
+
+    expect(screen.getByRole('tab', { name: 'Add Student' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Add students' }),
+    ).toBeInTheDocument();
+  });
+
+  it('re-scrolls to the same teacher panel when the parent sends another focus request', async () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    const view = renderPanel('teacher', { focusRequest: 1 });
+
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+    const callsAfterFirstRequest = scrollIntoView.mock.calls.length;
+
+    view.rerender(
+      <QueryClientProvider
+        client={
+          new QueryClient({
+            defaultOptions: {
+              queries: { retry: false },
+              mutations: { retry: false },
+            },
+          })
+        }
+      >
+        <ClassEnrollmentPanel
+          organizationId="org-1"
+          classes={[
+            {
+              id: 'class-1',
+              organizationId: 'org-1',
+              campusId: 'campus-1',
+              name: 'Class 1',
+              code: 'C1',
+              createdAt: '',
+              updatedAt: '',
+            },
+          ]}
+          sections={[
+            {
+              id: 'section-1',
+              organizationId: 'org-1',
+              classId: 'class-1',
+              name: 'A',
+              createdAt: '',
+              updatedAt: '',
+            },
+          ]}
+          years={[
+            {
+              id: 'year-1',
+              organizationId: 'org-1',
+              name: '2026-27',
+              startDate: '2026-04-01',
+              endDate: '2027-03-31',
+              status: 'active',
+              createdAt: '',
+              updatedAt: '',
+            },
+          ]}
+          subjects={[
+            {
+              id: 'subject-1',
+              organizationId: 'org-1',
+              name: 'English',
+              code: 'ENG',
+              createdAt: '',
+              updatedAt: '',
+            },
+          ]}
+          teachers={[
+            { id: 'teacher-1', firstName: 'Ayesha', lastName: 'Khan' },
+          ]}
+          initialView="teacher"
+          focusRequest={2}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() =>
+      expect(scrollIntoView.mock.calls.length).toBeGreaterThan(
+        callsAfterFirstRequest,
+      ),
+    );
+  });
+
+  it('switches repeatedly between student management and teacher assignment', async () => {
+    const user = userEvent.setup();
+    renderPanel('students');
+
+    expect(
+      await screen.findByText('Currently enrolled students'),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Assign Teacher' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Assign teacher' }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'View Students' }));
+    expect(
+      await screen.findByText('Currently enrolled students'),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Assign Teacher' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Assign teacher' }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'View Students' }));
+    expect(
+      await screen.findByText('Currently enrolled students'),
+    ).toBeInTheDocument();
+  });
+
   it('assigns a selected teacher to the chosen class section, subject, and academic year', async () => {
     const user = userEvent.setup();
     renderPanel('teacher');
@@ -112,11 +292,18 @@ describe('ClassEnrollmentPanel', () => {
     expect(
       screen.queryByRole('heading', { name: 'Add students' }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('option', { name: 'English (ENG)' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('option', { name: 'Biology (BIO)' }),
+    ).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText('Section'), 'section-1');
-    await user.selectOptions(
-      screen.getByLabelText('Subject teacher'),
-      'teacher-1',
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Search and choose teacher' }),
+      'Ayesha',
     );
+    await user.click(screen.getByRole('button', { name: /Ayesha Khan/ }));
     await user.selectOptions(screen.getByLabelText('Subject'), 'subject-1');
     await user.click(screen.getByRole('button', { name: 'Assign teacher' }));
 
@@ -178,6 +365,38 @@ describe('ClassEnrollmentPanel', () => {
       });
     });
     expect(await screen.findByText(/4 added/)).toBeInTheDocument();
+  });
+
+  it('recovers a newly created student when section placement fails without inviting duplicate creation', async () => {
+    const user = userEvent.setup();
+    mocks.placeStudent.mockRejectedValue(new Error('Placement failed.'));
+    mocks.getEligibleStudents.mockResolvedValue({
+      items: [{ id: 'student-new', firstName: 'New', lastName: 'Learner' }],
+    });
+
+    renderPanel();
+    await user.click(screen.getByRole('tab', { name: 'Add Student' }));
+    await user.click(screen.getByRole('button', { name: 'Add new student' }));
+    await user.type(screen.getByLabelText('First name'), 'New');
+    await user.type(screen.getByLabelText('Last name'), 'Learner');
+    await user.click(
+      screen.getByRole('button', { name: 'Create student and add to section' }),
+    );
+
+    expect(
+      await screen.findByText(
+        /If the student was created but enrollment failed/,
+      ),
+    ).toBeInTheDocument();
+    expect(mocks.createStudent).toHaveBeenCalledTimes(1);
+    expect(mocks.placeStudent).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByRole('textbox', {
+        name: 'Search eligible students to add',
+      }),
+    ).toHaveValue('New Learner');
+    expect(await screen.findAllByText('New Learner')).toHaveLength(2);
+    expect(screen.queryByLabelText('First name')).not.toBeInTheDocument();
   });
 
   it('filters eligible students by name and offers a clear action when there are no matches', async () => {

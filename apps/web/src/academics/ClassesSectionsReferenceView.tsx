@@ -25,7 +25,7 @@ interface Props {
   subjects: AcademicSubject[];
   assignments: TeacherAssignment[];
   teachers: Array<{ id: string; firstName: string; lastName: string }>;
-  onCreate: (resource: 'classes' | 'sections') => void;
+  onCreate: (resource: 'classes' | 'sections', classId?: string) => void;
   onCreateSubject: () => void;
   onEdit: (
     resource: 'classes' | 'sections',
@@ -39,7 +39,7 @@ interface Props {
   onOpenEnrollment: (
     sectionId?: string,
     classId?: string,
-    view?: 'students' | 'teacher',
+    view?: 'students' | 'add-students' | 'teacher',
   ) => void;
   onOpenCampusSetup: () => void;
 }
@@ -86,7 +86,7 @@ export function ClassesSectionsReferenceView({
         campusFilter === 'all' || item.campusId === campusFilter;
       const matchesSearch =
         !term ||
-        `${item.name} ${item.code} ${campusNames.get(item.campusId) ?? ''}`
+        `${item.name} ${item.programName ?? ''} ${item.studyLevel ?? ''} ${item.code} ${campusNames.get(item.campusId) ?? ''}`
           .toLocaleLowerCase()
           .includes(term);
       return matchesCampus && matchesSearch;
@@ -107,17 +107,6 @@ export function ClassesSectionsReferenceView({
   return (
     <main className="page-stack classes-reference-page">
       <header className="cr-header">
-        <div>
-          <div className="cr-kicker-row">
-            <span className="cr-module-pill">Module</span>
-            <span className="cr-muted">InstituteOS · Academic workspace</span>
-          </div>
-          <h1>Classes &amp; Sections</h1>
-          <p>
-            Manage classes, sections, student rosters and teacher assignments in
-            one place.
-          </p>
-        </div>
         <div className="cr-header-actions">
           <label className="cr-session-control">
             <span>Session</span>
@@ -269,6 +258,16 @@ export function ClassesSectionsReferenceView({
                       <span className="cr-card-code">{item.code}</span>
                     </div>
                     <h3>{item.name}</h3>
+                    {item.programName && (
+                      <p className="cr-card-campus">
+                        {item.programName} ·{' '}
+                        {item.studyLevel === 'first_year'
+                          ? 'First Year'
+                          : item.studyLevel === 'second_year'
+                            ? 'Second Year'
+                            : 'Other level'}
+                      </p>
+                    )}
                     <p className="cr-card-campus">
                       {campusNames.get(item.campusId) ?? 'Campus not available'}
                     </p>
@@ -325,6 +324,17 @@ export function ClassesSectionsReferenceView({
                     <h2>{selectedClass.name}</h2>
                     <p>
                       {selectedClass.code} ·{' '}
+                      {selectedClass.programName
+                        ? `${selectedClass.programName} · `
+                        : ''}
+                      {selectedClass.studyLevel === 'first_year'
+                        ? 'First Year'
+                        : selectedClass.studyLevel === 'second_year'
+                          ? 'Second Year'
+                          : selectedClass.studyLevel === 'other'
+                            ? 'Other level'
+                            : ''}
+                      {selectedClass.studyLevel ? ' · ' : ''}
                       {campusNames.get(selectedClass.campusId) ?? 'Campus'}
                     </p>
                   </div>
@@ -372,7 +382,7 @@ export function ClassesSectionsReferenceView({
                     <button
                       className="cr-small-dark-button"
                       type="button"
-                      onClick={() => onCreate('sections')}
+                      onClick={() => onCreate('sections', selectedClass.id)}
                     >
                       <Plus size={14} /> Add Section
                     </button>
@@ -417,7 +427,7 @@ export function ClassesSectionsReferenceView({
                       <button
                         className="cr-text-button"
                         type="button"
-                        onClick={() => onCreate('sections')}
+                        onClick={() => onCreate('sections', selectedClass.id)}
                       >
                         Add the first section
                       </button>
@@ -444,23 +454,21 @@ export function ClassesSectionsReferenceView({
                         onOpenEnrollment(
                           selectedSections[0]?.id,
                           selectedClass.id,
-                          'students',
+                          'add-students',
                         )
                       }
                     >
-                      <Plus size={15} /> Add Students
+                      <Plus size={15} /> Add Student
                     </button>
                     <button
                       className="cr-secondary-button"
                       type="button"
                       onClick={() =>
-                        selectedSections.length
-                          ? onOpenEnrollment(
-                              selectedSections[0]?.id,
-                              selectedClass.id,
-                              'teacher',
-                            )
-                          : onCreate('sections')
+                        onOpenEnrollment(
+                          selectedSections[0]?.id,
+                          selectedClass.id,
+                          'teacher',
+                        )
                       }
                     >
                       <BookOpen size={15} /> Assign Teacher
@@ -497,13 +505,28 @@ export function ClassesSectionsReferenceView({
                         academic year.
                       </p>
                     </div>
-                    <button
-                      className="cr-small-dark-button"
-                      type="button"
-                      onClick={onCreateSubject}
-                    >
-                      <Plus size={14} /> Add Subject
-                    </button>
+                    <div className="cr-detail-heading-actions">
+                      <button
+                        className="cr-secondary-button"
+                        type="button"
+                        onClick={() =>
+                          onOpenEnrollment(
+                            selectedSections[0]?.id,
+                            selectedClass.id,
+                            'teacher',
+                          )
+                        }
+                      >
+                        <Users size={14} /> Assign Teacher
+                      </button>
+                      <button
+                        className="cr-small-dark-button"
+                        type="button"
+                        onClick={onCreateSubject}
+                      >
+                        <Plus size={14} /> Add Subject
+                      </button>
+                    </div>
                   </div>
                   {selectedAssignments.length ? (
                     <div className="cr-section-list">

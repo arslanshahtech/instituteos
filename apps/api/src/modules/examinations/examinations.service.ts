@@ -407,6 +407,7 @@ export class ExaminationsService {
       !(await this.repository.validateSubject(
         context.organizationId,
         normalized.subjectId,
+        normalized.classId,
       ))
     )
       throw new AppError(
@@ -459,6 +460,7 @@ export class ExaminationsService {
       !(await this.repository.validateSubject(
         context.organizationId,
         normalized.subjectId,
+        normalized.classId,
       )) ||
       (await this.repository.getClassCampus(
         context.organizationId,

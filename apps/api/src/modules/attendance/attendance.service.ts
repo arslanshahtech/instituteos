@@ -189,6 +189,25 @@ export class AttendanceService {
         'Select an active student enrolled at this campus.',
       );
     }
+    const capacity = await this.repository.getSectionCapacity(
+      context.organizationId,
+      normalized.sectionId,
+    );
+    if (capacity !== null) {
+      const currentCount = await this.repository.countActiveSectionPlacements(
+        context.organizationId,
+        normalized.sectionId,
+        normalized.academicYearId,
+        normalized.studentId,
+      );
+      if (currentCount >= capacity) {
+        throw new AppError(
+          409,
+          'SECTION_CAPACITY_REACHED',
+          'This section has reached its configured student capacity. Choose another section or increase the capacity.',
+        );
+      }
+    }
     return this.repository.upsertStudentPlacements(
       context.organizationId,
       normalized,

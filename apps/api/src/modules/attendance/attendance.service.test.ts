@@ -30,6 +30,8 @@ function repository(overrides: Partial<AttendanceRepository> = {}) {
     validateAcademicYear: vi.fn().mockResolvedValue(true),
     validateActiveAcademicYear: vi.fn().mockResolvedValue(true),
     validateStudentEnrollment: vi.fn().mockResolvedValue(true),
+    getSectionCapacity: vi.fn().mockResolvedValue(null),
+    countActiveSectionPlacements: vi.fn().mockResolvedValue(0),
     validateStaff: vi.fn().mockResolvedValue({ campusId }),
     upsertStudentPlacements: vi.fn().mockResolvedValue({ id: 'placement' }),
     listStudentRoster: vi.fn().mockResolvedValue([
@@ -286,6 +288,28 @@ describe('AttendanceService', () => {
       classId,
       sectionId,
     );
+    expect(repo.upsertStudentPlacements).not.toHaveBeenCalled();
+  });
+
+  it('blocks a new placement when the section capacity is already reached', async () => {
+    const repo = repository({
+      getSectionCapacity: vi.fn().mockResolvedValue(30),
+      countActiveSectionPlacements: vi.fn().mockResolvedValue(30),
+    });
+    const service = new AttendanceService(repo);
+
+    await expect(
+      service.placeStudent(context, {
+        studentId,
+        classId,
+        sectionId,
+        academicYearId,
+        campusId,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'SECTION_CAPACITY_REACHED',
+    });
     expect(repo.upsertStudentPlacements).not.toHaveBeenCalled();
   });
 

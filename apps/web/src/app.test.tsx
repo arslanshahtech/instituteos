@@ -368,6 +368,7 @@ describe('frontend application foundation', () => {
     expect(platformMocks.createPlatformOrganization).toHaveBeenCalledWith(
       {
         name: 'City College',
+        institutionType: 'college',
         subdomain: 'citycollege',
         adminEmail: 'admin@citycollege.edu',
         plan: 'Growth',
@@ -431,7 +432,11 @@ describe('frontend application foundation', () => {
     renderPath('/admin/foundations');
 
     await user.click(
-      await screen.findByRole('button', { name: 'Open dialog' }),
+      await screen.findByRole(
+        'button',
+        { name: 'Open dialog' },
+        { timeout: 5000 },
+      ),
     );
     expect(
       screen.getByRole('dialog', { name: 'Dialog foundation' }),

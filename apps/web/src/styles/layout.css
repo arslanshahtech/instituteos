@@ -606,6 +606,82 @@
     margin-left: 0;
   }
 }
+
+/* Compact, user-controlled desktop navigation */
+.sidebar-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 14px;
+}
+.sidebar-heading-row .sidebar-label {
+  margin-right: 0;
+}
+.sidebar-collapse-button {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.sidebar-collapse-button:hover {
+  background: #f4f4f3;
+  color: #111;
+}
+@media (min-width: 821px) {
+  .sidebar {
+    transition: width 180ms ease;
+  }
+  .main-column {
+    transition: margin-left 180ms ease;
+  }
+  .sidebar.sidebar-collapsed {
+    width: 76px;
+  }
+  .sidebar.sidebar-collapsed + .main-column {
+    margin-left: 76px;
+  }
+  .sidebar.sidebar-collapsed .brand-lockup {
+    justify-content: center;
+    padding-inline: 8px;
+  }
+  .sidebar.sidebar-collapsed .brand-name,
+  .sidebar.sidebar-collapsed .sidebar-label,
+  .sidebar.sidebar-collapsed .navigation-link span,
+  .sidebar.sidebar-collapsed
+    .sidebar-bottom
+    > span:not(.environment-indicator) {
+    display: none;
+  }
+  .sidebar.sidebar-collapsed .sidebar-heading-row {
+    justify-content: center;
+    padding: 10px 0;
+  }
+  .sidebar.sidebar-collapsed .sidebar-collapse-button {
+    width: 34px;
+    height: 30px;
+  }
+  .sidebar.sidebar-collapsed .primary-navigation {
+    padding-inline: 10px;
+  }
+  .sidebar.sidebar-collapsed .navigation-link {
+    justify-content: center;
+    padding-inline: 0;
+  }
+  .sidebar.sidebar-collapsed .sidebar-bottom {
+    justify-content: center;
+    padding-inline: 8px;
+  }
+}
+@media (max-width: 820px) {
+  .sidebar-collapse-button {
+    display: none;
+  }
+}
 @media (max-width: 620px) {
   .topbar {
     background: rgb(255 255 255 / 96%);
@@ -627,5 +703,50 @@
   .navigation-link,
   .button {
     transition-timing-function: var(--motion-ease);
+  }
+}
+
+/* Tighten sidebar navigation hit areas and hover backgrounds. */
+.primary-navigation {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  justify-items: stretch;
+  justify-content: stretch;
+  align-content: start;
+  grid-auto-rows: 40px;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 4px;
+}
+.primary-navigation .navigation-link {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  height: 40px;
+  min-height: 40px;
+  max-height: 40px;
+  box-sizing: border-box;
+  justify-self: stretch;
+  align-self: stretch;
+  margin: 0;
+  padding-block: 0;
+  line-height: 1.2;
+}
+.primary-navigation .navigation-link:hover,
+.primary-navigation .navigation-link-active {
+  border-radius: 8px;
+}
+.sidebar .sidebar-label {
+  align-self: flex-start;
+  min-height: 0;
+  line-height: 1.2;
+}
+@media (min-width: 821px) {
+  .sidebar.sidebar-collapsed .primary-navigation .navigation-link {
+    flex-basis: 42px;
+    max-height: 42px;
   }
 }

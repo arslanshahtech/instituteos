@@ -72,6 +72,75 @@ export interface StudentRecord {
   updatedAt: string;
 }
 
+/** A single row from a school register, after spreadsheet column mapping. */
+export interface StudentImportRowInput {
+  rowNumber: number;
+  data: Record<string, unknown>;
+}
+
+export interface StudentImportGuardianInput extends GuardianInput {
+  firstName: string;
+  lastName: string;
+}
+
+export interface StudentImportMatchCandidate {
+  firstName: string;
+  lastName: string;
+  dateOfBirth?: string;
+  phone?: string;
+}
+
+export interface StudentImportExistingMatch {
+  id: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth?: string;
+  phone?: string;
+}
+
+export type StudentImportRowStatus =
+  'ready' | 'warning' | 'duplicate' | 'error';
+
+export interface StudentImportPreviewRow {
+  rowNumber: number;
+  status: StudentImportRowStatus;
+  input?: StudentInput;
+  guardian?: StudentImportGuardianInput;
+  firstName?: string;
+  lastName?: string;
+  issues: string[];
+  duplicateOf?: string;
+}
+
+export interface StudentImportPreviewResponse {
+  rows: StudentImportPreviewRow[];
+  summary: {
+    total: number;
+    ready: number;
+    warnings: number;
+    duplicates: number;
+    errors: number;
+    importable: number;
+  };
+}
+
+export interface StudentImportResultRow {
+  rowNumber: number;
+  outcome: 'created' | 'skipped' | 'failed';
+  message: string;
+  studentId?: string;
+}
+
+export interface StudentImportResult {
+  rows: StudentImportResultRow[];
+  summary: {
+    total: number;
+    created: number;
+    skipped: number;
+    failed: number;
+  };
+}
+
 export interface GuardianInput {
   firstName: string;
   lastName: string;
@@ -293,6 +362,24 @@ export interface PeopleRepository {
     organizationId: string,
     input: StudentInput,
   ): Promise<StudentRecord>;
+  createStudentWithGuardian(
+    organizationId: string,
+    input: StudentInput,
+    guardian: StudentImportGuardianInput,
+    relationship: GuardianRelationshipType,
+  ): Promise<{
+    student: StudentRecord;
+    guardian: GuardianRecord;
+    guardianCreated: boolean;
+  }>;
+  findStudentImportDuplicates(
+    organizationId: string,
+    candidates: StudentImportMatchCandidate[],
+  ): Promise<StudentImportExistingMatch[]>;
+  campusBelongsToOrganization(
+    organizationId: string,
+    campusId: string,
+  ): Promise<boolean>;
   updateStudent(
     organizationId: string,
     studentId: string,

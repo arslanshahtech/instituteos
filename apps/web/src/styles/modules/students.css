@@ -340,3 +340,422 @@
     display: none !important;
   }
 }
+
+/* Student directory actions and bulk import flow */
+.student-management-page .student-filters {
+  grid-template-columns: minmax(180px, 1fr) minmax(150px, 0.75fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.student-management-page .student-directory-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.student-management-page .student-directory-actions > .button {
+  min-height: 38px;
+  padding-inline: 12px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.student-management-page .student-add-button {
+  min-height: 38px;
+  justify-self: auto;
+}
+
+.student-import-page {
+  gap: 20px;
+}
+
+.student-import-page .student-import-heading {
+  align-items: flex-start;
+  margin-bottom: 0;
+}
+
+.student-import-page .student-import-heading > div:first-child {
+  min-width: 0;
+}
+
+.student-import-page .student-import-heading .button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.student-import-page > .student-import-panel,
+.student-import-page > .panel {
+  min-width: 0;
+  gap: 18px;
+  padding: clamp(16px, 2.2vw, 24px);
+  border: 1px solid var(--color-border, #e4e4e0);
+  border-radius: 12px;
+  background: var(--color-surface, #fff);
+}
+
+.student-import-page .student-import-panel h2 {
+  margin: 0;
+  color: var(--color-ink, #171715);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+
+.student-import-page .student-import-panel > div:first-child > p {
+  max-width: 760px;
+  margin: 7px 0 0;
+  color: var(--color-muted, #77736d);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.student-import-file-field {
+  gap: 9px;
+}
+
+.student-import-page .student-import-field-label {
+  color: var(--color-ink, #252522);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.student-import-file-picker {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 100px;
+  align-items: center;
+  gap: 14px;
+  border: 1px dashed var(--color-border-strong, #c9c9c2);
+  border-radius: 10px;
+  background: #fbfbf9;
+  padding: 18px;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease;
+}
+
+.student-import-file-picker:hover,
+.student-import-file-picker:focus-within {
+  border-color: var(--color-accent, #0f766e);
+  background: #f5faf8;
+}
+
+.student-import-file-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  border: 1px solid #dce9e4;
+  border-radius: 10px;
+  background: #edf6f1;
+  color: var(--color-accent, #0f766e);
+}
+
+.student-import-file-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 5px;
+}
+
+.student-import-file-copy strong {
+  color: var(--color-ink, #252522);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.student-import-file-copy small {
+  color: var(--color-muted, #77736d);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.student-import-choose-button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  font-size: 12px;
+}
+
+.student-import-file-input {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.student-import-file-input:disabled {
+  cursor: not-allowed;
+}
+
+.student-import-selected-file {
+  margin: -4px 0 0;
+  overflow-wrap: anywhere;
+  border: 1px solid #dce9e4;
+  border-radius: 8px;
+  background: #f5faf7;
+  padding: 10px 12px;
+  color: #315e4e;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.student-import-page .table-container {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-border, #e4e4e0);
+  border-radius: 9px;
+  overscroll-behavior-x: contain;
+}
+
+.student-import-page .table-container .data-table {
+  min-width: 640px;
+}
+
+.student-import-page .table-container .data-table th {
+  padding: 12px;
+  background: #f7f8f6;
+  color: #666a64;
+  font-size: 11px;
+}
+
+.student-import-page .table-container .data-table td {
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.student-import-page .student-import-scope-note {
+  margin: 0;
+  color: var(--color-muted, #77736d);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.student-import-page .button-row {
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.student-import-page .button-row > .button {
+  min-height: 40px;
+  font-size: 12px;
+}
+
+.student-import-page .summary-grid {
+  gap: 10px;
+}
+
+.student-import-page .summary-grid > div {
+  min-width: 0;
+  border: 1px solid var(--color-border, #e4e4e0);
+  border-radius: 9px;
+  background: #fbfbf9;
+  padding: 13px;
+}
+
+.student-import-page .summary-grid span {
+  display: block;
+  color: var(--color-muted, #77736d);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.student-import-page .summary-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--color-ink, #171715);
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+@media (max-width: 900px) {
+  .student-management-page .student-filters {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
+  }
+
+  .student-management-page .student-directory-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .student-management-page .student-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .student-management-page .student-directory-actions {
+    grid-column: auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .student-management-page .student-directory-actions > .button {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .student-management-page .student-directory-actions > .student-add-button {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .student-import-page {
+    gap: 16px;
+  }
+
+  .student-import-page .student-import-heading {
+    gap: 12px;
+  }
+
+  .student-import-page .student-import-heading > .button,
+  .student-import-page .student-import-heading .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .student-import-page > .student-import-panel,
+  .student-import-page > .panel {
+    gap: 15px;
+    padding: 15px;
+  }
+
+  .student-import-file-picker {
+    min-height: 116px;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    padding: 14px;
+  }
+
+  .student-import-file-icon {
+    width: 40px;
+    height: 40px;
+    flex-basis: 40px;
+  }
+
+  .student-import-file-copy {
+    flex-basis: calc(100% - 56px);
+  }
+
+  .student-import-choose-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .student-import-page .button-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .student-import-page .button-row > .button {
+    width: 100%;
+  }
+
+  .student-import-page .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .student-import-page .table-container {
+    overflow: visible;
+    border: 0;
+  }
+
+  .student-import-page .table-container .data-table {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .student-import-page .table-container .data-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .student-import-page .table-container .data-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .student-import-page .table-container .data-table tbody tr {
+    display: grid;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-border, #e4e4e0);
+    border-radius: 9px;
+    background: var(--color-surface, #fff);
+    padding: 4px 12px;
+  }
+
+  .student-import-page .table-container .data-table tbody td {
+    display: grid;
+    grid-template-columns: minmax(104px, 34%) minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    min-width: 0;
+    border-bottom: 1px solid #edf0ec;
+    padding: 10px 0;
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  .student-import-page .table-container .data-table tbody td:last-child {
+    border-bottom: 0;
+  }
+
+  .student-import-page .table-container .data-table tbody td::before {
+    display: block;
+    color: var(--color-muted, #77736d);
+    content: attr(data-label);
+    font-size: 10px;
+    font-weight: 650;
+    line-height: 1.5;
+  }
+
+  .student-import-page .table-container .data-table tbody td select {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .student-management-page .student-directory-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .student-management-page .student-directory-actions > .student-add-button {
+    grid-column: auto;
+  }
+
+  .student-import-page .summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

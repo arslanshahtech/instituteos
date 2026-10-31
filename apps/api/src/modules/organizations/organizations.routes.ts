@@ -261,7 +261,18 @@ function parseProvision(value: unknown): ProvisionOrganizationInput {
             160,
           ),
         };
-  return { ...profile, ...(initialCampus ? { initialCampus } : {}) };
+  const institutionType = body.institutionType;
+  if (institutionType !== 'school' && institutionType !== 'college')
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Choose School or College as the organization type.',
+    );
+  return {
+    ...profile,
+    institutionType,
+    ...(initialCampus ? { initialCampus } : {}),
+  };
 }
 
 function parseInvitation(value: unknown): MemberInvitationInput {
@@ -682,7 +693,7 @@ export function createPlatformOrganizationRouter(
     asyncHandler(async (_request, response) => {
       const organizations = await OrganizationModel.find({})
         .select(
-          '_id name subdomain plan trialEndsAt status contactEmail createdAt',
+          '_id name institutionType subdomain plan trialEndsAt status contactEmail createdAt',
         )
         .sort({ createdAt: -1 })
         .limit(500)
@@ -734,11 +745,14 @@ export function createPlatformOrganizationRouter(
         organizations: organizations.map((organization) => ({
           id: String(organization._id),
           name: organization.name,
+          institutionType: organization.institutionType ?? null,
           subdomain: organization.subdomain ?? null,
           adminEmail:
             ownerEmailByOrganizationId.get(String(organization._id)) ??
             organization.contactEmail ??
             null,
+          contactEmail: organization.contactEmail ?? null,
+          phone: organization.phone ?? null,
           studentCount:
             studentCountByOrganizationId.get(String(organization._id)) ?? 0,
           plan: organization.plan ?? null,
@@ -760,6 +774,13 @@ export function createPlatformOrganizationRouter(
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
       const name = requiredString(body.name, 'organization name', 2, 160);
+      const institutionType = body.institutionType;
+      if (institutionType !== 'school' && institutionType !== 'college')
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Choose School or College as the organization type.',
+        );
       const adminEmail = email(body.adminEmail);
       const subdomain = requiredString(
         body.subdomain,
@@ -788,6 +809,7 @@ export function createPlatformOrganizationRouter(
       const trialEndsAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
       const organization = await OrganizationModel.create({
         name,
+        institutionType,
         subdomain,
         plan,
         status: 'active',
@@ -814,7 +836,13 @@ export function createPlatformOrganizationRouter(
           organizationId: organization._id,
           actorUserId: actor.id,
           action: 'platform.organization.provisioned',
-          details: { subdomain, plan, adminEmail, trialEndsAt },
+          details: {
+            subdomain,
+            plan,
+            adminEmail,
+            institutionType,
+            trialEndsAt,
+          },
         });
         auditEventId = String(auditEvent._id);
         const delivered = await authEmailDelivery.sendInvitation(
@@ -840,6 +868,7 @@ export function createPlatformOrganizationRouter(
         organization: {
           id: String(organization._id),
           name: organization.name,
+          institutionType: organization.institutionType,
           subdomain: organization.subdomain,
           adminEmail,
           studentCount: 0,
@@ -851,6 +880,74 @@ export function createPlatformOrganizationRouter(
         },
         ownerInvitationSent: true,
       });
+    }),
+  );
+  router.patch(
+    '/:organizationId/details',
+    authenticate,
+    requirePlatformRole(accessRepository, 'platform_super_admin'),
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const body = bodyObject(request.body);
+      const changes = {
+        name: requiredString(body.name, 'organization name', 2, 160),
+        contactEmail: email(body.contactEmail),
+        phone: optionalString(body.phone, 'phone number', 40) ?? '',
+      };
+      const organizationId = routeParameter(request, 'organizationId');
+      const actor = currentUser(response);
+      const session = await mongoose.startSession();
+      let organization: Record<string, unknown> | null = null;
+      try {
+        await session.withTransaction(async () => {
+          organization = (await OrganizationModel.findByIdAndUpdate(
+            organizationId,
+            { $set: changes },
+            { new: true, runValidators: true, session },
+          ).lean()) as Record<string, unknown> | null;
+          if (!organization)
+            throw new AppError(
+              404,
+              'ORGANIZATION_NOT_FOUND',
+              'Organization not found.',
+            );
+          await OrganizationAuditEventModel.create(
+            [
+              {
+                organizationId,
+                actorUserId: actor.id,
+                action: 'platform.organization.details.updated',
+                details: { fields: Object.keys(changes) },
+              },
+            ],
+            { session },
+          );
+        });
+      } finally {
+        await session.endSession();
+      }
+      response.status(200).json({ organization });
+    }),
+  );
+  router.delete(
+    '/:organizationId',
+    authenticate,
+    requirePlatformRole(accessRepository, 'platform_super_admin'),
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const body = bodyObject(request.body);
+      const confirmationName = requiredString(
+        body.confirmationName,
+        'exact organization name',
+        1,
+        160,
+      );
+      await service.deleteArchivedOrganization(
+        routeParameter(request, 'organizationId'),
+        currentUser(response).id,
+        confirmationName,
+      );
+      response.status(204).end();
     }),
   );
   router.patch(

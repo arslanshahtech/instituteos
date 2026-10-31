@@ -178,6 +178,20 @@ export class AcademicsService {
       'Academic year',
     );
     this.assertWithinYear(normalized, year);
+    if (
+      await this.repository.hasOverlappingTerm(
+        context.organizationId,
+        normalized.academicYearId,
+        normalized.startDate,
+        normalized.endDate,
+      )
+    ) {
+      throw new AppError(
+        409,
+        'TERM_DATE_OVERLAP',
+        'Term dates cannot overlap another term in the same academic year.',
+      );
+    }
     return this.repository.createTerm(context.organizationId, normalized);
   }
   async updateTerm(
@@ -196,6 +210,21 @@ export class AcademicsService {
       'Academic year',
     );
     this.assertWithinYear(normalized, year);
+    if (
+      await this.repository.hasOverlappingTerm(
+        context.organizationId,
+        normalized.academicYearId,
+        normalized.startDate,
+        normalized.endDate,
+        id,
+      )
+    ) {
+      throw new AppError(
+        409,
+        'TERM_DATE_OVERLAP',
+        'Term dates cannot overlap another term in the same academic year.',
+      );
+    }
     return this.required(
       this.repository.updateTerm(context.organizationId, id, normalized),
       'TERM_NOT_FOUND',
@@ -204,6 +233,7 @@ export class AcademicsService {
   }
   async deleteTerm(context: AcademicsContext, id: string) {
     await this.getTerm(context, id);
+    await this.assertUnreferenced(context, 'term', id);
     return this.repository.deleteTerm(context.organizationId, id);
   }
 
@@ -223,10 +253,24 @@ export class AcademicsService {
   async createClass(context: AcademicsContext, input: ClassInput) {
     const campusId = objectId(input.campusId, 'campus');
     assertCampusScope(context, campusId);
+    const studyLevel = input.studyLevel
+      ? this.studyLevel(input.studyLevel)
+      : undefined;
+    const programName = input.programName?.trim()
+      ? requiredText(input.programName, 'program/group name', 120)
+      : undefined;
+    if (studyLevel && !programName)
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'A program/group name is required when a college study level is selected.',
+      );
     return this.repository.createClass(context.organizationId, {
       name: requiredText(input.name, 'class name', 100),
       code: requiredText(input.code, 'class code', 30).toUpperCase(),
       campusId,
+      ...(studyLevel ? { studyLevel } : {}),
+      ...(programName ? { programName } : {}),
     });
   }
   async updateClass(
@@ -244,6 +288,20 @@ export class AcademicsService {
       changes.campusId = objectId(input.campusId, 'campus');
       assertCampusScope(context, changes.campusId);
     }
+    if (input.studyLevel !== undefined)
+      changes.studyLevel = this.studyLevel(input.studyLevel);
+    if (input.programName !== undefined)
+      changes.programName = input.programName.trim()
+        ? requiredText(input.programName, 'program/group name', 120)
+        : '';
+    const nextStudyLevel = changes.studyLevel ?? existing.studyLevel;
+    const nextProgramName = changes.programName ?? existing.programName;
+    if (nextStudyLevel && !nextProgramName)
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'A program/group name is required when a college study level is selected.',
+      );
     return this.required(
       this.repository.updateClass(context.organizationId, id, changes),
       'CLASS_NOT_FOUND',
@@ -334,26 +392,28 @@ export class AcademicsService {
     );
   }
   async createSubject(context: AcademicsContext, input: SubjectInput) {
-    return this.repository.createSubject(
-      context.organizationId,
-      this.subjectInput(input),
-    );
+    const normalized = await this.subjectInput(context, input);
+    if (!normalized.classIds?.length)
+      throw new AppError(
+        400,
+        'SUBJECT_CLASS_REQUIRED',
+        'Assign this subject to at least one class or college group.',
+      );
+    return this.repository.createSubject(context.organizationId, normalized);
   }
   async updateSubject(
     context: AcademicsContext,
     id: string,
     input: Partial<SubjectInput>,
   ) {
-    await this.getSubject(context, id);
-    const changes = { ...input };
-    if (input.name !== undefined)
-      changes.name = requiredText(input.name, 'subject name', 120);
-    if (input.code !== undefined)
-      changes.code = requiredText(input.code, 'subject code', 30).toUpperCase();
-    if (input.department !== undefined)
-      changes.department = input.department.trim()
-        ? requiredText(input.department, 'department', 100)
-        : '';
+    const existing = await this.getSubject(context, id);
+    if (input.classIds !== undefined && input.classIds.length === 0)
+      throw new AppError(
+        400,
+        'SUBJECT_CLASS_REQUIRED',
+        'A subject must remain assigned to at least one class or college group.',
+      );
+    const changes = await this.subjectInput(context, { ...existing, ...input });
     return this.required(
       this.repository.updateSubject(context.organizationId, id, changes),
       'SUBJECT_NOT_FOUND',
@@ -400,8 +460,25 @@ export class AcademicsService {
     id: string,
     input: TeacherAssignmentInput,
   ) {
-    await this.getTeacherAssignment(context, id);
+    const existing = await this.getTeacherAssignment(context, id);
     const normalized = this.assignmentInput(input);
+    const changesAssignment = (
+      Object.keys(normalized) as Array<keyof TeacherAssignmentInput>
+    ).some((key) => normalized[key] !== existing[key]);
+    if (
+      changesAssignment &&
+      (await this.repository.hasReference(
+        context.organizationId,
+        'teacherAssignment',
+        id,
+      ))
+    ) {
+      throw new AppError(
+        409,
+        'RESOURCE_IN_USE',
+        'Remove or update this teacher timetable before changing the assignment.',
+      );
+    }
     await this.validateAssignmentReferences(context, normalized);
     await this.assertNoTeacherConflict(context, normalized, id);
     return this.required(
@@ -416,6 +493,7 @@ export class AcademicsService {
   }
   async deleteTeacherAssignment(context: AcademicsContext, id: string) {
     await this.getTeacherAssignment(context, id);
+    await this.assertUnreferenced(context, 'teacherAssignment', id);
     return this.repository.deleteTeacherAssignment(context.organizationId, id);
   }
 
@@ -466,14 +544,40 @@ export class AcademicsService {
     };
   }
 
-  private subjectInput(input: SubjectInput): SubjectInput {
+  private async subjectInput(
+    context: AcademicsContext,
+    input: SubjectInput,
+  ): Promise<SubjectInput> {
+    const classIds =
+      input.classIds === undefined
+        ? undefined
+        : [...new Set(input.classIds.map((id) => objectId(id, 'class')))];
+    if (classIds && classIds.length > 100)
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Select no more than 100 classes for a subject.',
+      );
+    if (classIds)
+      for (const classId of classIds) await this.getClass(context, classId);
     return {
       name: requiredText(input.name, 'subject name', 120),
       code: requiredText(input.code, 'subject code', 30).toUpperCase(),
       ...(input.department?.trim()
         ? { department: requiredText(input.department, 'department', 100) }
         : {}),
+      ...(classIds !== undefined ? { classIds } : {}),
     };
+  }
+
+  private studyLevel(value: string): 'first_year' | 'second_year' | 'other' {
+    if (!['first_year', 'second_year', 'other'].includes(value))
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Select a valid study level.',
+      );
+    return value as 'first_year' | 'second_year' | 'other';
   }
 
   private assignmentInput(
@@ -507,6 +611,13 @@ export class AcademicsService {
     )
       throw new AppError(404, 'SUBJECT_NOT_FOUND', 'Subject not found.');
     const classRecord = await this.getClass(context, input.classId);
+    const subject = await this.getSubject(context, input.subjectId);
+    if (subject.classIds?.length && !subject.classIds.includes(classRecord.id))
+      throw new AppError(
+        400,
+        'SUBJECT_NOT_AVAILABLE_FOR_CLASS',
+        'This subject is not assigned to the selected class/program.',
+      );
     const section = await this.getSection(context, input.sectionId);
     if (section.classId !== classRecord.id)
       throw new AppError(
@@ -549,7 +660,13 @@ export class AcademicsService {
 
   private async assertUnreferenced(
     context: AcademicsContext,
-    resource: 'academicYear' | 'class' | 'section' | 'subject',
+    resource:
+      | 'academicYear'
+      | 'term'
+      | 'class'
+      | 'section'
+      | 'subject'
+      | 'teacherAssignment',
     id: string,
   ): Promise<void> {
     if (
@@ -564,7 +681,8 @@ export class AcademicsService {
   }
 
   private yearStatus(value: string | undefined): 'active' | 'archived' {
-    if (value === undefined || value === 'active') return 'active';
+    if (value === undefined) return 'archived';
+    if (value === 'active') return 'active';
     if (value === 'archived') return value;
     throw new AppError(
       400,

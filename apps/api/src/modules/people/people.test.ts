@@ -9,12 +9,15 @@ import type {
   GuardianLinkInput,
   GuardianLinkRecord,
   GuardianRecord,
+  GuardianRelationshipType,
+  StudentImportGuardianInput,
   InquiryInput,
   InquiryRecord,
   PeopleRepository,
   QuerySummary,
   StaffInput,
   StaffRecord,
+  StudentImportMatchCandidate,
   StudentInput,
   StudentRecord,
   StudentStatus,
@@ -27,6 +30,7 @@ class MemoryPeopleRepository implements PeopleRepository {
   staff: StaffRecord[] = [];
   inquiries: InquiryRecord[] = [];
   applications: ApplicationRecord[] = [];
+  campuses = new Map<string, string>();
 
   async listStudents(query: {
     organizationId: string;
@@ -94,6 +98,119 @@ class MemoryPeopleRepository implements PeopleRepository {
     };
     this.students.push(record);
     return record;
+  }
+
+  async createStudentWithGuardian(
+    organizationId: string,
+    input: StudentInput,
+    guardianInput: StudentImportGuardianInput,
+    relationship: GuardianRelationshipType,
+  ): Promise<{
+    student: StudentRecord;
+    guardian: GuardianRecord;
+    guardianCreated: boolean;
+  }> {
+    const student = await this.createStudent(organizationId, input);
+    const phone = guardianInput.phone?.replace(/\D/g, '');
+    const email = guardianInput.email?.trim().toLowerCase();
+    const matches = this.guardians.filter(
+      (guardian) =>
+        guardian.organizationId === organizationId &&
+        ((phone && guardian.phone?.replace(/\D/g, '') === phone) ||
+          (email && guardian.email?.trim().toLowerCase() === email)),
+    );
+    const uniqueMatches = [
+      ...new Map(matches.map((item) => [item.id, item])).values(),
+    ];
+    if (uniqueMatches.length > 1)
+      throw new Error('Guardian phone and email match different records.');
+    // Model the real repository awaiting the database between the guardian
+    // lookup and creation, so concurrent imports can interleave here. This
+    // is the window the per-organization import lock in PeopleService closes.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    let guardian = uniqueMatches[0];
+    const guardianCreated = !guardian;
+    if (guardian) {
+      if (
+        guardian.firstName.trim().toLowerCase() !==
+          guardianInput.firstName.trim().toLowerCase() ||
+        guardian.lastName.trim().toLowerCase() !==
+          guardianInput.lastName.trim().toLowerCase()
+      ) {
+        throw new Error(
+          'Guardian contact details conflict with the existing name.',
+        );
+      }
+      await this.linkGuardianToStudent(organizationId, {
+        studentId: student.id,
+        guardianId: guardian.id,
+        relationship,
+        isPrimary: true,
+      });
+    } else {
+      guardian = await this.createGuardianWithLink(
+        organizationId,
+        guardianInput,
+        {
+          studentId: student.id,
+          relationship,
+          isPrimary: true,
+        },
+      );
+    }
+    const linkedStudent = await this.getStudent(organizationId, student.id);
+    if (!linkedStudent)
+      throw new Error('Student missing from memory repository');
+    return { student: linkedStudent, guardian, guardianCreated };
+  }
+
+  async findStudentImportDuplicates(
+    organizationId: string,
+    candidates: StudentImportMatchCandidate[],
+  ) {
+    const normalize = (value: string) =>
+      value.normalize('NFC').trim().toLocaleLowerCase();
+    return this.students
+      .filter(
+        (student) =>
+          student.organizationId === organizationId &&
+          candidates.some((candidate) => {
+            if (
+              normalize(student.firstName) !== normalize(candidate.firstName) ||
+              normalize(student.lastName) !== normalize(candidate.lastName)
+            ) {
+              return false;
+            }
+            if (candidate.dateOfBirth) {
+              if (student.dateOfBirth)
+                return (
+                  student.dateOfBirth.slice(0, 10) ===
+                  candidate.dateOfBirth.slice(0, 10)
+                );
+              return Boolean(
+                candidate.phone &&
+                student.phone?.trim() === candidate.phone.trim(),
+              );
+            }
+            if (candidate.phone)
+              return student.phone?.trim() === candidate.phone.trim();
+            return true;
+          }),
+      )
+      .map((student) => ({
+        id: student.id,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        dateOfBirth: student.dateOfBirth,
+        phone: student.phone,
+      }));
+  }
+
+  async campusBelongsToOrganization(
+    organizationId: string,
+    campusId: string,
+  ): Promise<boolean> {
+    return this.campuses.get(campusId) === organizationId;
   }
 
   async updateStudent(
@@ -1238,5 +1355,454 @@ describe('people domain services', () => {
 
     expect(result.total).toBe(1);
     expect(result.items[0]?.firstName).toBe('Aarav');
+  });
+
+  it('previews rows with warnings, date errors, and duplicate rows before creating students', async () => {
+    const repository = new MemoryPeopleRepository();
+    const service = new PeopleService(repository);
+    const preview = await service.previewStudentImport(
+      { organizationId: 'org-1' },
+      [
+        {
+          rowNumber: 2,
+          data: {
+            firstName: 'Ayesha',
+            lastName: 'Khan',
+            dateOfBirth: '2012-05-21',
+            phone: '03001234567',
+          },
+        },
+        {
+          rowNumber: 3,
+          data: {
+            firstName: 'Ayesha',
+            lastName: 'Khan',
+            dateOfBirth: '2012-05-21',
+            phone: '03001234567',
+          },
+        },
+        { rowNumber: 4, data: { fullName: 'Maryam Raza' } },
+        {
+          rowNumber: 5,
+          data: {
+            firstName: 'Bilal',
+            lastName: 'Ahmed',
+            dateOfBirth: '01/02/2014',
+          },
+        },
+        { rowNumber: 6, data: { firstName: 'A', lastName: 'B' } },
+      ],
+    );
+
+    expect(preview.summary).toEqual({
+      total: 5,
+      ready: 1,
+      warnings: 1,
+      duplicates: 1,
+      errors: 2,
+      importable: 2,
+    });
+    expect(preview.rows[1]).toMatchObject({
+      rowNumber: 3,
+      status: 'duplicate',
+      duplicateOf: 'another row in this file',
+    });
+    expect(preview.rows[2]).toMatchObject({
+      rowNumber: 4,
+      status: 'warning',
+      firstName: 'Maryam',
+      lastName: 'Raza',
+    });
+    expect(preview.rows[3]?.issues.join(' ')).toContain(
+      'Ambiguous dates are not guessed',
+    );
+    expect(repository.students).toHaveLength(0);
+  });
+
+  it('detects existing students and only creates confirmed non-duplicate valid rows', async () => {
+    const repository = new MemoryPeopleRepository();
+    const service = new PeopleService(repository);
+    await service.createStudent('org-1', {
+      firstName: 'Sana',
+      lastName: 'Malik',
+      dateOfBirth: '2011-06-01',
+      phone: '03009998888',
+    });
+
+    const rows = [
+      {
+        rowNumber: 2,
+        data: {
+          firstName: 'Sana',
+          lastName: 'Malik',
+          dateOfBirth: '2011-06-01',
+          phone: '03009998888',
+        },
+      },
+      {
+        rowNumber: 3,
+        data: {
+          firstName: 'Hassan',
+          lastName: 'Iqbal',
+          dateOfBirth: '2012-10-05',
+        },
+      },
+      {
+        rowNumber: 4,
+        data: {
+          firstName: 'Hassan',
+          lastName: 'Iqbal',
+          dateOfBirth: '2012-10-05',
+        },
+      },
+      {
+        rowNumber: 5,
+        data: {
+          firstName: 'Wrong',
+          lastName: 'Date',
+          dateOfBirth: '31/31/2012',
+        },
+      },
+    ];
+
+    const result = await service.importStudents(
+      { organizationId: 'org-1' },
+      rows,
+    );
+    expect(result.summary).toEqual({
+      total: 4,
+      created: 1,
+      skipped: 2,
+      failed: 1,
+    });
+    expect(repository.students).toHaveLength(2);
+    expect(
+      repository.students.some((student) => student.firstName === 'Sana'),
+    ).toBe(true);
+    expect(result.rows.map((row) => row.outcome)).toEqual([
+      'skipped',
+      'created',
+      'skipped',
+      'failed',
+    ]);
+  });
+
+  it('imports and links guardian details with the student in the same row', async () => {
+    const repository = new MemoryPeopleRepository();
+    const service = new PeopleService(repository);
+    const preview = await service.previewStudentImport(
+      { organizationId: 'org-1' },
+      [
+        {
+          rowNumber: 2,
+          data: {
+            firstName: 'Ayesha',
+            lastName: 'Khan',
+            dateOfBirth: '2012-04-03',
+            guardianName: 'Muhammad Khan',
+            guardianPhone: '03001234567',
+            guardianEmail: 'parent@example.com',
+            guardianRelationship: 'father',
+          },
+        },
+      ],
+    );
+    expect(preview.rows[0]?.guardian).toMatchObject({
+      firstName: 'Muhammad',
+      lastName: 'Khan',
+      phone: '03001234567',
+      email: 'parent@example.com',
+      relationship: 'father',
+    });
+
+    const result = await service.importStudents({ organizationId: 'org-1' }, [
+      {
+        rowNumber: 2,
+        data: {
+          firstName: 'Ayesha',
+          lastName: 'Khan',
+          dateOfBirth: '2012-04-03',
+          guardianName: 'Muhammad Khan',
+          guardianPhone: '03001234567',
+          guardianEmail: 'parent@example.com',
+          guardianRelationship: 'father',
+        },
+      },
+    ]);
+    expect(result.summary).toEqual({
+      total: 1,
+      created: 1,
+      skipped: 0,
+      failed: 0,
+    });
+    expect(repository.students).toHaveLength(1);
+    expect(repository.guardians).toHaveLength(1);
+    expect(repository.links).toHaveLength(1);
+    expect(repository.links[0]).toMatchObject({
+      studentId: repository.students[0]?.id,
+      guardianId: repository.guardians[0]?.id,
+      relationship: 'father',
+      isPrimary: true,
+    });
+    expect(repository.students[0]?.guardianIds).toContain(
+      repository.guardians[0]?.id,
+    );
+  });
+
+  it('flags a shared parent in preview using normalized phone/email identifiers', async () => {
+    const service = new PeopleService(new MemoryPeopleRepository());
+    const preview = await service.previewStudentImport(
+      { organizationId: 'org-1' },
+      [
+        {
+          rowNumber: 2,
+          data: {
+            firstName: 'Ali',
+            lastName: 'Khan',
+            dateOfBirth: '2012-04-03',
+            guardianName: 'Muhammad Khan',
+            guardianPhone: '0300-1234567',
+            guardianEmail: 'PARENT@example.com',
+            guardianRelationship: 'father',
+          },
+        },
+        {
+          rowNumber: 3,
+          data: {
+            firstName: 'Ahmed',
+            lastName: 'Khan',
+            dateOfBirth: '2014-08-11',
+            guardianName: 'Muhammad Khan',
+            guardianPhone: '03001234567',
+            guardianEmail: 'parent@example.com',
+            guardianRelationship: 'father',
+          },
+        },
+      ],
+    );
+
+    expect(preview.rows[0]?.status).toBe('ready');
+    expect(preview.rows[1]?.status).toBe('warning');
+    expect(preview.rows[1]?.issues.join(' ')).toContain(
+      'Guardian contact matches row 2',
+    );
+    expect(preview.summary.importable).toBe(2);
+  });
+
+  it('reuses one guardian record for siblings imported in the same batch', async () => {
+    const repository = new MemoryPeopleRepository();
+    const service = new PeopleService(repository);
+    const result = await service.importStudents({ organizationId: 'org-1' }, [
+      {
+        rowNumber: 2,
+        data: {
+          firstName: 'Ali',
+          lastName: 'Khan',
+          dateOfBirth: '2012-04-03',
+          guardianName: 'Muhammad Khan',
+          guardianPhone: '0300-1234567',
+          guardianEmail: 'PARENT@example.com',
+          guardianRelationship: 'father',
+        },
+      },
+      {
+        rowNumber: 3,
+        data: {
+          firstName: 'Ahmed',
+          lastName: 'Khan',
+          dateOfBirth: '2014-08-11',
+          guardianName: 'Muhammad Khan',
+          guardianPhone: '03001234567',
+          guardianEmail: 'parent@example.com',
+          guardianRelationship: 'father',
+        },
+      },
+    ]);
+
+    expect(result.summary).toEqual({
+      total: 2,
+      created: 2,
+      skipped: 0,
+      failed: 0,
+    });
+    expect(repository.students).toHaveLength(2);
+    expect(result.rows[1]?.message).toContain('existing guardian');
+    expect(repository.guardians).toHaveLength(1);
+    expect(repository.links).toHaveLength(2);
+    expect(new Set(repository.links.map((link) => link.guardianId))).toEqual(
+      new Set([repository.guardians[0]?.id]),
+    );
+    expect(
+      repository.students.every((student) =>
+        student.guardianIds.includes(repository.guardians[0]!.id),
+      ),
+    ).toBe(true);
+  });
+
+  it('creates only one guardian when two imports for siblings run concurrently', async () => {
+    const repository = new MemoryPeopleRepository();
+    const service = new PeopleService(repository);
+    const [first, second] = await Promise.all([
+      service.importStudents({ organizationId: 'org-1' }, [
+        {
+          rowNumber: 2,
+          data: {
+            firstName: 'Ali',
+            lastName: 'Khan',
+            dateOfBirth: '2012-04-03',
+            guardianName: 'Muhammad Khan',
+            guardianPhone: '0300-1234567',
+            guardianEmail: 'parent@example.com',
+            guardianRelationship: 'father',
+          },
+        },
+      ]),
+      service.importStudents({ organizationId: 'org-1' }, [
+        {
+          rowNumber: 2,
+          data: {
+            firstName: 'Ahmed',
+            lastName: 'Khan',
+            dateOfBirth: '2014-08-11',
+            guardianName: 'Muhammad Khan',
+            guardianPhone: '03001234567',
+            guardianEmail: 'parent@example.com',
+            guardianRelationship: 'father',
+          },
+        },
+      ]),
+    ]);
+
+    expect(first.summary).toEqual({
+      total: 1,
+      created: 1,
+      skipped: 0,
+      failed: 0,
+    });
+    expect(second.summary).toEqual({
+      total: 1,
+      created: 1,
+      skipped: 0,
+      failed: 0,
+    });
+    expect(repository.students).toHaveLength(2);
+    expect(repository.guardians).toHaveLength(1);
+    expect(repository.links).toHaveLength(2);
+    expect(new Set(repository.links.map((link) => link.guardianId))).toEqual(
+      new Set([repository.guardians[0]?.id]),
+    );
+  });
+
+  it('uses phone when an existing matching name has no DOB, but does not override a conflicting DOB', async () => {
+    const repository = new MemoryPeopleRepository();
+    const service = new PeopleService(repository);
+    await service.createStudent('org-1', {
+      firstName: 'Noor',
+      lastName: 'Fatima',
+      phone: '03110000000',
+    });
+    await service.createStudent('org-1', {
+      firstName: 'Ali',
+      lastName: 'Khan',
+      dateOfBirth: '2010-01-01',
+      phone: '03220000000',
+    });
+
+    const result = await service.importStudents({ organizationId: 'org-1' }, [
+      {
+        rowNumber: 2,
+        data: {
+          firstName: 'Noor',
+          lastName: 'Fatima',
+          dateOfBirth: '2013-03-02',
+          phone: '03110000000',
+        },
+      },
+      {
+        rowNumber: 3,
+        data: {
+          firstName: 'Ali',
+          lastName: 'Khan',
+          dateOfBirth: '2012-04-03',
+          phone: '03220000000',
+        },
+      },
+    ]);
+
+    expect(result.summary).toEqual({
+      total: 2,
+      created: 1,
+      skipped: 1,
+      failed: 0,
+    });
+    expect(repository.students).toHaveLength(3);
+  });
+
+  it('skips exact name-only matches on a repeated import when no stable identifier exists', async () => {
+    const repository = new MemoryPeopleRepository();
+    const service = new PeopleService(repository);
+    const rows = [{ rowNumber: 2, data: { fullName: 'Noor Fatima' } }];
+
+    const firstImport = await service.importStudents(
+      { organizationId: 'org-1' },
+      rows,
+    );
+    const repeatedImport = await service.importStudents(
+      { organizationId: 'org-1' },
+      rows,
+    );
+
+    expect(firstImport.summary).toMatchObject({
+      created: 1,
+      skipped: 0,
+      failed: 0,
+    });
+    expect(repeatedImport.summary).toMatchObject({
+      created: 0,
+      skipped: 1,
+      failed: 0,
+    });
+    expect(repository.students).toHaveLength(1);
+    expect(repeatedImport.rows[0]?.message).toContain('already exists');
+  });
+
+  it('enforces campus assignment and validates a campus before student import', async () => {
+    const repository = new MemoryPeopleRepository();
+    repository.campuses.set('campus-1', 'org-1');
+    const service = new PeopleService(repository);
+    const rows = [
+      { rowNumber: 2, data: { firstName: 'Ali', lastName: 'Raza' } },
+    ];
+
+    await expect(
+      service.previewStudentImport(
+        {
+          organizationId: 'org-1',
+          role: 'campus_admin',
+          campusIds: ['campus-1'],
+        },
+        rows,
+      ),
+    ).rejects.toMatchObject({ code: 'CAMPUS_FORBIDDEN' });
+
+    await expect(
+      service.previewStudentImport(
+        {
+          organizationId: 'org-1',
+          role: 'campus_admin',
+          campusIds: ['campus-1'],
+        },
+        rows,
+        'campus-2',
+      ),
+    ).rejects.toMatchObject({ code: 'CAMPUS_FORBIDDEN' });
+
+    await expect(
+      service.previewStudentImport(
+        { organizationId: 'org-1' },
+        rows,
+        'campus-2',
+      ),
+    ).rejects.toMatchObject({ code: 'CAMPUS_NOT_FOUND' });
   });
 });

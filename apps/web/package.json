@@ -20,6 +20,7 @@
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.89.0",
     "react-router-dom": "^7.18.4",
+    "read-excel-file": "^9.3.12",
     "vite": "^6.1.0",
     "zod": "^4.6.5"
   },

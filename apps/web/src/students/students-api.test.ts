@@ -4,6 +4,8 @@ import {
   createStudent,
   getStudent,
   listStudents,
+  previewStudentImport,
+  importStudents,
   updateStudent,
 } from './students-api.js';
 
@@ -59,6 +61,28 @@ describe('student API integration', () => {
       3,
       '/organizations/org-1/students/student-1',
       { method: 'PATCH', body: JSON.stringify(input) },
+    );
+  });
+
+  it('uses dedicated preview and confirm-import endpoints without inventing student fields', async () => {
+    vi.mocked(apiRequest).mockResolvedValue({ rows: [], summary: {} });
+    const input = {
+      campusId: 'campus-1',
+      rows: [{ rowNumber: 2, data: { firstName: 'Ali', lastName: 'Raza' } }],
+    };
+
+    await previewStudentImport('org-1', input);
+    await importStudents('org-1', input);
+
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      1,
+      '/organizations/org-1/students/import/preview',
+      { method: 'POST', body: JSON.stringify(input) },
+    );
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      2,
+      '/organizations/org-1/students/import',
+      { method: 'POST', body: JSON.stringify(input) },
     );
   });
 });

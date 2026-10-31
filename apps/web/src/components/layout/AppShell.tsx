@@ -3,6 +3,8 @@ import type { LucideIcon } from 'lucide-react';
 import {
   ArrowUpRight,
   BarChart3,
+  ChevronLeft,
+  ChevronRight,
   BookOpenText,
   ClipboardCheck,
   ClipboardList,
@@ -209,6 +211,10 @@ function getNavigationItems(
 
 export function AppShell({ role }: { role: RoleLayoutConfig }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () =>
+      window.localStorage.getItem('instituteos-sidebar-collapsed') === 'true',
+  );
   const [signOutError, setSignOutError] = useState(false);
   const [globalQuery, setGlobalQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -295,6 +301,17 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
     setSearchOpen(false);
   };
 
+  const toggleSidebar = () => {
+    setSidebarCollapsed((collapsed) => {
+      const next = !collapsed;
+      window.localStorage.setItem(
+        'instituteos-sidebar-collapsed',
+        String(next),
+      );
+      return next;
+    });
+  };
+
   const closeMobileNav = () => {
     if (mobileNavOpen) setMobileNavOpen(false);
   };
@@ -341,7 +358,9 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
         tabIndex={mobileNavOpen ? 0 : -1}
         type="button"
       />
-      <aside className={`sidebar${mobileNavOpen ? ' sidebar-open' : ''}`}>
+      <aside
+        className={`sidebar${mobileNavOpen ? ' sidebar-open' : ''}${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}
+      >
         <Link
           aria-label="InstituteOS home"
           className="brand-lockup"
@@ -356,7 +375,24 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
           </span>
         </Link>
 
-        <div className="sidebar-label">Workspace</div>
+        <div className="sidebar-heading-row">
+          <div className="sidebar-label">Workspace</div>
+          <button
+            className="sidebar-collapse-button"
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={
+              sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
+            }
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {sidebarCollapsed ? (
+              <ChevronRight size={16} />
+            ) : (
+              <ChevronLeft size={16} />
+            )}
+          </button>
+        </div>
         <nav
           aria-label="Main navigation"
           className="primary-navigation sidebar-navigation-scroll"

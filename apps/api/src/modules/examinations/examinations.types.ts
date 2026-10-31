@@ -134,7 +134,11 @@ export interface ExaminationsRepository {
     classId: string,
     sectionId: string,
   ): Promise<boolean>;
-  validateSubject(organizationId: string, subjectId: string): Promise<boolean>;
+  validateSubject(
+    organizationId: string,
+    subjectId: string,
+    classId: string,
+  ): Promise<boolean>;
   listExams(
     organizationId: string,
     campusIds?: string[],

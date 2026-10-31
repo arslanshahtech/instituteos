@@ -1,0 +1,5 @@
+First Name,Last Name,Date of Birth,Guardian Name,Guardian Phone,Guardian Email,Guardian Relationship
+Ali,Khan,2012-04-03,Muhammad Khan,0300-1234567,parent@example.test,father
+Ahmed,Khan,2014-08-11,Muhammad Khan,03001234567,parent@example.test,father
+Sana,Malik,2011-06-01,,,,
+Ali,Khan,2012-04-03,Muhammad Khan,03001234567,parent@example.test,father

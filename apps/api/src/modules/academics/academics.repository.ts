@@ -3,11 +3,25 @@ import { AppError } from '../../errors/app-error.js';
 import { CampusModel } from '../tenancy/tenancy.model.js';
 import { StaffMemberModel } from '../people/people.model.js';
 import {
+  StudentAttendanceModel,
+  StudentSectionPlacementModel,
+} from '../attendance/attendance.model.js';
+import {
+  FeeStructureModel,
+  StudentInvoiceModel,
+} from '../finance/finance.model.js';
+import {
+  ExamModel,
+  ExamScheduleModel,
+} from '../examinations/examinations.model.js';
+import { HomeworkTestModel } from '../homework/homework.model.js';
+import {
   AcademicClassModel,
   AcademicSectionModel,
   AcademicYearModel,
   SubjectModel,
   TeacherAssignmentModel,
+  TeacherTimetableModel,
   TermModel,
 } from './academics.model.js';
 import type {
@@ -69,6 +83,10 @@ function classRecord(record: Record<string, unknown>): ClassRecord {
     campusId: String(record.campusId),
     name: String(record.name),
     code: String(record.code),
+    ...(record.studyLevel
+      ? { studyLevel: record.studyLevel as ClassRecord['studyLevel'] }
+      : {}),
+    ...(record.programName ? { programName: String(record.programName) } : {}),
     createdAt: timestamp(record.createdAt as Date),
     updatedAt: timestamp(record.updatedAt as Date),
   };
@@ -95,6 +113,7 @@ function subjectRecord(record: Record<string, unknown>): SubjectRecord {
     name: String(record.name),
     code: String(record.code),
     ...(record.department ? { department: String(record.department) } : {}),
+    classIds: Array.isArray(record.classIds) ? record.classIds.map(String) : [],
     createdAt: timestamp(record.createdAt as Date),
     updatedAt: timestamp(record.updatedAt as Date),
   };
@@ -193,6 +212,17 @@ export class MongoAcademicsRepository implements AcademicsRepository {
         'Academic year',
       );
     } catch (error) {
+      if (
+        this.isDuplicateKey(error) &&
+        (error as { keyPattern?: Record<string, number> }).keyPattern
+          ?.organizationId
+      ) {
+        throw new AppError(
+          409,
+          'ACTIVE_ACADEMIC_YEAR_EXISTS',
+          'This organization already has an active academic year. Archive it before activating another year.',
+        );
+      }
       this.uniqueConflict(
         error,
         'An academic year with this name already exists.',
@@ -218,6 +248,17 @@ export class MongoAcademicsRepository implements AcademicsRepository {
       ).lean();
       return record ? yearRecord(record) : null;
     } catch (error) {
+      if (
+        this.isDuplicateKey(error) &&
+        (error as { keyPattern?: Record<string, number> }).keyPattern
+          ?.organizationId
+      ) {
+        throw new AppError(
+          409,
+          'ACTIVE_ACADEMIC_YEAR_EXISTS',
+          'This organization already has an active academic year. Archive it before activating another year.',
+        );
+      }
       this.uniqueConflict(
         error,
         'An academic year with this name already exists.',
@@ -258,6 +299,24 @@ export class MongoAcademicsRepository implements AcademicsRepository {
     }).lean();
     return record ? termRecord(record) : null;
   }
+  async hasOverlappingTerm(
+    organizationId: string,
+    academicYearId: string,
+    startDate: string,
+    endDate: string,
+    exceptId?: string,
+  ): Promise<boolean> {
+    return Boolean(
+      await TermModel.exists({
+        organizationId: oid(organizationId),
+        academicYearId: oid(academicYearId),
+        startDate: { $lte: new Date(endDate) },
+        endDate: { $gte: new Date(startDate) },
+        ...(exceptId ? { _id: { $ne: oid(exceptId) } } : {}),
+      }),
+    );
+  }
+
   async createTerm(
     organizationId: string,
     input: TermInput,
@@ -552,6 +611,9 @@ export class MongoAcademicsRepository implements AcademicsRepository {
     try {
       const record = await SubjectModel.create({
         ...input,
+        ...(input.classIds !== undefined
+          ? { classIds: input.classIds.map(oid) }
+          : {}),
         organizationId: oid(organizationId),
       });
       return this.created(
@@ -569,9 +631,15 @@ export class MongoAcademicsRepository implements AcademicsRepository {
     input: Partial<SubjectInput>,
   ): Promise<SubjectRecord | null> {
     try {
+      const changes = {
+        ...input,
+        ...(input.classIds !== undefined
+          ? { classIds: input.classIds.map(oid) }
+          : {}),
+      };
       const record = await SubjectModel.findOneAndUpdate(
         { _id: oid(id), organizationId: oid(organizationId) },
-        { $set: input },
+        { $set: changes },
         { new: true, runValidators: true },
       ).lean();
       return record ? subjectRecord(record) : null;
@@ -702,7 +770,13 @@ export class MongoAcademicsRepository implements AcademicsRepository {
 
   async hasReference(
     organizationId: string,
-    resource: 'academicYear' | 'class' | 'section' | 'subject',
+    resource:
+      | 'academicYear'
+      | 'term'
+      | 'class'
+      | 'section'
+      | 'subject'
+      | 'teacherAssignment',
     id: string,
   ): Promise<boolean> {
     const organization = oid(organizationId);
@@ -719,7 +793,45 @@ export class MongoAcademicsRepository implements AcademicsRepository {
               organizationId: organization,
               academicYearId: value,
             }),
+            StudentSectionPlacementModel.exists({
+              organizationId: organization,
+              academicYearId: value,
+            }),
+            StudentAttendanceModel.exists({
+              organizationId: organization,
+              academicYearId: value,
+            }),
+            FeeStructureModel.exists({
+              organizationId: organization,
+              academicYearId: value,
+            }),
+            StudentInvoiceModel.exists({
+              organizationId: organization,
+              academicYearId: value,
+            }),
+            ExamModel.exists({
+              organizationId: organization,
+              academicYearId: value,
+            }),
+            HomeworkTestModel.exists({
+              organizationId: organization,
+              academicYearId: value,
+            }),
           ]).then((references) => references.some(Boolean)),
+        );
+      case 'term':
+        return Boolean(
+          await ExamModel.exists({
+            organizationId: organization,
+            termId: value,
+          }),
+        );
+      case 'teacherAssignment':
+        return Boolean(
+          await TeacherTimetableModel.exists({
+            organizationId: organization,
+            teacherAssignmentId: value,
+          }),
         );
       case 'class':
         return Boolean(
@@ -728,7 +840,35 @@ export class MongoAcademicsRepository implements AcademicsRepository {
               organizationId: organization,
               classId: value,
             }),
+            SubjectModel.exists({
+              organizationId: organization,
+              classIds: value,
+            }),
             TeacherAssignmentModel.exists({
+              organizationId: organization,
+              classId: value,
+            }),
+            StudentSectionPlacementModel.exists({
+              organizationId: organization,
+              classId: value,
+            }),
+            StudentAttendanceModel.exists({
+              organizationId: organization,
+              classId: value,
+            }),
+            FeeStructureModel.exists({
+              organizationId: organization,
+              classId: value,
+            }),
+            StudentInvoiceModel.exists({
+              organizationId: organization,
+              classId: value,
+            }),
+            ExamScheduleModel.exists({
+              organizationId: organization,
+              classId: value,
+            }),
+            HomeworkTestModel.exists({
               organizationId: organization,
               classId: value,
             }),
@@ -736,17 +876,45 @@ export class MongoAcademicsRepository implements AcademicsRepository {
         );
       case 'section':
         return Boolean(
-          await TeacherAssignmentModel.exists({
-            organizationId: organization,
-            sectionId: value,
-          }),
+          await Promise.all([
+            TeacherAssignmentModel.exists({
+              organizationId: organization,
+              sectionId: value,
+            }),
+            StudentSectionPlacementModel.exists({
+              organizationId: organization,
+              sectionId: value,
+            }),
+            StudentAttendanceModel.exists({
+              organizationId: organization,
+              sectionId: value,
+            }),
+            ExamScheduleModel.exists({
+              organizationId: organization,
+              sectionId: value,
+            }),
+            HomeworkTestModel.exists({
+              organizationId: organization,
+              sectionId: value,
+            }),
+          ]).then((references) => references.some(Boolean)),
         );
       case 'subject':
         return Boolean(
-          await TeacherAssignmentModel.exists({
-            organizationId: organization,
-            subjectId: value,
-          }),
+          await Promise.all([
+            TeacherAssignmentModel.exists({
+              organizationId: organization,
+              subjectId: value,
+            }),
+            ExamScheduleModel.exists({
+              organizationId: organization,
+              subjectId: value,
+            }),
+            HomeworkTestModel.exists({
+              organizationId: organization,
+              subjectId: value,
+            }),
+          ]).then((references) => references.some(Boolean)),
         );
     }
   }
@@ -776,6 +944,15 @@ export class MongoAcademicsRepository implements AcademicsRepository {
         organizationId: oid(organizationId),
         status: 'active',
       }),
+    );
+  }
+
+  private isDuplicateKey(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 11000
     );
   }
 

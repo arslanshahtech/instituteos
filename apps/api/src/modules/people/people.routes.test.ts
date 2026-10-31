@@ -238,6 +238,113 @@ describe('staff HTTP routes', () => {
     );
   });
 
+  it('exposes a CSRF-protected student import preview for members with student.create', async () => {
+    const previewSpy = vi
+      .spyOn(PeopleService.prototype, 'previewStudentImport')
+      .mockResolvedValue({
+        rows: [
+          {
+            rowNumber: 2,
+            status: 'ready',
+            input: { firstName: 'Ali', lastName: 'Raza' },
+            firstName: 'Ali',
+            lastName: 'Raza',
+            issues: [],
+          },
+        ],
+        summary: {
+          total: 1,
+          ready: 1,
+          warnings: 0,
+          duplicates: 0,
+          errors: 0,
+          importable: 1,
+        },
+      });
+
+    const response = await request(testApp('organization_admin'))
+      .post(`/api/v1/${organizationId}/students/import/preview`)
+      .set('Cookie', `instituteos_csrf=${csrfToken}`)
+      .set('X-CSRF-Token', csrfToken)
+      .send({
+        rows: [{ rowNumber: 2, data: { firstName: 'Ali', lastName: 'Raza' } }],
+      });
+
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    expect(response.body.summary).toMatchObject({ total: 1, importable: 1 });
+    expect(previewSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId }),
+      [{ rowNumber: 2, data: { firstName: 'Ali', lastName: 'Raza' } }],
+      undefined,
+    );
+  });
+
+  it('commits student imports only through the protected confirm endpoint', async () => {
+    const importSpy = vi
+      .spyOn(PeopleService.prototype, 'importStudents')
+      .mockResolvedValue({
+        rows: [
+          {
+            rowNumber: 2,
+            outcome: 'created',
+            message: 'Student profile created.',
+            studentId: 'student-1',
+          },
+        ],
+        summary: { total: 1, created: 1, skipped: 0, failed: 0 },
+      });
+    const inputRows = [
+      { rowNumber: 2, data: { firstName: 'Ali', lastName: 'Raza' } },
+    ];
+
+    const response = await request(testApp('organization_admin'))
+      .post(`/api/v1/${organizationId}/students/import`)
+      .set('Cookie', `instituteos_csrf=${csrfToken}`)
+      .set('X-CSRF-Token', csrfToken)
+      .send({ rows: inputRows });
+
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    expect(response.body.summary).toMatchObject({
+      created: 1,
+      skipped: 0,
+      failed: 0,
+    });
+    expect(importSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId }),
+      inputRows,
+      undefined,
+    );
+  });
+
+  it('requires CSRF and rejects unsupported student import fields', async () => {
+    const app = testApp('organization_admin');
+    const noCsrf = await request(app)
+      .post(`/api/v1/${organizationId}/students/import/preview`)
+      .send({
+        rows: [{ rowNumber: 2, data: { firstName: 'Ali', lastName: 'Raza' } }],
+      });
+    expect(noCsrf.status).toBe(403);
+
+    const unsupportedField = await request(app)
+      .post(`/api/v1/${organizationId}/students/import/preview`)
+      .set('Cookie', `instituteos_csrf=${csrfToken}`)
+      .set('X-CSRF-Token', csrfToken)
+      .send({
+        rows: [
+          {
+            rowNumber: 2,
+            data: {
+              firstName: 'Ali',
+              lastName: 'Raza',
+              organizationId: 'another-org',
+            },
+          },
+        ],
+      });
+    expect(unsupportedField.status).toBe(400);
+    expect(unsupportedField.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
   it('denies staff routes to members without staff.read', async () => {
     const find = vi.spyOn(StaffMemberModel, 'find');
     const response = await request(testApp('student')).get(

@@ -31,6 +31,7 @@ export interface CampusInput {
 }
 
 export interface ProvisionOrganizationInput extends OrganizationProfileInput {
+  institutionType: 'school' | 'college';
   initialCampus?: CampusInput;
 }
 

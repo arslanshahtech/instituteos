@@ -1,11 +1,17 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Archive,
   Building2,
+  Eye,
+  Pencil,
+  Trash2,
   CalendarDays,
   CircleAlert,
   GraduationCap,
+  PauseCircle,
   RefreshCw,
+  RotateCcw,
   Search,
   ShieldCheck,
   Users,
@@ -20,6 +26,9 @@ import {
   createPlatformOrganization,
   getPlatformDemoRequests,
   getPlatformOrganizations,
+  updatePlatformOrganizationStatus,
+  updatePlatformOrganizationDetails,
+  deletePlatformOrganization,
 } from './platform-api.js';
 import '../styles/platform-overview.css';
 
@@ -69,15 +78,50 @@ function AccessDenied() {
 
 export function PlatformOverviewPage() {
   const [search, setSearch] = useState('');
+  const [managedOrganizationId, setManagedOrganizationId] = useState<
+    string | null
+  >(null);
+  const [viewOrganizationId, setViewOrganizationId] = useState<string | null>(
+    null,
+  );
+  const [editOrganizationId, setEditOrganizationId] = useState<string | null>(
+    null,
+  );
+  const [editForm, setEditForm] = useState({
+    name: '',
+    contactEmail: '',
+    phone: '',
+  });
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleteOrganizationId, setDeleteOrganizationId] = useState<
+    string | null
+  >(null);
+  const [actionError, setActionError] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
     name: '',
+    institutionType: 'college' as 'school' | 'college',
     subdomain: '',
     adminEmail: '',
     plan: 'Growth' as 'Starter' | 'Growth' | 'Enterprise',
   });
   const [createError, setCreateError] = useState('');
   const [createSuccess, setCreateSuccess] = useState('');
+  useEffect(() => {
+    const targetId = viewOrganizationId
+      ? 'platform-organization-view'
+      : editOrganizationId
+        ? 'platform-organization-edit'
+        : deleteOrganizationId
+          ? 'platform-organization-delete'
+          : null;
+    if (!targetId) return;
+    requestAnimationFrame(() =>
+      document
+        .getElementById(targetId)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    );
+  }, [viewOrganizationId, editOrganizationId, deleteOrganizationId]);
   const queryClient = useQueryClient();
   const createOrganizationMutation = useMutation({
     mutationFn: createPlatformOrganization,
@@ -88,6 +132,7 @@ export function PlatformOverviewPage() {
       setCreateOpen(false);
       setCreateForm({
         name: '',
+        institutionType: 'college',
         subdomain: '',
         adminEmail: '',
         plan: 'Growth',
@@ -120,6 +165,71 @@ export function PlatformOverviewPage() {
     queryKey: ['platform', 'organizations'],
     queryFn: getPlatformOrganizations,
     retry: false,
+  });
+  const statusMutation = useMutation({
+    mutationFn: ({
+      organizationId,
+      status,
+    }: {
+      organizationId: string;
+      status: 'active' | 'suspended' | 'archived';
+    }) => updatePlatformOrganizationStatus(organizationId, status),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['platform', 'organizations'],
+      });
+    },
+    onError: (error) =>
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : 'Organization status could not be updated.',
+      ),
+  });
+  const detailsMutation = useMutation({
+    mutationFn: ({
+      organizationId,
+      input,
+    }: {
+      organizationId: string;
+      input: { name: string; contactEmail: string; phone: string };
+    }) => updatePlatformOrganizationDetails(organizationId, input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['platform', 'organizations'],
+      });
+      setEditOrganizationId(null);
+      setActionError('');
+    },
+    onError: (error) =>
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : 'Organization details could not be saved.',
+      ),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: ({
+      organizationId,
+      confirmationName,
+    }: {
+      organizationId: string;
+      confirmationName: string;
+    }) => deletePlatformOrganization(organizationId, confirmationName),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['platform', 'organizations'],
+      });
+      setManagedOrganizationId(null);
+      setDeleteConfirmation('');
+      setActionError('');
+    },
+    onError: (error) =>
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : 'Organization could not be deleted.',
+      ),
   });
   const requestsQuery = useQuery({
     queryKey: ['platform', 'demo-requests'],
@@ -230,6 +340,22 @@ export function PlatformOverviewPage() {
                 }
                 placeholder="City College"
               />
+            </label>
+            <label>
+              Organization type
+              <select
+                required
+                value={createForm.institutionType}
+                onChange={(event) =>
+                  setCreateForm({
+                    ...createForm,
+                    institutionType: event.target.value as 'school' | 'college',
+                  })
+                }
+              >
+                <option value="school">School</option>
+                <option value="college">College</option>
+              </select>
             </label>
             <label>
               Subdomain
@@ -396,54 +522,232 @@ export function PlatformOverviewPage() {
                     <th>Plan / MRR</th>
                     <th>Status</th>
                     <th>Created</th>
+                    <th>Manage</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredOrganizations.map((organization) => (
-                    <tr key={organization.id}>
-                      <td>
-                        <strong>{organization.name}</strong>
-                        <small className="platform-cell-id">
-                          {organization.id}
-                        </small>
-                      </td>
-                      <td>
-                        {organization.subdomain ? (
-                          <span className="platform-subdomain">
-                            {organization.subdomain}.instituteos.com
+                    <Fragment key={organization.id}>
+                      <tr>
+                        <td>
+                          <strong>{organization.name}</strong>
+                          <small className="platform-cell-sub">
+                            {organization.institutionType === 'college'
+                              ? 'College'
+                              : organization.institutionType === 'school'
+                                ? 'School'
+                                : 'Type not set'}
+                          </small>
+                          <small className="platform-cell-id">
+                            {organization.id}
+                          </small>
+                        </td>
+                        <td>
+                          {organization.subdomain ? (
+                            <span className="platform-subdomain">
+                              {organization.subdomain}.instituteos.com
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td>{organization.adminEmail ?? 'Not assigned'}</td>
+                        <td className="platform-number-cell">
+                          {organization.studentCount.toLocaleString()}
+                        </td>
+                        <td>
+                          <strong>{organization.plan ?? 'Unassigned'}</strong>
+                          <small className="platform-cell-sub">
+                            {formatCurrency(organization.mrr)} / mo (estimate)
+                          </small>
+                          <small className="platform-cell-sub">
+                            {trialStatus(organization.trialEndsAt)}
+                          </small>
+                        </td>
+                        <td>
+                          <span
+                            className={
+                              'platform-status status-' + organization.status
+                            }
+                          >
+                            {organization.status}
                           </span>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td>{organization.adminEmail ?? 'Not assigned'}</td>
-                      <td className="platform-number-cell">
-                        {organization.studentCount.toLocaleString()}
-                      </td>
-                      <td>
-                        <strong>{organization.plan ?? 'Unassigned'}</strong>
-                        <small className="platform-cell-sub">
-                          {formatCurrency(organization.mrr)} / mo (estimate)
-                        </small>
-                        <small className="platform-cell-sub">
-                          {trialStatus(organization.trialEndsAt)}
-                        </small>
-                      </td>
-                      <td>
-                        <span
-                          className={
-                            'platform-status status-' + organization.status
-                          }
+                        </td>
+                        <td>{formatDate(organization.createdAt)}</td>
+                        <td>
+                          <button
+                            className="button button-secondary platform-manage-button"
+                            type="button"
+                            aria-expanded={
+                              managedOrganizationId === organization.id
+                            }
+                            onClick={() =>
+                              setManagedOrganizationId((current) =>
+                                current === organization.id
+                                  ? null
+                                  : organization.id,
+                              )
+                            }
+                          >
+                            {managedOrganizationId === organization.id
+                              ? 'Close'
+                              : 'Manage'}
+                          </button>
+                        </td>
+                      </tr>
+                      {managedOrganizationId === organization.id && (
+                        <tr
+                          key={`${organization.id}-manage`}
+                          className="platform-manage-row"
                         >
-                          {organization.status}
-                        </span>
-                      </td>
-                      <td>{formatDate(organization.createdAt)}</td>
-                    </tr>
+                          <td colSpan={8}>
+                            <section
+                              className="platform-manage-panel"
+                              aria-label={`Manage ${organization.name}`}
+                            >
+                              <div>
+                                <strong>{organization.name}</strong>
+                                <p>
+                                  Owner account:{' '}
+                                  {organization.adminEmail ??
+                                    'No active owner email assigned'}
+                                </p>
+                                <p>Organization ID: {organization.id}</p>
+                                <p>
+                                  Student records:{' '}
+                                  {organization.studentCount.toLocaleString()} ·
+                                  Plan: {organization.plan ?? 'Unassigned'}
+                                </p>
+                              </div>
+                              <div className="platform-manage-actions">
+                                {organization.status !== 'archived' && (
+                                  <>
+                                    <button
+                                      className="button button-secondary"
+                                      type="button"
+                                      onClick={() => {
+                                        setManagedOrganizationId(null);
+                                        setEditOrganizationId(null);
+                                        setDeleteOrganizationId(null);
+                                        setViewOrganizationId(organization.id);
+                                      }}
+                                    >
+                                      <Eye size={14} /> View
+                                    </button>
+                                    <button
+                                      className="button button-secondary"
+                                      type="button"
+                                      onClick={() => {
+                                        setManagedOrganizationId(null);
+                                        setViewOrganizationId(null);
+                                        setDeleteOrganizationId(null);
+                                        setEditOrganizationId(organization.id);
+                                        setEditForm({
+                                          name: organization.name,
+                                          contactEmail:
+                                            organization.contactEmail ?? '',
+                                          phone: organization.phone ?? '',
+                                        });
+                                        setActionError('');
+                                      }}
+                                    >
+                                      <Pencil size={14} /> Edit
+                                    </button>
+                                  </>
+                                )}
+                                {organization.status !== 'active' && (
+                                  <button
+                                    className="button button-secondary"
+                                    type="button"
+                                    disabled={statusMutation.isPending}
+                                    onClick={() =>
+                                      statusMutation.mutate({
+                                        organizationId: organization.id,
+                                        status: 'active',
+                                      })
+                                    }
+                                  >
+                                    <RotateCcw size={14} />{' '}
+                                    {organization.status === 'archived'
+                                      ? 'Restore'
+                                      : 'Reactivate'}
+                                  </button>
+                                )}
+                                {organization.status === 'active' && (
+                                  <button
+                                    className="button button-secondary"
+                                    type="button"
+                                    disabled={statusMutation.isPending}
+                                    onClick={() => {
+                                      if (
+                                        window.confirm(
+                                          `Suspend ${organization.name}? Members will lose normal access until reactivated.`,
+                                        )
+                                      )
+                                        statusMutation.mutate({
+                                          organizationId: organization.id,
+                                          status: 'suspended',
+                                        });
+                                    }}
+                                  >
+                                    <PauseCircle size={14} /> Suspend
+                                  </button>
+                                )}
+                                {organization.status !== 'archived' && (
+                                  <button
+                                    className="button button-secondary"
+                                    type="button"
+                                    disabled={statusMutation.isPending}
+                                    onClick={() => {
+                                      if (
+                                        window.confirm(
+                                          `Archive ${organization.name}? It will no longer be an active organization.`,
+                                        )
+                                      )
+                                        statusMutation.mutate({
+                                          organizationId: organization.id,
+                                          status: 'archived',
+                                        });
+                                    }}
+                                  >
+                                    <Archive size={14} /> Archive
+                                  </button>
+                                )}
+                                {organization.status === 'archived' && (
+                                  <button
+                                    className="button button-secondary platform-danger-action"
+                                    type="button"
+                                    disabled={deleteMutation.isPending}
+                                    onClick={() => {
+                                      setActionError('');
+                                      setDeleteConfirmation('');
+                                      setManagedOrganizationId(null);
+                                      setViewOrganizationId(null);
+                                      setEditOrganizationId(null);
+                                      setDeleteOrganizationId(organization.id);
+                                    }}
+                                  >
+                                    <Trash2 size={14} /> Delete
+                                  </button>
+                                )}
+                                {actionError && (
+                                  <p
+                                    className="platform-form-error"
+                                    role="alert"
+                                  >
+                                    {actionError}
+                                  </p>
+                                )}
+                              </div>
+                            </section>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                   {filteredOrganizations.length === 0 && (
                     <tr>
-                      <td colSpan={7}>
+                      <td colSpan={8}>
                         <div className="platform-table-empty">
                           {organizations.length
                             ? 'No organizations match this search.'
@@ -457,6 +761,249 @@ export function PlatformOverviewPage() {
             </div>
           </section>
 
+          {viewOrganizationId &&
+            (() => {
+              const item = organizations.find(
+                (org) => org.id === viewOrganizationId,
+              );
+              return item ? (
+                <section
+                  id="platform-organization-view"
+                  className="panel platform-detail-panel"
+                  aria-label="Organization details"
+                >
+                  <div className="platform-panel-heading">
+                    <div>
+                      <h2>{item.name}</h2>
+                      <p>Organization overview · read only</p>
+                    </div>
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      onClick={() => setViewOrganizationId(null)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <dl className="platform-detail-grid">
+                    <div>
+                      <dt>Organization ID</dt>
+                      <dd>{item.id}</dd>
+                    </div>
+                    <div>
+                      <dt>Subdomain</dt>
+                      <dd>{item.subdomain ?? 'Not assigned'}</dd>
+                    </div>
+                    <div>
+                      <dt>Owner email</dt>
+                      <dd>{item.adminEmail ?? 'Not assigned'}</dd>
+                    </div>
+                    <div>
+                      <dt>Status</dt>
+                      <dd>{item.status}</dd>
+                    </div>
+                    <div>
+                      <dt>Students</dt>
+                      <dd>{item.studentCount.toLocaleString()}</dd>
+                    </div>
+                    <div>
+                      <dt>Plan</dt>
+                      <dd>{item.plan ?? 'Unassigned'}</dd>
+                    </div>
+                    <div>
+                      <dt>Estimated MRR</dt>
+                      <dd>{formatCurrency(item.mrr)}</dd>
+                    </div>
+                    <div>
+                      <dt>Trial</dt>
+                      <dd>{trialStatus(item.trialEndsAt)}</dd>
+                    </div>
+                    <div>
+                      <dt>Created</dt>
+                      <dd>{formatDate(item.createdAt)}</dd>
+                    </div>
+                  </dl>
+                </section>
+              ) : null;
+            })()}
+          {editOrganizationId &&
+            (() => {
+              const item = organizations.find(
+                (org) => org.id === editOrganizationId,
+              );
+              return item ? (
+                <section
+                  id="platform-organization-edit"
+                  className="panel platform-detail-panel"
+                  aria-label="Edit organization"
+                >
+                  <div className="platform-panel-heading">
+                    <div>
+                      <h2>Edit organization</h2>
+                      <p>
+                        Update organization profile details. Changes are audit
+                        logged.
+                      </p>
+                    </div>
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      onClick={() => setEditOrganizationId(null)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <form
+                    className="platform-edit-form"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      detailsMutation.mutate({
+                        organizationId: item.id,
+                        input: {
+                          name: editForm.name.trim(),
+                          contactEmail: editForm.contactEmail.trim(),
+                          phone: editForm.phone.trim(),
+                        },
+                      });
+                    }}
+                  >
+                    <label>
+                      Organization name
+                      <input
+                        required
+                        minLength={2}
+                        maxLength={160}
+                        value={editForm.name}
+                        onChange={(event) =>
+                          setEditForm({ ...editForm, name: event.target.value })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Organization contact email
+                      <input
+                        required
+                        type="email"
+                        maxLength={254}
+                        value={editForm.contactEmail}
+                        onChange={(event) =>
+                          setEditForm({
+                            ...editForm,
+                            contactEmail: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                    <label>
+                      Phone
+                      <input
+                        maxLength={40}
+                        value={editForm.phone}
+                        onChange={(event) =>
+                          setEditForm({
+                            ...editForm,
+                            phone: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+                    {actionError && (
+                      <p className="platform-form-error" role="alert">
+                        {actionError}
+                      </p>
+                    )}
+                    <div className="platform-create-actions">
+                      <button
+                        className="button button-secondary"
+                        type="button"
+                        onClick={() => setEditOrganizationId(null)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="button button-primary"
+                        type="submit"
+                        disabled={detailsMutation.isPending}
+                      >
+                        {detailsMutation.isPending ? 'Saving…' : 'Save changes'}
+                      </button>
+                    </div>
+                  </form>
+                </section>
+              ) : null;
+            })()}
+          {deleteOrganizationId &&
+            (() => {
+              const item = organizations.find(
+                (org) => org.id === deleteOrganizationId,
+              );
+              return item ? (
+                <section
+                  id="platform-organization-delete"
+                  className="panel platform-delete-panel"
+                  aria-label="Permanently delete organization"
+                >
+                  <div className="platform-panel-heading">
+                    <div>
+                      <h2>Delete {item.name} permanently?</h2>
+                      <p>
+                        This permanently removes the organization, its campuses,
+                        memberships, invitations and organization audit history.
+                        This cannot be undone. Confirm the exact organization
+                        name to continue.
+                      </p>
+                    </div>
+                  </div>
+                  <label>
+                    Type <strong>{item.name}</strong> to confirm
+                    <input
+                      value={deleteConfirmation}
+                      onChange={(event) =>
+                        setDeleteConfirmation(event.target.value)
+                      }
+                      placeholder="Exact organization name"
+                    />
+                  </label>
+                  <p className="platform-delete-warning">
+                    Before continuing, make sure any records required for legal
+                    or school retention have been exported. The organization and
+                    the listed related records will be permanently removed.
+                  </p>
+                  {actionError && (
+                    <p className="platform-form-error" role="alert">
+                      {actionError}
+                    </p>
+                  )}
+                  <div className="platform-create-actions">
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      onClick={() => setDeleteOrganizationId(null)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      disabled={
+                        deleteConfirmation !== item.name ||
+                        deleteMutation.isPending
+                      }
+                      onClick={() =>
+                        deleteMutation.mutate({
+                          organizationId: item.id,
+                          confirmationName: deleteConfirmation,
+                        })
+                      }
+                    >
+                      {deleteMutation.isPending
+                        ? 'Deleting…'
+                        : 'Permanently delete'}
+                    </button>
+                  </div>
+                </section>
+              ) : null;
+            })()}
           <section
             className="panel platform-table-panel"
             aria-labelledby="platform-requests-heading"

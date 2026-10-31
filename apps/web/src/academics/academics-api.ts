@@ -28,6 +28,8 @@ export interface AcademicClass {
   campusId: string;
   name: string;
   code: string;
+  studyLevel?: 'first_year' | 'second_year' | 'other';
+  programName?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -48,6 +50,7 @@ export interface AcademicSubject {
   name: string;
   code: string;
   department?: string;
+  classIds?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -77,7 +80,7 @@ export type AcademicsResource =
   | 'subjects'
   | 'teacher-assignments';
 
-export type AcademicsFormPayload = Record<string, string | number>;
+export type AcademicsFormPayload = Record<string, string | number | string[]>;
 
 const organizationPath = (organizationId: string) =>
   `/organizations/${encodeURIComponent(organizationId)}`;
@@ -126,6 +129,42 @@ export function deleteAcademicsResource(
 ): Promise<void> {
   return apiRequest(
     `${organizationPath(organizationId)}/${resource}/${encodeURIComponent(id)}`,
+    { method: 'DELETE' },
+  );
+}
+
+export interface TeacherTimetableEntry {
+  id: string;
+  teacherStaffId: string;
+  teacherAssignmentId: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  room?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function listTeacherTimetable(organizationId: string, staffId: string) {
+  return apiRequest<{ items: TeacherTimetableEntry[] }>(
+    `${organizationPath(organizationId)}/teacher-timetable/${encodeURIComponent(staffId)}`,
+  );
+}
+
+export function saveTeacherTimetable(
+  organizationId: string,
+  input: Omit<TeacherTimetableEntry, 'id' | 'createdAt' | 'updatedAt'>,
+  id?: string,
+) {
+  return apiRequest<{ item: TeacherTimetableEntry }>(
+    `${organizationPath(organizationId)}/teacher-timetable${id ? `/${encodeURIComponent(id)}` : ''}`,
+    { method: id ? 'PATCH' : 'POST', body: JSON.stringify(input) },
+  );
+}
+
+export function deleteTeacherTimetable(organizationId: string, id: string) {
+  return apiRequest<void>(
+    `${organizationPath(organizationId)}/teacher-timetable/${encodeURIComponent(id)}`,
     { method: 'DELETE' },
   );
 }

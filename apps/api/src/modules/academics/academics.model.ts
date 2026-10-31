@@ -14,7 +14,7 @@ const academicYearSchema = new Schema(
     status: {
       type: String,
       enum: ['active', 'archived'] satisfies AcademicYearStatus[],
-      default: 'active',
+      default: 'archived',
       required: true,
     },
   },
@@ -23,6 +23,15 @@ const academicYearSchema = new Schema(
 academicYearSchema.index(
   { organizationId: 1, name: 1 },
   { unique: true, name: 'uniq_academic_year_name' },
+);
+// Database-enforced invariant: no two active years for the same organization.
+academicYearSchema.index(
+  { organizationId: 1 },
+  {
+    unique: true,
+    name: 'uniq_one_active_academic_year_per_organization',
+    partialFilterExpression: { status: 'active' },
+  },
 );
 
 const termSchema = new Schema(
@@ -64,6 +73,8 @@ const classSchema = new Schema(
       uppercase: true,
       maxlength: 30,
     },
+    studyLevel: { type: String, enum: ['first_year', 'second_year', 'other'] },
+    programName: { type: String, trim: true, maxlength: 120 },
   },
   { timestamps: true, versionKey: false },
 );
@@ -110,6 +121,10 @@ const subjectSchema = new Schema(
       maxlength: 30,
     },
     department: { type: String, trim: true, maxlength: 100 },
+    // Empty/missing classIds keeps legacy organization-wide subject behavior.
+    classIds: [
+      { type: Schema.Types.ObjectId, ref: 'AcademicClass', default: [] },
+    ],
   },
   { timestamps: true, versionKey: false },
 );
@@ -158,7 +173,9 @@ teacherAssignmentSchema.index(
     sectionId: 1,
     academicYearId: 1,
   },
-  { unique: true, name: 'uniq_teacher_section_per_year' },
+  // Versioned name avoids colliding with the legacy Atlas index, whose key
+  // omitted subjectId. The legacy index is left untouched for data safety.
+  { unique: true, name: 'uniq_teacher_subject_section_per_year_v2' },
 );
 
 const teacherTimetableSchema = new Schema(

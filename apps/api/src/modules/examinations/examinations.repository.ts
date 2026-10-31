@@ -225,11 +225,20 @@ export class MongoExaminationsRepository implements ExaminationsRepository {
     );
   }
 
-  async validateSubject(organizationId: string, subjectId: string) {
+  async validateSubject(
+    organizationId: string,
+    subjectId: string,
+    classId: string,
+  ) {
     return Boolean(
       await SubjectModel.exists({
         _id: oid(subjectId),
         organizationId: oid(organizationId),
+        $or: [
+          { classIds: { $exists: false } },
+          { classIds: { $size: 0 } },
+          { classIds: oid(classId) },
+        ],
       }),
     );
   }

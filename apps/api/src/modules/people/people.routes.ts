@@ -19,6 +19,7 @@ import {
 } from '../tenancy/tenant-context.middleware.js';
 import { MongoPeopleRepository } from './people.repository.js';
 import { PeopleService } from './people.service.js';
+import type { StudentImportRowInput } from './people.types.js';
 
 function bodyObject(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -29,6 +30,63 @@ function bodyObject(value: unknown): Record<string, unknown> {
     );
   }
   return value as Record<string, unknown>;
+}
+
+const STUDENT_IMPORT_FIELDS = [
+  'firstName',
+  'lastName',
+  'fullName',
+  'preferredName',
+  'dateOfBirth',
+  'gender',
+  'contactEmail',
+  'phone',
+  'status',
+  'guardianName',
+  'guardianPhone',
+  'guardianEmail',
+  'guardianRelationship',
+] as const;
+
+function studentImportRows(value: unknown): StudentImportRowInput[] {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 1000) {
+    throw new AppError(
+      400,
+      'STUDENT_IMPORT_ROW_LIMIT',
+      'Choose between 1 and 1000 student rows to import.',
+    );
+  }
+  return value.map((rawRow) => {
+    const row = bodyObject(rawRow);
+    if (!Number.isInteger(row.rowNumber) || Number(row.rowNumber) < 1) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Every import row must have a positive source row number.',
+      );
+    }
+    const rawData = bodyObject(row.data);
+    const unsupportedField = Object.keys(rawData).find(
+      (field) =>
+        !STUDENT_IMPORT_FIELDS.includes(
+          field as (typeof STUDENT_IMPORT_FIELDS)[number],
+        ),
+    );
+    if (unsupportedField) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'The import contains an unsupported mapped field.',
+      );
+    }
+    const data: Record<string, unknown> = {};
+    for (const field of STUDENT_IMPORT_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(rawData, field)) {
+        data[field] = rawData[field];
+      }
+    }
+    return { rowNumber: Number(row.rowNumber), data };
+  });
 }
 
 function requiredString(
@@ -310,6 +368,44 @@ export function createPeopleRouter(
         organizationContext(response),
       );
       response.status(201).json({ student });
+    }),
+  );
+
+  router.post(
+    '/:organizationId/students/import/preview',
+    authenticate,
+    resolveOrganization,
+    requireOrganizationPermission('student.create'),
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const body = bodyObject(request.body);
+      const rows = studentImportRows(body.rows);
+      const campusId = optionalObjectId(body.campusId, 'campusId');
+      const preview = await service.previewStudentImport(
+        organizationContext(response),
+        rows,
+        campusId,
+      );
+      response.status(200).json(preview);
+    }),
+  );
+
+  router.post(
+    '/:organizationId/students/import',
+    authenticate,
+    resolveOrganization,
+    requireOrganizationPermission('student.create'),
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const body = bodyObject(request.body);
+      const rows = studentImportRows(body.rows);
+      const campusId = optionalObjectId(body.campusId, 'campusId');
+      const result = await service.importStudents(
+        organizationContext(response),
+        rows,
+        campusId,
+      );
+      response.status(200).json(result);
     }),
   );
 

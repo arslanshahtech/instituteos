@@ -23,6 +23,8 @@ import type {
   QuerySummary,
   StaffInput,
   StaffRecord,
+  StudentImportExistingMatch,
+  StudentImportMatchCandidate,
   StudentInput,
   StudentListQuery,
   StudentRecord,
@@ -208,6 +210,239 @@ export class MongoPeopleRepository {
       organizationId,
       String(record._id),
     ) as Promise<StudentRecord>;
+  }
+
+  async createStudentWithGuardian(
+    organizationId: string,
+    input: StudentInput,
+    guardianInput: import('./people.types.js').StudentImportGuardianInput,
+    relationship: import('./people.types.js').GuardianRelationshipType,
+  ): Promise<{
+    student: StudentRecord;
+    guardian: GuardianRecord;
+    guardianCreated: boolean;
+  }> {
+    const session = await mongoose.startSession();
+    let studentId: Types.ObjectId | undefined;
+    let guardianId: Types.ObjectId | undefined;
+    let guardianCreated = false;
+    try {
+      await session.withTransaction(async () => {
+        const [student] = await StudentModel.create(
+          [studentDocumentInput(organizationId, input)],
+          { session },
+        );
+        if (!student)
+          throw new AppError(
+            500,
+            'STUDENT_CREATE_FAILED',
+            'Student could not be created.',
+          );
+        studentId = student._id;
+
+        const normalizedPhone = guardianInput.phone?.replace(/\D/g, '');
+        const normalizedEmail = guardianInput.email?.trim().toLowerCase();
+        const phonePattern = normalizedPhone
+          ? new RegExp(`^${normalizedPhone.split('').join('[^0-9]*')}$`)
+          : undefined;
+        const identityMatches = [
+          ...(phonePattern ? [{ phone: phonePattern }] : []),
+          ...(normalizedEmail ? [{ email: normalizedEmail }] : []),
+        ];
+        const matchedGuardians = identityMatches.length
+          ? await GuardianModel.find({
+              organizationId: idObject(organizationId),
+              $or: identityMatches,
+            }).session(session)
+          : [];
+        const uniqueMatches = new Map(
+          matchedGuardians.map((record) => [String(record._id), record]),
+        );
+        if (uniqueMatches.size > 1) {
+          throw new AppError(
+            409,
+            'GUARDIAN_IDENTITY_CONFLICT',
+            'Guardian phone and email match different existing records. Review guardian details before importing.',
+          );
+        }
+        let guardian = [...uniqueMatches.values()][0] ?? null;
+        if (guardian) {
+          const sameName =
+            String(guardian.firstName).trim().toLocaleLowerCase() ===
+              guardianInput.firstName.trim().toLocaleLowerCase() &&
+            String(guardian.lastName).trim().toLocaleLowerCase() ===
+              guardianInput.lastName.trim().toLocaleLowerCase();
+          const phoneConflict =
+            normalizedPhone &&
+            guardian.phone &&
+            String(guardian.phone).replace(/\D/g, '') !== normalizedPhone;
+          const emailConflict =
+            normalizedEmail &&
+            guardian.email &&
+            String(guardian.email).trim().toLowerCase() !== normalizedEmail;
+          if (!sameName || phoneConflict || emailConflict) {
+            throw new AppError(
+              409,
+              'GUARDIAN_DETAILS_CONFLICT',
+              'Guardian contact details match an existing record with different identity details. Review the row before importing.',
+            );
+          }
+          const updates: Record<string, unknown> = {};
+          if (normalizedPhone && !guardian.phone)
+            updates.phone = normalizedPhone;
+          if (normalizedEmail && !guardian.email)
+            updates.email = normalizedEmail;
+          if (guardianInput.address && !guardian.address) {
+            updates.address = guardianInput.address;
+          }
+          if (Object.keys(updates).length > 0) {
+            guardian = await GuardianModel.findOneAndUpdate(
+              { _id: guardian._id, organizationId: idObject(organizationId) },
+              { $set: updates },
+              { new: true, session },
+            );
+          }
+        } else {
+          const [createdGuardian] = await GuardianModel.create(
+            [
+              {
+                organizationId: idObject(organizationId),
+                firstName: guardianInput.firstName,
+                lastName: guardianInput.lastName,
+                relationship,
+                phone: normalizedPhone,
+                email: normalizedEmail,
+                communicationPreference:
+                  guardianInput.communicationPreference ?? 'email',
+                address: guardianInput.address,
+              },
+            ],
+            { session },
+          );
+          guardian = createdGuardian ?? null;
+          guardianCreated = Boolean(createdGuardian);
+        }
+        if (!guardian)
+          throw new AppError(
+            500,
+            'GUARDIAN_CREATE_FAILED',
+            'Guardian could not be created or matched.',
+          );
+        guardianId = guardian._id;
+
+        await StudentGuardianLinkModel.create(
+          [
+            {
+              organizationId: idObject(organizationId),
+              studentId: student._id,
+              guardianId: guardian._id,
+              relationship,
+              isPrimary: true,
+            },
+          ],
+          { session },
+        );
+        await StudentModel.updateOne(
+          { _id: student._id, organizationId: idObject(organizationId) },
+          { $addToSet: { guardianIds: guardian._id } },
+          { session },
+        );
+      });
+    } finally {
+      await session.endSession();
+    }
+    if (!studentId || !guardianId)
+      throw new AppError(
+        500,
+        'STUDENT_IMPORT_FAILED',
+        'Student and guardian could not be created.',
+      );
+    const [student, guardian] = await Promise.all([
+      this.getStudent(organizationId, String(studentId)),
+      this.getGuardian(organizationId, String(guardianId)),
+    ]);
+    if (!student || !guardian)
+      throw new AppError(
+        500,
+        'STUDENT_IMPORT_FAILED',
+        'Imported records could not be loaded.',
+      );
+    return { student, guardian, guardianCreated };
+  }
+
+  async findStudentImportDuplicates(
+    organizationId: string,
+    candidates: StudentImportMatchCandidate[],
+  ): Promise<StudentImportExistingMatch[]> {
+    const matchingClauses: Record<string, unknown>[] = [];
+    for (const candidate of candidates) {
+      const nameMatch = {
+        firstName: {
+          $regex: `^${escapeRegex(candidate.firstName.trim())}$`,
+          $options: 'i',
+        },
+        lastName: {
+          $regex: `^${escapeRegex(candidate.lastName.trim())}$`,
+          $options: 'i',
+        },
+      };
+      if (candidate.dateOfBirth) {
+        matchingClauses.push({
+          ...nameMatch,
+          dateOfBirth: new Date(`${candidate.dateOfBirth}T00:00:00.000Z`),
+        });
+        if (candidate.phone) {
+          // Match a reliable phone only when the existing DOB is missing, not contradictory.
+          matchingClauses.push({
+            ...nameMatch,
+            dateOfBirth: null,
+            phone: candidate.phone.trim(),
+          });
+        }
+      } else if (candidate.phone) {
+        matchingClauses.push({ ...nameMatch, phone: candidate.phone.trim() });
+      } else {
+        // No stable identifier is available, so flag exact-name matches for review.
+        matchingClauses.push(nameMatch);
+      }
+    }
+    if (matchingClauses.length === 0) return [];
+
+    const found = new Map<string, StudentImportExistingMatch>();
+    // Chunk large imports so one preview cannot create an unbounded Mongo query.
+    for (let start = 0; start < matchingClauses.length; start += 100) {
+      const records = await StudentModel.find({
+        organizationId: idObject(organizationId),
+        $or: matchingClauses.slice(start, start + 100),
+      })
+        .select('firstName lastName dateOfBirth phone')
+        .lean();
+      for (const record of records) {
+        const id = String(record._id);
+        found.set(id, {
+          id,
+          firstName: String(record.firstName),
+          lastName: String(record.lastName),
+          dateOfBirth: record.dateOfBirth
+            ? new Date(record.dateOfBirth).toISOString().slice(0, 10)
+            : undefined,
+          phone: record.phone ? String(record.phone) : undefined,
+        });
+      }
+    }
+    return [...found.values()];
+  }
+
+  async campusBelongsToOrganization(
+    organizationId: string,
+    campusId: string,
+  ): Promise<boolean> {
+    return Boolean(
+      await CampusModel.exists({
+        _id: idObject(campusId),
+        organizationId: idObject(organizationId),
+      }),
+    );
   }
 
   async updateStudent(

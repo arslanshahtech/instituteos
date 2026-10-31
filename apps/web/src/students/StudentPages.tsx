@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Download, Plus, Upload } from 'lucide-react';
 import {
   WorkspacePageHeading,
   WorkspaceSearchField,
@@ -30,7 +31,12 @@ import { StudentGuardiansSection } from '../guardians/GuardianPages.js';
 import { getGuardian } from '../guardians/guardians-api.js';
 import { listStudentAttendance } from '../attendance/attendance-api.js';
 import { ChildPickupPanel } from './ChildPickupPanel.js';
-import type { StudentInput, StudentStatus } from './students-api.js';
+import { listStudents } from './students-api.js';
+import type {
+  StudentInput,
+  StudentStatus,
+  StudentRecord,
+} from './students-api.js';
 import {
   useCreateStudent,
   useStudent,
@@ -39,6 +45,34 @@ import {
 } from './student-queries.js';
 
 const PAGE_SIZE = 20;
+const EXPORT_PAGE_SIZE = 100;
+const MAX_EXPORT_STUDENTS = 10_000;
+
+function csvCell(value: unknown): string {
+  let text = value === undefined || value === null ? '' : String(value);
+  // Prevent spreadsheet formula execution when staff opens exported CSV files.
+  if (/^\s*[=+@-]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function studentCsv(students: StudentRecord[]): string {
+  const columns: Array<[string, (student: StudentRecord) => unknown]> = [
+    ['First name', (student) => student.firstName],
+    ['Last name', (student) => student.lastName],
+    ['Preferred name', (student) => student.preferredName],
+    ['Date of birth', (student) => student.dateOfBirth?.slice(0, 10)],
+    ['Gender', (student) => student.gender],
+    ['Email', (student) => student.contactEmail],
+    ['Phone', (student) => student.phone],
+    ['Status', (student) => student.status],
+  ];
+  return [
+    columns.map(([label]) => csvCell(label)).join(','),
+    ...students.map((student) =>
+      columns.map(([, getValue]) => csvCell(getValue(student))).join(','),
+    ),
+  ].join('\r\n');
+}
 
 function apiMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
@@ -163,6 +197,8 @@ export function StudentsListPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<StudentStatus | ''>('');
   const [page, setPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
+  const { showToast } = useToast();
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -179,6 +215,55 @@ export function StudentsListPage() {
   );
   const canCreate =
     access.data?.permissions.includes('student.create') ?? false;
+  const exportStudents = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const firstPage = await listStudents(organizationId, {
+        search: search || undefined,
+        status: status || undefined,
+        page: 1,
+        pageSize: EXPORT_PAGE_SIZE,
+      });
+      if (firstPage.total > MAX_EXPORT_STUDENTS) {
+        showToast(
+          `Export is limited to ${MAX_EXPORT_STUDENTS.toLocaleString()} matching students. Narrow the search and try again.`,
+          'info',
+        );
+        return;
+      }
+      const allStudents = [...firstPage.items];
+      for (
+        let currentPage = 2;
+        currentPage <= Math.ceil(firstPage.total / EXPORT_PAGE_SIZE);
+        currentPage += 1
+      ) {
+        const result = await listStudents(organizationId, {
+          search: search || undefined,
+          status: status || undefined,
+          page: currentPage,
+          pageSize: EXPORT_PAGE_SIZE,
+        });
+        allStudents.push(...result.items);
+      }
+      const blob = new Blob([`\uFEFF${studentCsv(allStudents)}`], {
+        type: 'text/csv;charset=utf-8',
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `students-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      showToast(`Exported ${allStudents.length} student record(s).`);
+    } catch (error) {
+      showToast(apiMessage(error), 'info');
+    } finally {
+      setIsExporting(false);
+    }
+  };
   const canReadFinance =
     access.data?.permissions.includes('finance.read') ?? false;
   const invoices = useQuery({
@@ -292,14 +377,38 @@ export function StudentsListPage() {
               ]}
               value={status}
             />
-            {canCreate && (
-              <Link
-                className="button button-primary student-add-button"
-                to={`/admin/organizations/${encodeURIComponent(organizationId)}/students/new`}
+            <div
+              className="student-directory-actions"
+              aria-label="Student actions"
+            >
+              <button
+                className="button button-secondary"
+                disabled={isExporting || !students.data?.total}
+                onClick={() => void exportStudents()}
+                type="button"
               >
-                + Add Student
-              </Link>
-            )}
+                <Download size={15} aria-hidden="true" />
+                {isExporting ? 'Exporting…' : 'Export Students'}
+              </button>
+              {canCreate && (
+                <>
+                  <Link
+                    className="button button-secondary"
+                    to={`/admin/organizations/${encodeURIComponent(organizationId)}/students/import`}
+                  >
+                    <Upload size={15} aria-hidden="true" />
+                    Import Students
+                  </Link>
+                  <Link
+                    className="button button-primary student-add-button"
+                    to={`/admin/organizations/${encodeURIComponent(organizationId)}/students/new`}
+                  >
+                    <Plus size={16} aria-hidden="true" />
+                    Add Student
+                  </Link>
+                </>
+              )}
+            </div>
           </WorkspaceModuleToolbar>
           {students.isPending ? (
             <LoadingState message="Loading students…" />

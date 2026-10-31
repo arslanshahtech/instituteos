@@ -103,6 +103,11 @@ const StudentsListPage = lazy(() =>
     default: module.StudentsListPage,
   })),
 );
+const StudentImportPage = lazy(() =>
+  import('../students/StudentImportPage.js').then((module) => ({
+    default: module.StudentImportPage,
+  })),
+);
 const GuardianCreatePage = lazy(() =>
   import('../guardians/GuardianPages.js').then((module) => ({
     default: module.GuardianCreatePage,
@@ -338,6 +343,10 @@ const roleRoutes: RouteObject[] = [
       {
         path: 'organizations/:organizationId/students',
         element: <StudentsListPage />,
+      },
+      {
+        path: 'organizations/:organizationId/students/import',
+        element: <StudentImportPage />,
       },
       {
         path: 'organizations/:organizationId/students/new',
