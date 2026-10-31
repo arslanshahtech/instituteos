@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '../components/ui/Button.js';
 import { LoadingState } from '../components/ui/States.js';
-import { useStudentFeeLedger } from './finance-queries.js';
+import {
+  useSetStudentPreviousDues,
+  useStudentFeeLedger,
+} from './finance-queries.js';
 import type { StudentLedgerEntry } from './finance-api.js';
 
 interface StudentFeeLedgerModalProps {
@@ -10,6 +13,7 @@ interface StudentFeeLedgerModalProps {
   studentName?: string;
   isOpen: boolean;
   onClose: () => void;
+  canWrite?: boolean;
 }
 
 export function StudentFeeLedgerModal({
@@ -18,15 +22,25 @@ export function StudentFeeLedgerModal({
   studentName,
   isOpen,
   onClose,
+  canWrite = true,
 }: StudentFeeLedgerModalProps) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
+  const [duesInput, setDuesInput] = useState('');
+  const [duesMessage, setDuesMessage] = useState<string | null>(null);
+  const setPreviousDues = useSetStudentPreviousDues(organizationId);
 
   const {
     data: ledger,
     isLoading,
     isError,
   } = useStudentFeeLedger(organizationId, studentId, isOpen);
+
+  useEffect(() => {
+    if (ledger) {
+      setDuesInput(String(ledger.previousDues ?? 0));
+    }
+  }, [ledger]);
 
   if (!isOpen) return null;
 
@@ -38,12 +52,8 @@ export function StudentFeeLedgerModal({
 
   const formatReference = (ref: string) => {
     if (!ref) return '—';
-    if (ref.length <= 15) return ref;
-    const parts = ref.split('-');
-    if (parts.length >= 2) {
-      return `${parts[0]}-${parts[1].slice(0, 8)}…`;
-    }
-    return `${ref.slice(0, 12)}…`;
+    if (ref.length <= 18) return ref;
+    return `${ref.slice(0, 8)}…${ref.slice(-4)}`;
   };
 
   const cleanDescription = (desc: string) => {
@@ -176,6 +186,72 @@ export function StudentFeeLedgerModal({
                     {formatMoney(ledger.outstandingBalance)}
                   </div>
                 </div>
+              </div>
+
+              {/* Previous dues */}
+              <div
+                style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '0.75rem',
+                  padding: '1rem',
+                  marginBottom: '1rem',
+                }}
+              >
+                <div style={{ fontWeight: 700 }}>
+                  Previous dues (pehla baqaya):{' '}
+                  {formatMoney(ledger.previousDues ?? 0)}
+                </div>
+                <p style={{ color: '#64748b', margin: '0.25rem 0 0.75rem' }}>
+                  Ye raqam agli nayi invoice me arrears ke tor par shamil
+                  hogi. Invoice banne par ye khatam ho jayegi.
+                </p>
+                {canWrite && (
+                  <form
+                    onSubmit={async (event) => {
+                      event.preventDefault();
+                      const amount = Number(duesInput);
+                      if (!Number.isFinite(amount) || amount < 0) {
+                        setDuesMessage('Enter a valid amount of zero or more.');
+                        return;
+                      }
+                      try {
+                        await setPreviousDues.mutateAsync({
+                          studentId,
+                          amount,
+                        });
+                        setDuesMessage('Previous dues saved.');
+                      } catch {
+                        setDuesMessage('Could not save previous dues.');
+                      }
+                    }}
+                    style={{
+                      display: 'flex',
+                      gap: '0.5rem',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <label>
+                      Previous dues (Rs.){' '}
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={duesInput}
+                        onChange={(event) => setDuesInput(event.target.value)}
+                        style={{
+                          padding: '0.4rem',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '0.375rem',
+                        }}
+                      />
+                    </label>
+                    <Button type="submit" disabled={setPreviousDues.isPending}>
+                      Save previous dues
+                    </Button>
+                    {duesMessage && <span role="status">{duesMessage}</span>}
+                  </form>
+                )}
               </div>
 
               {/* Desktop Balanced Table View */}

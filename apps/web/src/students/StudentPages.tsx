@@ -26,6 +26,10 @@ import { getOrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import type { OrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import { listInvoices } from '../finance/finance-api.js';
 import type { StudentInvoice } from '../finance/finance-api.js';
+import {
+  useSetStudentPreviousDues,
+  useStudentFeeLedger,
+} from '../finance/finance-queries.js';
 import { StudentForm } from './StudentForm.js';
 import { StudentGuardiansSection } from '../guardians/GuardianPages.js';
 import { getGuardian } from '../guardians/guardians-api.js';
@@ -634,6 +638,116 @@ export function StudentCreatePage() {
   );
 }
 
+function StudentPreviousDuesSection({
+  organizationId,
+  studentId,
+  canWrite,
+}: {
+  organizationId: string;
+  studentId: string;
+  canWrite: boolean;
+}) {
+  const [duesInput, setDuesInput] = useState('');
+  const [duesMessage, setDuesMessage] = useState<string | null>(null);
+  const ledger = useStudentFeeLedger(organizationId, studentId);
+  const setPreviousDues = useSetStudentPreviousDues(organizationId);
+
+  useEffect(() => {
+    if (ledger.data) {
+      setDuesInput(String(ledger.data.previousDues ?? 0));
+    }
+  }, [ledger.data]);
+
+  const formatMoney = (val: number) =>
+    `Rs. ${Number(val || 0).toLocaleString('en-PK', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+  return (
+    <section className="student-detail-panel panel">
+      <div className="student-detail-heading">
+        <h2>Fee dues</h2>
+      </div>
+      {ledger.isPending ? (
+        <LoadingState message="Loading fee dues…" />
+      ) : ledger.isError || !ledger.data ? (
+        <p role="alert" style={{ color: '#b91c1c' }}>
+          Fee dues could not be loaded for this student.
+        </p>
+      ) : (
+        <>
+          <dl className="student-details">
+            <div>
+              <dt>Previous dues (pehla baqaya)</dt>
+              <dd>{formatMoney(ledger.data.previousDues ?? 0)}</dd>
+            </div>
+            <div>
+              <dt>Total outstanding (kul baqaya)</dt>
+              <dd>{formatMoney(ledger.data.outstandingBalance)}</dd>
+            </div>
+          </dl>
+          <p>
+            Previous dues agli nayi invoice me shamil honge. Invoice banne
+            ke baad baqaya us invoice me rehta hai jab tak poori payment na
+            ho jaye. Invoice delete hone par bacha hua baqaya wapas previous
+            dues me aa jata hai.
+          </p>
+          {canWrite && (
+            <form
+              onSubmit={async (event) => {
+                event.preventDefault();
+                const amount = Number(duesInput);
+                if (!Number.isFinite(amount) || amount < 0) {
+                  setDuesMessage('Enter a valid amount of zero or more.');
+                  return;
+                }
+                try {
+                  await setPreviousDues.mutateAsync({ studentId, amount });
+                  setDuesMessage('Previous dues saved.');
+                } catch {
+                  setDuesMessage('Could not save previous dues.');
+                }
+              }}
+              style={{
+                display: 'flex',
+                gap: '0.5rem',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                marginTop: '1rem',
+              }}
+            >
+              <label>
+                Previous dues (Rs.){' '}
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={duesInput}
+                  onChange={(event) => setDuesInput(event.target.value)}
+                  style={{
+                    padding: '0.4rem',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '0.375rem',
+                  }}
+                />
+              </label>
+              <button
+                className="button button-primary"
+                type="submit"
+                disabled={setPreviousDues.isPending}
+              >
+                Save previous dues
+              </button>
+              {duesMessage && <span role="status">{duesMessage}</span>}
+            </form>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export function StudentDetailPage() {
   const { organizationId = '', studentId = '' } = useParams();
   const access = useOrganizationAccess(organizationId);
@@ -770,6 +884,14 @@ export function StudentDetailPage() {
           )}
         </dl>
       </section>
+
+      {access.data.permissions.includes('finance.read') && (
+        <StudentPreviousDuesSection
+          organizationId={organizationId}
+          studentId={studentId}
+          canWrite={access.data.permissions.includes('finance.write')}
+        />
+      )}
 
       {access.data.permissions.includes('guardian.read') && (
         <StudentGuardiansSection

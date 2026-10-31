@@ -377,6 +377,10 @@ export class FinanceService {
       context.organizationId,
       input,
     );
+    const previousDues = await this.repository.getStudentsPreviousDues(
+      context.organizationId,
+      studentIds,
+    );
     const invoices = await this.repository.createInvoices(
       context.organizationId,
       input,
@@ -384,12 +388,55 @@ export class FinanceService {
       studentIds,
       issueDate,
       totalCents / 100,
+      previousDues,
     );
+    const consumptions = invoices
+      .filter((invoice) => (invoice.arrearsAmount ?? 0) > 0)
+      .map((invoice) => ({
+        studentId: invoice.studentId,
+        amount: invoice.arrearsAmount ?? 0,
+      }));
+    if (consumptions.length) {
+      await this.repository.consumeStudentPreviousDues(
+        context.organizationId,
+        consumptions,
+      );
+    }
     return {
       createdCount: invoices.length,
       skippedCount: studentIds.length - invoices.length,
       invoices,
     };
+  }
+
+  async setStudentPreviousDues(
+    context: FinanceContext,
+    rawStudentId: string,
+    rawAmount: unknown,
+  ): Promise<{ studentId: string; previousDues: number }> {
+    const studentId = objectId(rawStudentId, 'student');
+    if (typeof rawAmount !== 'number') {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Enter a valid previous dues amount with no more than two decimal places.',
+      );
+    }
+    const cents = moneyCents(rawAmount, 'previous dues');
+    const amount = cents / 100;
+    const existing = await this.repository.getStudentPreviousDues(
+      context.organizationId,
+      studentId,
+    );
+    if (existing === null) {
+      throw new AppError(404, 'RESOURCE_NOT_FOUND', 'Student not found.');
+    }
+    const previousDues = await this.repository.setStudentPreviousDues(
+      context.organizationId,
+      studentId,
+      amount,
+    );
+    return { studentId, previousDues };
   }
 
   async recordPayment(

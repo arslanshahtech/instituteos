@@ -171,6 +171,7 @@ export interface FinanceRepository {
     studentIds: string[],
     issueDate: string,
     totalAmount: number,
+    arrearsByStudent: Record<string, number>,
   ): Promise<StudentInvoiceRecord[]>;
   recordPayment(
     organizationId: string,
@@ -216,6 +217,27 @@ export interface FinanceRepository {
     invoiceId: string,
     applyDiscount: boolean,
   ): Promise<StudentInvoiceRecord | null>;
+
+  getStudentPreviousDues(
+    organizationId: string,
+    studentId: string,
+  ): Promise<number | null>;
+
+  getStudentsPreviousDues(
+    organizationId: string,
+    studentIds: string[],
+  ): Promise<Record<string, number>>;
+
+  setStudentPreviousDues(
+    organizationId: string,
+    studentId: string,
+    amount: number,
+  ): Promise<number>;
+
+  consumeStudentPreviousDues(
+    organizationId: string,
+    consumptions: Array<{ studentId: string; amount: number }>,
+  ): Promise<void>;
 }
 
 export interface InvoiceDeleteOtpChallenge {
@@ -244,5 +266,6 @@ export interface StudentLedgerSummary {
   totalBilled: number;
   totalPaid: number;
   outstandingBalance: number;
+  previousDues: number;
   entries: StudentLedgerEntry[];
 }

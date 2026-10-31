@@ -18,6 +18,7 @@ import {
   requestInvoiceDeleteOtp,
   deleteInvoice,
   setInvoiceDiscount,
+  setStudentPreviousDues,
   listFinancePayments,
   listFinanceExpenses,
   listFinanceExpenseBudgets,
@@ -196,6 +197,15 @@ export function useRecordInvoicePayment(organizationId: string) {
       invoiceId: string;
       data: Parameters<typeof recordInvoicePayment>[2];
     }) => recordInvoicePayment(organizationId, input.invoiceId, input.data),
+    onSuccess: invalidate,
+  });
+}
+
+export function useSetStudentPreviousDues(organizationId: string) {
+  const invalidate = useInvalidateFinance(organizationId);
+  return useMutation({
+    mutationFn: (input: { studentId: string; amount: number }) =>
+      setStudentPreviousDues(organizationId, input.studentId, input.amount),
     onSuccess: invalidate,
   });
 }

@@ -392,6 +392,23 @@ export function createFinanceRouter(
     }),
   );
 
+  router.post(
+    `${base}/students/:studentId/previous-dues`,
+    ...write,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const studentId = objectId(request.params.studentId, 'student');
+      const amount = bodyObject(request.body).amount;
+      response.status(200).json(
+        await service.setStudentPreviousDues(
+          organizationContext(response),
+          studentId,
+          amount,
+        ),
+      );
+    }),
+  );
+
   router.get(
     `${base}/students/:studentId/concessions`,
     ...read,

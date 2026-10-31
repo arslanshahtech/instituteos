@@ -63,6 +63,7 @@ const studentSchema = new Schema(
     guardianIds: [
       { type: Schema.Types.ObjectId, ref: 'Guardian', default: [] },
     ],
+    previousDues: { type: Number, default: 0 },
   },
   { timestamps: true, versionKey: false },
 );

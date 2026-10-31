@@ -90,6 +90,7 @@ export interface StudentLedgerSummary {
   totalBilled: number;
   totalPaid: number;
   outstandingBalance: number;
+  previousDues: number;
   entries: StudentLedgerEntry[];
 }
 
@@ -228,6 +229,20 @@ export function recordInvoicePayment(
 export function getStudentFeeLedger(organizationId: string, studentId: string) {
   return apiRequest<StudentLedgerSummary>(
     `${financePath(organizationId)}/students/${encodeURIComponent(studentId)}/ledger`,
+  );
+}
+
+export function setStudentPreviousDues(
+  organizationId: string,
+  studentId: string,
+  amount: number,
+) {
+  return apiRequest<{ studentId: string; previousDues: number }>(
+    `${financePath(organizationId)}/students/${encodeURIComponent(studentId)}/previous-dues`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ amount }),
+    },
   );
 }
 

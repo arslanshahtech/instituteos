@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowUpRight,
   Banknote,
@@ -52,16 +53,17 @@ import {
   useSaveFeeStructure,
   useSaveFinanceExpenseBudget,
 } from './finance-queries.js';
+import { getOrganizationDashboard } from '../organizations/organizations-api.js';
 import { StudentFeeLedgerModal } from './StudentFeeLedgerModal.js';
 import { StudentConcessionModal } from './StudentConcessionModal.js';
 
 const tabs = [
   'All',
-  'Fee Collection',
+  'Fee Structures',
   'Invoices',
   'Payments',
   'Expenses',
-  'Ledger (Laser)',
+  'Ledger',
   'Concessions',
 ] as const;
 type WorkspaceTab = (typeof tabs)[number];
@@ -308,6 +310,7 @@ function handlePrintReceipt(
     paymentMethod: PaymentMethod;
     paymentDate: string;
   },
+  orgName?: string,
 ) {
   const remaining = Math.max(0, invoice.totalAmount - invoice.paidAmount);
 
@@ -320,7 +323,11 @@ function handlePrintReceipt(
       <style>
         * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { padding: 30px; margin: 0; background: #ffffff; color: #0f172a; }
-        .receipt-card { border: 2px solid #0f172a; border-radius: 8px; padding: 24px; max-width: 520px; margin: 0 auto; }
+        .receipt-card { border: 1px solid #cbd5e1; border-radius: 12px; padding: 28px; max-width: 520px; margin: 0 auto; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12); }
+        @media print {
+          body { padding: 0; }
+          .receipt-card { max-width: 100%; border: 1px solid #0f172a; border-radius: 0; box-shadow: none; }
+        }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px; }
         .header h2 { margin: 0; font-size: 20px; color: #0f172a; }
         .badge { padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
@@ -341,7 +348,7 @@ function handlePrintReceipt(
     <body>
       <div class="receipt-card">
         <div class="header">
-          <h2>InstituteOS ${payment ? 'Payment Receipt' : 'Fee Statement'}</h2>
+          <h2>${orgName ?? 'InstituteOS'} ${payment ? 'Payment Receipt' : 'Fee Statement'}</h2>
           <span class="badge ${invoice.status}">${invoice.status}</span>
         </div>
         <div class="meta-grid">
@@ -441,6 +448,14 @@ export function FinanceDashboard() {
   const campuses = academics.campuses.data?.campuses ?? [];
   const years = academics.years.data?.items ?? [];
   const classes = academics.classes.data?.items ?? [];
+  const organizationProfile = useQuery({
+    queryKey: ['organization-dashboard', organizationId],
+    queryFn: () => getOrganizationDashboard(organizationId),
+    enabled: Boolean(organizationId),
+    retry: false,
+  });
+  const organizationName =
+    organizationProfile.data?.organization.name ?? null;
   const [tab, setTab] = useState<Tab>('All');
   const [campusFilter, setCampusFilter] = useState('');
   const [classFilter, setClassFilter] = useState('');
@@ -657,6 +672,17 @@ export function FinanceDashboard() {
       credit: expense.amount,
       account: expense.paymentMethod === 'cash' ? 'Cash in Hand' : 'Bank',
     })),
+    ...visibleInvoices
+      .filter((invoice) => invoice.totalAmount > invoice.paidAmount)
+      .map((invoice) => ({
+        id: `invoice-${invoice.id}`,
+        date: invoice.issueDate,
+        description: `Invoice ${invoice.invoiceNumber} — ${invoice.studentName} (outstanding)`,
+        reference: invoice.invoiceNumber,
+        debit: Math.max(0, invoice.totalAmount - invoice.paidAmount),
+        credit: 0,
+        account: 'Fee Income',
+      })),
   ]
     .filter((entry) => {
       if (ledgerAccountFilter === 'All Accounts') return true;
@@ -1368,16 +1394,16 @@ export function FinanceDashboard() {
             aria-current={
               tab === item ||
               (tab === 'Create invoices' && item === 'Invoices') ||
-              (tab === 'Fee setup' && item === 'Fee Collection')
+              (tab === 'Fee setup' && item === 'Fee Structures')
                 ? 'page'
                 : undefined
             }
-            className={`finance-tab${tab === item || (tab === 'Create invoices' && item === 'Invoices') || (tab === 'Fee setup' && item === 'Fee Collection') ? ' finance-tab-active' : ''}`}
+            className={`finance-tab${tab === item || (tab === 'Create invoices' && item === 'Invoices') || (tab === 'Fee setup' && item === 'Fee Structures') ? ' finance-tab-active' : ''}`}
             key={item}
             onClick={() => setTab(item)}
             type="button"
           >
-            {item === 'Ledger (Laser)' ? 'Ledger (Laser)' : item}
+            {item}
             {item === 'All' && allTransactions.length > 0 && (
               <span className="finance-tab-count">
                 {allTransactions.length}
@@ -1732,7 +1758,7 @@ export function FinanceDashboard() {
                           Receipt
                         </Button>
                       ) : (
-                        <span className="finance-muted-action">?</span>
+                        <span className="finance-muted-action">—</span>
                       )}
                     </td>
                   </tr>
@@ -1749,11 +1775,11 @@ export function FinanceDashboard() {
         </section>
       )}
 
-      {tab === 'Fee Collection' && (
+      {tab === 'Fee Structures' && (
         <section className="finance-section" aria-label="Fee collection">
           <div className="finance-section-heading">
             <div>
-              <h2>Fee collection</h2>
+              <h2>Fee structures</h2>
               <p>Review fee plans currently configured for your classes.</p>
             </div>
             <Button onClick={() => setTab('Fee setup')} type="button">
@@ -2125,14 +2151,14 @@ export function FinanceDashboard() {
         </section>
       )}
 
-      {tab === 'Ledger (Laser)' && (
+      {tab === 'Ledger' && (
         <section className="finance-section" aria-label="Financial ledger">
           <div className="finance-section-heading">
             <div>
               <h2>General ledger</h2>
               <p>
-                Chronological cash movement from recorded fee payments and
-                expenses.
+                Chronological movement from fee payments, outstanding invoices
+                and expenses.
               </p>
             </div>
             <div className="finance-section-heading-actions">
@@ -2223,7 +2249,7 @@ export function FinanceDashboard() {
             {!ledgerRows.length && (
               <EmptyState
                 title="Ledger is empty"
-                description="Record a fee payment or expense to begin the general ledger."
+                description="Record a fee payment, invoice or expense to begin the general ledger."
               />
             )}
           </div>
@@ -2518,13 +2544,6 @@ export function FinanceDashboard() {
                         Receipt
                       </Button>
                       <Button
-                        variant="quiet"
-                        onClick={() => openInvoiceReceipt(row)}
-                        title="Open printable receipt / PDF view"
-                      >
-                        PDF
-                      </Button>
-                      <Button
                         disabled={!row.guardianPhone || row.status === 'paid'}
                         variant="quiet"
                         onClick={() => handleInvoiceReminder(row)}
@@ -2614,13 +2633,6 @@ export function FinanceDashboard() {
                       onClick={() => openInvoiceReceipt(invoice)}
                     >
                       Receipt
-                    </Button>
-                    <Button
-                      variant="quiet"
-                      onClick={() => openInvoiceReceipt(invoice)}
-                      title="Open printable receipt / PDF view"
-                    >
-                      PDF
                     </Button>
                     <Button
                       disabled={
@@ -3411,14 +3423,14 @@ export function FinanceDashboard() {
             <div className="finance-receipt-card" id="printable-fee-receipt">
               <div className="finance-receipt-header">
                 <h3>
-                  InstituteOS{' '}
+                  {organizationName ?? 'InstituteOS'}{' '}
                   {receiptPayment ? 'Payment Receipt' : 'Fee Statement'}
                 </h3>
                 <span className="finance-receipt-tag">
                   {statusLabels[receiptInvoice.status]}
                 </span>
               </div>
-              <hr style={{ margin: '0.75rem 0', opacity: 0.2 }} />
+              <hr style={{ margin: '1rem 0', opacity: 0.2 }} />
               <div className="finance-receipt-meta">
                 <div>
                   <strong>Invoice:</strong> {receiptInvoice.invoiceNumber}
@@ -3455,7 +3467,7 @@ export function FinanceDashboard() {
                   {new Date(receiptInvoice.dueDate).toLocaleDateString()}
                 </div>
               </div>
-              <hr style={{ margin: '0.75rem 0', opacity: 0.2 }} />
+              <hr style={{ margin: '1rem 0', opacity: 0.2 }} />
               <table
                 style={{
                   width: '100%',
@@ -3468,7 +3480,7 @@ export function FinanceDashboard() {
                   receiptInvoice.discountAmount > 0 ? (
                     <>
                       <tr>
-                        <td style={{ padding: '0.35rem 0', color: '#64748b' }}>
+                        <td style={{ padding: '0.5rem 0', color: '#64748b' }}>
                           Base Fee:
                         </td>
                         <td style={{ textAlign: 'right', color: '#64748b' }}>
@@ -3480,7 +3492,7 @@ export function FinanceDashboard() {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ padding: '0.35rem 0', color: '#16a34a' }}>
+                        <td style={{ padding: '0.5rem 0', color: '#16a34a' }}>
                           Discount (
                           {receiptInvoice.discountReason || 'Concession'}):
                         </td>
@@ -3497,14 +3509,14 @@ export function FinanceDashboard() {
                     </>
                   ) : null}
                   <tr>
-                    <td style={{ padding: '0.35rem 0' }}>Net Total Billed:</td>
+                    <td style={{ padding: '0.5rem 0' }}>Net Total Billed:</td>
                     <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
                       Rs. {amountText(receiptInvoice.totalAmount)}
                     </td>
                   </tr>
                   {receiptPayment && (
                     <tr>
-                      <td style={{ padding: '0.35rem 0', color: '#10b981' }}>
+                      <td style={{ padding: '0.5rem 0', color: '#10b981' }}>
                         This payment:
                       </td>
                       <td
@@ -3519,7 +3531,7 @@ export function FinanceDashboard() {
                     </tr>
                   )}
                   <tr>
-                    <td style={{ padding: '0.35rem 0', color: '#10b981' }}>
+                    <td style={{ padding: '0.5rem 0', color: '#10b981' }}>
                       Total paid:
                     </td>
                     <td
@@ -3581,6 +3593,7 @@ export function FinanceDashboard() {
                     receiptInvoice,
                     className(receiptInvoice.classId, classes),
                     receiptPayment ?? undefined,
+                    organizationName ?? undefined,
                   )
                 }
               >
@@ -3608,6 +3621,7 @@ export function FinanceDashboard() {
           studentName={ledgerStudent.name}
           isOpen={Boolean(ledgerStudent)}
           onClose={() => setLedgerStudent(null)}
+          canWrite={canWrite}
         />
       )}
 

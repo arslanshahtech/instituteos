@@ -421,6 +421,7 @@ export class MongoFinanceRepository implements FinanceRepository {
     studentIds: string[],
     issueDate: string,
     totalAmount: number,
+    arrearsByStudent: Record<string, number>,
   ): Promise<StudentInvoiceRecord[]> {
     if (!studentIds.length) return [];
     const existing = await StudentInvoiceModel.find({
@@ -497,7 +498,8 @@ export class MongoFinanceRepository implements FinanceRepository {
     const documents = targetStudentIds.map((studentId, index) => {
       const conc = concessionMap.get(studentId);
       const discount = conc ? conc.discountAmount : 0;
-      const netTotal = Math.max(0, totalAmount - discount);
+      const arrears = Math.max(0, arrearsByStudent[studentId] ?? 0);
+      const netTotal = Math.max(0, totalAmount + arrears - discount);
 
       return {
         organizationId: oid(organizationId),
@@ -512,7 +514,7 @@ export class MongoFinanceRepository implements FinanceRepository {
         currentAmount: money(totalAmount),
         discountAmount: money(discount),
         discountReason: conc ? conc.reason : undefined,
-        arrearsAmount: money(0),
+        arrearsAmount: money(arrears),
         totalAmount: money(netTotal),
         paidAmount: money(0),
         status: netTotal === 0 ? 'paid' : status,
@@ -524,6 +526,70 @@ export class MongoFinanceRepository implements FinanceRepository {
     return created.map((record) =>
       invoiceRecord(record.toObject() as Record<string, unknown>),
     );
+  }
+
+  async getStudentPreviousDues(
+    organizationId: string,
+    studentId: string,
+  ): Promise<number | null> {
+    const student = await StudentModel.findOne({
+      _id: oid(studentId),
+      organizationId: oid(organizationId),
+    })
+      .select({ previousDues: 1 })
+      .lean();
+    if (!student) return null;
+    return Number(student.previousDues ?? 0);
+  }
+
+  async getStudentsPreviousDues(
+    organizationId: string,
+    studentIds: string[],
+  ): Promise<Record<string, number>> {
+    if (!studentIds.length) return {};
+    const students = await StudentModel.find({
+      _id: { $in: studentIds.map(oid) },
+      organizationId: oid(organizationId),
+    })
+      .select({ previousDues: 1 })
+      .lean();
+    const map: Record<string, number> = {};
+    for (const student of students) {
+      map[String(student._id)] = Number(student.previousDues ?? 0);
+    }
+    return map;
+  }
+
+  async setStudentPreviousDues(
+    organizationId: string,
+    studentId: string,
+    amount: number,
+  ): Promise<number> {
+    await StudentModel.updateOne(
+      { _id: oid(studentId), organizationId: oid(organizationId) },
+      { $set: { previousDues: amount } },
+    );
+    return amount;
+  }
+
+  async consumeStudentPreviousDues(
+    organizationId: string,
+    consumptions: Array<{ studentId: string; amount: number }>,
+  ): Promise<void> {
+    const operations = consumptions
+      .filter((item) => item.amount > 0)
+      .map((item) => ({
+        updateOne: {
+          filter: {
+            _id: oid(item.studentId),
+            organizationId: oid(organizationId),
+            previousDues: { $gte: item.amount },
+          },
+          update: { $inc: { previousDues: -item.amount } },
+        },
+      }));
+    if (!operations.length) return;
+    await StudentModel.bulkWrite(operations);
   }
 
   async recordPayment(
@@ -674,7 +740,7 @@ export class MongoFinanceRepository implements FinanceRepository {
       _id: oid(studentId),
       organizationId: oid(organizationId),
     })
-      .select({ firstName: 1, lastName: 1 })
+      .select({ firstName: 1, lastName: 1, previousDues: 1 })
       .lean();
 
     const studentName = student
@@ -770,6 +836,7 @@ export class MongoFinanceRepository implements FinanceRepository {
       totalBilled,
       totalPaid,
       outstandingBalance: Math.max(0, totalBilled - totalPaid),
+      previousDues: student ? Number(student.previousDues ?? 0) : 0,
       entries,
     };
   }
@@ -1030,6 +1097,20 @@ export class MongoFinanceRepository implements FinanceRepository {
       invoiceId: oid(invoiceId),
     });
 
+    // If the deleted invoice carried previous dues, return the unpaid
+    // remainder to the student's previous dues so the amount is not lost.
+    // Any portion already paid is not restored.
+    const restoreDues = Math.max(
+      0,
+      decimalNumber(deleted.arrearsAmount) - decimalNumber(deleted.paidAmount),
+    );
+    if (restoreDues > 0 && deleted.studentId) {
+      await StudentModel.updateOne(
+        { _id: deleted.studentId, organizationId: oid(organizationId) },
+        { $inc: { previousDues: restoreDues } },
+      );
+    }
+
     return true;
   }
 
@@ -1078,8 +1159,9 @@ export class MongoFinanceRepository implements FinanceRepository {
       }
     }
 
+    const arrears = decimalNumber(inv.arrearsAmount);
     combinedDiscount = Math.min(baseFee, Math.max(0, combinedDiscount));
-    const newNetTotal = Math.max(0, baseFee - combinedDiscount);
+    const newNetTotal = Math.max(0, baseFee + arrears - combinedDiscount);
     const paid = decimalNumber(inv.paidAmount);
     const dueDateObj = new Date(inv.dueDate as Date);
     const now = new Date();
@@ -1100,7 +1182,7 @@ export class MongoFinanceRepository implements FinanceRepository {
           currentAmount: money(baseFee),
           discountAmount: money(combinedDiscount),
           discountReason: reasons.length ? reasons.join(' + ') : undefined,
-          arrearsAmount: money(0),
+          arrearsAmount: money(arrears),
           totalAmount: money(newNetTotal),
           status: newStatus,
         },

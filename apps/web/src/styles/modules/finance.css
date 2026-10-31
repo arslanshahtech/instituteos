@@ -7,7 +7,7 @@
   max-width: 100%;
   min-width: 0;
   overflow-x: hidden;
-  gap: 22px;
+  gap: 20px;
 }
 
 .finance-page-heading {
@@ -15,7 +15,7 @@
 }
 
 .finance-page.reference-live-module {
-  gap: 12px;
+  gap: 20px;
 }
 
 .finance-overview-metrics {
@@ -143,7 +143,7 @@
 }
 
 .finance-section-heading {
-  margin-bottom: 17px;
+  margin-bottom: 16px;
 }
 
 .finance-section-heading h2,
@@ -233,9 +233,9 @@
   min-width: 0;
   border: 1px solid #e2e8f0;
   border-left: 4px solid #0f766e;
-  border-radius: 14px;
+  border-radius: 12px;
   background: #ffffff;
-  padding: 18px 20px;
+  padding: 20px;
   box-shadow:
     0 4px 6px -1px rgba(0, 0, 0, 0.04),
     0 2px 4px -2px rgba(0, 0, 0, 0.02);
@@ -285,7 +285,7 @@
   display: grid;
   min-width: 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
   margin: 14px 0;
   padding: 12px;
   background: #f8fafc;
@@ -864,7 +864,7 @@
 
 .finance-metric-card {
   background: #ffffff;
-  padding: 1.15rem 1.5rem;
+  padding: 1.25rem 1.5rem;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
@@ -1711,8 +1711,8 @@
   width: 100%;
   min-width: 0;
   overflow-x: auto;
-  border: 1px solid #e3e9f1;
-  border-radius: 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
   -webkit-overflow-scrolling: touch;
 }
 .finance-page .finance-premium-table {
@@ -1817,11 +1817,12 @@
   min-width: 0;
   flex-direction: column;
   align-items: stretch;
-  gap: 11px;
-  border: 1px solid #dce4ef;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   background: #fff;
-  padding: 17px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
 }
 .finance-page .finance-collection-card-top {
   display: flex;
@@ -2294,25 +2295,25 @@
   width: 100%;
   min-width: 0;
   table-layout: fixed;
-  font-size: 10px;
+  font-size: 11px;
 }
 .finance-page .finance-premium-table th {
-  padding: 11px 8px;
-  font-size: 8px;
+  padding: 12px 14px;
+  font-size: 9px;
   letter-spacing: 0.055em;
   white-space: normal;
 }
 .finance-page .finance-premium-table td {
-  padding: 12px 8px;
+  padding: 12px 14px;
   white-space: normal;
   overflow-wrap: anywhere;
 }
 .finance-page .finance-premium-table td strong {
-  font-size: 10px;
+  font-size: 11px;
   overflow-wrap: anywhere;
 }
 .finance-page .finance-premium-table td small {
-  font-size: 9px;
+  font-size: 10px;
 }
 .finance-page .finance-premium-table th:nth-child(1),
 .finance-page .finance-premium-table td:nth-child(1) {

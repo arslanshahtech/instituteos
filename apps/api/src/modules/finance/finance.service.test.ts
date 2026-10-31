@@ -142,6 +142,14 @@ function repository(
     requestInvoiceDeleteOtp: vi.fn(),
     deleteInvoice: vi.fn().mockResolvedValue(true),
     setInvoiceDiscount: vi.fn(),
+    getStudentPreviousDues: vi.fn().mockResolvedValue(0),
+    getStudentsPreviousDues: vi.fn().mockResolvedValue({}),
+    setStudentPreviousDues: vi
+      .fn()
+      .mockImplementation(
+        async (_org: string, _id: string, amount: number) => amount,
+      ),
+    consumeStudentPreviousDues: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -164,6 +172,7 @@ describe('FinanceService', () => {
       [studentId, userId],
       expect.any(String),
       1325.75,
+      {},
     );
     expect(result).toMatchObject({ createdCount: 1, skippedCount: 1 });
   });
@@ -321,5 +330,82 @@ describe('FinanceService', () => {
 
     expect(repo.listActiveClassStudents).not.toHaveBeenCalled();
     expect(repo.createInvoices).not.toHaveBeenCalled();
+  });
+
+  it('carries a student previous dues into the next generated invoice and consumes it once', async () => {
+    const repo = repository({
+      listActiveClassStudents: vi.fn().mockResolvedValue([studentId]),
+      getStudentsPreviousDues: vi
+        .fn()
+        .mockResolvedValue({ [studentId]: 5000 }),
+      createInvoices: vi.fn().mockImplementation(
+        async (
+          _org: string,
+          _input: unknown,
+          structure: FeeStructureRecord,
+          ids: string[],
+          _issueDate: string,
+          totalAmount: number,
+          arrearsByStudent: Record<string, number>,
+        ) =>
+          ids.map((id) =>
+            invoice({
+              studentId: id,
+              feeStructureId: structure.id,
+              totalAmount: totalAmount + (arrearsByStudent[id] ?? 0),
+              arrearsAmount: arrearsByStudent[id] ?? 0,
+            }),
+          ),
+      ),
+    });
+    const result = await new FinanceService(repo).generateInvoices(context, {
+      classId,
+      academicYearId,
+      feeStructureId,
+      dueDate: '2026-10-30',
+      billingCycle: '2026-term-1',
+    });
+    expect(result.invoices[0]).toMatchObject({
+      totalAmount: 6325.75,
+      arrearsAmount: 5000,
+    });
+    expect(repo.consumeStudentPreviousDues).toHaveBeenCalledWith(
+      organizationId,
+      [{ studentId, amount: 5000 }],
+    );
+  });
+
+  it('sets and clears a student previous dues amount', async () => {
+    const repo = repository({
+      getStudentPreviousDues: vi.fn().mockResolvedValue(0),
+      setStudentPreviousDues: vi
+        .fn()
+        .mockImplementation(
+          async (_org: string, _id: string, amount: number) => amount,
+        ),
+    });
+    const result = await new FinanceService(repo).setStudentPreviousDues(
+      context,
+      studentId,
+      2500.5,
+    );
+    expect(result).toEqual({ studentId, previousDues: 2500.5 });
+  });
+
+  it('rejects a negative previous dues amount and an unknown student', async () => {
+    const repo = repository();
+    await expect(
+      new FinanceService(repo).setStudentPreviousDues(context, studentId, -100),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    const missing = repository({
+      getStudentPreviousDues: vi.fn().mockResolvedValue(null),
+    });
+    await expect(
+      new FinanceService(missing).setStudentPreviousDues(
+        context,
+        studentId,
+        100,
+      ),
+    ).rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND' });
   });
 });
