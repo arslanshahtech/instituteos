@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { LucideIcon } from 'lucide-react';
 import {
   ArrowUpRight,
@@ -25,6 +26,7 @@ import {
 } from 'lucide-react';
 import {
   Link,
+  Navigate,
   NavLink,
   Outlet,
   useLocation,
@@ -34,6 +36,14 @@ import {
 
 import type { RoleLayoutConfig } from '../../layouts/layoutTypes.js';
 import { useAuth } from '../../auth/AuthProvider.js';
+import { ApiError } from '../../api/client.js';
+import { getOrganizationAccessContext } from '../../tenancy/tenancy-api.js';
+import { getRoleLayout } from '../../layouts/layoutTypes.js';
+import {
+  ErrorState,
+  LoadingState,
+  PermissionDeniedState,
+} from '../ui/States.js';
 import { Button } from '../ui/Button.js';
 
 interface NavigationItem {
@@ -56,6 +66,26 @@ function workspaceBasePath(role: RoleLayoutConfig, organizationId?: string) {
   return role.key === 'admin'
     ? `/admin/organizations/${encodeURIComponent(organizationId)}`
     : `/${role.key}/organizations/${encodeURIComponent(organizationId)}`;
+}
+
+function workspaceKeyForMembershipRole(
+  membershipRole: string,
+): RoleLayoutConfig['key'] | null {
+  if (
+    [
+      'organization_owner',
+      'organization_admin',
+      'campus_admin',
+      'principal_director',
+      'academic_coordinator',
+    ].includes(membershipRole)
+  )
+    return 'admin';
+  if (membershipRole === 'teacher') return 'teacher';
+  if (membershipRole === 'accountant_finance_officer') return 'accountant';
+  if (membershipRole === 'parent_guardian') return 'parent';
+  if (membershipRole === 'student') return 'student';
+  return null;
 }
 
 function getNavigationItems(
@@ -166,6 +196,11 @@ function getNavigationItems(
         to: base + '/homework-tests',
         icon: BookOpenText,
       },
+      {
+        label: 'Examinations',
+        to: base + '/examinations',
+        icon: ClipboardList,
+      },
       { label: 'Admissions', to: base + '/admissions', icon: UserPlus },
       { label: 'Finance', to: base + '/finance', icon: WalletCards },
       { label: 'Concessions', to: base + '/concessions', icon: ReceiptText },
@@ -181,6 +216,11 @@ function getNavigationItems(
         label: 'Homework & Tests',
         to: base + '/homework-tests',
         icon: BookOpenText,
+      },
+      {
+        label: 'Examinations & Marks',
+        to: base + '/examinations',
+        icon: ClipboardList,
       },
       { label: 'Messages', to: base + '/communications', icon: Megaphone },
     );
@@ -229,6 +269,25 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
     (organizationId === 'preview' ||
       location.pathname.includes('/organizations/preview'));
   const navigationOrganizationId = isDemoPreview ? 'preview' : organizationId;
+  const organizationAccess = useQuery({
+    queryKey: ['organization-context', organizationId],
+    queryFn: () => getOrganizationAccessContext(organizationId!),
+    enabled: Boolean(
+      organizationId && !isDemoPreview && role.key !== 'platform',
+    ),
+    retry: false,
+    staleTime: 30_000,
+  });
+  const authorizedRoleKey = organizationAccess.data
+    ? workspaceKeyForMembershipRole(organizationAccess.data.role)
+    : null;
+  const roleMismatch = Boolean(
+    organizationId &&
+    !isDemoPreview &&
+    role.key !== 'platform' &&
+    authorizedRoleKey &&
+    authorizedRoleKey !== role.key,
+  );
   const items = useMemo(
     () => getNavigationItems(role, navigationOrganizationId, isDemoPreview),
     [role, navigationOrganizationId, isDemoPreview],
@@ -267,6 +326,7 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
           label: 'Homework & Tests',
           to: base + (preview ? '/homework' : '/homework-tests'),
         },
+        { label: 'Examinations & Marks', to: base + '/examinations' },
         { label: 'Messages', to: base + '/communications' },
       ];
     if (role.key === 'accountant')
@@ -342,6 +402,69 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
   const isLiveOrganizationWorkspace = Boolean(
     organizationId && !isDemoPreview && role.key !== 'platform',
   );
+
+  if (isLiveOrganizationWorkspace && organizationAccess.isPending)
+    return (
+      <main className="auth-bootstrap">
+        <LoadingState message="Verifying your institute workspace access…" />
+      </main>
+    );
+
+  if (isLiveOrganizationWorkspace && organizationAccess.isError) {
+    if (
+      organizationAccess.error instanceof ApiError &&
+      organizationAccess.error.status === 404
+    )
+      return <Navigate to="/dashboard" replace />;
+
+    if (
+      organizationAccess.error instanceof ApiError &&
+      [401, 403].includes(organizationAccess.error.status)
+    )
+      return (
+        <main className="auth-bootstrap">
+          <PermissionDeniedState
+            title="Workspace access unavailable"
+            description="Your account does not have active access to this institute workspace. Ask the institute owner to check your membership."
+          />
+          <p>
+            <Link to="/dashboard">Return to your assigned workspace</Link>
+          </p>
+        </main>
+      );
+
+    return (
+      <main className="auth-bootstrap">
+        <ErrorState
+          title="Unable to verify workspace access"
+          description="The institute access service could not be reached. No workspace data has been opened. Please try again."
+          onRetry={() => void organizationAccess.refetch()}
+        />
+      </main>
+    );
+  }
+
+  if (
+    isLiveOrganizationWorkspace &&
+    organizationAccess.data &&
+    !authorizedRoleKey
+  )
+    return (
+      <main className="auth-bootstrap">
+        <PermissionDeniedState
+          title="Workspace role not supported"
+          description="This account has an organization role that is not assigned to a supported workspace. Contact the institute owner."
+        />
+      </main>
+    );
+
+  if (isLiveOrganizationWorkspace && roleMismatch && authorizedRoleKey)
+    return (
+      <Navigate
+        to={workspaceBasePath(getRoleLayout(authorizedRoleKey), organizationId)}
+        replace
+      />
+    );
 
   return (
     <div

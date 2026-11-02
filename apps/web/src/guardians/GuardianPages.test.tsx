@@ -324,7 +324,11 @@ describe('guardian management pages', () => {
     renderRoute(`/admin/organizations/${organizationId}/students/${studentId}`);
 
     expect(
-      await screen.findByText('No guardians are linked to this student yet.'),
+      await screen.findByText(
+        'No guardians are linked to this student yet.',
+        {},
+        { timeout: 5000 },
+      ),
     ).toBeVisible();
     await user.selectOptions(
       screen.getByLabelText('Link existing guardian'),

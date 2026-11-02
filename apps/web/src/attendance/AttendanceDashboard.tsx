@@ -108,8 +108,20 @@ export function AttendanceDashboard() {
   const { organizationId = '' } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const access = useOrganizationAccess(organizationId);
-  const isTeacher = access.data?.role === 'teacher';
-  const canManage = managerRoles.includes(access.data?.role ?? '');
+  const canReadAttendance =
+    access.data?.permissions.includes('attendance.read') ?? false;
+  const canWriteAttendance =
+    access.data?.permissions.includes('attendance.write') ?? false;
+  const canReadAcademicSetup =
+    access.data?.permissions.includes('academics.read') ?? false;
+  const isTeacher =
+    access.data?.role === 'teacher' &&
+    canReadAttendance &&
+    canReadAcademicSetup;
+  const canManage =
+    managerRoles.includes(access.data?.role ?? '') &&
+    canReadAttendance &&
+    canReadAcademicSetup;
   const canTakeAttendance = canManage || isTeacher;
   const workspace = useAcademicsWorkspace(
     organizationId,
@@ -400,7 +412,9 @@ export function AttendanceDashboard() {
     organizationId,
     campusId,
     academicYearId,
-    Boolean(access.data && canManage && view === 'students'),
+    Boolean(
+      access.data && canManage && canWriteAttendance && view === 'students',
+    ),
   );
   const staffQuery = useQuery({
     queryKey: ['attendance', organizationId, 'staff-list', campusId],
@@ -413,14 +427,16 @@ export function AttendanceDashboard() {
         page: 1,
         pageSize: 100,
       }),
-    enabled: Boolean(access.data && canManage && view === 'staff'),
+    enabled: Boolean(
+      access.data && canManage && view === 'staff' && canReadAttendance,
+    ),
     retry: false,
   });
   const staffAttendance = useStaffAttendance(
     organizationId,
     campusId,
     attendanceDate,
-    Boolean(access.data && canManage && view === 'staff'),
+    Boolean(access.data && canManage && view === 'staff' && canReadAttendance),
   );
   const staffItems = staffQuery.data?.items;
   const staffMarkItems = staffAttendance.data?.items;
@@ -488,6 +504,7 @@ export function AttendanceDashboard() {
     !attendance.isPending;
 
   async function saveStaff() {
+    if (!canWriteAttendance) return;
     const pending = staff.filter(
       (person: StaffRecord) => staffStatusesById[person.id],
     );
@@ -638,6 +655,12 @@ export function AttendanceDashboard() {
             : 'Record daily attendance for staff at the selected campus.'
         }
       />
+      {!canWriteAttendance && (
+        <p className="attendance-readonly-note" role="status">
+          You have read-only access to attendance records. Ask the Owner to
+          grant attendance.write if you need to record or change attendance.
+        </p>
+      )}
 
       {!isTeacher && (
         <nav
@@ -668,7 +691,7 @@ export function AttendanceDashboard() {
 
         {view === 'students' ? (
           <>
-            {eligible.data?.items.length ? (
+            {canWriteAttendance && eligible.data?.items.length ? (
               <form
                 className="attendance-placement"
                 onSubmit={(event) => {
@@ -906,6 +929,7 @@ export function AttendanceDashboard() {
                                     aria-pressed={
                                       studentStatusesById[student.id] === status
                                     }
+                                    disabled={!canWriteAttendance}
                                     className={`attendance-status-choice attendance-status-choice-${status}${studentStatusesById[student.id] === status ? ' is-active' : ''}`}
                                     key={status}
                                     onClick={() =>
@@ -932,6 +956,7 @@ export function AttendanceDashboard() {
                                 <label>
                                   Remarks
                                   <input
+                                    disabled={!canWriteAttendance}
                                     maxLength={500}
                                     onChange={(event) =>
                                       setStudentRemarksById((current) => ({
@@ -957,7 +982,7 @@ export function AttendanceDashboard() {
                     </p>
                   )}
                   <Button
-                    disabled={!studentSaveReady}
+                    disabled={!canWriteAttendance || !studentSaveReady}
                     onClick={() =>
                       attendance.mutate({
                         campusId,
@@ -1031,6 +1056,7 @@ export function AttendanceDashboard() {
                       <label>
                         Status
                         <select
+                          disabled={!canWriteAttendance}
                           onChange={(event) =>
                             setStaffStatusesById((current) => ({
                               ...current,
@@ -1061,6 +1087,7 @@ export function AttendanceDashboard() {
                   )}
                   <Button
                     disabled={
+                      !canWriteAttendance ||
                       staffSave.isPending ||
                       !staff.some(
                         (person: StaffRecord) => staffStatusesById[person.id],

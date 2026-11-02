@@ -210,6 +210,7 @@ const rolePermissions: Record<
     'examination.read',
     'examination.write',
     'communication.read',
+    'communication.write',
   ],
 
   accountant_finance_officer: [
@@ -244,6 +245,7 @@ const rolePermissions: Record<
     'examination.read',
     'finance.read',
     'communication.read',
+    'communication.write',
   ],
 };
 
@@ -251,6 +253,24 @@ export function permissionsForOrganizationRole(
   role: OrganizationRole,
 ): readonly OrganizationPermission[] {
   return rolePermissions[role] ?? [];
+}
+
+/** Owner permissions are immutable and always complete. Admin permissions may
+ * be narrowed by an owner; older memberships without an override keep the
+ * existing default admin capability set. */
+export function permissionsForMembership(
+  role: OrganizationRole,
+  assignedPermissions?: readonly string[],
+): readonly OrganizationPermission[] {
+  if (role === 'organization_owner')
+    return permissionsForOrganizationRole(role);
+  if (role !== 'organization_admin' || assignedPermissions === undefined)
+    return permissionsForOrganizationRole(role);
+  const allowed = new Set<string>(ORGANIZATION_PERMISSIONS);
+  return [...new Set(assignedPermissions)].filter(
+    (permission): permission is OrganizationPermission =>
+      allowed.has(permission),
+  );
 }
 
 export const PLATFORM_ROLES = [

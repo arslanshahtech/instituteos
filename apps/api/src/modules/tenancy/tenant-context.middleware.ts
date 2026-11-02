@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { AppError } from '../../errors/app-error.js';
 import {
   hasPermission,
-  permissionsForOrganizationRole,
+  permissionsForMembership,
   type OrganizationPermission,
 } from './authorization.js';
 import type {
@@ -58,7 +58,10 @@ export function createOrganizationContextMiddleware(
 
       (response.locals as AuthenticatedLocals).organizationContext = {
         ...membership,
-        permissions: permissionsForOrganizationRole(membership.role),
+        permissions: permissionsForMembership(
+          membership.role,
+          membership.permissions,
+        ),
       };
       return next();
     } catch (error) {
@@ -86,6 +89,36 @@ export function requireOrganizationPermission(
         ),
       );
     return next();
+  };
+}
+
+export function requireOrganizationMethodPermission(
+  readPermission: OrganizationPermission,
+  writePermission: OrganizationPermission,
+) {
+  return (request: Request, response: Response, next: NextFunction) => {
+    const permission = ['GET', 'HEAD', 'OPTIONS'].includes(
+      request.method.toUpperCase(),
+    )
+      ? readPermission
+      : writePermission;
+    return requireOrganizationPermission(permission)(request, response, next);
+  };
+}
+
+export function requireOrganizationPermissionForRole(
+  role: OrganizationRole,
+  permission: OrganizationPermission,
+) {
+  return (request: Request, response: Response, next: NextFunction) => {
+    const context = (response.locals as AuthenticatedLocals)
+      .organizationContext;
+    if (!context)
+      return next(
+        new AppError(404, 'ORGANIZATION_NOT_FOUND', 'Organization not found.'),
+      );
+    if (context.role !== role) return next();
+    return requireOrganizationPermission(permission)(request, response, next);
   };
 }
 

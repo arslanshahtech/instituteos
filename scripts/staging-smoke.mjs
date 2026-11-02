@@ -70,7 +70,10 @@ async function main() {
     headers: { Origin: webOrigin },
   });
   const readyBody = await ready.json().catch(() => null);
-  if (readyBody?.ready !== true) {
+  if (
+    readyBody?.status !== 'ready' ||
+    readyBody?.checks?.database !== 'connected'
+  ) {
     throw new Error(
       'API readiness did not confirm database/index initialization.',
     );

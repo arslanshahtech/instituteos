@@ -1,5 +1,6 @@
 import mongoose, { Types } from 'mongoose';
 import { AppError } from '../../errors/app-error.js';
+import { AuditLogModel } from '../audit/audit.model.js';
 import {
   AcademicClassModel,
   AcademicSectionModel,
@@ -9,6 +10,7 @@ import {
 import { AuthUserModel } from '../auth/auth.model.js';
 import { CampusModel } from '../tenancy/tenancy.model.js';
 import { StaffMemberModel, StudentModel } from '../people/people.model.js';
+import { OrganizationSettingsModel } from '../settings/settings.model.js';
 import {
   StaffAttendanceModel,
   StudentAttendanceModel,
@@ -27,6 +29,7 @@ import type {
   StudentPlacementRecord,
   StudentRosterMember,
   TeacherAttendanceAssignment,
+  TeacherSelfAttendanceConfig,
 } from './attendance.types.js';
 
 const oid = (id: string) => new Types.ObjectId(id);
@@ -97,6 +100,47 @@ function dateRangeFilter(input: {
 }
 
 export class MongoAttendanceRepository implements AttendanceRepository {
+  async getTeacherSelfAttendanceConfig(
+    organizationId: string,
+  ): Promise<TeacherSelfAttendanceConfig> {
+    const settings = await OrganizationSettingsModel.findOne({
+      organizationId: oid(organizationId),
+    })
+      .select({ teacherSelfAttendance: 1, 'localization.timezone': 1 })
+      .lean();
+    const policy = settings?.teacherSelfAttendance as
+      Partial<TeacherSelfAttendanceConfig> | undefined;
+    return {
+      viewOwnAttendance: policy?.viewOwnAttendance ?? true,
+      selfMarkingEnabled: policy?.selfMarkingEnabled ?? false,
+      allowedStatuses: policy?.allowedStatuses?.length
+        ? policy.allowedStatuses
+        : ['present'],
+      timezone: settings?.localization?.timezone ?? 'Asia/Karachi',
+    };
+  }
+
+  async findActiveStaffForUser(
+    organizationId: string,
+    userId: string,
+  ): Promise<{ id: string; campusId?: string } | null> {
+    const matches = await StaffMemberModel.find({
+      organizationId: oid(organizationId),
+      userId: oid(userId),
+      status: 'active',
+    })
+      .select({ _id: 1, campusId: 1 })
+      .limit(2)
+      .lean();
+    if (matches.length !== 1) return null;
+    return {
+      id: String(matches[0]!._id),
+      ...(matches[0]!.campusId
+        ? { campusId: String(matches[0]!.campusId) }
+        : {}),
+    };
+  }
+
   async listTeacherAssignmentsForUser(
     organizationId: string,
     userId: string,
@@ -107,28 +151,50 @@ export class MongoAttendanceRepository implements AttendanceRepository {
     ) {
       return [];
     }
-    const [user] = await AuthUserModel.find({ _id: oid(userId) })
-      .select({ email: 1 })
-      .limit(1)
-      .lean();
-    const email =
-      typeof user?.email === 'string' ? user.email.trim().toLowerCase() : '';
-    if (!email) return [];
-
-    // Staff records currently link to accounts by email. Fail closed if that link is ambiguous.
-    const staffMatches = await StaffMemberModel.find({
-      organizationId: oid(organizationId),
-      email,
+    const organization = oid(organizationId);
+    const account = oid(userId);
+    const linkedStaffMatches = await StaffMemberModel.find({
+      organizationId: organization,
+      userId: account,
       status: 'active',
     })
       .select({ _id: 1 })
       .limit(2)
       .lean();
-    if (staffMatches.length !== 1) return [];
+    if (linkedStaffMatches.length > 1) return [];
+
+    let staffId = linkedStaffMatches[0]?._id;
+    if (!staffId) {
+      const [user] = await AuthUserModel.find({ _id: account })
+        .select({ email: 1 })
+        .limit(1)
+        .lean();
+      const email =
+        typeof user?.email === 'string' ? user.email.trim().toLowerCase() : '';
+      if (!email) return [];
+
+      // Legacy memberships may still rely on email until the teacher accepts a fresh invitation.
+      // Never fall back to a staff profile already linked to another account.
+      const staffMatches = await StaffMemberModel.find({
+        organizationId: organization,
+        email,
+        status: 'active',
+        $or: [
+          { userId: { $exists: false } },
+          { userId: null },
+          { userId: account },
+        ],
+      })
+        .select({ _id: 1 })
+        .limit(2)
+        .lean();
+      if (staffMatches.length !== 1) return [];
+      staffId = staffMatches[0]!._id;
+    }
 
     const assignments = await TeacherAssignmentModel.find({
       organizationId: oid(organizationId),
-      teacherStaffId: staffMatches[0]!._id,
+      teacherStaffId: staffId,
     })
       .sort({ createdAt: 1 })
       .lean();
@@ -373,6 +439,87 @@ export class MongoAttendanceRepository implements AttendanceRepository {
     }));
   }
 
+  async upsertStudentPlacementWithinCapacity(
+    organizationId: string,
+    input: StudentPlacementInput,
+  ): Promise<StudentPlacementRecord> {
+    const session = await mongoose.startSession();
+    let placed: StudentPlacementRecord | null = null;
+    try {
+      await session.withTransaction(async () => {
+        // The section document is a transaction-level mutex. Concurrent
+        // placements for the same section conflict here; MongoDB retries the
+        // losing transaction, which then observes the committed roster count.
+        const section = await AcademicSectionModel.findOneAndUpdate(
+          {
+            _id: oid(input.sectionId),
+            organizationId: oid(organizationId),
+            classId: oid(input.classId),
+          },
+          { $inc: { placementRevision: 1 } },
+          { new: true, session },
+        )
+          .select({ capacity: 1 })
+          .lean();
+        if (!section)
+          throw new AppError(404, 'SECTION_NOT_FOUND', 'Section not found.');
+
+        if (typeof section.capacity === 'number') {
+          const currentCount =
+            await StudentSectionPlacementModel.countDocuments({
+              organizationId: oid(organizationId),
+              sectionId: oid(input.sectionId),
+              academicYearId: oid(input.academicYearId),
+              status: 'active',
+              studentId: { $ne: oid(input.studentId) },
+            }).session(session);
+          if (currentCount >= section.capacity)
+            throw new AppError(
+              409,
+              'SECTION_CAPACITY_REACHED',
+              'This section has reached its configured student capacity. Choose another section or increase the capacity.',
+            );
+        }
+
+        const record = await StudentSectionPlacementModel.findOneAndUpdate(
+          {
+            organizationId: oid(organizationId),
+            studentId: oid(input.studentId),
+            academicYearId: oid(input.academicYearId),
+          },
+          {
+            $set: {
+              ...input,
+              studentId: oid(input.studentId),
+              classId: oid(input.classId),
+              sectionId: oid(input.sectionId),
+              academicYearId: oid(input.academicYearId),
+              campusId: oid(input.campusId),
+              status: 'active',
+            },
+          },
+          { upsert: true, new: true, runValidators: true, session },
+        ).lean();
+        if (!record)
+          throw new AppError(
+            500,
+            'STUDENT_PLACEMENT_FAILED',
+            'The student placement could not be saved.',
+          );
+        placed = placementRecord(record);
+      });
+    } finally {
+      await session.endSession();
+    }
+    if (!placed)
+      throw new AppError(
+        500,
+        'STUDENT_PLACEMENT_FAILED',
+        'The student placement could not be saved.',
+      );
+    return placed;
+  }
+
   async upsertStudentPlacements(
     organizationId: string,
     input: StudentPlacementInput,
@@ -575,6 +722,10 @@ export class MongoAttendanceRepository implements AttendanceRepository {
     if (input.studentId) filter.studentId = oid(input.studentId);
     if (input.classId) filter.classId = oid(input.classId);
     if (input.sectionId) filter.sectionId = oid(input.sectionId);
+    if (input.academicYearIds) {
+      if (input.academicYearIds.length === 0) return [];
+      filter.academicYearId = { $in: input.academicYearIds.map(oid) };
+    }
     const allowedCampuses =
       input.campusId && campusIds?.length
         ? campusIds.includes(input.campusId)
@@ -608,6 +759,52 @@ export class MongoAttendanceRepository implements AttendanceRepository {
           ...(record.campusId ? { campusId: String(record.campusId) } : {}),
         }
       : null;
+  }
+
+  async createStaffAttendanceOnce(
+    organizationId: string,
+    campusId: string | undefined,
+    actorId: string,
+    input: StaffAttendanceInput,
+  ): Promise<StaffAttendanceRecord> {
+    try {
+      const [record] = await StaffAttendanceModel.create([
+        {
+          organizationId: oid(organizationId),
+          staffId: oid(input.staffId),
+          campusId: campusId ? oid(campusId) : null,
+          date: utcDay(input.date),
+          status: input.status,
+          remarks: input.remarks ?? '',
+        },
+      ]);
+      await AuditLogModel.create({
+        organizationId: oid(organizationId),
+        ...(campusId ? { campusId: oid(campusId) } : {}),
+        actorId: oid(actorId),
+        action: 'TEACHER_SELF_ATTENDANCE_MARKED',
+        entityType: 'StaffAttendance',
+        entityId: String(record!._id),
+        metadata: { date: input.date, status: input.status },
+      });
+      return staffAttendanceRecord(
+        record!.toObject() as Record<string, unknown>,
+      );
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 11000
+      ) {
+        throw new AppError(
+          409,
+          'SELF_ATTENDANCE_ALREADY_MARKED',
+          'Your attendance has already been recorded for today. Contact the administrator if it needs correction.',
+        );
+      }
+      throw error;
+    }
   }
 
   async saveStaffAttendance(

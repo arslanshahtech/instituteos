@@ -61,7 +61,7 @@ function dateOnly(value: unknown): string | null {
     : parsed.toISOString().slice(0, 10);
 }
 
-async function activeStudentIdsForAccount(
+export async function activeStudentIdsForAccount(
   organizationId: string,
   userId: string,
   role: PortalRole,
@@ -79,11 +79,16 @@ async function activeStudentIdsForAccount(
 
   const organizationObjectId = oid(organizationId);
   const user = await AuthUserModel.findById(oid(userId))
-    .select({ email: 1, status: 1 })
+    .select({ email: 1, status: 1, emailVerifiedAt: 1 })
     .lean();
   const email =
     typeof user?.email === 'string' ? user.email.trim().toLowerCase() : '';
-  if (!user || user.status !== 'active' || !email) {
+  if (
+    !user ||
+    user.status !== 'active' ||
+    !email ||
+    (role === 'parent_guardian' && !user.emailVerifiedAt)
+  ) {
     throw new AppError(
       403,
       'PORTAL_ACCOUNT_UNLINKED',
@@ -248,10 +253,6 @@ async function publishedExamResultsForStudent(
 async function studentPortalRecord(organizationId: string, studentId: string) {
   const organizationObjectId = oid(organizationId);
   const studentObjectId = oid(studentId);
-  const startOfMonth = new Date();
-  startOfMonth.setUTCHours(0, 0, 0, 0);
-  startOfMonth.setUTCDate(1);
-
   const [student, attendance, invoices, activeYear] = await Promise.all([
     StudentModel.findOne({
       _id: studentObjectId,
@@ -261,17 +262,14 @@ async function studentPortalRecord(organizationId: string, studentId: string) {
     StudentAttendanceModel.find({
       organizationId: organizationObjectId,
       studentId: studentObjectId,
-      date: { $gte: startOfMonth },
     })
       .sort({ date: -1 })
-      .limit(100)
       .lean(),
     StudentInvoiceModel.find({
       organizationId: organizationObjectId,
       studentId: studentObjectId,
     })
       .sort({ dueDate: -1 })
-      .limit(100)
       .lean(),
     AcademicYearModel.findOne({
       organizationId: organizationObjectId,
@@ -369,7 +367,7 @@ async function studentPortalRecord(organizationId: string, studentId: string) {
       absent,
       leave,
       percentage: attendancePercentage,
-      records: attendance.slice(0, 12).map((record) => ({
+      records: attendance.map((record) => ({
         date: dateOnly(record.date),
         status: String(record.status),
         remarks: record.remarks ? String(record.remarks) : '',
@@ -380,7 +378,7 @@ async function studentPortalRecord(organizationId: string, studentId: string) {
         Math.round(
           feeItems.reduce((sum, fee) => sum + fee.outstandingAmount, 0) * 100,
         ) / 100,
-      invoices: feeItems.slice(0, 12),
+      invoices: feeItems,
     },
     results: publishedResults,
     resultsAvailable: publishedResults.length > 0,

@@ -1,5 +1,6 @@
 import mongoose, { Types } from 'mongoose';
 import { AuthUserModel } from '../auth/auth.model.js';
+import { StaffMemberModel } from '../people/people.model.js';
 import {
   CampusModel,
   MembershipModel,
@@ -18,6 +19,7 @@ import type {
 } from './organizations.types.js';
 import type { OrganizationRole } from '../tenancy/tenancy.types.js';
 import { ORGANIZATION_ROLES } from '../tenancy/tenancy.types.js';
+import { permissionsForMembership } from '../tenancy/authorization.js';
 
 function idObject(id: string): Types.ObjectId {
   return new Types.ObjectId(id);
@@ -543,7 +545,7 @@ export class MongoOrganizationRepository implements OrganizationRepository {
     if (campusIds) filter.campusIds = { $in: campusIds.map(idObject) };
     const memberships = (await MembershipModel.find(filter)
       .select(
-        '_id organizationId userId role status campusIds createdAt updatedAt',
+        '_id organizationId userId role status campusIds permissions createdAt updatedAt',
       )
       .sort({ createdAt: 1 })
       .lean()) as Record<string, unknown>[];
@@ -555,6 +557,12 @@ export class MongoOrganizationRepository implements OrganizationRepository {
     return memberships.map((membership) => ({
       ...serialize(membership)!,
       campusIds: ((membership.campusIds ?? []) as unknown[]).map(String),
+      permissions: permissionsForMembership(
+        membership.role as OrganizationRole,
+        Array.isArray(membership.permissions)
+          ? (membership.permissions as string[])
+          : undefined,
+      ),
       user: serialize(byId.get(String(membership.userId)) ?? null),
     }));
   }
@@ -652,6 +660,7 @@ export class MongoOrganizationRepository implements OrganizationRepository {
     email: string;
     role: import('../tenancy/tenancy.types.js').OrganizationRole;
     campusIds: string[];
+    permissions?: import('../tenancy/authorization.js').OrganizationPermission[];
     tokenHash: string;
     expiresAt: Date;
   }): Promise<void> {
@@ -676,6 +685,9 @@ export class MongoOrganizationRepository implements OrganizationRepository {
               email: input.email,
               role: input.role,
               campusIds: input.campusIds.map(idObject),
+              ...(input.permissions !== undefined
+                ? { permissions: input.permissions }
+                : {}),
               tokenHash: input.tokenHash,
               expiresAt: input.expiresAt,
               status: 'pending',
@@ -713,7 +725,7 @@ export class MongoOrganizationRepository implements OrganizationRepository {
         status: 'pending',
       })
         .select(
-          '_id organizationId email role campusIds invitedByUserId status expiresAt createdAt',
+          '_id organizationId email role campusIds permissions invitedByUserId status expiresAt createdAt',
         )
         .sort({ createdAt: -1 })
         .lean()) as Record<string, unknown>[],
@@ -758,6 +770,81 @@ export class MongoOrganizationRepository implements OrganizationRepository {
             'ALREADY_ORGANIZATION_MEMBER',
             'This account already has an active organization membership.',
           );
+
+        let linkedTeacherStaffId: Types.ObjectId | undefined;
+        if (invite.role === 'teacher') {
+          const teacherProfiles = (await StaffMemberModel.find({
+            organizationId: invite.organizationId,
+            email: input.email.toLowerCase(),
+            status: 'active',
+            $or: [
+              {
+                designation: {
+                  $regex:
+                    '\\b(teacher|lecturer|professor|instructor|tutor|faculty)\\b',
+                  $options: 'i',
+                },
+              },
+              { 'subjects.0': { $exists: true } },
+            ],
+          })
+            .session(session)
+            .limit(2)
+            .lean()) as Record<string, unknown>[];
+          if (teacherProfiles.length !== 1) {
+            throw new AppError(
+              409,
+              teacherProfiles.length === 0
+                ? 'TEACHER_STAFF_PROFILE_REQUIRED'
+                : 'TEACHER_STAFF_PROFILE_AMBIGUOUS',
+              teacherProfiles.length === 0
+                ? 'Create one active teaching staff profile with this exact email before accepting the teacher invitation.'
+                : 'More than one active teaching staff profile uses this email. Ask the administrator to resolve the duplicate before accepting the invitation.',
+            );
+          }
+          const teacherProfile = teacherProfiles[0]!;
+          const existingLink = (await StaffMemberModel.findOne({
+            organizationId: invite.organizationId,
+            userId: idObject(input.userId),
+          })
+            .session(session)
+            .lean()) as Record<string, unknown> | null;
+          if (
+            (teacherProfile.userId &&
+              String(teacherProfile.userId) !== input.userId) ||
+            (existingLink &&
+              String(existingLink._id) !== String(teacherProfile._id))
+          ) {
+            throw new AppError(
+              409,
+              'TEACHER_STAFF_PROFILE_ALREADY_LINKED',
+              'This account or staff profile is already linked to another teacher record. Ask the administrator to review the staff account link.',
+            );
+          }
+          const linkedProfile = await StaffMemberModel.findOneAndUpdate(
+            {
+              _id: teacherProfile._id,
+              organizationId: invite.organizationId,
+              status: 'active',
+              $or: [
+                { userId: { $exists: false } },
+                { userId: null },
+                { userId: idObject(input.userId) },
+              ],
+            },
+            { $set: { userId: idObject(input.userId) } },
+            { new: true, runValidators: true, session },
+          ).lean();
+          if (!linkedProfile) {
+            throw new AppError(
+              409,
+              'TEACHER_STAFF_PROFILE_LINK_CONFLICT',
+              'The teacher staff profile changed while the invitation was being accepted. Ask the administrator to retry after reviewing the profile.',
+            );
+          }
+          linkedTeacherStaffId = teacherProfile._id as Types.ObjectId;
+        }
+
         if (existing) {
           membership = serialize(
             (await MembershipModel.findOneAndUpdate(
@@ -767,7 +854,13 @@ export class MongoOrganizationRepository implements OrganizationRepository {
                   role: invite.role,
                   status: 'active',
                   campusIds: invite.campusIds,
+                  ...(Array.isArray(invite.permissions)
+                    ? { permissions: invite.permissions }
+                    : {}),
                 },
+                ...(!Array.isArray(invite.permissions)
+                  ? { $unset: { permissions: 1 } }
+                  : {}),
               },
               { new: true, runValidators: true, session },
             ).lean()) as Record<string, unknown> | null,
@@ -781,6 +874,9 @@ export class MongoOrganizationRepository implements OrganizationRepository {
                 role: invite.role,
                 status: 'active',
                 campusIds: invite.campusIds,
+                ...(Array.isArray(invite.permissions)
+                  ? { permissions: invite.permissions }
+                  : {}),
               },
             ],
             { session },
@@ -798,7 +894,12 @@ export class MongoOrganizationRepository implements OrganizationRepository {
             actorUserId: input.userId,
             action: 'membership.invitation.accepted',
             targetId: String(invite._id),
-            details: { role: invite.role },
+            details: {
+              role: invite.role,
+              ...(linkedTeacherStaffId
+                ? { staffId: String(linkedTeacherStaffId) }
+                : {}),
+            },
           },
           session,
         );

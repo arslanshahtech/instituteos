@@ -1,8 +1,9 @@
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AcademicClassModel,
   AcademicSectionModel,
+  AcademicYearModel,
   SubjectModel,
   TeacherAssignmentModel,
   TeacherTimetableModel,
@@ -21,6 +22,7 @@ import {
   ExamScheduleModel,
 } from '../examinations/examinations.model.js';
 import { HomeworkTestModel } from '../homework/homework.model.js';
+import { StaffMemberModel } from '../people/people.model.js';
 import { MongoAcademicsRepository } from './academics.repository.js';
 
 afterEach(() => vi.restoreAllMocks());
@@ -47,10 +49,152 @@ describe('TeacherAssignment schema and repository constraints', () => {
   });
 });
 
+describe('Academic year activation transaction', () => {
+  const organizationId = '650000000000000000000001';
+  const yearId = '650000000000000000000099';
+
+  it('archives the previous active year and activates the selected year in one transaction', async () => {
+    const target = {
+      _id: new Types.ObjectId(yearId),
+      organizationId: new Types.ObjectId(organizationId),
+      name: '2027–2028',
+      startDate: new Date('2027-09-01T00:00:00.000Z'),
+      endDate: new Date('2028-06-30T00:00:00.000Z'),
+      status: 'archived',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    };
+    const session = {
+      withTransaction: vi.fn(async (callback: () => Promise<void>) =>
+        callback(),
+      ),
+      endSession: vi.fn().mockResolvedValue(undefined),
+    };
+    const targetQuery = {
+      session: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue(target),
+    };
+    const updatedQuery = {
+      lean: vi.fn().mockResolvedValue({ ...target, status: 'active' }),
+    };
+    const startSession = vi
+      .spyOn(mongoose, 'startSession')
+      .mockResolvedValue(session as never);
+    const findOne = vi
+      .spyOn(AcademicYearModel, 'findOne')
+      .mockReturnValue(targetQuery as never);
+    const updateMany = vi
+      .spyOn(AcademicYearModel, 'updateMany')
+      .mockResolvedValue({ modifiedCount: 1 } as never);
+    const findOneAndUpdate = vi
+      .spyOn(AcademicYearModel, 'findOneAndUpdate')
+      .mockReturnValue(updatedQuery as never);
+
+    const result = await new MongoAcademicsRepository().activateAcademicYear(
+      organizationId,
+      yearId,
+      { status: 'active' },
+    );
+
+    expect(result?.status).toBe('active');
+    expect(startSession).toHaveBeenCalledOnce();
+    expect(session.withTransaction).toHaveBeenCalledOnce();
+    expect(findOne).toHaveBeenCalledWith({
+      _id: new Types.ObjectId(yearId),
+      organizationId: new Types.ObjectId(organizationId),
+    });
+    expect(updateMany).toHaveBeenCalledWith(
+      {
+        organizationId: new Types.ObjectId(organizationId),
+        status: 'active',
+        _id: { $ne: new Types.ObjectId(yearId) },
+      },
+      { $set: { status: 'archived' } },
+      { session },
+    );
+    expect(findOneAndUpdate).toHaveBeenCalledWith(
+      {
+        _id: new Types.ObjectId(yearId),
+        organizationId: new Types.ObjectId(organizationId),
+      },
+      { $set: { status: 'active' } },
+      { new: true, runValidators: true, session },
+    );
+    expect(session.endSession).toHaveBeenCalledOnce();
+  });
+
+  it('does not archive the current year when the requested target is missing', async () => {
+    const session = {
+      withTransaction: vi.fn(async (callback: () => Promise<void>) =>
+        callback(),
+      ),
+      endSession: vi.fn().mockResolvedValue(undefined),
+    };
+    const targetQuery = {
+      session: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue(null),
+    };
+    vi.spyOn(mongoose, 'startSession').mockResolvedValue(session as never);
+    vi.spyOn(AcademicYearModel, 'findOne').mockReturnValue(
+      targetQuery as never,
+    );
+    const updateMany = vi.spyOn(AcademicYearModel, 'updateMany');
+
+    await expect(
+      new MongoAcademicsRepository().activateAcademicYear(
+        organizationId,
+        yearId,
+        { status: 'active' },
+      ),
+    ).resolves.toBeNull();
+
+    expect(updateMany).not.toHaveBeenCalled();
+    expect(session.endSession).toHaveBeenCalledOnce();
+  });
+});
+
+describe('Section capacity update transaction', () => {
+  const organizationId = '650000000000000000000001';
+  const sectionId = '650000000000000000000004';
+
+  it('rejects lowering capacity below the largest active academic-year roster', async () => {
+    const session = {
+      withTransaction: vi.fn(async (callback: () => Promise<void>) =>
+        callback(),
+      ),
+      endSession: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.spyOn(mongoose, 'startSession').mockResolvedValue(session as never);
+    const lockQuery = {
+      lean: vi.fn().mockResolvedValue({ _id: new Types.ObjectId(sectionId) }),
+    };
+    const findOneAndUpdate = vi
+      .spyOn(AcademicSectionModel, 'findOneAndUpdate')
+      .mockReturnValue(lockQuery as never);
+    const aggregate = {
+      session: vi.fn().mockResolvedValue([{ maxCount: 13 }]),
+    };
+    vi.spyOn(StudentSectionPlacementModel, 'aggregate').mockReturnValue(
+      aggregate as never,
+    );
+
+    await expect(
+      new MongoAcademicsRepository().updateSection(organizationId, sectionId, {
+        capacity: 12,
+      }),
+    ).rejects.toMatchObject({ code: 'SECTION_CAPACITY_BELOW_ENROLLMENT' });
+
+    expect(findOneAndUpdate).toHaveBeenCalledOnce();
+    expect(aggregate.session).toHaveBeenCalledWith(session);
+    expect(session.endSession).toHaveBeenCalledOnce();
+  });
+});
+
 describe('MongoAcademicsRepository tenant and campus scopes', () => {
   it('lists only classes belonging to the organization and assigned campuses', async () => {
+    const sort = vi.fn().mockReturnThis();
     const find = vi.spyOn(AcademicClassModel, 'find').mockReturnValue({
-      sort: vi.fn().mockReturnThis(),
+      sort,
       lean: vi.fn().mockResolvedValue([]),
     } as never);
 
@@ -62,6 +206,34 @@ describe('MongoAcademicsRepository tenant and campus scopes', () => {
     expect(find).toHaveBeenCalledWith({
       organizationId: new Types.ObjectId('650000000000000000000001'),
       campusId: { $in: [new Types.ObjectId('650000000000000000000002')] },
+    });
+    expect(sort).toHaveBeenCalledWith({ sortOrder: 1, name: 1, code: 1 });
+  });
+
+  it('only accepts active teaching staff for teacher assignments', async () => {
+    const exists = vi
+      .spyOn(StaffMemberModel, 'exists')
+      .mockResolvedValue({ _id: '650000000000000000000002' } as never);
+
+    await new MongoAcademicsRepository().validateStaff(
+      '650000000000000000000001',
+      '650000000000000000000002',
+    );
+
+    expect(exists).toHaveBeenCalledWith({
+      _id: new Types.ObjectId('650000000000000000000002'),
+      organizationId: new Types.ObjectId('650000000000000000000001'),
+      status: 'active',
+      $or: [
+        {
+          designation: {
+            $regex:
+              '\\b(teacher|lecturer|professor|instructor|tutor|faculty)\\b',
+            $options: 'i',
+          },
+        },
+        { 'subjects.0': { $exists: true } },
+      ],
     });
   });
 

@@ -13,7 +13,10 @@ import {
   MemoryAuthRepository,
 } from '../auth/auth.test-helpers.js';
 import { AppError } from '../../errors/app-error.js';
-import { permissionsForOrganizationRole } from './authorization.js';
+import {
+  permissionsForMembership,
+  permissionsForOrganizationRole,
+} from './authorization.js';
 import {
   requireOrganizationPermission,
   requireOrganizationRole,
@@ -73,6 +76,9 @@ class MemoryOrganizationAccess implements OrganizationAccessRepository {
       userId: membership.userId,
       role: membership.role,
       campusIds: membership.campusIds,
+      ...(membership.permissions
+        ? { permissions: membership.permissions }
+        : {}),
     };
   }
 
@@ -235,6 +241,7 @@ function addMembership(
   organizationId: string,
   role: OrganizationRole,
   status: 'active' | 'suspended' | 'revoked' = 'active',
+  permissions?: readonly string[],
 ) {
   repository.memberships.push({
     membershipId: `${userId}-${organizationId}`,
@@ -242,6 +249,7 @@ function addMembership(
     organizationId,
     role,
     campusIds: [],
+    ...(permissions ? { permissions } : {}),
     status,
   });
 }
@@ -289,8 +297,35 @@ describe('organization authorization and tenant isolation', () => {
         'examination.read',
         'examination.write',
         'communication.read',
+        'communication.write',
       ],
     });
+  });
+
+  it('enforces owner-assigned admin permissions at the API boundary', async () => {
+    const { app, authService, accessRepository } = buildHarness();
+    const admin = await addUser(authService, 'restricted-admin@example.test');
+    addMembership(
+      accessRepository,
+      admin.userId,
+      organizationA,
+      'organization_admin',
+      'active',
+      ['organization.read'],
+    );
+
+    const allowedRead = await request(app)
+      .get(`/api/v1/organizations/${organizationA}/resources/${resourceA}`)
+      .set('Cookie', admin.cookie);
+    const deniedWrite = await request(app)
+      .patch(`/api/v1/organizations/${organizationA}/resources/${resourceA}`)
+      .set('Cookie', admin.cookie)
+      .set('X-CSRF-Token', admin.csrfToken)
+      .send({ value: 'should not change' });
+
+    expect(allowedRead.status).toBe(200);
+    expect(deniedWrite.status).toBe(403);
+    expect(deniedWrite.body.error.code).toBe('PERMISSION_DENIED');
   });
 
   it('allows same-tenant access and blocks cross-tenant read and update IDOR attempts', async () => {
@@ -424,6 +459,7 @@ describe('organization authorization and tenant isolation', () => {
       'examination.read',
       'examination.write',
       'communication.read',
+      'communication.write',
     ]);
   });
 
@@ -457,6 +493,24 @@ describe('organization authorization and tenant isolation', () => {
     expect(platformAccess.status).toBe(200);
     expect(noImplicitTenantAccess.status).toBe(404);
     expect(noImplicitPlatformAccess.status).toBe(403);
+  });
+
+  it('keeps owner permissions immutable and applies owner-assigned admin permissions', () => {
+    expect(
+      permissionsForMembership('organization_owner', ['student.read']),
+    ).toEqual(permissionsForOrganizationRole('organization_owner'));
+    expect(
+      permissionsForMembership('organization_admin', [
+        'student.read',
+        'finance.read',
+      ]),
+    ).toEqual(['student.read', 'finance.read']);
+    expect(permissionsForMembership('organization_admin')).toEqual(
+      permissionsForOrganizationRole('organization_admin'),
+    );
+    expect(permissionsForMembership('teacher', ['finance.write'])).toEqual(
+      permissionsForOrganizationRole('teacher'),
+    );
   });
 
   it('uses explicit role capability sets rather than implied inheritance', () => {

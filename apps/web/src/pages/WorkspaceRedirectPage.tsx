@@ -2,11 +2,18 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { ApiError } from '../api/client.js';
 import { LoadingState } from '../components/ui/States.js';
-import { getAccessibleOrganizations } from '../organizations/organizations-api.js';
+import {
+  getAccessibleOrganizations,
+  type AccessibleOrganization,
+} from '../organizations/organizations-api.js';
 import { getPlatformOrganizations } from './platform-api.js';
 import '../styles/workspace-redirect.css';
 
-type RedirectState = { destination: string } | { message: string } | null;
+type RedirectState =
+  | { destination: string }
+  | { organizations: AccessibleOrganization[] }
+  | { message: string }
+  | null;
 
 function pathForRole(role: string, organizationId: string) {
   const encodedId = encodeURIComponent(organizationId);
@@ -50,15 +57,20 @@ export function WorkspaceRedirectPage() {
       }
       try {
         const result = await getAccessibleOrganizations();
-        const organization = result.organizations.find(
-          (item) => item.status === 'active',
+        const organizations = result.organizations.filter(
+          (item) => item.status === 'active' && pathForRole(item.role, item.id),
         );
-        if (organization) {
+        if (organizations.length === 1) {
+          const organization = organizations[0]!;
           const destination = pathForRole(organization.role, organization.id);
           if (destination) {
             if (active) setState({ destination });
             return;
           }
+        }
+        if (organizations.length > 1) {
+          if (active) setState({ organizations });
+          return;
         }
         if (active)
           setState({
@@ -87,6 +99,43 @@ export function WorkspaceRedirectPage() {
     );
   if ('destination' in state)
     return <Navigate to={state.destination} replace />;
+  if ('organizations' in state) {
+    return (
+      <main className="workspace-unassigned">
+        <div className="workspace-unassigned-card">
+          <span className="workspace-unassigned-mark">I</span>
+          <p className="eyebrow">InstituteOS</p>
+          <h1>Choose your workspace</h1>
+          <p>
+            Your account has access to more than one institute. Select where you
+            want to continue.
+          </p>
+          <div className="workspace-choice-list">
+            {state.organizations.map((organization) => {
+              const destination = pathForRole(
+                organization.role,
+                organization.id,
+              );
+              if (!destination) return null;
+              return (
+                <Link
+                  className="accessible-organization"
+                  key={organization.id}
+                  to={destination}
+                >
+                  <span>
+                    <strong>{organization.name}</strong>
+                    <small>{organization.role.replaceAll('_', ' ')}</small>
+                  </span>
+                  <span className="button button-primary">Open workspace</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </main>
+    );
+  }
   return (
     <main className="workspace-unassigned">
       <div className="workspace-unassigned-card">

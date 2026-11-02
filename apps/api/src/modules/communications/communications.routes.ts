@@ -29,6 +29,7 @@ import { MongoOrganizationAccessRepository } from '../tenancy/tenancy.repository
 import type { OrganizationAccessRepository } from '../tenancy/tenancy.types.js';
 import {
   createOrganizationContextMiddleware,
+  requireOrganizationMethodPermission,
   requireOrganizationRole,
 } from '../tenancy/tenant-context.middleware.js';
 import {
@@ -307,11 +308,12 @@ const defaultVerificationAdapters: VerificationAdapters = {
     const user = await AuthUserModel.findById(oid(teacherUserId))
       .select({ email: 1, status: 1 })
       .lean();
-    if (user?.status !== 'active' || typeof user.email !== 'string') {
+    if (user?.status !== 'active') {
       return false;
     }
 
-    const email = user.email.trim().toLowerCase();
+    const email =
+      typeof user.email === 'string' ? user.email.trim().toLowerCase() : '';
     const teacherMembership = await MembershipModel.exists({
       organizationId: organizationObjectId,
       userId: oid(teacherUserId),
@@ -320,10 +322,10 @@ const defaultVerificationAdapters: VerificationAdapters = {
     });
     if (!teacherMembership) return false;
 
-    const [staff, activeYears] = await Promise.all([
+    const [linkedStaff, activeYears] = await Promise.all([
       StaffMemberModel.find({
         organizationId: organizationObjectId,
-        email,
+        userId: oid(teacherUserId),
         status: 'active',
       })
         .select({ _id: 1 })
@@ -336,7 +338,25 @@ const defaultVerificationAdapters: VerificationAdapters = {
         .select({ _id: 1 })
         .lean(),
     ]);
-    if (staff.length !== 1 || !activeYears.length) return false;
+    if (linkedStaff.length > 1 || !activeYears.length) return false;
+    const staff = linkedStaff.length
+      ? linkedStaff
+      : email
+        ? await StaffMemberModel.find({
+            organizationId: organizationObjectId,
+            email,
+            status: 'active',
+            $or: [
+              { userId: { $exists: false } },
+              { userId: null },
+              { userId: oid(teacherUserId) },
+            ],
+          })
+            .select({ _id: 1 })
+            .limit(2)
+            .lean()
+        : [];
+    if (staff.length !== 1) return false;
 
     const yearIds = activeYears.map((year) => year._id);
     const placements = await StudentSectionPlacementModel.find({
@@ -489,9 +509,8 @@ async function listParentMessagingContacts(
         organizationId: organizationObjectId,
         _id: { $in: teacherStaffIds.map(oid) },
         status: 'active',
-        email: { $exists: true, $ne: '' },
       })
-        .select({ _id: 1, email: 1, firstName: 1, lastName: 1 })
+        .select({ _id: 1, userId: 1, email: 1, firstName: 1, lastName: 1 })
         .lean()
     : [];
   const staffById = new Map(
@@ -499,22 +518,41 @@ async function listParentMessagingContacts(
   );
   const staffEmails = [
     ...new Set(
-      staff.map((member) => String(member.email).trim().toLowerCase()),
+      staff
+        .filter(
+          (member) => typeof member.email === 'string' && member.email.trim(),
+        )
+        .map((member) => String(member.email).trim().toLowerCase()),
     ),
   ];
-  const teacherUsers = staffEmails.length
-    ? await AuthUserModel.find({
-        email: { $in: staffEmails },
-        status: 'active',
-      })
-        .select({ _id: 1, email: 1, displayName: 1 })
-        .lean()
-    : [];
+  const linkedTeacherUserIds = [
+    ...new Set(
+      staff
+        .filter((member) => member.userId)
+        .map((member) => String(member.userId)),
+    ),
+  ];
+  const teacherUsers =
+    staffEmails.length || linkedTeacherUserIds.length
+      ? await AuthUserModel.find({
+          $or: [
+            ...(linkedTeacherUserIds.length
+              ? [{ _id: { $in: linkedTeacherUserIds.map(oid) } }]
+              : []),
+            ...(staffEmails.length ? [{ email: { $in: staffEmails } }] : []),
+          ],
+          status: 'active',
+        })
+          .select({ _id: 1, email: 1, displayName: 1 })
+          .lean()
+      : [];
+  const teacherUserById = new Map(
+    teacherUsers.map((teacher) => [String(teacher._id), teacher]),
+  );
   const teacherUserByEmail = new Map(
-    teacherUsers.map((teacher) => [
-      String(teacher.email).toLowerCase(),
-      teacher,
-    ]),
+    teacherUsers
+      .filter((teacher) => typeof teacher.email === 'string')
+      .map((teacher) => [String(teacher.email).toLowerCase(), teacher]),
   );
   const teacherUserIds = teacherUsers.map((teacher) => teacher._id);
   const teacherMemberships = teacherUserIds.length
@@ -564,9 +602,11 @@ async function listParentMessagingContacts(
       : [];
     const teachers = studentAssignments.flatMap((assignment) => {
       const member = staffById.get(String(assignment.teacherStaffId));
-      const account = member?.email
-        ? teacherUserByEmail.get(String(member.email).trim().toLowerCase())
-        : undefined;
+      const account = member?.userId
+        ? teacherUserById.get(String(member.userId))
+        : member?.email
+          ? teacherUserByEmail.get(String(member.email).trim().toLowerCase())
+          : undefined;
       if (!account || !activeTeacherIds.has(String(account._id))) return [];
       return [
         {
@@ -615,12 +655,20 @@ export function createCommunicationsRouter(
     authenticate,
     createOrganizationContextMiddleware(accessRepository),
     requireOrganizationRole(announcementManagers),
+    requireOrganizationMethodPermission(
+      'communication.read',
+      'communication.write',
+    ),
   ] as const;
 
   const protectMessaging = [
     authenticate,
     createOrganizationContextMiddleware(accessRepository),
     requireOrganizationRole(messagingRoles),
+    requireOrganizationMethodPermission(
+      'communication.read',
+      'communication.write',
+    ),
   ] as const;
   const protectParentMessaging = [
     authenticate,

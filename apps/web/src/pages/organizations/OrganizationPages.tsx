@@ -55,6 +55,7 @@ import {
   getOrganizationDashboard,
   inviteMember,
   ORGANIZATION_ROLES,
+  ORGANIZATION_PERMISSIONS,
   restoreOrganization,
   updateCampus,
   updateMember,
@@ -421,6 +422,7 @@ export function OrganizationAdminPage() {
     queryFn: () => getOrganizationAccessContext(organizationId),
     enabled: Boolean(organizationId),
     retry: false,
+    staleTime: 30_000,
   });
 
   const dashboard = useQuery({
@@ -1789,6 +1791,9 @@ function MembersPanel({
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<string>('teacher');
   const [inviteCampusIds, setInviteCampusIds] = useState<string[]>([]);
+  const [invitePermissions, setInvitePermissions] = useState<string[]>([
+    ...ORGANIZATION_PERMISSIONS,
+  ]);
   const [drafts, setDrafts] = useState<
     Record<
       string,
@@ -1796,12 +1801,20 @@ function MembersPanel({
         role: string;
         status: OrganizationMember['status'];
         campusIds: string[];
+        permissions: string[];
       }
     >
   >({});
   const invite = useMutation({
     mutationFn: () =>
-      inviteMember(organizationId, { email, role, campusIds: inviteCampusIds }),
+      inviteMember(organizationId, {
+        email,
+        role,
+        campusIds: inviteCampusIds,
+        ...(role === 'organization_admin' && canAssignOwner
+          ? { permissions: invitePermissions }
+          : {}),
+      }),
     onSuccess: async () => {
       setEmail('');
       await onDone('Invitation sent when delivery is available.');
@@ -1817,8 +1830,18 @@ function MembersPanel({
         role: string;
         status: OrganizationMember['status'];
         campusIds: string[];
+        permissions: string[];
       };
-    }) => updateMember(organizationId, id, draft),
+    }) => {
+      const { permissions, ...basicChanges } = draft;
+      return updateMember(
+        organizationId,
+        id,
+        draft.role === 'organization_admin'
+          ? { ...basicChanges, permissions }
+          : basicChanges,
+      );
+    },
     onSuccess: () => onDone('Member access updated.'),
   });
   if (query.isPending) return <LoadingState message="Loading members…" />;
@@ -1857,14 +1880,28 @@ function MembersPanel({
               onChange={(event) => setEmail(event.target.value)}
             />
           </label>
+          <small className="field-hint">
+            {role === 'parent_guardian'
+              ? 'Parent/guardian ko invite karte waqt wohi verified email use karein jo student ke Guardian record mein saved hai. Is email ka match hona zaroori hai.'
+              : role === 'teacher'
+                ? 'Teacher ko invite karte waqt wohi email use karein jo Staff / Teachers profile mein save ki hai.'
+                : 'Invitee ko isi email address se account verify karke invitation accept karna hoga.'}
+          </small>
           <label>
             Role
             <select
               value={role}
-              onChange={(event) => setRole(event.target.value)}
+              onChange={(event) => {
+                setRole(event.target.value);
+                if (event.target.value === 'organization_admin')
+                  setInvitePermissions([...ORGANIZATION_PERMISSIONS]);
+              }}
             >
               {ORGANIZATION_ROLES.filter(
-                (item) => canAssignOwner || item !== 'organization_owner',
+                (item) =>
+                  canAssignOwner ||
+                  (item !== 'organization_owner' &&
+                    item !== 'organization_admin'),
               ).map((item) => (
                 <option key={item} value={item}>
                   {item.replaceAll('_', ' ')}
@@ -1879,6 +1916,31 @@ function MembersPanel({
               onChange={setInviteCampusIds}
               selectedCampusIds={inviteCampusIds}
             />
+          )}
+          {canAssignOwner && role === 'organization_admin' && (
+            <details className="admin-permission-editor">
+              <summary>Admin permissions ({invitePermissions.length})</summary>
+              <div className="admin-permission-list">
+                {ORGANIZATION_PERMISSIONS.map((permission) => (
+                  <label key={permission}>
+                    <input
+                      type="checkbox"
+                      checked={invitePermissions.includes(permission)}
+                      onChange={(event) =>
+                        setInvitePermissions(
+                          event.target.checked
+                            ? [...invitePermissions, permission]
+                            : invitePermissions.filter(
+                                (item) => item !== permission,
+                              ),
+                        )
+                      }
+                    />
+                    {permission}
+                  </label>
+                ))}
+              </div>
+            </details>
           )}
           <Button type="submit" disabled={invite.isPending}>
             Invite member
@@ -1897,6 +1959,7 @@ function MembersPanel({
               role: member.role,
               status: member.status,
               campusIds: member.campusIds,
+              permissions: member.permissions ?? [],
             };
             return (
               <article key={member.id} className="organization-row member-row">
@@ -1921,7 +1984,7 @@ function MembersPanel({
                     </span>
                   </span>
                 </div>
-                {canManage && (
+                {canManage && member.role !== 'organization_owner' && (
                   <div className="member-controls">
                     <select
                       aria-label={`Role for ${member.user?.email ?? member.id}`}
@@ -1929,13 +1992,22 @@ function MembersPanel({
                       onChange={(event) =>
                         setDrafts({
                           ...drafts,
-                          [member.id]: { ...draft, role: event.target.value },
+                          [member.id]: {
+                            ...draft,
+                            role: event.target.value,
+                            permissions:
+                              event.target.value === 'organization_admin'
+                                ? draft.permissions
+                                : [],
+                          },
                         })
                       }
                     >
                       {ORGANIZATION_ROLES.filter(
                         (item) =>
-                          canAssignOwner || item !== 'organization_owner',
+                          canAssignOwner ||
+                          (item !== 'organization_owner' &&
+                            item !== 'organization_admin'),
                       ).map((item) => (
                         <option key={item} value={item}>
                           {item.replaceAll('_', ' ')}
@@ -1960,6 +2032,37 @@ function MembersPanel({
                       <option value="suspended">suspended</option>
                       <option value="revoked">revoked</option>
                     </select>
+                    {canAssignOwner && draft.role === 'organization_admin' && (
+                      <details className="admin-permission-editor">
+                        <summary>
+                          Assigned permissions ({draft.permissions.length})
+                        </summary>
+                        <div className="admin-permission-list">
+                          {ORGANIZATION_PERMISSIONS.map((permission) => (
+                            <label key={permission}>
+                              <input
+                                type="checkbox"
+                                checked={draft.permissions.includes(permission)}
+                                onChange={(event) =>
+                                  setDrafts({
+                                    ...drafts,
+                                    [member.id]: {
+                                      ...draft,
+                                      permissions: event.target.checked
+                                        ? [...draft.permissions, permission]
+                                        : draft.permissions.filter(
+                                            (item) => item !== permission,
+                                          ),
+                                    },
+                                  })
+                                }
+                              />
+                              {permission}
+                            </label>
+                          ))}
+                        </div>
+                      </details>
+                    )}
                     <CampusScopeSelect
                       campuses={campuses}
                       label={`Campus scope for ${member.user?.email ?? member.id}`}
@@ -2092,12 +2195,10 @@ export function AcceptOrganizationInvitationPage() {
   );
   const accept = useMutation({
     mutationFn: acceptOrganizationInvitation,
-    onSuccess: (result) => {
+    onSuccess: () => {
       setStatus('done');
       window.history.replaceState(null, '', window.location.pathname);
-      navigate(`/admin/organizations/${result.membership.organizationId}`, {
-        replace: true,
-      });
+      navigate('/dashboard', { replace: true });
     },
     onError: (reason) => {
       setStatus('error');

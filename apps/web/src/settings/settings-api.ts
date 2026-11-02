@@ -25,6 +25,11 @@ export interface OrganizationSettings {
     smsAlerts: boolean;
     autoAttendanceAlerts: boolean;
   };
+  teacherSelfAttendance: {
+    viewOwnAttendance: boolean;
+    selfMarkingEnabled: boolean;
+    allowedStatuses: Array<'present' | 'absent' | 'half-day' | 'on-leave'>;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -32,7 +37,11 @@ export interface OrganizationSettings {
 export type OrganizationSettingsInput = Partial<
   Pick<
     OrganizationSettings,
-    'branding' | 'contact' | 'localization' | 'notifications'
+    | 'branding'
+    | 'contact'
+    | 'localization'
+    | 'notifications'
+    | 'teacherSelfAttendance'
   >
 >;
 

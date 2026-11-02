@@ -189,26 +189,7 @@ export class AttendanceService {
         'Select an active student enrolled at this campus.',
       );
     }
-    const capacity = await this.repository.getSectionCapacity(
-      context.organizationId,
-      normalized.sectionId,
-    );
-    if (capacity !== null) {
-      const currentCount = await this.repository.countActiveSectionPlacements(
-        context.organizationId,
-        normalized.sectionId,
-        normalized.academicYearId,
-        normalized.studentId,
-      );
-      if (currentCount >= capacity) {
-        throw new AppError(
-          409,
-          'SECTION_CAPACITY_REACHED',
-          'This section has reached its configured student capacity. Choose another section or increase the capacity.',
-        );
-      }
-    }
-    return this.repository.upsertStudentPlacements(
+    return this.repository.upsertStudentPlacementWithinCapacity(
       context.organizationId,
       normalized,
     );
@@ -360,7 +341,7 @@ export class AttendanceService {
         context.organizationId,
         context.userId,
       );
-      const hasAccess = assignments.some(
+      const scopedAssignments = assignments.filter(
         (assignment) =>
           assignment.sectionId === normalized.sectionId &&
           (!normalized.classId || assignment.classId === normalized.classId) &&
@@ -369,18 +350,176 @@ export class AttendanceService {
           (context.campusIds.length === 0 ||
             context.campusIds.includes(assignment.campusId)),
       );
-      if (!hasAccess) {
+      if (scopedAssignments.length === 0) {
         throw new AppError(
           403,
           'TEACHER_ASSIGNMENT_REQUIRED',
           'You can only view attendance for your assigned class sections.',
         );
       }
+      // Attendance records are year-specific. Restrict history to academic years
+      // in which this teacher is assigned to this exact class/section/campus.
+      normalized.academicYearIds = [
+        ...new Set(
+          scopedAssignments.map((assignment) => assignment.academicYearId),
+        ),
+      ];
     }
     return this.repository.listStudentAttendance(
       context.organizationId,
       normalized,
       campusScope(context),
+    );
+  }
+
+  async getTeacherSelfAttendance(
+    context: AttendanceContext,
+    input: { dateFrom?: string; dateTo?: string } = {},
+  ) {
+    if (context.role !== 'teacher' || !context.userId) {
+      throw new AppError(
+        403,
+        'ROLE_REQUIRED',
+        'Only signed-in teachers can view their own attendance.',
+      );
+    }
+    dateRange(input);
+    const config = await this.repository.getTeacherSelfAttendanceConfig(
+      context.organizationId,
+    );
+    if (!config.viewOwnAttendance) {
+      throw new AppError(
+        403,
+        'SELF_ATTENDANCE_VIEW_DISABLED',
+        'Your institute has disabled teacher self-attendance history.',
+      );
+    }
+    const staff = await this.repository.findActiveStaffForUser(
+      context.organizationId,
+      context.userId,
+    );
+    if (!staff) {
+      throw new AppError(
+        403,
+        'TEACHER_ACCOUNT_UNLINKED',
+        'Your teacher login is not linked to one active staff profile. Contact the institute administrator.',
+      );
+    }
+    if (staff.campusId) assertCampus(context, staff.campusId);
+    const items = await this.repository.listStaffAttendance(
+      context.organizationId,
+      { ...input, staffId: staff.id },
+      campusScope(context),
+    );
+    return {
+      policy: {
+        viewOwnAttendance: config.viewOwnAttendance,
+        selfMarkingEnabled: config.selfMarkingEnabled,
+        allowedStatuses: config.allowedStatuses,
+      },
+      items,
+    };
+  }
+
+  async saveTeacherSelfAttendance(
+    context: AttendanceContext,
+    input: {
+      date: string;
+      status: StaffAttendanceInput['status'];
+      remarks?: string;
+    },
+  ) {
+    if (context.role !== 'teacher' || !context.userId) {
+      throw new AppError(
+        403,
+        'ROLE_REQUIRED',
+        'Only signed-in teachers can mark their own attendance.',
+      );
+    }
+    const config = await this.repository.getTeacherSelfAttendanceConfig(
+      context.organizationId,
+    );
+    if (!config.selfMarkingEnabled) {
+      throw new AppError(
+        403,
+        'SELF_ATTENDANCE_MARKING_DISABLED',
+        'Your institute has not enabled teacher self-attendance marking.',
+      );
+    }
+    if (!config.allowedStatuses.includes(input.status)) {
+      throw new AppError(
+        403,
+        'SELF_ATTENDANCE_STATUS_NOT_ALLOWED',
+        'This attendance status is not allowed by your institute.',
+      );
+    }
+    const attendanceDate = date(input.date, 'date');
+    let today: string;
+    try {
+      today = new Intl.DateTimeFormat('en-CA', {
+        timeZone: config.timezone || 'Asia/Karachi',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date());
+    } catch {
+      throw new AppError(
+        500,
+        'INVALID_ORGANIZATION_TIMEZONE',
+        'The institute timezone setting is invalid. Contact the administrator.',
+      );
+    }
+    if (attendanceDate !== today) {
+      throw new AppError(
+        400,
+        'SELF_ATTENDANCE_DATE_RESTRICTED',
+        'Teachers can only mark their own attendance for today.',
+      );
+    }
+    if (
+      input.remarks !== undefined &&
+      (typeof input.remarks !== 'string' || input.remarks.trim().length > 500)
+    ) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Remarks must be 500 characters or fewer.',
+      );
+    }
+    const staff = await this.repository.findActiveStaffForUser(
+      context.organizationId,
+      context.userId,
+    );
+    if (!staff) {
+      throw new AppError(
+        403,
+        'TEACHER_ACCOUNT_UNLINKED',
+        'Your teacher login is not linked to one active staff profile. Contact the institute administrator.',
+      );
+    }
+    if (staff.campusId) assertCampus(context, staff.campusId);
+    const existing = await this.repository.listStaffAttendance(
+      context.organizationId,
+      { staffId: staff.id, dateFrom: attendanceDate, dateTo: attendanceDate },
+      campusScope(context),
+    );
+    if (existing.length) {
+      throw new AppError(
+        409,
+        'SELF_ATTENDANCE_ALREADY_MARKED',
+        'Your attendance has already been recorded for today. Contact the administrator if it needs correction.',
+      );
+    }
+    return this.repository.createStaffAttendanceOnce(
+      context.organizationId,
+      staff.campusId,
+      context.userId,
+      {
+        staffId: staff.id,
+        date: attendanceDate,
+        status: input.status,
+        ...(input.remarks?.trim() ? { remarks: input.remarks.trim() } : {}),
+      },
     );
   }
 

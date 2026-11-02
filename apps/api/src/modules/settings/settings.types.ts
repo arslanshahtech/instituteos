@@ -23,11 +23,21 @@ export interface OrganizationSettingsNotifications {
   autoAttendanceAlerts: boolean;
 }
 
+export type TeacherSelfAttendanceStatus =
+  'present' | 'absent' | 'half-day' | 'on-leave';
+
+export interface TeacherSelfAttendancePolicy {
+  viewOwnAttendance: boolean;
+  selfMarkingEnabled: boolean;
+  allowedStatuses: TeacherSelfAttendanceStatus[];
+}
+
 export interface OrganizationSettingsInput {
   branding?: Partial<OrganizationSettingsBranding>;
   contact?: Partial<OrganizationSettingsContact>;
   localization?: Partial<OrganizationSettingsLocalization>;
   notifications?: Partial<OrganizationSettingsNotifications>;
+  teacherSelfAttendance?: Partial<TeacherSelfAttendancePolicy>;
 }
 
 export interface OrganizationSettingsRecord {
@@ -36,6 +46,7 @@ export interface OrganizationSettingsRecord {
   contact: OrganizationSettingsContact;
   localization: OrganizationSettingsLocalization;
   notifications: OrganizationSettingsNotifications;
+  teacherSelfAttendance: TeacherSelfAttendancePolicy;
   createdAt: string;
   updatedAt: string;
 }

@@ -195,6 +195,7 @@ export function StaffForm({
         <FormField
           autoComplete="email"
           error={form.formState.errors.email?.message}
+          hint="Teacher login aur class assignment ke liye yahi email Institute Setup → Members mein invite karte waqt use karein."
           label="Contact email"
           maxLength={254}
           type="email"

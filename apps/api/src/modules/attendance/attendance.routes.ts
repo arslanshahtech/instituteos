@@ -14,6 +14,7 @@ import { MongoOrganizationAccessRepository } from '../tenancy/tenancy.repository
 import type { OrganizationAccessRepository } from '../tenancy/tenancy.types.js';
 import {
   createOrganizationContextMiddleware,
+  requireOrganizationMethodPermission,
   requireOrganizationRole,
 } from '../tenancy/tenant-context.middleware.js';
 import { MongoAttendanceRepository } from './attendance.repository.js';
@@ -149,12 +150,14 @@ export function createAttendanceRouter(
     authenticate,
     resolveOrganization,
     requireOrganizationRole(studentAttendanceRoles),
+    requireOrganizationMethodPermission('attendance.read', 'attendance.write'),
   ] as const;
 
   const protectTeacherAttendance = [
     authenticate,
     resolveOrganization,
     requireOrganizationRole(['teacher']),
+    requireOrganizationMethodPermission('attendance.read', 'attendance.write'),
   ] as const;
 
   // Management & Staff Attendance: Accessible only by Admin/Managers
@@ -162,6 +165,7 @@ export function createAttendanceRouter(
     authenticate,
     resolveOrganization,
     requireOrganizationRole(staffAttendanceManagers),
+    requireOrganizationMethodPermission('staff.read', 'attendance.write'),
   ] as const;
 
   const base = '/:organizationId';
@@ -174,6 +178,55 @@ export function createAttendanceRouter(
         organizationContext(response),
       );
       response.status(200).json({ items: assignments });
+    }),
+  );
+
+  // Teachers can only read their own staff attendance; staffId is derived server-side.
+  router.get(
+    `${base}/attendance/self`,
+    ...protectTeacherAttendance,
+    asyncHandler(async (request, response) => {
+      const query = request.query as Record<string, unknown>;
+      const result = await service.getTeacherSelfAttendance(
+        organizationContext(response),
+        {
+          ...(queryValue(query.dateFrom, 'dateFrom')
+            ? { dateFrom: queryValue(query.dateFrom, 'dateFrom') }
+            : {}),
+          ...(queryValue(query.dateTo, 'dateTo')
+            ? { dateTo: queryValue(query.dateTo, 'dateTo') }
+            : {}),
+        },
+      );
+      response.status(200).json(result);
+    }),
+  );
+
+  router.post(
+    `${base}/attendance/self`,
+    ...protectTeacherAttendance,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const body = bodyObject(request.body);
+      const status = text(body.status, 'staff attendance status', 20);
+      if (!['present', 'absent', 'half-day', 'on-leave'].includes(status)) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Select a valid staff attendance status.',
+        );
+      }
+      const attendance = await service.saveTeacherSelfAttendance(
+        organizationContext(response),
+        {
+          date: text(body.date, 'date', 10),
+          status: status as StaffAttendanceStatus,
+          ...(optionalText(body.remarks, 'remarks')
+            ? { remarks: optionalText(body.remarks, 'remarks') }
+            : {}),
+        },
+      );
+      response.status(201).json({ attendance });
     }),
   );
 

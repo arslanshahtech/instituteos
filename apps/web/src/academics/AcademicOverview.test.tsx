@@ -38,6 +38,7 @@ describe('AcademicOverview', () => {
             campusId: 'campus-1',
             name: 'Class 5',
             code: 'C5',
+            sortOrder: 0,
             createdAt: '',
             updatedAt: '',
           },

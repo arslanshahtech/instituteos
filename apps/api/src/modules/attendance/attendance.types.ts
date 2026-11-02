@@ -9,6 +9,13 @@ export interface AttendanceContext {
   userId?: string;
 }
 
+export interface TeacherSelfAttendanceConfig {
+  viewOwnAttendance: boolean;
+  selfMarkingEnabled: boolean;
+  allowedStatuses: StaffAttendanceStatus[];
+  timezone: string;
+}
+
 export interface TeacherAttendanceAssignment {
   id: string;
   classId: string;
@@ -73,6 +80,8 @@ export interface StudentAttendanceQuery {
   classId?: string;
   sectionId?: string;
   campusId?: string;
+  /** Internal repository restriction derived from the signed-in teacher's assignments. */
+  academicYearIds?: string[];
 }
 
 export interface StaffAttendanceInput {
@@ -116,6 +125,13 @@ export interface AttendanceRepository {
     organizationId: string,
     userId: string,
   ): Promise<TeacherAttendanceAssignment[]>;
+  getTeacherSelfAttendanceConfig(
+    organizationId: string,
+  ): Promise<TeacherSelfAttendanceConfig>;
+  findActiveStaffForUser(
+    organizationId: string,
+    userId: string,
+  ): Promise<{ id: string; campusId?: string } | null>;
   isTeacherAssignedToSection(
     organizationId: string,
     userId: string,
@@ -167,6 +183,10 @@ export interface AttendanceRepository {
     organizationId: string,
     input: StudentPlacementInput,
   ): Promise<StudentPlacementRecord>;
+  upsertStudentPlacementWithinCapacity(
+    organizationId: string,
+    input: StudentPlacementInput,
+  ): Promise<StudentPlacementRecord>;
   deactivateStudentPlacement(
     organizationId: string,
     input: StudentPlacementInput,
@@ -190,6 +210,12 @@ export interface AttendanceRepository {
   saveStaffAttendance(
     organizationId: string,
     campusId: string | undefined,
+    input: StaffAttendanceInput,
+  ): Promise<StaffAttendanceRecord>;
+  createStaffAttendanceOnce(
+    organizationId: string,
+    campusId: string | undefined,
+    actorId: string,
     input: StaffAttendanceInput,
   ): Promise<StaffAttendanceRecord>;
   listStaffAttendance(

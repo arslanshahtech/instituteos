@@ -16,6 +16,7 @@ import {
   ORGANIZATION_ROLES,
   type OrganizationRole,
 } from '../tenancy/tenancy.types.js';
+import { ORGANIZATION_PERMISSIONS } from '../tenancy/authorization.js';
 import {
   createOrganizationContextMiddleware,
   requireAssignedCampusScope,
@@ -277,10 +278,41 @@ function parseProvision(value: unknown): ProvisionOrganizationInput {
 
 function parseInvitation(value: unknown): MemberInvitationInput {
   const body = bodyObject(value);
+  const role = parseRole(body.role);
+  let permissions: MemberInvitationInput['permissions'];
+  if (body.permissions !== undefined) {
+    if (
+      !Array.isArray(body.permissions) ||
+      body.permissions.some((item) => typeof item !== 'string')
+    )
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Permissions must be a list of valid permission names.',
+      );
+    const requested = body.permissions as string[];
+    if (
+      requested.some(
+        (permission) =>
+          !ORGANIZATION_PERMISSIONS.includes(
+            permission as (typeof ORGANIZATION_PERMISSIONS)[number],
+          ),
+      )
+    )
+      throw new AppError(
+        400,
+        'INVALID_PERMISSION',
+        'One or more permissions are invalid.',
+      );
+    permissions = [
+      ...new Set(requested),
+    ] as MemberInvitationInput['permissions'];
+  }
   return {
     email: email(body.email),
-    role: parseRole(body.role),
+    role,
     campusIds: parseCampusIds(body.campusIds),
+    ...(permissions !== undefined ? { permissions } : {}),
   };
 }
 
@@ -299,6 +331,34 @@ function parseMemberUpdate(value: unknown): MemberUpdateInput {
   }
   if (body.campusIds !== undefined)
     update.campusIds = parseCampusIds(body.campusIds);
+  if (body.permissions !== undefined) {
+    if (
+      !Array.isArray(body.permissions) ||
+      body.permissions.some((item) => typeof item !== 'string')
+    )
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Permissions must be a list of valid permission names.',
+      );
+    const requested = body.permissions as string[];
+    if (
+      requested.some(
+        (permission) =>
+          !ORGANIZATION_PERMISSIONS.includes(
+            permission as (typeof ORGANIZATION_PERMISSIONS)[number],
+          ),
+      )
+    )
+      throw new AppError(
+        400,
+        'INVALID_PERMISSION',
+        'One or more permissions are invalid.',
+      );
+    update.permissions = [
+      ...new Set(requested),
+    ] as MemberUpdateInput['permissions'];
+  }
   if (Object.keys(update).length === 0)
     throw new AppError(
       400,

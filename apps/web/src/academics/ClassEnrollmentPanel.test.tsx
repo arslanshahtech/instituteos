@@ -40,6 +40,10 @@ function renderPanel(
     onRetryTeachers?: () => void;
     onManageStaff?: () => void;
     focusRequest?: number;
+    canReadStudents?: boolean;
+    canAddStudents?: boolean;
+    canAssignTeachers?: boolean;
+    canWriteAcademics?: boolean;
   } = {},
 ) {
   const client = new QueryClient({
@@ -56,6 +60,7 @@ function renderPanel(
             campusId: 'campus-1',
             name: 'Class 1',
             code: 'C1',
+            sortOrder: 0,
             createdAt: '',
             updatedAt: '',
           },
@@ -108,6 +113,10 @@ function renderPanel(
         onManageStaff={teacherOptions.onManageStaff}
         initialView={initialView}
         focusRequest={teacherOptions.focusRequest ?? 0}
+        canReadStudents={teacherOptions.canReadStudents}
+        canAddStudents={teacherOptions.canAddStudents}
+        canAssignTeachers={teacherOptions.canAssignTeachers}
+        canWriteAcademics={teacherOptions.canWriteAcademics}
       />
     </QueryClientProvider>,
   );
@@ -133,6 +142,30 @@ beforeEach(() => {
 });
 
 describe('ClassEnrollmentPanel', () => {
+  it('keeps student roster read-only and avoids loading eligible students without write permissions', async () => {
+    renderPanel('students', {
+      canReadStudents: true,
+      canAddStudents: false,
+      canAssignTeachers: false,
+      canWriteAcademics: false,
+    });
+
+    expect(
+      screen.getByRole('tab', { name: 'View Students' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('tab', { name: 'Add Student' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('tab', { name: 'Assign Teacher' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add new student' }),
+    ).not.toBeInTheDocument();
+    await waitFor(() => expect(mocks.getStudentRoster).toHaveBeenCalled());
+    expect(mocks.getEligibleStudents).not.toHaveBeenCalled();
+  });
+
   it('shows a teacher-list error with retry and staff-directory actions', () => {
     const retry = vi.fn();
     const manageStaff = vi.fn();
@@ -199,6 +232,7 @@ describe('ClassEnrollmentPanel', () => {
               campusId: 'campus-1',
               name: 'Class 1',
               code: 'C1',
+              sortOrder: 0,
               createdAt: '',
               updatedAt: '',
             },

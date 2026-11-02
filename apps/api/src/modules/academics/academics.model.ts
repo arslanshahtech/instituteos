@@ -73,6 +73,7 @@ const classSchema = new Schema(
       uppercase: true,
       maxlength: 30,
     },
+    sortOrder: { type: Number, min: 0, max: 100000, default: 0 },
     studyLevel: { type: String, enum: ['first_year', 'second_year', 'other'] },
     programName: { type: String, trim: true, maxlength: 120 },
   },
@@ -97,6 +98,8 @@ const sectionSchema = new Schema(
     },
     name: { type: String, required: true, trim: true, maxlength: 80 },
     capacity: { type: Number, min: 1, max: 10000 },
+    // Transactional write lock shared by placement and capacity changes.
+    placementRevision: { type: Number, default: 0, select: false },
   },
   { timestamps: true, versionKey: false },
 );

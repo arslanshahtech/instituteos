@@ -21,6 +21,11 @@ function settingsRecord(
       record.localization as OrganizationSettingsRecord['localization'],
     notifications:
       record.notifications as OrganizationSettingsRecord['notifications'],
+    teacherSelfAttendance: (record.teacherSelfAttendance ?? {
+      viewOwnAttendance: true,
+      selfMarkingEnabled: false,
+      allowedStatuses: ['present'],
+    }) as OrganizationSettingsRecord['teacherSelfAttendance'],
     createdAt: iso(record.createdAt as Date),
     updatedAt: iso(record.updatedAt as Date),
   };
@@ -33,6 +38,7 @@ function updateFields(input: OrganizationSettingsInput) {
     'contact',
     'localization',
     'notifications',
+    'teacherSelfAttendance',
   ] as const) {
     const values = input[section];
     if (!values) continue;

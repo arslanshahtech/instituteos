@@ -204,3 +204,36 @@ export function saveStaffAttendance(
     { method: 'POST', body: JSON.stringify(input) },
   );
 }
+
+export interface TeacherSelfAttendanceResponse {
+  policy: {
+    viewOwnAttendance: boolean;
+    selfMarkingEnabled: boolean;
+    allowedStatuses: StaffAttendanceStatus[];
+  };
+  items: StaffAttendanceRecord[];
+}
+
+export function getTeacherSelfAttendance(
+  organizationId: string,
+  input: { dateFrom?: string; dateTo?: string } = {},
+) {
+  const query = new URLSearchParams(
+    Object.entries(input).filter((entry): entry is [string, string] =>
+      Boolean(entry[1]),
+    ),
+  ).toString();
+  return apiRequest<TeacherSelfAttendanceResponse>(
+    `${organizationPath(organizationId)}/attendance/self${query ? `?${query}` : ''}`,
+  );
+}
+
+export function saveTeacherSelfAttendance(
+  organizationId: string,
+  input: { date: string; status: StaffAttendanceStatus; remarks?: string },
+) {
+  return apiRequest<{ attendance: StaffAttendanceRecord }>(
+    `${organizationPath(organizationId)}/attendance/self`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+}

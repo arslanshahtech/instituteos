@@ -141,8 +141,20 @@ export class AcademicsService {
         'The academic year cannot exclude dates used by existing terms.',
       );
     }
+    const updated =
+      changes.status === 'active'
+        ? await this.repository.activateAcademicYear(
+            context.organizationId,
+            id,
+            changes,
+          )
+        : await this.repository.updateAcademicYear(
+            context.organizationId,
+            id,
+            changes,
+          );
     return this.required(
-      this.repository.updateAcademicYear(context.organizationId, id, changes),
+      Promise.resolve(updated),
       'ACADEMIC_YEAR_NOT_FOUND',
       'Academic year',
     );
@@ -256,6 +268,7 @@ export class AcademicsService {
     const studyLevel = input.studyLevel
       ? this.studyLevel(input.studyLevel)
       : undefined;
+    const sortOrder = this.classSortOrder(input.sortOrder);
     const programName = input.programName?.trim()
       ? requiredText(input.programName, 'program/group name', 120)
       : undefined;
@@ -269,6 +282,7 @@ export class AcademicsService {
       name: requiredText(input.name, 'class name', 100),
       code: requiredText(input.code, 'class code', 30).toUpperCase(),
       campusId,
+      sortOrder,
       ...(studyLevel ? { studyLevel } : {}),
       ...(programName ? { programName } : {}),
     });
@@ -290,6 +304,8 @@ export class AcademicsService {
     }
     if (input.studyLevel !== undefined)
       changes.studyLevel = this.studyLevel(input.studyLevel);
+    if (input.sortOrder !== undefined)
+      changes.sortOrder = this.classSortOrder(input.sortOrder);
     if (input.programName !== undefined)
       changes.programName = input.programName.trim()
         ? requiredText(input.programName, 'program/group name', 120)
@@ -568,6 +584,17 @@ export class AcademicsService {
         : {}),
       ...(classIds !== undefined ? { classIds } : {}),
     };
+  }
+
+  private classSortOrder(value: number | undefined): number {
+    if (value === undefined) return 0;
+    if (!Number.isInteger(value) || value < 0 || value > 100000)
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Class display order must be a whole number from 0 to 100,000.',
+      );
+    return value;
   }
 
   private studyLevel(value: string): 'first_year' | 'second_year' | 'other' {

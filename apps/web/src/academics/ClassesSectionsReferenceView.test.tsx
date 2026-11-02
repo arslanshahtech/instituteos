@@ -11,6 +11,7 @@ describe('ClassesSectionsReferenceView', () => {
         campusId: 'campus-1',
         name: 'Class 5',
         code: 'C5',
+        sortOrder: 0,
         createdAt: '',
         updatedAt: '',
       },
@@ -124,6 +125,41 @@ describe('ClassesSectionsReferenceView', () => {
     fireEvent.click(screen.getByRole('button', { name: /Add Subject/ }));
 
     expect(props.onCreateSubject).toHaveBeenCalledTimes(1);
+  });
+
+  it('respects read-only Admin permissions without hiding class data', () => {
+    const props = {
+      ...baseProps(),
+      canWriteAcademics: false,
+      canReadStudents: true,
+      canAddStudents: false,
+      canAssignTeachers: false,
+    };
+    render(<ClassesSectionsReferenceView {...props} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Class 5/ }));
+
+    expect(
+      screen.getByRole('button', { name: /View Students/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Create Class' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Add Section/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add Student' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Assign Teacher/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Edit Class' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Delete Class' }),
+    ).not.toBeInTheDocument();
   });
 
   it('keeps Assign Teacher available from the teachers and subjects tab', () => {

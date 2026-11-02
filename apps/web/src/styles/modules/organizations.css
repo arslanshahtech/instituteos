@@ -1490,3 +1490,42 @@
   width: 100%;
   min-width: 0;
 }
+
+.admin-permission-editor {
+  flex: 1 1 100%;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-canvas);
+  padding: 10px 12px;
+}
+.admin-permission-editor summary {
+  color: var(--color-ink);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+}
+.admin-permission-list {
+  display: grid;
+  max-height: 260px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 7px 12px;
+  overflow: auto;
+  padding: 12px 2px 2px;
+}
+.admin-permission-list label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-ink);
+  font-size: 11px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.admin-permission-list input {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  accent-color: var(--color-accent);
+}

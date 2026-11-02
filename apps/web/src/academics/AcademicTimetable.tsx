@@ -28,6 +28,7 @@ interface Props {
   sections: AcademicSection[];
   subjects: AcademicSubject[];
   years: AcademicYear[];
+  canWrite?: boolean;
 }
 
 const days = [
@@ -48,6 +49,7 @@ export function AcademicTimetable({
   sections,
   subjects,
   years,
+  canWrite = true,
 }: Props) {
   const queryClient = useQueryClient();
   const [teacherId, setTeacherId] = useState(teachers[0]?.id ?? '');
@@ -130,121 +132,130 @@ export function AcademicTimetable({
           </p>
         </div>
       </header>
+      {!canWrite && (
+        <p className="academics-readonly-note" role="status">
+          You have read-only access to the timetable. Ask the Owner to grant
+          academics.write if you need to change periods.
+        </p>
+      )}
       {teachers.length === 0 ? (
         <p className="form-help-text">
-          Pehle Staff module mein active teachers add karein.
+          No teaching staff are available. Check staff.read access and ensure
+          teacher profiles have a teaching designation or assigned subjects.
         </p>
       ) : (
         <>
-          <div className="academic-timetable-form">
-            <label>
-              Teacher
-              <select
-                value={teacherId}
-                onChange={(event) => {
-                  setTeacherId(event.target.value);
-                  setAssignmentId('');
-                }}
-              >
-                {teachers.map((teacher) => (
-                  <option key={teacher.id} value={teacher.id}>
-                    {teacher.firstName} {teacher.lastName}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Class / Subject assignment
-              <select
-                value={assignmentId}
-                onChange={(event) => setAssignmentId(event.target.value)}
-              >
-                <option value="">Select assignment</option>
-                {teacherAssignments.map((assignment) => {
-                  const subject =
-                    subjects.find((item) => item.id === assignment.subjectId)
-                      ?.name ?? 'Subject';
-                  const className =
-                    classes.find((item) => item.id === assignment.classId)
-                      ?.name ?? 'Class';
-                  const sectionName =
-                    sections.find((item) => item.id === assignment.sectionId)
-                      ?.name ?? 'Section';
-                  return (
-                    <option key={assignment.id} value={assignment.id}>
-                      {subject} · {className} - {sectionName}
+          {canWrite && (
+            <div className="academic-timetable-form">
+              <label>
+                Teacher
+                <select
+                  value={teacherId}
+                  onChange={(event) => {
+                    setTeacherId(event.target.value);
+                    setAssignmentId('');
+                  }}
+                >
+                  {teachers.map((teacher) => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {teacher.firstName} {teacher.lastName}
                     </option>
-                  );
-                })}
-              </select>
-            </label>
-            <label>
-              Day
-              <select
-                value={dayOfWeek}
-                onChange={(event) => setDayOfWeek(event.target.value)}
-              >
-                {days.map((day) => (
-                  <option key={day} value={day}>
-                    {day[0]!.toUpperCase() + day.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Start time
-              <input
-                type="time"
-                value={startTime}
-                onChange={(event) => setStartTime(event.target.value)}
-              />
-            </label>
-            <label>
-              End time
-              <input
-                type="time"
-                value={endTime}
-                onChange={(event) => setEndTime(event.target.value)}
-              />
-            </label>
-            <label>
-              Room (optional)
-              <input
-                value={room}
-                onChange={(event) => setRoom(event.target.value)}
-                maxLength={80}
-                placeholder="e.g. Room 12"
-              />
-            </label>
-            <button
-              type="button"
-              disabled={
-                !assignmentId || startTime >= endTime || create.isPending
-              }
-              onClick={() => create.mutate()}
-            >
-              {create.isPending
-                ? 'Saving…'
-                : editingId
-                  ? 'Update timetable period'
-                  : 'Add timetable period'}
-            </button>
-            {editingId && (
+                  ))}
+                </select>
+              </label>
+              <label>
+                Class / Subject assignment
+                <select
+                  value={assignmentId}
+                  onChange={(event) => setAssignmentId(event.target.value)}
+                >
+                  <option value="">Select assignment</option>
+                  {teacherAssignments.map((assignment) => {
+                    const subject =
+                      subjects.find((item) => item.id === assignment.subjectId)
+                        ?.name ?? 'Subject';
+                    const className =
+                      classes.find((item) => item.id === assignment.classId)
+                        ?.name ?? 'Class';
+                    const sectionName =
+                      sections.find((item) => item.id === assignment.sectionId)
+                        ?.name ?? 'Section';
+                    return (
+                      <option key={assignment.id} value={assignment.id}>
+                        {subject} · {className} - {sectionName}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+              <label>
+                Day
+                <select
+                  value={dayOfWeek}
+                  onChange={(event) => setDayOfWeek(event.target.value)}
+                >
+                  {days.map((day) => (
+                    <option key={day} value={day}>
+                      {day[0]!.toUpperCase() + day.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Start time
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(event) => setStartTime(event.target.value)}
+                />
+              </label>
+              <label>
+                End time
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(event) => setEndTime(event.target.value)}
+                />
+              </label>
+              <label>
+                Room (optional)
+                <input
+                  value={room}
+                  onChange={(event) => setRoom(event.target.value)}
+                  maxLength={80}
+                  placeholder="e.g. Room 12"
+                />
+              </label>
               <button
                 type="button"
-                className="academic-timetable-cancel"
-                onClick={() => {
-                  setEditingId(undefined);
-                  setAssignmentId('');
-                  setRoom('');
-                  setStartTime('08:00');
-                  setEndTime('08:40');
-                }}
+                disabled={
+                  !assignmentId || startTime >= endTime || create.isPending
+                }
+                onClick={() => create.mutate()}
               >
-                Cancel edit
+                {create.isPending
+                  ? 'Saving…'
+                  : editingId
+                    ? 'Update timetable period'
+                    : 'Add timetable period'}
               </button>
-            )}
-          </div>
+              {editingId && (
+                <button
+                  type="button"
+                  className="academic-timetable-cancel"
+                  onClick={() => {
+                    setEditingId(undefined);
+                    setAssignmentId('');
+                    setRoom('');
+                    setStartTime('08:00');
+                    setEndTime('08:40');
+                  }}
+                >
+                  Cancel edit
+                </button>
+              )}
+            </div>
+          )}
           {create.isError && (
             <p className="form-error" role="alert">
               {apiMessage(create.error)}
@@ -275,35 +286,37 @@ export function AcademicTimetable({
                             <span>{labelFor(entry)}</span>
                             {entry.room && <small>{entry.room}</small>}
                           </div>
-                          <div className="academic-timetable-entry-actions">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingId(entry.id);
-                                setAssignmentId(entry.teacherAssignmentId);
-                                setDayOfWeek(entry.dayOfWeek);
-                                setStartTime(entry.startTime);
-                                setEndTime(entry.endTime);
-                                setRoom(entry.room ?? '');
-                              }}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              disabled={remove.isPending}
-                              onClick={() => {
-                                if (
-                                  window.confirm(
-                                    'Remove this timetable period?',
+                          {canWrite && (
+                            <div className="academic-timetable-entry-actions">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingId(entry.id);
+                                  setAssignmentId(entry.teacherAssignmentId);
+                                  setDayOfWeek(entry.dayOfWeek);
+                                  setStartTime(entry.startTime);
+                                  setEndTime(entry.endTime);
+                                  setRoom(entry.room ?? '');
+                                }}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                disabled={remove.isPending}
+                                onClick={() => {
+                                  if (
+                                    window.confirm(
+                                      'Remove this timetable period?',
+                                    )
                                   )
-                                )
-                                  remove.mutate(entry.id);
-                              }}
-                            >
-                              Remove
-                            </button>
-                          </div>
+                                    remove.mutate(entry.id);
+                                }}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          )}
                         </article>
                       ))
                     ) : (

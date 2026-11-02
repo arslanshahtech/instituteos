@@ -20,6 +20,7 @@ const classRecord: ClassRecord = {
   campusId: context.campusIds[0]!,
   name: 'Grade 8',
   code: 'G8',
+  sortOrder: 0,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
@@ -37,15 +38,13 @@ function repository(overrides: Partial<AcademicsRepository> = {}) {
   return {
     validateStaff: vi.fn().mockResolvedValue(true),
     validateSubject: vi.fn().mockResolvedValue(true),
-    getSubject: vi
-      .fn()
-      .mockResolvedValue({
-        id: '650000000000000000000007',
-        organizationId: context.organizationId,
-        name: 'Mathematics',
-        code: 'MATH',
-        classIds: [],
-      }),
+    getSubject: vi.fn().mockResolvedValue({
+      id: '650000000000000000000007',
+      organizationId: context.organizationId,
+      name: 'Mathematics',
+      code: 'MATH',
+      classIds: [],
+    }),
     getClass: vi.fn().mockResolvedValue(classRecord),
     getSection: vi.fn().mockResolvedValue(sectionRecord),
     validateAcademicYear: vi.fn().mockResolvedValue(true),
@@ -63,8 +62,10 @@ function repository(overrides: Partial<AcademicsRepository> = {}) {
     }),
     createTerm: vi.fn().mockResolvedValue({ id: 'term' }),
     hasOverlappingTerm: vi.fn().mockResolvedValue(false),
+    termsFitAcademicYear: vi.fn().mockResolvedValue(true),
     createAcademicYear: vi.fn(),
     updateAcademicYear: vi.fn(),
+    activateAcademicYear: vi.fn(),
     createClass: vi.fn(),
     createSubject: vi.fn().mockResolvedValue({ id: 'subject' }),
     ...overrides,
@@ -95,6 +96,61 @@ describe('AcademicsService', () => {
         status: 'archived',
       },
     );
+  });
+
+  it('persists a validated class display order', async () => {
+    const repo = repository({
+      createClass: vi.fn().mockResolvedValue({ ...classRecord, sortOrder: 4 }),
+    });
+    const service = new AcademicsService(repo);
+
+    await service.createClass(context, {
+      name: 'Grade 8',
+      code: 'G8',
+      campusId: context.campusIds[0]!,
+      sortOrder: 4,
+    });
+
+    expect(repo.createClass).toHaveBeenCalledWith(
+      context.organizationId,
+      expect.objectContaining({ sortOrder: 4 }),
+    );
+  });
+
+  it('rejects an invalid class display order', async () => {
+    const repo = repository();
+    const service = new AcademicsService(repo);
+
+    await expect(
+      service.createClass(context, {
+        name: 'Grade 8',
+        code: 'G8',
+        campusId: context.campusIds[0]!,
+        sortOrder: -1,
+      }),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    expect(repo.createClass).not.toHaveBeenCalled();
+  });
+
+  it('activates a new academic year through the atomic repository transition', async () => {
+    const repo = repository({
+      activateAcademicYear: vi.fn().mockResolvedValue({
+        id: '650000000000000000000005',
+        status: 'active',
+      }),
+    });
+    const service = new AcademicsService(repo);
+
+    await service.updateAcademicYear(context, '650000000000000000000005', {
+      status: 'active',
+    });
+
+    expect(repo.activateAcademicYear).toHaveBeenCalledWith(
+      context.organizationId,
+      '650000000000000000000005',
+      { status: 'active' },
+    );
+    expect(repo.updateAcademicYear).not.toHaveBeenCalled();
   });
 
   it('rejects academic year dates with an invalid range', async () => {
@@ -208,13 +264,11 @@ describe('AcademicsService', () => {
 
   it('stores college study level and program name on the class record', async () => {
     const repo = repository({
-      createClass: vi
-        .fn()
-        .mockResolvedValue({
-          ...classRecord,
-          studyLevel: 'first_year',
-          programName: 'FSc Pre-Medical',
-        }),
+      createClass: vi.fn().mockResolvedValue({
+        ...classRecord,
+        studyLevel: 'first_year',
+        programName: 'FSc Pre-Medical',
+      }),
     });
     const service = new AcademicsService(repo);
     await service.createClass(context, {
@@ -248,6 +302,26 @@ describe('AcademicsService', () => {
     expect(repo.createClass).not.toHaveBeenCalled();
   });
 
+  it('rejects a non-teaching staff profile as a teacher assignment', async () => {
+    const repo = repository({
+      validateStaff: vi.fn().mockResolvedValue(false),
+    });
+    const service = new AcademicsService(repo);
+
+    await expect(
+      service.createTeacherAssignment(context, {
+        teacherStaffId: '650000000000000000000006',
+        subjectId: '650000000000000000000007',
+        classId: classRecord.id,
+        sectionId: sectionRecord.id,
+        academicYearId: '650000000000000000000005',
+      }),
+    ).rejects.toMatchObject({ code: 'STAFF_MEMBER_NOT_FOUND' });
+
+    expect(repo.createTeacherAssignment).not.toHaveBeenCalled();
+    expect(repo.validateSubject).not.toHaveBeenCalled();
+  });
+
   it('rejects a teacher assignment when the teacher is already assigned to that section and year', async () => {
     const repo = repository({
       findTeacherAssignmentConflict: vi.fn().mockResolvedValue(true),
@@ -272,15 +346,13 @@ describe('AcademicsService', () => {
 
   it('rejects teacher assignment when the subject is not mapped to the selected college group', async () => {
     const repo = repository({
-      getSubject: vi
-        .fn()
-        .mockResolvedValue({
-          id: '650000000000000000000007',
-          organizationId: context.organizationId,
-          name: 'Biology',
-          code: 'BIO',
-          classIds: ['650000000000000000000099'],
-        }),
+      getSubject: vi.fn().mockResolvedValue({
+        id: '650000000000000000000007',
+        organizationId: context.organizationId,
+        name: 'Biology',
+        code: 'BIO',
+        classIds: ['650000000000000000000099'],
+      }),
     });
     const service = new AcademicsService(repo);
     await expect(

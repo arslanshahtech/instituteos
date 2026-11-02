@@ -46,6 +46,7 @@ export interface ClassInput {
   name: string;
   code: string;
   campusId: string;
+  sortOrder?: number;
   studyLevel?: AcademicStudyLevel;
   programName?: string;
 }
@@ -53,6 +54,7 @@ export interface ClassInput {
 export interface ClassRecord extends ClassInput {
   id: string;
   organizationId: string;
+  sortOrder: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -121,6 +123,11 @@ export interface AcademicsRepository {
     input: AcademicYearInput,
   ): Promise<AcademicYearRecord>;
   updateAcademicYear(
+    organizationId: string,
+    id: string,
+    input: Partial<AcademicYearInput>,
+  ): Promise<AcademicYearRecord | null>;
+  activateAcademicYear(
     organizationId: string,
     id: string,
     input: Partial<AcademicYearInput>,

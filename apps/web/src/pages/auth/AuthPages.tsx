@@ -43,6 +43,24 @@ function errorMessage(error: unknown): string {
   return 'We could not complete that request. Please try again.';
 }
 
+function safeReturnPath(state: unknown): string | undefined {
+  if (typeof state !== 'object' || state === null || !('from' in state))
+    return undefined;
+  const destination = state.from;
+  return typeof destination === 'string' &&
+    destination.startsWith('/') &&
+    !destination.startsWith('//')
+    ? destination
+    : undefined;
+}
+
+function invitationReturnPath(state: unknown): string | undefined {
+  const destination = safeReturnPath(state);
+  return destination?.startsWith('/invitations/accept')
+    ? destination
+    : undefined;
+}
+
 function AuthFrame({
   eyebrow,
   title,
@@ -131,7 +149,15 @@ export function LoginPage() {
       description="Use your account email and password. InstituteOS will open the workspace your account has actually been authorized to access."
       footer={
         <>
-          New to InstituteOS? <Link to="/register">Create an account</Link>
+          New to InstituteOS?{' '}
+          <Link
+            to="/register"
+            state={safeReturnPath(location.state)
+              ? { from: safeReturnPath(location.state) }
+              : undefined}
+          >
+            Create an account
+          </Link>
         </>
       }
     >
@@ -175,6 +201,8 @@ export function LoginPage() {
 export function RegistrationPage() {
   const auth = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = safeReturnPath(location.state);
   const [error, setError] = useState('');
   const form = useForm<z.infer<typeof registrationSchema>>({
     resolver: zodResolver(registrationSchema),
@@ -190,7 +218,10 @@ export function RegistrationPage() {
         result.verificationRequired
           ? '/verification-pending'
           : '/login?registration=complete',
-        { replace: true },
+        {
+          replace: true,
+          ...(returnTo ? { state: { from: returnTo } } : {}),
+        },
       );
     } catch (cause) {
       setError(errorMessage(cause));
@@ -203,7 +234,14 @@ export function RegistrationPage() {
       description="Set up your personal InstituteOS identity. Organization access is managed separately."
       footer={
         <>
-          Already have an account? <Link to="/login">Sign in</Link> or{' '}
+          Already have an account?{' '}
+          <Link
+            to="/login"
+            state={returnTo ? { from: returnTo } : undefined}
+          >
+            Sign in
+          </Link>{' '}
+          or{' '}
           <Link to="/forgot-password">reset your password</Link>.
         </>
       }
@@ -397,6 +435,8 @@ export function VerifyEmailPage() {
 
 export function VerificationPendingPage() {
   const auth = useAuth();
+  const location = useLocation();
+  const invitationReturn = invitationReturnPath(location.state);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const form = useForm<z.infer<typeof emailSchema>>({
@@ -418,7 +458,14 @@ export function VerificationPendingPage() {
       eyebrow="Email verification"
       title="Check your email"
       description="Follow the verification link to finish setting up your account."
-      footer={<Link to="/login">Return to sign in</Link>}
+      footer={
+        <Link
+          to="/login"
+          state={invitationReturn ? { from: invitationReturn } : undefined}
+        >
+          Return to sign in
+        </Link>
+      }
     >
       <form className="auth-form" onSubmit={submit} noValidate>
         <FormField
@@ -437,6 +484,13 @@ export function VerificationPendingPage() {
           Resend verification email
         </Button>
       </form>
+      {invitationReturn && (
+        <p className="auth-notice" role="status">
+          After verifying your email, return here and continue to your institute
+          invitation.{' '}
+          <Link to={invitationReturn}>Continue to invitation</Link>
+        </p>
+      )}
     </AuthFrame>
   );
 }

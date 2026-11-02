@@ -91,6 +91,7 @@ export function OverviewPage() {
       organizationId && role.key !== 'platform' && !isDemoPreview,
     ),
     retry: false,
+    staleTime: 30_000,
   });
 
   const allowedRoles = roleMemberships[role.key] ?? [];

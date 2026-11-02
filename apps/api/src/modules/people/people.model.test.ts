@@ -21,7 +21,19 @@ describe('student schema indexes', () => {
       expect(schema.path('subjects').instance).toBe('Array');
       expect(schema.path('designation').instance).toBe('String');
       expect(schema.path('campusId').instance).toBe('ObjectId');
+      expect(schema.path('userId').instance).toBe('ObjectId');
       expect(schema.path('status').options.enum).toContain('terminated');
+      const accountIndex = schema
+        .indexes()
+        .find(
+          ([, options]) =>
+            options.name === 'uniq_staff_account_per_organization',
+        );
+      expect(accountIndex?.[0]).toEqual({ organizationId: 1, userId: 1 });
+      expect(accountIndex?.[1]).toMatchObject({
+        unique: true,
+        partialFilterExpression: { userId: { $type: 'objectId' } },
+      });
     });
   });
 

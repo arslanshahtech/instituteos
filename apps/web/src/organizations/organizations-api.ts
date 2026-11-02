@@ -36,6 +36,7 @@ export interface OrganizationMember {
   role: string;
   status: 'active' | 'suspended' | 'revoked';
   campusIds: string[];
+  permissions: string[];
   user: {
     id: string;
     email: string;
@@ -54,6 +55,7 @@ export interface OrganizationInvitation {
   id: string;
   email: string;
   role: string;
+  permissions?: string[];
   expiresAt: string;
 }
 
@@ -68,6 +70,42 @@ export const ORGANIZATION_ROLES = [
   'admissions_reception',
   'student',
   'parent_guardian',
+] as const;
+
+export const ORGANIZATION_PERMISSIONS = [
+  'organization.read',
+  'organization.update',
+  'campus.read',
+  'campus.create',
+  'campus.update',
+  'campus.status.update',
+  'member.read',
+  'member.invite',
+  'member.manage',
+  'student.read',
+  'student.create',
+  'student.update',
+  'guardian.read',
+  'guardian.create',
+  'guardian.update',
+  'staff.read',
+  'staff.create',
+  'staff.update',
+  'admission.read',
+  'admission.create',
+  'admission.review',
+  'academics.read',
+  'academics.write',
+  'attendance.read',
+  'attendance.write',
+  'examination.read',
+  'examination.write',
+  'finance.read',
+  'finance.write',
+  'communication.read',
+  'communication.write',
+  'reporting.read',
+  'audit.read',
 ] as const;
 
 const base = (organizationId: string) =>
@@ -185,7 +223,9 @@ export function getMembers(organizationId: string) {
 export function updateMember(
   organizationId: string,
   membershipId: string,
-  changes: Partial<Pick<OrganizationMember, 'role' | 'status' | 'campusIds'>>,
+  changes: Partial<
+    Pick<OrganizationMember, 'role' | 'status' | 'campusIds' | 'permissions'>
+  >,
 ) {
   return apiRequest<{ member: OrganizationMember }>(
     `${base(organizationId)}/members/${encodeURIComponent(membershipId)}`,
@@ -201,7 +241,12 @@ export function getInvitations(organizationId: string) {
 
 export function inviteMember(
   organizationId: string,
-  input: { email: string; role: string; campusIds: string[] },
+  input: {
+    email: string;
+    role: string;
+    campusIds: string[];
+    permissions?: string[];
+  },
 ) {
   return apiRequest<{ message: string }>(
     `${base(organizationId)}/invitations`,

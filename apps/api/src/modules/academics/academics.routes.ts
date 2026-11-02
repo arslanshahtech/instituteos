@@ -14,6 +14,7 @@ import { MongoOrganizationAccessRepository } from '../tenancy/tenancy.repository
 import type { OrganizationAccessRepository } from '../tenancy/tenancy.types.js';
 import {
   createOrganizationContextMiddleware,
+  requireOrganizationMethodPermission,
   requireOrganizationRole,
 } from '../tenancy/tenant-context.middleware.js';
 import { MongoAcademicsRepository } from './academics.repository.js';
@@ -69,6 +70,29 @@ function optionalString(
   return requiredString(body, field, max);
 }
 
+function optionalInteger(
+  body: Record<string, unknown>,
+  field: string,
+  min: number,
+  max: number,
+): number | undefined {
+  const value = body[field];
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== 'number' ||
+    !Number.isSafeInteger(value) ||
+    value < min ||
+    value > max
+  ) {
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      `Enter a whole-number ${field} between ${min} and ${max}.`,
+    );
+  }
+  return value;
+}
+
 function academicYearStatus(
   body: Record<string, unknown>,
 ): NonNullable<AcademicYearInput['status']> {
@@ -115,7 +139,17 @@ function organizationContext(response: {
 
 function assertAcademicYearLifecycleAuthority(response: Response): void {
   const { role } = organizationContext(response);
-  if (role !== 'organization_owner' && role !== 'organization_admin') {
+  const context = response.locals.organizationContext as
+    | {
+        role?: string;
+        permissions?: readonly string[];
+      }
+    | undefined;
+  if (
+    role !== 'organization_owner' &&
+    (role !== 'organization_admin' ||
+      !context?.permissions?.includes('organization.update'))
+  ) {
     throw new AppError(
       403,
       'ACADEMIC_YEAR_LIFECYCLE_FORBIDDEN',
@@ -148,7 +182,12 @@ export function createAcademicsRouter(
   const resolveOrganization =
     createOrganizationContextMiddleware(accessRepository);
   const authorize = requireOrganizationRole(academicManagers);
-  const protect = [authenticate, resolveOrganization, authorize] as const;
+  const protect = [
+    authenticate,
+    resolveOrganization,
+    authorize,
+    requireOrganizationMethodPermission('academics.read', 'academics.write'),
+  ] as const;
   const base = '/:organizationId';
 
   router.get(
@@ -362,10 +401,12 @@ export function createAcademicsRouter(
           'VALIDATION_ERROR',
           'Select a valid study level.',
         );
+      const sortOrder = optionalInteger(body, 'sortOrder', 0, 100000);
       const input: ClassInput = {
         name: requiredString(body, 'name', 100),
         code: requiredString(body, 'code', 30),
         campusId: requiredString(body, 'campusId', 24),
+        ...(sortOrder === undefined ? {} : { sortOrder }),
         ...(studyLevel
           ? { studyLevel: studyLevel as ClassInput['studyLevel'] }
           : {}),
@@ -396,6 +437,7 @@ export function createAcademicsRouter(
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
+      const sortOrder = optionalInteger(body, 'sortOrder', 0, 100000);
       const input: Partial<ClassInput> = {
         ...(body.name === undefined
           ? {}
@@ -409,6 +451,7 @@ export function createAcademicsRouter(
         ...(body.studyLevel === undefined
           ? {}
           : { studyLevel: body.studyLevel as ClassInput['studyLevel'] }),
+        ...(sortOrder === undefined ? {} : { sortOrder }),
         ...(body.programName === undefined
           ? {}
           : {

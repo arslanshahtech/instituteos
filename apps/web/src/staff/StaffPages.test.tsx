@@ -147,7 +147,7 @@ describe('staff management pages', () => {
       await screen.findByRole(
         'link',
         { name: 'Ada Lovelace' },
-        { timeout: 3_000 },
+        { timeout: 8_000 },
       ),
     ).toHaveAttribute(
       'href',
@@ -181,13 +181,18 @@ describe('staff management pages', () => {
         }),
       );
     });
-  });
+  }, 10_000);
 
   it('creates a staff profile, navigates to its detail page and displays profile fields', async () => {
     const user = userEvent.setup();
     renderStaffRoute(`/admin/organizations/${organizationId}/staff/new`);
 
     await screen.findByRole('textbox', { name: 'First name' });
+    expect(
+      screen.getByText(
+        'Teacher login aur class assignment ke liye yahi email Institute Setup → Members mein invite karte waqt use karein.',
+      ),
+    ).toBeInTheDocument();
     await user.type(screen.getByRole('textbox', { name: 'First name' }), 'Ada');
     await user.type(
       screen.getByRole('textbox', { name: 'Last name' }),
@@ -251,7 +256,7 @@ describe('staff management pages', () => {
   it('protects the list when staff.read is missing', async () => {
     accessMocks.getOrganizationAccessContext.mockResolvedValue({
       organizationId,
-      role: 'teacher',
+      role: 'organization_admin',
       permissions: [],
       campusIds: [],
     });

@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { AppError } from '../../errors/app-error.js';
 import { CampusModel } from '../tenancy/tenancy.model.js';
 import { StaffMemberModel } from '../people/people.model.js';
@@ -83,6 +83,7 @@ function classRecord(record: Record<string, unknown>): ClassRecord {
     campusId: String(record.campusId),
     name: String(record.name),
     code: String(record.code),
+    sortOrder: typeof record.sortOrder === 'number' ? record.sortOrder : 0,
     ...(record.studyLevel
       ? { studyLevel: record.studyLevel as ClassRecord['studyLevel'] }
       : {}),
@@ -266,6 +267,69 @@ export class MongoAcademicsRepository implements AcademicsRepository {
       throw error;
     }
   }
+  async activateAcademicYear(
+    organizationId: string,
+    id: string,
+    input: Partial<AcademicYearInput>,
+  ): Promise<AcademicYearRecord | null> {
+    const session = await mongoose.startSession();
+    let activated: Record<string, unknown> | null = null;
+    try {
+      await session.withTransaction(async () => {
+        const filter = {
+          _id: oid(id),
+          organizationId: oid(organizationId),
+        };
+        const target = await AcademicYearModel.findOne(filter)
+          .session(session)
+          .lean();
+        if (!target) {
+          activated = null;
+          return;
+        }
+
+        // Archive the previous active year before activating the target. Both
+        // writes commit together, so the organization never has two active
+        // years and a failed target update cannot leave the old year archived.
+        await AcademicYearModel.updateMany(
+          {
+            organizationId: oid(organizationId),
+            status: 'active',
+            _id: { $ne: oid(id) },
+          },
+          { $set: { status: 'archived' } },
+          { session },
+        );
+        const changes: Record<string, unknown> = { ...input, status: 'active' };
+        if (typeof changes.startDate === 'string')
+          changes.startDate = new Date(changes.startDate);
+        if (typeof changes.endDate === 'string')
+          changes.endDate = new Date(changes.endDate);
+        activated = (await AcademicYearModel.findOneAndUpdate(
+          filter,
+          { $set: changes },
+          { new: true, runValidators: true, session },
+        ).lean()) as Record<string, unknown> | null;
+      });
+      return activated ? yearRecord(activated) : null;
+    } catch (error) {
+      if (
+        this.isDuplicateKey(error) &&
+        (error as { keyPattern?: Record<string, number> }).keyPattern
+          ?.organizationId
+      ) {
+        throw new AppError(
+          409,
+          'ACADEMIC_YEAR_ACTIVATION_CONFLICT',
+          'Another academic year was activated at the same time. Refresh and try again.',
+        );
+      }
+      throw error;
+    } finally {
+      await session.endSession();
+    }
+  }
+
   async deleteAcademicYear(
     organizationId: string,
     id: string,
@@ -383,7 +447,7 @@ export class MongoAcademicsRepository implements AcademicsRepository {
       organizationId: oid(organizationId),
       ...scopedCampusFilter(campusIds),
     })
-      .sort({ name: 1 })
+      .sort({ sortOrder: 1, name: 1, code: 1 })
       .lean();
     return records.map((record) => classRecord(record));
   }
@@ -554,21 +618,58 @@ export class MongoAcademicsRepository implements AcademicsRepository {
       throw new AppError(404, 'CLASS_NOT_FOUND', 'Class not found.');
     }
     try {
-      const changes: Record<string, unknown> = {
-        ...input,
-        ...(input.classId ? { classId: oid(input.classId) } : {}),
-      };
-      const update: Record<string, unknown> = { $set: changes };
-      if (input.capacity === null) {
-        delete changes.capacity;
-        update.$unset = { capacity: 1 };
+      const session = await mongoose.startSession();
+      let updated: Record<string, unknown> | null = null;
+      try {
+        await session.withTransaction(async () => {
+          // Serialize capacity changes with new placements using the same
+          // section-level revision write used by placement transactions.
+          const locked = await AcademicSectionModel.findOneAndUpdate(
+            { _id: oid(id), organizationId: oid(organizationId) },
+            { $inc: { placementRevision: 1 } },
+            { new: true, session },
+          ).lean();
+          if (!locked) return;
+
+          if (typeof input.capacity === 'number') {
+            const [usage] = await StudentSectionPlacementModel.aggregate([
+              {
+                $match: {
+                  organizationId: oid(organizationId),
+                  sectionId: oid(id),
+                  status: 'active',
+                },
+              },
+              { $group: { _id: '$academicYearId', count: { $sum: 1 } } },
+              { $group: { _id: null, maxCount: { $max: '$count' } } },
+            ]).session(session);
+            if (Number(usage?.maxCount ?? 0) > input.capacity)
+              throw new AppError(
+                409,
+                'SECTION_CAPACITY_BELOW_ENROLLMENT',
+                'Section capacity cannot be lower than the number of students already placed in an academic year.',
+              );
+          }
+
+          const changes: Record<string, unknown> = {
+            ...input,
+            ...(input.classId ? { classId: oid(input.classId) } : {}),
+          };
+          const update: Record<string, unknown> = { $set: changes };
+          if (input.capacity === null) {
+            delete changes.capacity;
+            update.$unset = { capacity: 1 };
+          }
+          updated = (await AcademicSectionModel.findOneAndUpdate(
+            { _id: oid(id), organizationId: oid(organizationId) },
+            update,
+            { new: true, runValidators: true, session },
+          ).lean()) as Record<string, unknown> | null;
+        });
+      } finally {
+        await session.endSession();
       }
-      const record = await AcademicSectionModel.findOneAndUpdate(
-        { _id: oid(id), organizationId: oid(organizationId) },
-        update,
-        { new: true, runValidators: true },
-      ).lean();
-      return record ? sectionRecord(record) : null;
+      return updated ? sectionRecord(updated) : null;
     } catch (error) {
       this.uniqueConflict(
         error,
@@ -943,6 +1044,16 @@ export class MongoAcademicsRepository implements AcademicsRepository {
         _id: oid(id),
         organizationId: oid(organizationId),
         status: 'active',
+        $or: [
+          {
+            designation: {
+              $regex:
+                '\\b(teacher|lecturer|professor|instructor|tutor|faculty)\\b',
+              $options: 'i',
+            },
+          },
+          { 'subjects.0': { $exists: true } },
+        ],
       }),
     );
   }

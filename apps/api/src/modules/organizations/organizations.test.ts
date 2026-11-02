@@ -417,6 +417,12 @@ describe('organization invitation service', () => {
     expect(storedHash).not.toBe(token);
     await expect(
       service.acceptInvitation(
+        { id: userObjectId, email: 'different-account@example.test' },
+        token,
+      ),
+    ).rejects.toMatchObject({ code: 'INVITATION_UNAVAILABLE' });
+    await expect(
+      service.acceptInvitation(
         { id: userObjectId, email: 'invitee@example.test' },
         token,
       ),
@@ -427,10 +433,75 @@ describe('organization invitation service', () => {
         token,
       ),
     ).rejects.toMatchObject({ code: 'INVITATION_UNAVAILABLE' });
+
+    await service.invite(ownerContext, {
+      email: 'restricted-admin@example.test',
+      role: 'organization_admin',
+      campusIds: [],
+      permissions: ['student.read', 'attendance.read'],
+    });
+    expect(repository.createInvitation).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        email: 'restricted-admin@example.test',
+        role: 'organization_admin',
+        permissions: ['student.read', 'attendance.read'],
+      }),
+    );
   });
 });
 
 describe('organization owner administration', () => {
+  it('allows only the owner to assign a restricted permission set to an organization admin', async () => {
+    const repository = {
+      findMember: vi.fn().mockResolvedValue({
+        id: userObjectId,
+        role: 'organization_admin',
+        status: 'active',
+        campusIds: [],
+      }),
+      updateMember: vi.fn().mockResolvedValue({
+        id: userObjectId,
+        role: 'organization_admin',
+        permissions: ['student.read'],
+      }),
+    } as unknown as OrganizationRepository;
+    const service = new OrganizationService(
+      repository,
+      new MemoryAuthEmailDelivery(),
+    );
+
+    await expect(
+      service.updateMember(
+        context(
+          '680000000000000000000001',
+          organizationA,
+          'organization_admin',
+        ),
+        userObjectId,
+        { permissions: ['student.read'] },
+      ),
+    ).rejects.toMatchObject({ code: 'PERMISSION_ASSIGNMENT_DENIED' });
+    expect(repository.updateMember).not.toHaveBeenCalled();
+
+    await expect(
+      service.updateMember(
+        context(
+          '680000000000000000000002',
+          organizationA,
+          'organization_owner',
+        ),
+        userObjectId,
+        { permissions: ['student.read'] },
+      ),
+    ).resolves.toMatchObject({ permissions: ['student.read'] });
+    expect(repository.updateMember).toHaveBeenCalledWith(
+      organizationA,
+      userObjectId,
+      '680000000000000000000002',
+      { permissions: ['student.read'] },
+    );
+  });
+
   it('prevents an organization admin from changing an owner membership', async () => {
     const repository = {
       findMember: vi.fn().mockResolvedValue({

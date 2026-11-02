@@ -34,6 +34,7 @@ import { ClassEnrollmentPanel } from './ClassEnrollmentPanel.js';
 import { ClassesSectionsReferenceView } from './ClassesSectionsReferenceView.js';
 import { AcademicOverview } from './AcademicOverview.js';
 import { AcademicTimetable } from './AcademicTimetable.js';
+import { getAcademicsRosterPermissions } from './academics-permissions.js';
 
 const managerRoles = [
   'organization_owner',
@@ -85,11 +86,33 @@ function displayName(firstName: string, lastName: string) {
   return `${firstName} ${lastName}`;
 }
 
+function isTeachingStaff(person: {
+  designation?: string;
+  subjects?: string[];
+}): boolean {
+  return (
+    /\b(teacher|lecturer|professor|instructor|tutor|faculty)\b/i.test(
+      person.designation ?? '',
+    ) || (person.subjects?.length ?? 0) > 0
+  );
+}
+
 export function AcademicsDashboard() {
   const { organizationId = '' } = useParams();
   const navigate = useNavigate();
   const access = useOrganizationAccess(organizationId);
-  const canManage = managerRoles.includes(access.data?.role ?? '');
+  const canReadAcademics =
+    access.data?.permissions.includes('academics.read') ?? false;
+  const canWriteAcademics =
+    access.data?.permissions.includes('academics.write') ?? false;
+  const canReadStaff = access.data?.permissions.includes('staff.read') ?? false;
+  const { canReadStudents, canAddStudents } =
+    getAcademicsRosterPermissions(access.data?.permissions ?? []);
+  const canAssignTeachers = canWriteAcademics && canReadStaff;
+  const canCreateCampuses =
+    access.data?.permissions.includes('campus.create') ?? false;
+  const canManage =
+    managerRoles.includes(access.data?.role ?? '') && canReadAcademics;
   const workspace = useAcademicsWorkspace(
     organizationId,
     Boolean(access.data && canManage),
@@ -104,12 +127,16 @@ export function AcademicsDashboard() {
         page: 1,
         pageSize: 100,
       }),
-    enabled: Boolean(access.data && canManage),
+    enabled: Boolean(access.data && canManage && canReadStaff),
     retry: false,
   });
+  const teacherCandidates = (staff.data?.items ?? []).filter(isTeachingStaff);
   const save = useSaveAcademicsResource(organizationId);
   const remove = useDeleteAcademicsResource(organizationId);
   const [resource, setResource] = useState<AcademicsResource>('classes');
+  const canWriteResource =
+    canWriteAcademics &&
+    (resource !== 'teacher-assignments' || canAssignTeachers);
   const [resourceSearch, setResourceSearch] = useState('');
   const [activeArea, setActiveArea] = useState<
     | 'overview'
@@ -270,29 +297,33 @@ export function AcademicsDashboard() {
       value: item.id,
       label: `${classNames.get(item.classId) ?? 'Class'} · ${item.name}`,
     })),
-    teacherStaffId: (staff.data?.items ?? []).map((item) => ({
+    teacherStaffId: teacherCandidates.map((item) => ({
       value: item.id,
       label: displayName(item.firstName, item.lastName),
     })),
   };
 
   const beginCreate = () => {
+    if (!canWriteResource) return;
     save.reset();
     setEditing(undefined);
     setDialogOpen(true);
   };
   const beginEdit = (item: AcademicsRow) => {
+    if (!canWriteResource) return;
     save.reset();
     setEditing(item);
     setDialogOpen(true);
   };
   const saveRecord = (input: AcademicsFormPayload) => {
+    if (!canWriteResource) return;
     save.mutate(
       { resource, id: editing?.id, data: input },
       { onSuccess: () => setDialogOpen(false) },
     );
   };
   const deleteRecord = (item: AcademicsRow) => {
+    if (!canWriteResource) return;
     if (!window.confirm(`Delete ${item.title}?`)) return;
     remove.mutate({ resource, id: item.id });
   };
@@ -315,48 +346,56 @@ export function AcademicsDashboard() {
   if (!canManage) return <PermissionDeniedState />;
 
   const areaNavigation = (
-    <nav aria-label="Academic centre navigation" className="academics-tabs">
-      {(
-        [
-          ['overview', 'Overview'],
-          ['academic-years', 'Academic Years'],
-          ['terms', 'Terms'],
-          ['classes', 'Classes & Sections'],
-          ['subjects', 'Subjects'],
-          ['teacher-assignments', 'Teacher Assignments'],
-          ['timetable', 'Timetable'],
-        ] as const
-      ).map(([area, label]) => (
-        <button
-          aria-current={activeArea === area ? 'page' : undefined}
-          className={`academics-tab${activeArea === area ? ' academics-tab-active' : ''}`}
-          key={area}
-          onClick={() => {
-            save.reset();
-            remove.reset();
-            setActiveArea(area);
-            setResourceSearch('');
-            // Returning to Classes & Sections must always open its overview,
-            // never a previously opened student/teacher assignment panel.
-            setShowEnrollment(false);
-            setEnrollmentSectionId(undefined);
-            setEnrollmentClassId(undefined);
-            setEnrollmentView('students');
-            if (area === 'classes') setResource('classes');
-            else if (
-              area === 'academic-years' ||
-              area === 'terms' ||
-              area === 'subjects' ||
-              area === 'teacher-assignments'
-            )
-              setResource(area);
-          }}
-          type="button"
-        >
-          {label}
-        </button>
-      ))}
-    </nav>
+    <>
+      <nav aria-label="Academic centre navigation" className="academics-tabs">
+        {(
+          [
+            ['overview', 'Overview'],
+            ['academic-years', 'Academic Years'],
+            ['terms', 'Terms'],
+            ['classes', 'Classes & Sections'],
+            ['subjects', 'Subjects'],
+            ['teacher-assignments', 'Teacher Assignments'],
+            ['timetable', 'Timetable'],
+          ] as const
+        ).map(([area, label]) => (
+          <button
+            aria-current={activeArea === area ? 'page' : undefined}
+            className={`academics-tab${activeArea === area ? ' academics-tab-active' : ''}`}
+            key={area}
+            onClick={() => {
+              save.reset();
+              remove.reset();
+              setActiveArea(area);
+              setResourceSearch('');
+              // Returning to Classes & Sections must always open its overview,
+              // never a previously opened student/teacher assignment panel.
+              setShowEnrollment(false);
+              setEnrollmentSectionId(undefined);
+              setEnrollmentClassId(undefined);
+              setEnrollmentView('students');
+              if (area === 'classes') setResource('classes');
+              else if (
+                area === 'academic-years' ||
+                area === 'terms' ||
+                area === 'subjects' ||
+                area === 'teacher-assignments'
+              )
+                setResource(area);
+            }}
+            type="button"
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      {!canWriteAcademics && (
+        <p className="academics-readonly-note" role="status">
+          You have read-only access to academic setup. Ask the Owner to grant
+          academics.write if you need to make changes.
+        </p>
+      )}
+    </>
   );
 
   if (activeArea === 'overview') {
@@ -401,14 +440,17 @@ export function AcademicsDashboard() {
         {areaNavigation}
         <AcademicTimetable
           organizationId={organizationId}
-          teachers={(staff.data?.items ?? []).map(
-            ({ id, firstName, lastName }) => ({ id, firstName, lastName }),
-          )}
+          teachers={teacherCandidates.map(({ id, firstName, lastName }) => ({
+            id,
+            firstName,
+            lastName,
+          }))}
           assignments={workspace.assignments.data?.items ?? []}
           classes={workspace.classes.data?.items ?? []}
           sections={workspace.sections.data?.items ?? []}
           subjects={workspace.subjects.data?.items ?? []}
           years={workspace.years.data?.items ?? []}
+          canWrite={canWriteAcademics && canReadStaff}
         />
         {staff.isError && (
           <p className="form-error" role="alert">
@@ -459,6 +501,7 @@ export function AcademicsDashboard() {
       targetResource: 'classes' | 'sections',
       targetClassId?: string,
     ) => {
+      if (!canWriteAcademics) return;
       save.reset();
       remove.reset();
       setResource(targetResource);
@@ -472,6 +515,7 @@ export function AcademicsDashboard() {
       targetResource: 'classes' | 'sections',
       record: AcademicClass | AcademicSection,
     ) => {
+      if (!canWriteAcademics) return;
       save.reset();
       setResource(targetResource);
       setNewSectionClassId(undefined);
@@ -487,6 +531,7 @@ export function AcademicsDashboard() {
       id: string,
       title: string,
     ) => {
+      if (!canWriteAcademics) return;
       if (!window.confirm(`Delete ${title}?`)) return;
       remove.mutate({ resource: targetResource, id });
     };
@@ -506,21 +551,31 @@ export function AcademicsDashboard() {
           campuses={workspace.campuses.data?.campuses ?? []}
           subjects={workspace.subjects.data?.items ?? []}
           assignments={workspace.assignments.data?.items ?? []}
-          teachers={(staff.data?.items ?? []).map(
-            ({ id, firstName, lastName }) => ({
-              id,
-              firstName,
-              lastName,
-            }),
-          )}
+          teachers={teacherCandidates.map(({ id, firstName, lastName }) => ({
+            id,
+            firstName,
+            lastName,
+          }))}
           onCreate={openCreate}
           onCreateSubject={() => {
+            if (!canWriteAcademics) return;
             save.reset();
             setSubjectDialogOpen(true);
           }}
           onEdit={openEdit}
           onDelete={deleteAcademicRecord}
+          canWriteAcademics={canWriteAcademics}
+          canReadStudents={canReadStudents}
+          canAddStudents={canAddStudents}
+          canAssignTeachers={canAssignTeachers}
+          canCreateCampuses={canCreateCampuses}
           onOpenEnrollment={(sectionId, classId, view = 'students') => {
+            if (
+              (view === 'students' && !canReadStudents) ||
+              (view === 'add-students' && !canAddStudents) ||
+              (view === 'teacher' && !canAssignTeachers)
+            )
+              return;
             setEnrollmentSectionId(sectionId);
             setEnrollmentClassId(classId);
             setEnrollmentView(view);
@@ -567,18 +622,24 @@ export function AcademicsDashboard() {
               sections={workspace.sections.data?.items ?? []}
               years={workspace.years.data?.items ?? []}
               subjects={workspace.subjects.data?.items ?? []}
-              teachers={(staff.data?.items ?? []).map(
+              teachers={teacherCandidates.map(
                 ({ id, firstName, lastName }) => ({
                   id,
                   firstName,
                   lastName,
                 }),
               )}
-              teachersLoading={staff.isFetching}
+              teachersLoading={canReadStaff && staff.isFetching}
               teachersError={
-                staff.isError ? apiMessage(staff.error) : undefined
+                !canReadStaff
+                  ? 'Your Admin role does not have staff.read permission.'
+                  : staff.isError
+                    ? apiMessage(staff.error)
+                    : undefined
               }
-              onRetryTeachers={() => void staff.refetch()}
+              onRetryTeachers={() => {
+                if (canReadStaff) void staff.refetch();
+              }}
               onManageStaff={() =>
                 navigate(
                   `/admin/organizations/${encodeURIComponent(organizationId)}/staff`,
@@ -590,6 +651,10 @@ export function AcademicsDashboard() {
               focusRequest={enrollmentFocusRequest}
               onViewChange={setEnrollmentView}
               onCreateSection={(classId) => openCreate('sections', classId)}
+              canWriteAcademics={canWriteAcademics}
+              canReadStudents={canReadStudents}
+              canAddStudents={canAddStudents}
+              canAssignTeachers={canAssignTeachers}
             />
           </div>
         )}
@@ -645,25 +710,33 @@ export function AcademicsDashboard() {
   const columns: TableColumn<AcademicsRow>[] = [
     { header: 'Name', render: (item) => <strong>{item.title}</strong> },
     { header: 'Details', render: (item) => item.details },
-    {
-      header: 'Actions',
-      align: 'right',
-      render: (item) => (
-        <span className="academics-row-actions">
-          <Button onClick={() => beginEdit(item)} type="button" variant="quiet">
-            Edit
-          </Button>
-          <Button
-            disabled={remove.isPending}
-            onClick={() => deleteRecord(item)}
-            type="button"
-            variant="quiet"
-          >
-            Delete
-          </Button>
-        </span>
-      ),
-    },
+    ...(canWriteResource
+      ? [
+          {
+            header: 'Actions',
+            align: 'right' as const,
+            render: (item: AcademicsRow) => (
+              <span className="academics-row-actions">
+                <Button
+                  onClick={() => beginEdit(item)}
+                  type="button"
+                  variant="quiet"
+                >
+                  Edit
+                </Button>
+                <Button
+                  disabled={remove.isPending}
+                  onClick={() => deleteRecord(item)}
+                  type="button"
+                  variant="quiet"
+                >
+                  Delete
+                </Button>
+              </span>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -673,9 +746,11 @@ export function AcademicsDashboard() {
         title="Academics"
         description="Set up academic calendars, class structures, subjects, and teacher assignments."
         aside={
-          <Button onClick={beginCreate} type="button" variant="primary">
-            Add {resourceNames[resource]}
-          </Button>
+          canWriteResource ? (
+            <Button onClick={beginCreate} type="button" variant="primary">
+              Add {resourceNames[resource]}
+            </Button>
+          ) : undefined
         }
       />
 

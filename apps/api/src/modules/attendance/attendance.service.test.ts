@@ -23,6 +23,15 @@ const context: AttendanceContext = {
 function repository(overrides: Partial<AttendanceRepository> = {}) {
   return {
     listTeacherAssignmentsForUser: vi.fn().mockResolvedValue([]),
+    getTeacherSelfAttendanceConfig: vi.fn().mockResolvedValue({
+      viewOwnAttendance: true,
+      selfMarkingEnabled: false,
+      allowedStatuses: ['present'],
+      timezone: 'Asia/Karachi',
+    }),
+    findActiveStaffForUser: vi
+      .fn()
+      .mockResolvedValue({ id: '650000000000000000000009', campusId }),
     isTeacherAssignedToSection: vi.fn().mockResolvedValue(true),
     getClassCampus: vi.fn().mockResolvedValue(campusId),
     validateSection: vi.fn().mockResolvedValue(true),
@@ -34,6 +43,9 @@ function repository(overrides: Partial<AttendanceRepository> = {}) {
     countActiveSectionPlacements: vi.fn().mockResolvedValue(0),
     validateStaff: vi.fn().mockResolvedValue({ campusId }),
     upsertStudentPlacements: vi.fn().mockResolvedValue({ id: 'placement' }),
+    upsertStudentPlacementWithinCapacity: vi
+      .fn()
+      .mockResolvedValue({ id: 'placement' }),
     listStudentRoster: vi.fn().mockResolvedValue([
       { id: studentId, firstName: 'Ari', lastName: 'Lee' },
       { id: anotherStudentId, firstName: 'Sam', lastName: 'Kim' },
@@ -41,6 +53,9 @@ function repository(overrides: Partial<AttendanceRepository> = {}) {
     saveStudentAttendance: vi.fn().mockResolvedValue([]),
     listStudentAttendance: vi.fn().mockResolvedValue([]),
     saveStaffAttendance: vi.fn().mockResolvedValue({ id: 'staff-mark' }),
+    createStaffAttendanceOnce: vi
+      .fn()
+      .mockResolvedValue({ id: 'self-staff-mark' }),
     listStaffAttendance: vi.fn().mockResolvedValue([]),
     ...overrides,
   } as unknown as AttendanceRepository;
@@ -183,6 +198,88 @@ describe('AttendanceService', () => {
     expect(repo.listStudentRoster).not.toHaveBeenCalled();
   });
 
+  it('restricts teacher attendance history to academic years assigned for that section', async () => {
+    const teacherContext: AttendanceContext = {
+      ...context,
+      role: 'teacher',
+      userId: '650000000000000000000008',
+    };
+    const assignments = [
+      {
+        id: 'assignment-current',
+        classId,
+        className: 'Grade 8',
+        sectionId,
+        sectionName: 'A',
+        academicYearId,
+        academicYearName: '2026',
+        campusId,
+        campusName: 'Main Campus',
+      },
+      {
+        id: 'assignment-other-section',
+        classId,
+        className: 'Grade 8',
+        sectionId: '650000000000000000000099',
+        sectionName: 'B',
+        academicYearId: '650000000000000000000098',
+        academicYearName: '2025',
+        campusId,
+        campusName: 'Main Campus',
+      },
+    ];
+    const repo = repository({
+      listTeacherAssignmentsForUser: vi.fn().mockResolvedValue(assignments),
+    });
+    const service = new AttendanceService(repo);
+
+    await service.listStudentAttendance(teacherContext, {
+      sectionId,
+      dateFrom: '2026-10-01',
+      dateTo: '2026-10-31',
+    });
+
+    expect(repo.listStudentAttendance).toHaveBeenCalledWith(
+      organizationId,
+      expect.objectContaining({
+        sectionId,
+        academicYearIds: [academicYearId],
+      }),
+      [campusId],
+    );
+  });
+
+  it('blocks attendance history when a teacher has no assignment for the selected section', async () => {
+    const repo = repository({
+      listTeacherAssignmentsForUser: vi.fn().mockResolvedValue([
+        {
+          id: 'other-assignment',
+          classId,
+          className: 'Grade 8',
+          sectionId: '650000000000000000000099',
+          sectionName: 'B',
+          academicYearId,
+          academicYearName: '2026',
+          campusId,
+          campusName: 'Main Campus',
+        },
+      ]),
+    });
+    const service = new AttendanceService(repo);
+
+    await expect(
+      service.listStudentAttendance(
+        {
+          ...context,
+          role: 'teacher',
+          userId: '650000000000000000000008',
+        },
+        { sectionId },
+      ),
+    ).rejects.toMatchObject({ code: 'TEACHER_ASSIGNMENT_REQUIRED' });
+    expect(repo.listStudentAttendance).not.toHaveBeenCalled();
+  });
+
   it('rejects dates outside the active academic year', async () => {
     const repo = repository({
       validateAcademicYear: vi.fn().mockResolvedValue(false),
@@ -288,13 +385,15 @@ describe('AttendanceService', () => {
       classId,
       sectionId,
     );
-    expect(repo.upsertStudentPlacements).not.toHaveBeenCalled();
+    expect(repo.upsertStudentPlacementWithinCapacity).not.toHaveBeenCalled();
   });
 
-  it('blocks a new placement when the section capacity is already reached', async () => {
+  it('blocks a new placement when the atomic repository capacity check is reached', async () => {
     const repo = repository({
-      getSectionCapacity: vi.fn().mockResolvedValue(30),
-      countActiveSectionPlacements: vi.fn().mockResolvedValue(30),
+      upsertStudentPlacementWithinCapacity: vi.fn().mockRejectedValue({
+        statusCode: 409,
+        code: 'SECTION_CAPACITY_REACHED',
+      }),
     });
     const service = new AttendanceService(repo);
 
@@ -310,7 +409,28 @@ describe('AttendanceService', () => {
       statusCode: 409,
       code: 'SECTION_CAPACITY_REACHED',
     });
-    expect(repo.upsertStudentPlacements).not.toHaveBeenCalled();
+    expect(repo.upsertStudentPlacementWithinCapacity).toHaveBeenCalledWith(
+      organizationId,
+      { studentId, classId, sectionId, academicYearId, campusId },
+    );
+  });
+
+  it('uses the atomic repository method for a valid student placement', async () => {
+    const repo = repository();
+    const service = new AttendanceService(repo);
+
+    await service.placeStudent(context, {
+      studentId,
+      classId,
+      sectionId,
+      academicYearId,
+      campusId,
+    });
+
+    expect(repo.upsertStudentPlacementWithinCapacity).toHaveBeenCalledWith(
+      organizationId,
+      { studentId, classId, sectionId, academicYearId, campusId },
+    );
   });
 
   it('rejects staff records outside the current campus scope', async () => {
@@ -342,5 +462,144 @@ describe('AttendanceService', () => {
     ).rejects.toMatchObject({ code: 'SECTION_NOT_FOUND' });
 
     expect(repo.saveStudentAttendance).not.toHaveBeenCalled();
+  });
+
+  it('allows a teacher to view only their linked staff attendance history', async () => {
+    const repo = repository({
+      listStaffAttendance: vi.fn().mockResolvedValue([{ id: 'history' }]),
+    });
+    const service = new AttendanceService(repo);
+    const teacherContext = {
+      ...context,
+      role: 'teacher',
+      userId: '650000000000000000000008',
+    };
+
+    const result = await service.getTeacherSelfAttendance(teacherContext, {
+      dateFrom: '2026-10-01',
+      dateTo: '2026-10-31',
+    });
+
+    expect(result.items).toEqual([{ id: 'history' }]);
+    expect(repo.findActiveStaffForUser).toHaveBeenCalledWith(
+      organizationId,
+      teacherContext.userId,
+    );
+    expect(repo.listStaffAttendance).toHaveBeenCalledWith(
+      organizationId,
+      {
+        dateFrom: '2026-10-01',
+        dateTo: '2026-10-31',
+        staffId: '650000000000000000000009',
+      },
+      [campusId],
+    );
+  });
+
+  it('blocks non-teachers and respects the institute history policy', async () => {
+    const repo = repository({
+      getTeacherSelfAttendanceConfig: vi.fn().mockResolvedValue({
+        viewOwnAttendance: false,
+        selfMarkingEnabled: false,
+        allowedStatuses: ['present'],
+        timezone: 'Asia/Karachi',
+      }),
+    });
+    const service = new AttendanceService(repo);
+    await expect(
+      service.getTeacherSelfAttendance(context),
+    ).rejects.toMatchObject({ code: 'ROLE_REQUIRED' });
+    await expect(
+      service.getTeacherSelfAttendance({
+        ...context,
+        role: 'teacher',
+        userId: '650000000000000000000008',
+      }),
+    ).rejects.toMatchObject({ code: 'SELF_ATTENDANCE_VIEW_DISABLED' });
+    expect(repo.findActiveStaffForUser).not.toHaveBeenCalled();
+  });
+
+  it('allows self-marking only when enabled and uses the linked staff profile', async () => {
+    const repo = repository({
+      getTeacherSelfAttendanceConfig: vi.fn().mockResolvedValue({
+        viewOwnAttendance: true,
+        selfMarkingEnabled: true,
+        allowedStatuses: ['present', 'half-day'],
+        timezone: 'Asia/Karachi',
+      }),
+    });
+    const service = new AttendanceService(repo);
+    const teacherContext = {
+      ...context,
+      role: 'teacher',
+      userId: '650000000000000000000008',
+    };
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Karachi',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    await expect(
+      service.saveTeacherSelfAttendance(teacherContext, {
+        date: today,
+        status: 'present',
+        remarks: '  On time  ',
+      }),
+    ).resolves.toEqual({ id: 'self-staff-mark' });
+    expect(repo.createStaffAttendanceOnce).toHaveBeenCalledWith(
+      organizationId,
+      campusId,
+      teacherContext.userId,
+      {
+        staffId: '650000000000000000000009',
+        date: today,
+        status: 'present',
+        remarks: 'On time',
+      },
+    );
+    expect(repo.saveStaffAttendance).not.toHaveBeenCalled();
+  });
+
+  it('blocks self-marking when disabled, for disallowed statuses, or for past dates', async () => {
+    const teacherContext = {
+      ...context,
+      role: 'teacher',
+      userId: '650000000000000000000008',
+    };
+    const disabledRepo = repository();
+    await expect(
+      new AttendanceService(disabledRepo).saveTeacherSelfAttendance(
+        teacherContext,
+        {
+          date: '2026-10-12',
+          status: 'present',
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'SELF_ATTENDANCE_MARKING_DISABLED' });
+
+    const enabledRepo = repository({
+      getTeacherSelfAttendanceConfig: vi.fn().mockResolvedValue({
+        viewOwnAttendance: true,
+        selfMarkingEnabled: true,
+        allowedStatuses: ['present'],
+        timezone: 'Asia/Karachi',
+      }),
+    });
+    const service = new AttendanceService(enabledRepo);
+    await expect(
+      service.saveTeacherSelfAttendance(teacherContext, {
+        date: '2026-10-12',
+        status: 'absent',
+      }),
+    ).rejects.toMatchObject({ code: 'SELF_ATTENDANCE_STATUS_NOT_ALLOWED' });
+    await expect(
+      service.saveTeacherSelfAttendance(teacherContext, {
+        date: '2026-10-12',
+        status: 'present',
+      }),
+    ).rejects.toMatchObject({ code: 'SELF_ATTENDANCE_DATE_RESTRICTED' });
+    expect(enabledRepo.createStaffAttendanceOnce).not.toHaveBeenCalled();
   });
 });

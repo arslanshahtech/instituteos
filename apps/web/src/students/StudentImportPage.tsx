@@ -47,6 +47,7 @@ export function StudentImportPage() {
     queryFn: () => getOrganizationAccessContext(organizationId),
     enabled: Boolean(organizationId),
     retry: false,
+    staleTime: 30_000,
   });
   const campusQuery = useQuery({
     queryKey: ['organization-campuses', organizationId],

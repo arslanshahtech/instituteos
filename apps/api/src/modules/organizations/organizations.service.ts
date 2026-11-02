@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { AppError } from '../../errors/app-error.js';
 import { hashOpaqueToken } from '../auth/auth.service.js';
 import { type OrganizationContext } from '../tenancy/tenancy.types.js';
+import { ORGANIZATION_PERMISSIONS } from '../tenancy/authorization.js';
 import type { AuthEmailDelivery } from '../auth/auth.types.js';
 import type {
   AccessibleOrganization,
@@ -222,23 +223,28 @@ export class OrganizationService implements OrganizationServices {
     );
     if (!existing)
       throw new AppError(404, 'MEMBER_NOT_FOUND', 'Member not found.');
-    if (
-      existing.role === 'organization_owner' &&
-      context.role !== 'organization_owner'
-    )
+    if (existing.role === 'organization_owner') {
+      if (context.role !== 'organization_owner')
+        throw new AppError(
+          403,
+          'ROLE_ASSIGNMENT_DENIED',
+          'Only an organization owner can manage owner membership.',
+        );
       throw new AppError(
-        403,
-        'ROLE_ASSIGNMENT_DENIED',
-        'Only an organization owner can change another owner.',
+        400,
+        'OWNER_MEMBERSHIP_IMMUTABLE',
+        'An organization owner cannot be changed or removed through member management.',
       );
+    }
     if (
-      changes.role === 'organization_owner' &&
+      (changes.role === 'organization_owner' ||
+        changes.role === 'organization_admin') &&
       context.role !== 'organization_owner'
     )
       throw new AppError(
         403,
         'ROLE_ASSIGNMENT_DENIED',
-        'Only an organization owner can assign another owner.',
+        'Only an organization owner can assign an owner or administrator role.',
       );
     if (changes.role === 'campus_admin') {
       const effectiveCampusIds =
@@ -251,6 +257,30 @@ export class OrganizationService implements OrganizationServices {
           400,
           'CAMPUS_SCOPE_REQUIRED',
           'Assign at least one campus to a campus administrator.',
+        );
+    }
+    if (changes.permissions !== undefined) {
+      if (context.role !== 'organization_owner')
+        throw new AppError(
+          403,
+          'PERMISSION_ASSIGNMENT_DENIED',
+          'Only an organization owner can assign administrator permissions.',
+        );
+      if (
+        existing.role !== 'organization_admin' &&
+        changes.role !== 'organization_admin'
+      )
+        throw new AppError(
+          400,
+          'PERMISSIONS_REQUIRE_ADMIN_ROLE',
+          'Custom permissions can only be assigned to an organization admin.',
+        );
+      const allowed = new Set<string>(ORGANIZATION_PERMISSIONS);
+      if (changes.permissions.some((permission) => !allowed.has(permission)))
+        throw new AppError(
+          400,
+          'INVALID_PERMISSION',
+          'One or more permissions are invalid.',
         );
     }
     if (changes.campusIds)
@@ -274,14 +304,33 @@ export class OrganizationService implements OrganizationServices {
     input: MemberInvitationInput,
   ): Promise<void> {
     if (
-      input.role === 'organization_owner' &&
+      (input.role === 'organization_owner' ||
+        input.role === 'organization_admin') &&
       context.role !== 'organization_owner'
     )
       throw new AppError(
         403,
         'ROLE_ASSIGNMENT_DENIED',
-        'Only an organization owner can invite another owner.',
+        'Only an organization owner can invite an owner or administrator.',
       );
+    if (input.permissions !== undefined) {
+      if (
+        input.role !== 'organization_admin' ||
+        context.role !== 'organization_owner'
+      )
+        throw new AppError(
+          403,
+          'PERMISSION_ASSIGNMENT_DENIED',
+          'Only an organization owner can assign permissions to an invited administrator.',
+        );
+      const allowed = new Set<string>(ORGANIZATION_PERMISSIONS);
+      if (input.permissions.some((permission) => !allowed.has(permission)))
+        throw new AppError(
+          400,
+          'INVALID_PERMISSION',
+          'One or more permissions are invalid.',
+        );
+    }
     if (input.role === 'campus_admin' && input.campusIds.length === 0)
       throw new AppError(
         400,
@@ -298,6 +347,9 @@ export class OrganizationService implements OrganizationServices {
         email: input.email.trim().toLowerCase(),
         role: input.role,
         campusIds: input.campusIds,
+        ...(input.permissions !== undefined
+          ? { permissions: input.permissions }
+          : {}),
         tokenHash: hashOpaqueToken(token),
         expiresAt: new Date(this.now().getTime() + INVITATION_TTL_MS),
       });

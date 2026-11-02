@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppProviders } from './app/providers.js';
 import { createAppRouter } from './app/router.js';
 import { queryClient } from './app/query-client.js';
@@ -71,6 +71,41 @@ const organizationMocks = vi.hoisted(() => ({
     'student',
     'parent_guardian',
   ],
+  ORGANIZATION_PERMISSIONS: [
+    'organization.read',
+    'organization.update',
+    'campus.read',
+    'campus.create',
+    'campus.update',
+    'campus.status.update',
+    'member.read',
+    'member.invite',
+    'member.manage',
+    'student.read',
+    'student.create',
+    'student.update',
+    'guardian.read',
+    'guardian.create',
+    'guardian.update',
+    'staff.read',
+    'staff.create',
+    'staff.update',
+    'admission.read',
+    'admission.create',
+    'admission.review',
+    'academics.read',
+    'academics.write',
+    'attendance.read',
+    'attendance.write',
+    'examination.read',
+    'examination.write',
+    'finance.read',
+    'finance.write',
+    'communication.read',
+    'communication.write',
+    'reporting.read',
+    'audit.read',
+  ],
 }));
 
 vi.mock('./api/client.js', async (importOriginal) => {
@@ -138,9 +173,9 @@ describe('frontend application foundation', () => {
     });
     authMocks.getCurrentUser.mockResolvedValue({ user: authMocks.user });
     authMocks.loginRequest.mockResolvedValue({ user: authMocks.user });
-    platformMocks.getPlatformOrganizations.mockResolvedValue({
-      organizations: [],
-    });
+    platformMocks.getPlatformOrganizations.mockRejectedValue(
+      new ApiError('Platform access required.', 403, 'PLATFORM_ROLE_REQUIRED'),
+    );
     platformMocks.getPlatformDemoRequests.mockResolvedValue({ requests: [] });
     platformMocks.createPlatformOrganization.mockResolvedValue({
       organization: {
@@ -286,6 +321,45 @@ describe('frontend application foundation', () => {
     });
   });
 
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('asks the signed-in user to choose when multiple active workspaces are available', async () => {
+    organizationMocks.getAccessibleOrganizations.mockResolvedValue({
+      organizations: [
+        {
+          id: '650000000000000000000001',
+          name: 'North Institute',
+          role: 'organization_owner',
+          status: 'active' as const,
+        },
+        {
+          id: '650000000000000000000002',
+          name: 'South College',
+          role: 'teacher',
+          status: 'active' as const,
+        },
+      ],
+    });
+
+    renderPath('/dashboard');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Choose your workspace' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('link', { name: /Open workspace/ }),
+    ).toHaveLength(2);
+    expect(
+      screen.getByRole('link', { name: /North Institute/ }),
+    ).toHaveAttribute('href', '/admin/organizations/650000000000000000000001');
+    expect(screen.getByRole('link', { name: /South College/ })).toHaveAttribute(
+      'href',
+      '/teacher/organizations/650000000000000000000002',
+    );
+  });
+
   it('renders the public landing page with the expected scroll sections', async () => {
     renderPath('/');
 
@@ -299,6 +373,9 @@ describe('frontend application foundation', () => {
   });
 
   it('renders the platform organizations workspace', async () => {
+    platformMocks.getPlatformOrganizations.mockResolvedValue({
+      organizations: [],
+    });
     renderPath('/platform');
 
     expect(
@@ -337,6 +414,9 @@ describe('frontend application foundation', () => {
 
   it('creates an organization from the platform workspace and refreshes the list', async () => {
     const user = userEvent.setup();
+    platformMocks.getPlatformOrganizations.mockResolvedValue({
+      organizations: [],
+    });
     renderPath('/super-admin');
 
     await user.click(
@@ -392,7 +472,11 @@ describe('frontend application foundation', () => {
     renderPath('/admin');
 
     expect(
-      await screen.findByRole('link', { name: 'Open reference UI preview' }),
+      await screen.findByRole(
+        'link',
+        { name: 'Open reference UI preview' },
+        { timeout: 5000 },
+      ),
     ).toHaveAttribute('href', '/admin/organizations/preview?preview=demo');
   });
 
@@ -402,7 +486,11 @@ describe('frontend application foundation', () => {
     );
 
     expect(
-      await screen.findByRole('heading', { name: 'Students' }),
+      await screen.findByRole(
+        'heading',
+        { name: 'Students' },
+        { timeout: 5000 },
+      ),
     ).toBeInTheDocument();
     expect(await screen.findByText(/SAMPLE DATA/)).toBeInTheDocument();
   });
@@ -513,8 +601,12 @@ describe('frontend application foundation', () => {
     expect(authMocks.getCurrentUser).toHaveBeenCalledOnce();
   });
 
-  it('signs in and restores the requested protected route', async () => {
+  it('signs in, clears prior account data, and restores the requested protected route', async () => {
     const user = userEvent.setup();
+    queryClient.setQueryData(
+      ['organization-context', '650000000000000000000001'],
+      { organizationId: '650000000000000000000001', role: 'parent_guardian' },
+    );
     renderPath('/login', false);
     await user.type(
       screen.getByRole('textbox', { name: 'Email address' }),
@@ -524,12 +616,18 @@ describe('frontend application foundation', () => {
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
     expect(
-      await screen.findByRole('heading', { name: 'Super Admin' }),
+      await screen.findByRole('heading', { name: 'Institute Overview' }),
     ).toBeInTheDocument();
     expect(loginRequest).toHaveBeenCalledWith({
       email: 'user@example.test',
       password: 'long password',
     });
+    expect(
+      queryClient.getQueryData([
+        'organization-context',
+        '650000000000000000000001',
+      ]),
+    ).toMatchObject({ role: 'organization_admin' });
   });
 
   it('shows the API rate-limit message on the sign-in form', async () => {
@@ -577,6 +675,38 @@ describe('frontend application foundation', () => {
     expect(
       screen.getByRole('link', { name: 'Forgot password?' }),
     ).toHaveAttribute('href', '/forgot-password');
+  });
+
+  it('preserves an invitation through registration and email activation', async () => {
+    const user = userEvent.setup();
+    const invitationPath =
+      '/invitations/accept#token=disposable-invitation-token';
+    authMocks.registerRequest.mockResolvedValueOnce({
+      verificationRequired: true,
+      message: 'Check your email.',
+    });
+
+    renderPath(invitationPath, false);
+    await user.click(
+      await screen.findByRole('link', { name: 'Create an account' }),
+    );
+    await user.type(
+      await screen.findByRole('textbox', { name: 'Full name' }),
+      'Invited Teacher',
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Email address' }),
+      'teacher@example.test',
+    );
+    await user.type(screen.getByLabelText('Password'), 'a long test password');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Check your email' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Continue to invitation' }),
+    ).toHaveAttribute('href', invitationPath);
   });
 
   it('loads server-verified organization context and gates the page by permission', async () => {
@@ -701,6 +831,139 @@ describe('frontend application foundation', () => {
     );
   });
 
+  it('keeps all Phase 2 modules available from Admin navigation', async () => {
+    tenancyMocks.getOrganizationAccessContext.mockResolvedValueOnce({
+      organizationId: '650000000000000000000001',
+      role: 'organization_owner',
+      permissions: [
+        'organization.read',
+        'examination.read',
+        'examination.write',
+      ],
+      campusIds: [],
+    });
+
+    renderPath('/admin/organizations/650000000000000000000001');
+
+    const navigation = await screen.findByRole('navigation', {
+      name: 'Main navigation',
+    });
+    const base = '/admin/organizations/650000000000000000000001';
+    for (const [label, path] of [
+      ['Academics & Classes', '/academics'],
+      ['Students', '/students'],
+      ['Guardians', '/guardians'],
+      ['Teachers / Staff', '/staff'],
+      ['Attendance', '/attendance'],
+      ['Examinations', '/examinations'],
+      ['Finance', '/finance'],
+      ['Reports & Export', '/reports'],
+      ['Settings', '/settings'],
+    ]) {
+      expect(
+        within(navigation).getByRole('link', { name: label }),
+      ).toHaveAttribute('href', base + path);
+    }
+  });
+
+  it('redirects a manually requested admin URL to the server-authorized teacher workspace', async () => {
+    tenancyMocks.getOrganizationAccessContext.mockResolvedValueOnce({
+      organizationId: '650000000000000000000001',
+      role: 'teacher',
+      permissions: ['organization.read', 'student.read', 'attendance.read'],
+      campusIds: [],
+    });
+
+    renderPath('/admin/organizations/650000000000000000000001');
+
+    const navigation = await screen.findByRole('navigation', {
+      name: 'Main navigation',
+    });
+    expect(
+      within(navigation).getByRole('link', {
+        name: 'My classes & students',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Your colleges' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens the signed-in teacher workspace and its role-specific dashboard', async () => {
+    tenancyMocks.getOrganizationAccessContext.mockResolvedValueOnce({
+      organizationId: '650000000000000000000001',
+      role: 'teacher',
+      permissions: [
+        'organization.read',
+        'student.read',
+        'attendance.read',
+        'examination.read',
+      ],
+      campusIds: [],
+    });
+
+    renderPath('/teacher/organizations/650000000000000000000001');
+
+    expect(
+      await screen.findByRole(
+        'heading',
+        { name: 'Teaching overview' },
+        { timeout: 5000 },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'My staff attendance' }),
+    ).toBeInTheDocument();
+    const mainNavigation = screen.getByRole('navigation', {
+      name: 'Main navigation',
+    });
+    expect(
+      within(mainNavigation).getByRole('link', {
+        name: /Examinations & Marks/,
+      }),
+    ).toBeInTheDocument();
+    const navigation = screen.getByRole('navigation', {
+      name: 'Teacher quick actions',
+    });
+    expect(
+      within(navigation).getByRole('link', { name: /My classes & students/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(navigation).getByRole('link', { name: /Mark attendance/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(navigation).getByRole('link', { name: /Homework & tests/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(navigation).getByRole('link', { name: /Examinations & Marks/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(navigation).getByRole('link', { name: /Messages/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('redirects a manually requested teacher URL to the server-authorized parent workspace', async () => {
+    tenancyMocks.getOrganizationAccessContext.mockResolvedValueOnce({
+      organizationId: '650000000000000000000001',
+      role: 'parent_guardian',
+      permissions: ['organization.read', 'attendance.read', 'finance.read'],
+      campusIds: [],
+    });
+
+    renderPath('/teacher/organizations/650000000000000000000001');
+
+    expect(
+      await screen.findByRole(
+        'link',
+        { name: 'Fees & receipts' },
+        { timeout: 5000 },
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'My classes & students' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('does not show a current-organization switcher in the organization dashboard', async () => {
     renderPath('/admin/organizations/650000000000000000000001');
 
@@ -721,14 +984,14 @@ describe('frontend application foundation', () => {
     expect(screen.queryByText(organizationId)).not.toBeInTheDocument();
   });
 
-  it('returns an inaccessible organization route to discovery', async () => {
+  it('returns an inaccessible organization route to the signed-in user’s assigned workspace', async () => {
     tenancyMocks.getOrganizationAccessContext.mockRejectedValueOnce(
       new ApiError('Organization not found.', 404, 'ORGANIZATION_NOT_FOUND'),
     );
     renderPath('/admin/organizations/650000000000000000000099');
 
     expect(
-      await screen.findByRole('heading', { name: 'Organizations' }),
+      await screen.findByRole('heading', { name: 'Institute Overview' }),
     ).toBeInTheDocument();
   });
 
@@ -756,6 +1019,50 @@ describe('frontend application foundation', () => {
         role: 'teacher',
         campusIds: [],
       },
+    );
+  });
+
+  it('lets the organization owner assign restricted permissions when inviting an admin', async () => {
+    const user = userEvent.setup();
+    tenancyMocks.getOrganizationAccessContext.mockResolvedValueOnce({
+      organizationId: '650000000000000000000001',
+      role: 'organization_owner',
+      permissions: [
+        'organization.read',
+        'member.read',
+        'member.invite',
+        'member.manage',
+      ],
+      campusIds: [],
+    });
+    renderPath('/admin/organizations/650000000000000000000001?tab=members');
+    await user.click(await screen.findByRole('button', { name: 'members' }));
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Role' }),
+      'organization_admin',
+    );
+
+    const permissionEditor = await screen.findByText(/Admin permissions/);
+    expect(permissionEditor).toBeInTheDocument();
+    const financePermission = screen.getByRole('checkbox', {
+      name: 'finance.write',
+    });
+    expect(financePermission).toBeChecked();
+    await user.click(financePermission);
+    await user.type(
+      screen.getByRole('textbox', { name: 'Email' }),
+      'limited-admin@example.test',
+    );
+    await user.click(screen.getByRole('button', { name: 'Invite member' }));
+
+    expect(organizationMocks.inviteMember).toHaveBeenCalledWith(
+      '650000000000000000000001',
+      expect.objectContaining({
+        email: 'limited-admin@example.test',
+        role: 'organization_admin',
+        campusIds: [],
+        permissions: expect.not.arrayContaining(['finance.write']),
+      }),
     );
   });
 
@@ -1102,7 +1409,7 @@ describe('frontend application foundation', () => {
     const user = userEvent.setup();
     tenancyMocks.getOrganizationAccessContext.mockResolvedValueOnce({
       organizationId: '650000000000000000000001',
-      role: 'student',
+      role: 'organization_admin',
       permissions: ['organization.read'],
       campusIds: [],
     });
@@ -1123,9 +1430,20 @@ describe('frontend application foundation', () => {
     expect(organizationMocks.getInvitations).not.toHaveBeenCalled();
   });
 
-  it('logs out from the authenticated application shell', async () => {
+  it('logs out and clears previously cached organization data', async () => {
     const user = userEvent.setup();
     renderPath('/student');
+    queryClient.setQueryData(
+      ['organization-context', '650000000000000000000001'],
+      {
+        organizationId: '650000000000000000000001',
+        role: 'organization_admin',
+      },
+    );
+    queryClient.setQueryData(
+      ['organization-members', '650000000000000000000001'],
+      { members: [{ id: 'private-member' }] },
+    );
     const signOutButtons = await screen.findAllByRole('button', {
       name: 'Sign out',
     });
@@ -1135,5 +1453,17 @@ describe('frontend application foundation', () => {
       await screen.findByRole('heading', { name: 'Sign in to InstituteOS' }),
     ).toBeInTheDocument();
     expect(logoutRequest).toHaveBeenCalledOnce();
+    expect(
+      queryClient.getQueryData([
+        'organization-context',
+        '650000000000000000000001',
+      ]),
+    ).toBeUndefined();
+    expect(
+      queryClient.getQueryData([
+        'organization-members',
+        '650000000000000000000001',
+      ]),
+    ).toBeUndefined();
   });
 });

@@ -31,6 +31,7 @@ export function useOrganizationAccess(organizationId: string) {
     queryFn: () => getOrganizationAccessContext(organizationId),
     enabled: Boolean(organizationId),
     retry: false,
+    staleTime: 30_000,
   });
 }
 

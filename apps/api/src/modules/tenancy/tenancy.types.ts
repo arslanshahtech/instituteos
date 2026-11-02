@@ -23,6 +23,7 @@ export interface OrganizationMembershipContext {
   userId: string;
   role: OrganizationRole;
   campusIds: string[];
+  permissions?: readonly string[];
 }
 
 export interface OrganizationContext extends OrganizationMembershipContext {

@@ -5,7 +5,7 @@ import {
   type OrganizationStatus,
   type PlatformGrantStatus,
 } from './tenancy.types.js';
-import { PLATFORM_ROLES } from './authorization.js';
+import { ORGANIZATION_PERMISSIONS, PLATFORM_ROLES } from './authorization.js';
 
 const organizationSchema = new Schema(
   {
@@ -71,6 +71,10 @@ const membershipSchema = new Schema(
       required: true,
     },
     role: { type: String, enum: ORGANIZATION_ROLES, required: true },
+    permissions: {
+      type: [{ type: String, enum: ORGANIZATION_PERMISSIONS }],
+      default: undefined,
+    },
     status: {
       type: String,
       enum: ['active', 'suspended', 'revoked'] satisfies MembershipStatus[],
@@ -168,6 +172,10 @@ const invitationSchema = new Schema(
     },
     email: { type: String, required: true, lowercase: true, trim: true },
     role: { type: String, enum: ORGANIZATION_ROLES, required: true },
+    permissions: {
+      type: [{ type: String, enum: ORGANIZATION_PERMISSIONS }],
+      default: undefined,
+    },
     campusIds: [{ type: Schema.Types.ObjectId, ref: 'Campus', default: [] }],
     invitedByUserId: {
       type: Schema.Types.ObjectId,

@@ -28,6 +28,7 @@ export interface AcademicClass {
   campusId: string;
   name: string;
   code: string;
+  sortOrder: number;
   studyLevel?: 'first_year' | 'second_year' | 'other';
   programName?: string;
   createdAt: string;

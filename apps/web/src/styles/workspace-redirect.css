@@ -54,3 +54,49 @@
   font-size: 12px;
   font-weight: 650;
 }
+
+.workspace-choice-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  text-align: left;
+}
+.workspace-choice-list .accessible-organization {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px;
+  color: #0f172a;
+  text-decoration: none;
+}
+.workspace-choice-list .accessible-organization > span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+.workspace-choice-list .accessible-organization small {
+  color: #64748b;
+  text-transform: capitalize;
+}
+.workspace-choice-list .accessible-organization .button {
+  flex: 0 0 auto;
+  margin: 0;
+  white-space: nowrap;
+}
+@media (max-width: 520px) {
+  .workspace-unassigned-card {
+    padding: 22px;
+  }
+  .workspace-choice-list .accessible-organization {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .workspace-choice-list .accessible-organization .button {
+    justify-content: center;
+  }
+}

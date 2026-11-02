@@ -42,6 +42,11 @@ interface Props {
     view?: 'students' | 'add-students' | 'teacher',
   ) => void;
   onOpenCampusSetup: () => void;
+  canWriteAcademics?: boolean;
+  canReadStudents?: boolean;
+  canAddStudents?: boolean;
+  canAssignTeachers?: boolean;
+  canCreateCampuses?: boolean;
 }
 
 export function ClassesSectionsReferenceView({
@@ -58,6 +63,11 @@ export function ClassesSectionsReferenceView({
   onDelete,
   onOpenEnrollment,
   onOpenCampusSetup,
+  canWriteAcademics = true,
+  canReadStudents = true,
+  canAddStudents = true,
+  canAssignTeachers = true,
+  canCreateCampuses = true,
 }: Props) {
   const [campusFilter, setCampusFilter] = useState('all');
   const [yearId, setYearId] = useState(
@@ -124,15 +134,18 @@ export function ClassesSectionsReferenceView({
               ))}
             </select>
           </label>
-          <button
-            className="cr-primary-button"
-            type="button"
-            onClick={() =>
-              campuses.length ? onCreate('classes') : onOpenCampusSetup()
-            }
-          >
-            <Plus size={16} /> Create Class
-          </button>
+          {canWriteAcademics && (campuses.length > 0 || canCreateCampuses) && (
+            <button
+              className="cr-primary-button"
+              type="button"
+              onClick={() =>
+                campuses.length ? onCreate('classes') : onOpenCampusSetup()
+              }
+            >
+              <Plus size={16} />{' '}
+              {campuses.length ? 'Create Class' : 'Create Campus'}
+            </button>
+          )}
         </div>
       </header>
 
@@ -145,13 +158,15 @@ export function ClassesSectionsReferenceView({
               banayein, phir class us campus ke saath assign karein.
             </p>
           </div>
-          <button
-            className="cr-primary-button"
-            type="button"
-            onClick={onOpenCampusSetup}
-          >
-            Create Campus
-          </button>
+          {canCreateCampuses && (
+            <button
+              className="cr-primary-button"
+              type="button"
+              onClick={onOpenCampusSetup}
+            >
+              Create Campus
+            </button>
+          )}
         </section>
       )}
 
@@ -292,17 +307,22 @@ export function ClassesSectionsReferenceView({
                   ? 'Try changing your search or academy filter.'
                   : 'Create the first class for this organization.'}
               </p>
-              {!search && campusFilter === 'all' && (
-                <button
-                  className="cr-primary-button"
-                  type="button"
-                  onClick={() =>
-                    campuses.length ? onCreate('classes') : onOpenCampusSetup()
-                  }
-                >
-                  <Plus size={16} /> Create Class
-                </button>
-              )}
+              {!search &&
+                campusFilter === 'all' &&
+                canWriteAcademics &&
+                (campuses.length > 0 || canCreateCampuses) && (
+                  <button
+                    className="cr-primary-button"
+                    type="button"
+                    onClick={() =>
+                      campuses.length
+                        ? onCreate('classes')
+                        : onOpenCampusSetup()
+                    }
+                  >
+                    <Plus size={16} /> Create Class
+                  </button>
+                )}
             </div>
           )}
         </div>
@@ -379,13 +399,15 @@ export function ClassesSectionsReferenceView({
                       <h3>Class Sections</h3>
                       <p>Sections configured for this class.</p>
                     </div>
-                    <button
-                      className="cr-small-dark-button"
-                      type="button"
-                      onClick={() => onCreate('sections', selectedClass.id)}
-                    >
-                      <Plus size={14} /> Add Section
-                    </button>
+                    {canWriteAcademics && (
+                      <button
+                        className="cr-small-dark-button"
+                        type="button"
+                        onClick={() => onCreate('sections', selectedClass.id)}
+                      >
+                        <Plus size={14} /> Add Section
+                      </button>
+                    )}
                   </div>
                   {selectedSections.length ? (
                     <div className="cr-section-list">
@@ -402,97 +424,113 @@ export function ClassesSectionsReferenceView({
                                 : 'Capacity not set'}
                             </small>
                           </div>
-                          <button
-                            className="cr-text-button"
-                            type="button"
-                            onClick={() => onEdit('sections', section)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="cr-text-button danger"
-                            type="button"
-                            onClick={() =>
-                              onDelete('sections', section.id, section.name)
-                            }
-                          >
-                            Delete
-                          </button>
+                          {canWriteAcademics && (
+                            <>
+                              <button
+                                className="cr-text-button"
+                                type="button"
+                                onClick={() => onEdit('sections', section)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="cr-text-button danger"
+                                type="button"
+                                onClick={() =>
+                                  onDelete('sections', section.id, section.name)
+                                }
+                              >
+                                Delete
+                              </button>
+                            </>
+                          )}
                         </article>
                       ))}
                     </div>
                   ) : (
                     <div className="cr-empty-inline">
                       <p>No sections created for this class yet.</p>
-                      <button
-                        className="cr-text-button"
-                        type="button"
-                        onClick={() => onCreate('sections', selectedClass.id)}
-                      >
-                        Add the first section
-                      </button>
+                      {canWriteAcademics && (
+                        <button
+                          className="cr-text-button"
+                          type="button"
+                          onClick={() => onCreate('sections', selectedClass.id)}
+                        >
+                          Add the first section
+                        </button>
+                      )}
                     </div>
                   )}
                   <div className="cr-detail-actions">
-                    <button
-                      className="cr-secondary-button"
-                      type="button"
-                      onClick={() =>
-                        onOpenEnrollment(
-                          selectedSections[0]?.id,
-                          selectedClass.id,
-                          'students',
-                        )
-                      }
-                    >
-                      <Users size={15} /> View Students
-                    </button>
-                    <button
-                      className="cr-primary-button"
-                      type="button"
-                      onClick={() =>
-                        onOpenEnrollment(
-                          selectedSections[0]?.id,
-                          selectedClass.id,
-                          'add-students',
-                        )
-                      }
-                    >
-                      <Plus size={15} /> Add Student
-                    </button>
-                    <button
-                      className="cr-secondary-button"
-                      type="button"
-                      onClick={() =>
-                        onOpenEnrollment(
-                          selectedSections[0]?.id,
-                          selectedClass.id,
-                          'teacher',
-                        )
-                      }
-                    >
-                      <BookOpen size={15} /> Assign Teacher
-                    </button>
-                    <button
-                      className="cr-secondary-button"
-                      type="button"
-                      onClick={() => onEdit('classes', selectedClass)}
-                    >
-                      Edit Class
-                    </button>
-                    <button
-                      className="cr-danger-button"
-                      type="button"
-                      onClick={() =>
-                        onDelete(
-                          'classes',
-                          selectedClass.id,
-                          selectedClass.name,
-                        )
-                      }
-                    >
-                      <Archive size={15} /> Delete Class
-                    </button>
+                    {canReadStudents && (
+                      <button
+                        className="cr-secondary-button"
+                        type="button"
+                        onClick={() =>
+                          onOpenEnrollment(
+                            selectedSections[0]?.id,
+                            selectedClass.id,
+                            'students',
+                          )
+                        }
+                      >
+                        <Users size={15} /> View Students
+                      </button>
+                    )}
+                    {canAddStudents && (
+                      <button
+                        className="cr-primary-button"
+                        type="button"
+                        onClick={() =>
+                          onOpenEnrollment(
+                            selectedSections[0]?.id,
+                            selectedClass.id,
+                            'add-students',
+                          )
+                        }
+                      >
+                        <Plus size={15} /> Add Student
+                      </button>
+                    )}
+                    {canAssignTeachers && (
+                      <button
+                        className="cr-secondary-button"
+                        type="button"
+                        onClick={() =>
+                          onOpenEnrollment(
+                            selectedSections[0]?.id,
+                            selectedClass.id,
+                            'teacher',
+                          )
+                        }
+                      >
+                        <BookOpen size={15} /> Assign Teacher
+                      </button>
+                    )}
+                    {canWriteAcademics && (
+                      <>
+                        <button
+                          className="cr-secondary-button"
+                          type="button"
+                          onClick={() => onEdit('classes', selectedClass)}
+                        >
+                          Edit Class
+                        </button>
+                        <button
+                          className="cr-danger-button"
+                          type="button"
+                          onClick={() =>
+                            onDelete(
+                              'classes',
+                              selectedClass.id,
+                              selectedClass.name,
+                            )
+                          }
+                        >
+                          <Archive size={15} /> Delete Class
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -506,26 +544,30 @@ export function ClassesSectionsReferenceView({
                       </p>
                     </div>
                     <div className="cr-detail-heading-actions">
-                      <button
-                        className="cr-secondary-button"
-                        type="button"
-                        onClick={() =>
-                          onOpenEnrollment(
-                            selectedSections[0]?.id,
-                            selectedClass.id,
-                            'teacher',
-                          )
-                        }
-                      >
-                        <Users size={14} /> Assign Teacher
-                      </button>
-                      <button
-                        className="cr-small-dark-button"
-                        type="button"
-                        onClick={onCreateSubject}
-                      >
-                        <Plus size={14} /> Add Subject
-                      </button>
+                      {canAssignTeachers && (
+                        <button
+                          className="cr-secondary-button"
+                          type="button"
+                          onClick={() =>
+                            onOpenEnrollment(
+                              selectedSections[0]?.id,
+                              selectedClass.id,
+                              'teacher',
+                            )
+                          }
+                        >
+                          <Users size={14} /> Assign Teacher
+                        </button>
+                      )}
+                      {canWriteAcademics && (
+                        <button
+                          className="cr-small-dark-button"
+                          type="button"
+                          onClick={onCreateSubject}
+                        >
+                          <Plus size={14} /> Add Subject
+                        </button>
+                      )}
                     </div>
                   </div>
                   {selectedAssignments.length ? (
@@ -575,19 +617,21 @@ export function ClassesSectionsReferenceView({
                         Add a subject first, then open Assign Teacher to choose
                         the subject, section, year and teacher.
                       </span>
-                      <button
-                        className="cr-text-button"
-                        type="button"
-                        onClick={() =>
-                          onOpenEnrollment(
-                            selectedSections[0]?.id,
-                            selectedClass.id,
-                            'teacher',
-                          )
-                        }
-                      >
-                        Open teacher assignment
-                      </button>
+                      {canAssignTeachers && (
+                        <button
+                          className="cr-text-button"
+                          type="button"
+                          onClick={() =>
+                            onOpenEnrollment(
+                              selectedSections[0]?.id,
+                              selectedClass.id,
+                              'teacher',
+                            )
+                          }
+                        >
+                          Open teacher assignment
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

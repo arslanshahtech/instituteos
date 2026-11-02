@@ -10,6 +10,7 @@ import { MongoOrganizationAccessRepository } from '../tenancy/tenancy.repository
 import type { OrganizationAccessRepository } from '../tenancy/tenancy.types.js';
 import {
   createOrganizationContextMiddleware,
+  requireOrganizationMethodPermission,
   requireOrganizationRole,
 } from '../tenancy/tenant-context.middleware.js';
 import { MongoSettingsRepository } from './settings.repository.js';
@@ -48,13 +49,18 @@ function parseSettingsInput(value: unknown): OrganizationSettingsInput {
     contact: ['email', 'phone', 'address', 'website'],
     localization: ['timezone', 'currency', 'dateFormat'],
     notifications: ['emailAlerts', 'smsAlerts', 'autoAttendanceAlerts'],
+    teacherSelfAttendance: [
+      'viewOwnAttendance',
+      'selfMarkingEnabled',
+      'allowedStatuses',
+    ],
   } as const;
 
   for (const [section, keys] of Object.entries(definitions)) {
     const rawSection = body[section];
     if (rawSection === undefined) continue;
     const values = bodyObject(rawSection);
-    const parsed: Record<string, string | boolean> = {};
+    const parsed: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(values)) {
       if (!(keys as readonly string[]).includes(key)) {
         throw new AppError(
@@ -63,11 +69,35 @@ function parseSettingsInput(value: unknown): OrganizationSettingsInput {
           'Settings contain an unsupported field.',
         );
       }
-      if (section === 'notifications') {
-        if (typeof item !== 'boolean') {
-          throw new AppError(400, 'VALIDATION_ERROR', `Select a valid ${key}.`);
+      if (section === 'notifications' || section === 'teacherSelfAttendance') {
+        if (key === 'allowedStatuses') {
+          if (
+            !Array.isArray(item) ||
+            item.length === 0 ||
+            item.some(
+              (status) =>
+                !['present', 'absent', 'half-day', 'on-leave'].includes(
+                  String(status),
+                ),
+            )
+          ) {
+            throw new AppError(
+              400,
+              'VALIDATION_ERROR',
+              'Select valid teacher self-attendance statuses.',
+            );
+          }
+          parsed[key] = item as unknown as string;
+        } else {
+          if (typeof item !== 'boolean') {
+            throw new AppError(
+              400,
+              'VALIDATION_ERROR',
+              `Select a valid ${key}.`,
+            );
+          }
+          parsed[key] = item;
         }
-        parsed[key] = item;
       } else {
         if (
           typeof item !== 'string' ||
@@ -120,6 +150,10 @@ export function createSettingsRouter(
     authenticate,
     resolveOrganization,
     requireOrganizationRole(organizationManagers),
+    requireOrganizationMethodPermission(
+      'organization.read',
+      'organization.update',
+    ),
   ] as const;
 
   router.get(

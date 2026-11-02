@@ -1,5 +1,6 @@
 import type { OrganizationContext } from '../tenancy/tenancy.types.js';
 import type { OrganizationRole } from '../tenancy/tenancy.types.js';
+import type { OrganizationPermission } from '../tenancy/authorization.js';
 
 export interface AddressInput {
   line1?: string;
@@ -39,12 +40,14 @@ export interface MemberInvitationInput {
   email: string;
   role: OrganizationRole;
   campusIds: string[];
+  permissions?: OrganizationPermission[];
 }
 
 export interface MemberUpdateInput {
   role?: OrganizationRole;
   status?: 'active' | 'suspended' | 'revoked';
   campusIds?: string[];
+  permissions?: OrganizationPermission[];
 }
 
 export interface AccessibleOrganization {
@@ -132,6 +135,7 @@ export interface OrganizationRepository {
     email: string;
     role: OrganizationRole;
     campusIds: string[];
+    permissions?: OrganizationPermission[];
     tokenHash: string;
     expiresAt: Date;
   }): Promise<void>;

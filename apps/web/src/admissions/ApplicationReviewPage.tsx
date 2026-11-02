@@ -65,6 +65,7 @@ export function ApplicationReviewPage() {
     queryFn: () => getOrganizationAccessContext(organizationId),
     enabled: Boolean(organizationId),
     retry: false,
+    staleTime: 30_000,
   });
   const campuses = useQuery({
     queryKey: ['organization-campuses', organizationId],

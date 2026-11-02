@@ -37,6 +37,19 @@ const notificationsSchema = new Schema(
   { _id: false },
 );
 
+const teacherSelfAttendanceSchema = new Schema(
+  {
+    viewOwnAttendance: { type: Boolean, default: true },
+    selfMarkingEnabled: { type: Boolean, default: false },
+    allowedStatuses: {
+      type: [String],
+      enum: ['present', 'absent', 'half-day', 'on-leave'],
+      default: ['present'],
+    },
+  },
+  { _id: false },
+);
+
 export const organizationSettingsSchema = new Schema(
   {
     organizationId: {
@@ -50,6 +63,10 @@ export const organizationSettingsSchema = new Schema(
     contact: { type: contactSchema, default: () => ({}) },
     localization: { type: localizationSchema, default: () => ({}) },
     notifications: { type: notificationsSchema, default: () => ({}) },
+    teacherSelfAttendance: {
+      type: teacherSelfAttendanceSchema,
+      default: () => ({}),
+    },
   },
   { timestamps: true, versionKey: false },
 );

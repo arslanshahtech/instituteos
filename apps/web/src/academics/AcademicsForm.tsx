@@ -12,6 +12,7 @@ import type {
 interface FormValues {
   name: string;
   code: string;
+  sortOrder: string;
   startDate: string;
   endDate: string;
   status: 'active' | 'archived';
@@ -46,6 +47,13 @@ function schemaForResource(resource: AcademicsResource, isEditing: boolean) {
     .object({
       name: z.string().trim().max(120, 'Use 120 characters or fewer.'),
       code: z.string().trim().max(30, 'Use 30 characters or fewer.'),
+      sortOrder: z
+        .string()
+        .refine(
+          (value) =>
+            value === '' || (/^\d+$/.test(value) && Number(value) <= 100000),
+          'Enter a whole number from 0 to 100,000.',
+        ),
       startDate: z.string(),
       endDate: z.string(),
       status: z.enum(['active', 'archived']),
@@ -169,6 +177,7 @@ const fieldsByResource: Record<AcademicsResource, Field[]> = {
   classes: [
     { name: 'name', label: 'Class / study level name (e.g. First Year)' },
     { name: 'code', label: 'Class code' },
+    { name: 'sortOrder', label: 'Display order', type: 'number' },
     {
       name: 'studyLevel',
       label: 'Study level',
@@ -209,6 +218,7 @@ const fieldsByResource: Record<AcademicsResource, Field[]> = {
 const emptyValues: FormValues = {
   name: '',
   code: '',
+  sortOrder: '0',
   startDate: '',
   endDate: '',
   status: 'active',
@@ -248,6 +258,7 @@ export function AcademicsForm({
     return {
       name: value('name'),
       code: value('code'),
+      sortOrder: value('sortOrder'),
       startDate: value('startDate'),
       endDate: value('endDate'),
       status:
@@ -311,6 +322,9 @@ export function AcademicsForm({
 
   const submit = form.handleSubmit((values) => {
     const input: AcademicsFormPayload = { ...values };
+    if (resource === 'classes')
+      input.sortOrder = values.sortOrder === '' ? 0 : Number(values.sortOrder);
+    else delete input.sortOrder;
     if (resource === 'sections')
       input.capacity = values.capacity ? Number(values.capacity) : '';
     else delete input.capacity;

@@ -82,26 +82,39 @@ export function AuthProvider({ children }: PropsWithChildren) {
       user,
       error: currentUser.error,
       async login(input) {
-        await queryClient.cancelQueries({ queryKey: CURRENT_USER_KEY });
+        await queryClient.cancelQueries();
         const result = await loginRequest(input);
+        // A successful sign-in may switch accounts. Remove cached organization
+        // and role-scoped data before exposing the newly authenticated user.
+        queryClient.removeQueries({
+          predicate: (query) => query.queryKey[0] !== 'auth',
+        });
         queryClient.setQueryData(CURRENT_USER_KEY, result.user);
       },
       async register(input) {
         return registerRequest(input);
       },
       async logout() {
-        // Cancel an in-flight session bootstrap so it cannot restore stale
-        // authenticated data after the logout request has completed.
-        await queryClient.cancelQueries({ queryKey: CURRENT_USER_KEY });
+        // Cancel in-flight requests and clear all user-scoped cache entries so
+        // a later account cannot see another member's previously loaded data.
+        await queryClient.cancelQueries();
         await logoutRequest();
+        queryClient.removeQueries({
+          predicate: (query) => query.queryKey[0] !== 'auth',
+        });
         queryClient.setQueryData(CURRENT_USER_KEY, null);
       },
       forgotPassword: forgotPasswordRequest,
       resendVerification: resendVerificationRequest,
       resetPassword: resetPasswordRequest,
       async verifyEmail(token) {
-        await queryClient.cancelQueries({ queryKey: CURRENT_USER_KEY });
+        await queryClient.cancelQueries();
         const result = await verifyEmailRequest(token);
+        // Email verification establishes a session and can change the active
+        // identity, so no previously cached workspace data may survive it.
+        queryClient.removeQueries({
+          predicate: (query) => query.queryKey[0] !== 'auth',
+        });
         queryClient.setQueryData(CURRENT_USER_KEY, result.user);
       },
       async retryBootstrap() {

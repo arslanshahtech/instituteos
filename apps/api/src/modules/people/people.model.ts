@@ -176,6 +176,11 @@ const staffMemberSchema = new Schema(
       ref: 'Campus',
       default: null,
     },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'AuthUser',
+      default: null,
+    },
     firstName: { type: String, required: true, trim: true, maxlength: 80 },
     lastName: { type: String, required: true, trim: true, maxlength: 80 },
     employeeCode: { type: String, trim: true, maxlength: 40 },
@@ -204,6 +209,14 @@ const staffMemberSchema = new Schema(
   { timestamps: true, versionKey: false },
 );
 staffMemberSchema.index({ organizationId: 1, status: 1, department: 1 });
+staffMemberSchema.index(
+  { organizationId: 1, userId: 1 },
+  {
+    unique: true,
+    name: 'uniq_staff_account_per_organization',
+    partialFilterExpression: { userId: { $type: 'objectId' } },
+  },
+);
 
 const inquirySchema = new Schema(
   {

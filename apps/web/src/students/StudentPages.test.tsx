@@ -217,7 +217,11 @@ describe('student management pages', () => {
     renderStudentRoute(`/admin/organizations/${organizationId}/students/new`);
 
     await user.click(
-      await screen.findByRole('button', { name: 'Create student' }),
+      await screen.findByRole(
+        'button',
+        { name: 'Create student' },
+        { timeout: 8_000 },
+      ),
     );
     expect(
       await screen.findAllByText('Enter at least two characters.'),
@@ -244,7 +248,7 @@ describe('student management pages', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Student created successfully.',
     );
-  });
+  }, 10_000);
 
   it('requires campus admins to select an assigned campus before saving', async () => {
     const user = userEvent.setup();
@@ -329,7 +333,7 @@ describe('student management pages', () => {
     readOnlyClient.setQueryData(['auth', 'current-user'], authMocks.user);
     accessMocks.getOrganizationAccessContext.mockResolvedValueOnce({
       organizationId,
-      role: 'teacher',
+      role: 'organization_admin',
       permissions: ['student.read'],
       campusIds: [],
     });

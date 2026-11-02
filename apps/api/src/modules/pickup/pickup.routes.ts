@@ -15,6 +15,7 @@ import type { OrganizationAccessRepository } from '../tenancy/tenancy.types.js';
 import {
   createOrganizationContextMiddleware,
   requireOrganizationPermission,
+  requireOrganizationPermissionForRole,
   requireOrganizationRole,
 } from '../tenancy/tenant-context.middleware.js';
 import { MongoPickupRepository } from './pickup.repository.js';
@@ -227,6 +228,7 @@ export function createPickupRouter(
     authenticate,
     resolveOrganization,
     requireOrganizationRole(staffVerificationRoles),
+    requireOrganizationPermissionForRole('organization_admin', 'staff.update'),
     csrfProtection,
     asyncHandler(async (request, response) => {
       const { organizationId } = organizationContext(response);
@@ -256,6 +258,7 @@ export function createPickupRouter(
     authenticate,
     resolveOrganization,
     requireOrganizationRole(staffVerificationRoles),
+    requireOrganizationPermissionForRole('organization_admin', 'staff.update'),
     csrfProtection,
     asyncHandler(async (request, response) => {
       const { organizationId } = organizationContext(response);

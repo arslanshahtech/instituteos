@@ -131,6 +131,54 @@ function authMiddleware() {
     }),
   );
 }
+async function resolveTeacher(context: Context) {
+  const linked = await StaffMemberModel.find({
+    organizationId: context.organizationId,
+    userId: context.userId,
+    status: 'active',
+  })
+    .select({ _id: 1 })
+    .limit(2)
+    .lean();
+  if (linked.length > 1)
+    throw new AppError(
+      403,
+      'TEACHER_ACCOUNT_UNLINKED',
+      'Your account is linked to more than one staff profile. Contact the administrator.',
+    );
+  if (linked.length === 1) return linked[0]!._id;
+
+  const user = await AuthUserModel.findById(context.userId)
+    .select({ email: 1, status: 1 })
+    .lean();
+  if (user?.status !== 'active' || !user.email)
+    throw new AppError(
+      403,
+      'TEACHER_ACCOUNT_UNLINKED',
+      'Your active account is not linked to a teacher record.',
+    );
+  const legacyMatches = await StaffMemberModel.find({
+    organizationId: context.organizationId,
+    email: user.email.trim().toLowerCase(),
+    status: 'active',
+    $or: [
+      { userId: { $exists: false } },
+      { userId: null },
+      { userId: context.userId },
+    ],
+  })
+    .select({ _id: 1 })
+    .limit(2)
+    .lean();
+  if (legacyMatches.length !== 1)
+    throw new AppError(
+      403,
+      'TEACHER_ACCOUNT_UNLINKED',
+      'Your account must match exactly one active staff record.',
+    );
+  return legacyMatches[0]!._id;
+}
+
 async function verifyTeacherScope(
   context: Context,
   input: {
@@ -141,32 +189,10 @@ async function verifyTeacherScope(
   },
 ) {
   if (context.role !== 'teacher') return;
-  const user = await AuthUserModel.findById(context.userId)
-    .select({ email: 1, status: 1 })
-    .lean();
-  if (user?.status !== 'active' || !user.email)
-    throw new AppError(
-      403,
-      'TEACHER_ACCOUNT_UNLINKED',
-      'Your active account is not linked to a teacher record.',
-    );
-  const staff = await StaffMemberModel.find({
-    organizationId: context.organizationId,
-    email: user.email.trim().toLowerCase(),
-    status: 'active',
-  })
-    .select({ _id: 1 })
-    .limit(2)
-    .lean();
-  if (staff.length !== 1)
-    throw new AppError(
-      403,
-      'TEACHER_ACCOUNT_UNLINKED',
-      'Your account must match exactly one active staff record.',
-    );
+  const staffId = await resolveTeacher(context);
   const assigned = await TeacherAssignmentModel.exists({
     organizationId: context.organizationId,
-    teacherStaffId: staff[0]!._id,
+    teacherStaffId: staffId,
     ...input,
   });
   if (!assigned)
@@ -175,32 +201,6 @@ async function verifyTeacherScope(
       'TEACHER_ASSIGNMENT_REQUIRED',
       'You can only manage homework and tests for your assigned class, section, subject, and academic year.',
     );
-}
-async function resolveTeacher(context: Context) {
-  const user = await AuthUserModel.findById(context.userId)
-    .select({ email: 1, status: 1 })
-    .lean();
-  if (user?.status !== 'active' || !user.email)
-    throw new AppError(
-      403,
-      'TEACHER_ACCOUNT_UNLINKED',
-      'Your active account is not linked to a teacher record.',
-    );
-  const staff = await StaffMemberModel.find({
-    organizationId: context.organizationId,
-    email: user.email.trim().toLowerCase(),
-    status: 'active',
-  })
-    .select({ _id: 1 })
-    .limit(2)
-    .lean();
-  if (staff.length !== 1)
-    throw new AppError(
-      403,
-      'TEACHER_ACCOUNT_UNLINKED',
-      'Your account must match exactly one active staff record.',
-    );
-  return staff[0]!._id;
 }
 type HomeworkTestRecord = {
   _id: { toString(): string };

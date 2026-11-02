@@ -9,6 +9,7 @@ import {
   PlatformRoleGrantModel,
 } from '../tenancy/tenancy.model.js';
 import { AuthUserModel } from '../auth/auth.model.js';
+import { StaffMemberModel } from '../people/people.model.js';
 import { MongoOrganizationRepository } from './organizations.repository.js';
 
 const organizationId = '650000000000000000000001';
@@ -437,6 +438,148 @@ describe('organization repository transactions', () => {
     ).rejects.toMatchObject({ code: 'ORGANIZATION_NAME_CONFIRMATION_FAILED' });
 
     expect(cleanup).not.toHaveBeenCalled();
+    expect(session.endSession).toHaveBeenCalledOnce();
+  });
+});
+
+describe('teacher invitation account linking', () => {
+  const teacherUserId = '670000000000000000000099';
+  const teacherStaffId = '680000000000000000000099';
+  const invitationId = '690000000000000000000099';
+  const teacherEmail = 'teacher@example.edu';
+
+  function mockTeacherInvitation() {
+    const session = makeSession();
+    const invite = {
+      _id: new Types.ObjectId(invitationId),
+      organizationId: new Types.ObjectId(organizationId),
+      email: teacherEmail,
+      role: 'teacher',
+      campusIds: [new Types.ObjectId(campusId)],
+      status: 'pending',
+      expiresAt: new Date('2027-01-01T00:00:00.000Z'),
+    };
+    const invitationQuery = {
+      select: vi.fn().mockReturnThis(),
+      session: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue(invite),
+    };
+    const organizationQuery = {
+      session: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue({
+        _id: new Types.ObjectId(organizationId),
+        status: 'active',
+      }),
+    };
+    const membershipQuery = {
+      session: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue(null),
+    };
+    vi.spyOn(OrganizationInvitationModel, 'findOne').mockReturnValue(
+      invitationQuery as never,
+    );
+    vi.spyOn(OrganizationModel, 'findOne').mockReturnValue(
+      organizationQuery as never,
+    );
+    vi.spyOn(MembershipModel, 'findOne').mockReturnValue(
+      membershipQuery as never,
+    );
+    return session;
+  }
+
+  it('links exactly one active teaching profile in the same transaction as invitation activation', async () => {
+    const session = mockTeacherInvitation();
+    const profile = {
+      _id: new Types.ObjectId(teacherStaffId),
+      userId: null,
+    };
+    const staffListQuery = {
+      session: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue([profile]),
+    };
+    const existingLinkQuery = {
+      session: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue(null),
+    };
+    const linkedProfileQuery = {
+      lean: vi.fn().mockResolvedValue({
+        ...profile,
+        userId: new Types.ObjectId(teacherUserId),
+      }),
+    };
+    vi.spyOn(StaffMemberModel, 'find').mockReturnValue(staffListQuery as never);
+    vi.spyOn(StaffMemberModel, 'findOne').mockReturnValue(
+      existingLinkQuery as never,
+    );
+    const linkProfile = vi
+      .spyOn(StaffMemberModel, 'findOneAndUpdate')
+      .mockReturnValue(linkedProfileQuery as never);
+    const membership = {
+      _id: new Types.ObjectId('670000000000000000000098'),
+      toObject: () => ({
+        _id: new Types.ObjectId('670000000000000000000098'),
+        role: 'teacher',
+      }),
+    };
+    const createMembership = vi
+      .spyOn(MembershipModel, 'create')
+      .mockResolvedValue([membership] as never);
+    vi.spyOn(OrganizationInvitationModel, 'updateOne').mockResolvedValue({
+      modifiedCount: 1,
+    } as never);
+    const createAudit = vi
+      .spyOn(OrganizationAuditEventModel, 'create')
+      .mockResolvedValue([] as never);
+
+    const result = await new MongoOrganizationRepository().acceptInvitation({
+      tokenHash: 'hashed-token',
+      userId: teacherUserId,
+      email: teacherEmail,
+      now: new Date('2026-11-01T00:00:00.000Z'),
+    });
+
+    expect(result).toMatchObject({ role: 'teacher' });
+    expect(linkProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _id: profile._id,
+        organizationId: new Types.ObjectId(organizationId),
+      }),
+      { $set: { userId: new Types.ObjectId(teacherUserId) } },
+      { new: true, runValidators: true, session },
+    );
+    expect(createMembership).toHaveBeenCalledOnce();
+    expect(createAudit).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          details: { role: 'teacher', staffId: teacherStaffId },
+        }),
+      ],
+      { session },
+    );
+    expect(session.withTransaction).toHaveBeenCalledOnce();
+  });
+
+  it('rejects teacher activation when no matching active teaching profile exists', async () => {
+    const session = mockTeacherInvitation();
+    const staffListQuery = {
+      session: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue([]),
+    };
+    vi.spyOn(StaffMemberModel, 'find').mockReturnValue(staffListQuery as never);
+    const createMembership = vi.spyOn(MembershipModel, 'create');
+
+    await expect(
+      new MongoOrganizationRepository().acceptInvitation({
+        tokenHash: 'hashed-token',
+        userId: teacherUserId,
+        email: teacherEmail,
+        now: new Date('2026-11-01T00:00:00.000Z'),
+      }),
+    ).rejects.toMatchObject({ code: 'TEACHER_STAFF_PROFILE_REQUIRED' });
+
+    expect(createMembership).not.toHaveBeenCalled();
     expect(session.endSession).toHaveBeenCalledOnce();
   });
 });

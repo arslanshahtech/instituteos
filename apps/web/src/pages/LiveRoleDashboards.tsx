@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import {
   BookOpenText,
@@ -13,10 +13,13 @@ import {
 import { Link } from 'react-router-dom';
 import {
   getStudentRoster,
+  getTeacherSelfAttendance,
   listStudentAttendance,
   listTeacherAttendanceAssignments,
+  saveTeacherSelfAttendance,
 } from '../attendance/attendance-api.js';
 import type {
+  StaffAttendanceStatus,
   StudentAttendanceRecord,
   TeacherAttendanceAssignment,
 } from '../attendance/attendance-api.js';
@@ -130,6 +133,10 @@ export function TeacherLiveDashboard({
   userName?: string;
 }) {
   const today = localDate();
+  const queryClient = useQueryClient();
+  const [selfAttendanceStatus, setSelfAttendanceStatus] =
+    useState<StaffAttendanceStatus>('present');
+  const [selfAttendanceRemarks, setSelfAttendanceRemarks] = useState('');
   const days = useMemo(lastSevenDays, []);
   const dateFrom = days[0]!;
   const assignmentsQuery = useQuery({
@@ -166,12 +173,39 @@ export function TeacherLiveDashboard({
       organizationId,
       dateFrom,
       today,
-      assignments.map((item) => item.sectionId).join('|'),
+      assignments
+        .map((item) => `${item.sectionId}:${item.academicYearId}`)
+        .join('|'),
     ],
     queryFn: () =>
       teacherAttendanceQuery(organizationId, assignments, dateFrom, today),
     enabled: assignmentsQuery.isSuccess && assignments.length > 0,
     retry: false,
+  });
+  const selfAttendanceQuery = useQuery({
+    queryKey: ['attendance', organizationId, 'teacher-self', today],
+    queryFn: () =>
+      getTeacherSelfAttendance(organizationId, {
+        dateFrom: dateFrom,
+        dateTo: today,
+      }),
+    retry: false,
+  });
+  const selfAttendanceMutation = useMutation({
+    mutationFn: () =>
+      saveTeacherSelfAttendance(organizationId, {
+        date: today,
+        status: selfAttendanceStatus,
+        ...(selfAttendanceRemarks.trim()
+          ? { remarks: selfAttendanceRemarks.trim() }
+          : {}),
+      }),
+    onSuccess: () => {
+      setSelfAttendanceRemarks('');
+      void queryClient.invalidateQueries({
+        queryKey: ['attendance', organizationId, 'teacher-self'],
+      });
+    },
   });
   const roster = rosterQuery.data ?? [];
   const records = attendanceQuery.data ?? [];
@@ -222,11 +256,132 @@ export function TeacherLiveDashboard({
           <BookOpenText size={13} aria-hidden="true" /> Homework &amp; tests
         </QuickAction>
         <QuickAction
+          to={`/teacher/organizations/${encodeURIComponent(organizationId)}/examinations`}
+        >
+          <GraduationCap size={13} aria-hidden="true" /> Examinations & Marks
+        </QuickAction>
+        <QuickAction
           to={`/teacher/organizations/${encodeURIComponent(organizationId)}/communications`}
         >
           <ClipboardList size={13} aria-hidden="true" /> Messages
         </QuickAction>
       </nav>
+      <section
+        className="reference-dashboard-panel"
+        aria-labelledby="teacher-self-attendance-title"
+      >
+        <div className="reference-panel-heading">
+          <h2 id="teacher-self-attendance-title">My staff attendance</h2>
+          <span>{today}</span>
+        </div>
+        {selfAttendanceQuery.isPending ? (
+          <p className="reference-scope-note">
+            Loading your attendance policy and history…
+          </p>
+        ) : selfAttendanceQuery.isError ? (
+          <p className="reference-scope-note" role="status">
+            Your own attendance is currently unavailable. Your institute may
+            have disabled attendance history, or your staff profile needs to be
+            linked by an administrator.
+          </p>
+        ) : (
+          <>
+            {selfAttendanceQuery.data.items.length ? (
+              <div className="reference-activity-list">
+                {selfAttendanceQuery.data.items.map((item) => (
+                  <div className="reference-activity-row" key={item.id}>
+                    <span
+                      className="reference-activity-dot"
+                      aria-hidden="true"
+                    />
+                    <span className="reference-activity-copy">
+                      <strong>{item.date}</strong>
+                      <small>{item.remarks || 'Staff attendance record'}</small>
+                    </span>
+                    <span className="reference-status reference-status-info">
+                      {item.status.replace('-', ' ')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="reference-scope-note">
+                No staff attendance records found for this period.
+              </p>
+            )}
+            {selfAttendanceQuery.data.policy.selfMarkingEnabled &&
+            !selfAttendanceQuery.data.items.some(
+              (item) => item.date === today,
+            ) ? (
+              <form
+                className="settings-fields"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  selfAttendanceMutation.mutate();
+                }}
+              >
+                <label className="settings-field">
+                  <span>Today's attendance</span>
+                  <select
+                    value={selfAttendanceStatus}
+                    onChange={(event) =>
+                      setSelfAttendanceStatus(
+                        event.target.value as StaffAttendanceStatus,
+                      )
+                    }
+                  >
+                    {selfAttendanceQuery.data.policy.allowedStatuses.map(
+                      (status) => (
+                        <option key={status} value={status}>
+                          {status.replace('-', ' ')}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </label>
+                <label className="settings-field">
+                  <span>Remarks (optional)</span>
+                  <input
+                    maxLength={500}
+                    value={selfAttendanceRemarks}
+                    onChange={(event) =>
+                      setSelfAttendanceRemarks(event.target.value)
+                    }
+                    placeholder="Add a short note"
+                  />
+                </label>
+                <button
+                  className="button button-primary"
+                  type="submit"
+                  disabled={
+                    selfAttendanceMutation.isPending ||
+                    !selfAttendanceQuery.data.policy.allowedStatuses.length
+                  }
+                >
+                  {selfAttendanceMutation.isPending
+                    ? 'Saving…'
+                    : 'Mark my attendance'}
+                </button>
+                {selfAttendanceMutation.error && (
+                  <p className="settings-error" role="alert">
+                    {selfAttendanceMutation.error.message}
+                  </p>
+                )}
+              </form>
+            ) : selfAttendanceQuery.data.policy.selfMarkingEnabled ? (
+              <p className="reference-scope-note">
+                Today's attendance has already been recorded. Contact your
+                administrator if it needs correction.
+              </p>
+            ) : (
+              <p className="reference-scope-note">
+                Self-marking is disabled by your institute. You can view your
+                history here.
+              </p>
+            )}
+          </>
+        )}
+      </section>
       {assignmentsQuery.isError ? (
         <section className="reference-dashboard-panel">
           <h2>Assigned classes unavailable</h2>

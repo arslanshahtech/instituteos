@@ -34,6 +34,11 @@ function defaultSettings(
       smsAlerts: false,
       autoAttendanceAlerts: false,
     },
+    teacherSelfAttendance: {
+      viewOwnAttendance: true,
+      selfMarkingEnabled: false,
+      allowedStatuses: ['present'],
+    },
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -45,6 +50,7 @@ function validateInput(input: OrganizationSettingsInput): void {
     'contact',
     'localization',
     'notifications',
+    'teacherSelfAttendance',
   ] as const;
   let hasValue = false;
   for (const section of sections) {
@@ -55,6 +61,11 @@ function validateInput(input: OrganizationSettingsInput): void {
       contact: ['email', 'phone', 'address', 'website'],
       localization: ['timezone', 'currency', 'dateFormat'],
       notifications: ['emailAlerts', 'smsAlerts', 'autoAttendanceAlerts'],
+      teacherSelfAttendance: [
+        'viewOwnAttendance',
+        'selfMarkingEnabled',
+        'allowedStatuses',
+      ],
     }[section];
     const optionalTextFields = [
       'logoUrl',
@@ -73,8 +84,25 @@ function validateInput(input: OrganizationSettingsInput): void {
           'Settings contain an unsupported field.',
         );
       }
-      if (section === 'notifications') {
-        if (typeof value !== 'boolean') {
+      if (section === 'notifications' || section === 'teacherSelfAttendance') {
+        if (key === 'allowedStatuses') {
+          if (
+            !Array.isArray(value) ||
+            value.length === 0 ||
+            value.some(
+              (status) =>
+                !['present', 'absent', 'half-day', 'on-leave'].includes(
+                  String(status),
+                ),
+            )
+          ) {
+            throw new AppError(
+              400,
+              'VALIDATION_ERROR',
+              'Select valid teacher self-attendance statuses.',
+            );
+          }
+        } else if (typeof value !== 'boolean') {
           throw new AppError(400, 'VALIDATION_ERROR', `Select a valid ${key}.`);
         }
       } else if (
@@ -104,13 +132,15 @@ function changedSettings(
     'contact',
     'localization',
     'notifications',
+    'teacherSelfAttendance',
   ] as const) {
     const values = input[section];
     if (!values) continue;
     for (const [key, value] of Object.entries(values)) {
       if (
-        current[section][key as keyof (typeof current)[typeof section]] !==
-        value
+        JSON.stringify(
+          current[section][key as keyof (typeof current)[typeof section]],
+        ) !== JSON.stringify(value)
       ) {
         return true;
       }

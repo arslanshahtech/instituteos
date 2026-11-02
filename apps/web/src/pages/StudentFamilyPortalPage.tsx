@@ -76,6 +76,7 @@ function StudentFamilyPortalPage({ mode }: { mode: PortalMode }) {
     queryFn: () => getOrganizationAccessContext(organizationId),
     enabled: Boolean(organizationId),
     retry: false,
+    staleTime: 30_000,
   });
   const portal = useQuery({
     queryKey: ['portal-me', organizationId],
@@ -447,7 +448,7 @@ function StudentFamilyPortalPage({ mode }: { mode: PortalMode }) {
                   </article>
                   <article className="parent-summary-card panel">
                     <div className="parent-metric-heading">
-                      <span>Attendance this month</span>
+                      <span>Attendance summary</span>
                       <span className="parent-metric-icon">
                         <CalendarCheck size={18} aria-hidden="true" />
                       </span>
@@ -613,7 +614,7 @@ function StudentFamilyPortalPage({ mode }: { mode: PortalMode }) {
             <section className="parent-overview-grid">
               <article className="parent-summary-card panel">
                 <div className="parent-metric-heading">
-                  <span>Attendance this month</span>
+                  <span>Attendance summary</span>
                   <CalendarCheck size={18} aria-hidden="true" />
                 </div>
                 <strong>
@@ -640,13 +641,13 @@ function StudentFamilyPortalPage({ mode }: { mode: PortalMode }) {
                   {selectedStudent.attendance.absent} /{' '}
                   {selectedStudent.attendance.leave}
                 </strong>
-                <p>Recorded this month</p>
+                <p>Recorded attendance history</p>
               </article>
               <section className="panel parent-content-panel parent-full-width">
                 <h2>Attendance history</h2>
                 {selectedStudent.attendance.records.length === 0 ? (
                   <p>
-                    No attendance records are available for the current month.
+                    No attendance records are available for this student yet.
                   </p>
                 ) : (
                   <div className="parent-fee-list">

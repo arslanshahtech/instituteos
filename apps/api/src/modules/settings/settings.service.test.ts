@@ -27,6 +27,11 @@ function settingsRecord(
       smsAlerts: false,
       autoAttendanceAlerts: false,
     },
+    teacherSelfAttendance: {
+      viewOwnAttendance: true,
+      selfMarkingEnabled: false,
+      allowedStatuses: ['present'],
+    },
     createdAt: timestamp,
     updatedAt: timestamp,
     ...overrides,
@@ -52,6 +57,10 @@ function repository(overrides: Partial<SettingsRepository> = {}) {
             notifications: {
               ...current.notifications,
               ...input.notifications,
+            },
+            teacherSelfAttendance: {
+              ...current.teacherSelfAttendance,
+              ...input.teacherSelfAttendance,
             },
           };
         },
@@ -106,6 +115,52 @@ describe('SettingsService', () => {
     );
 
     expect(repo.createSettingsAuditLog).not.toHaveBeenCalled();
+  });
+
+  it('persists and audits teacher self-attendance policy changes', async () => {
+    const repo = repository();
+    const service = new SettingsService(repo);
+    const policy = {
+      viewOwnAttendance: true,
+      selfMarkingEnabled: true,
+      allowedStatuses: ['present', 'half-day'] as Array<
+        'present' | 'absent' | 'half-day' | 'on-leave'
+      >,
+    };
+
+    await service.updateSettings(
+      organizationId,
+      { teacherSelfAttendance: policy },
+      { userId, role: 'organization_owner' },
+    );
+
+    expect(repo.updateSettings).toHaveBeenCalledWith(organizationId, {
+      teacherSelfAttendance: policy,
+    });
+    expect(repo.createSettingsAuditLog).toHaveBeenCalledWith(
+      organizationId,
+      userId,
+    );
+  });
+
+  it('rejects an empty or unsupported self-attendance status list', async () => {
+    const service = new SettingsService(repository());
+    await expect(
+      service.updateSettings(
+        organizationId,
+        { teacherSelfAttendance: { allowedStatuses: [] } },
+        { userId, role: 'organization_owner' },
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    await expect(
+      service.updateSettings(
+        organizationId,
+        {
+          teacherSelfAttendance: { allowedStatuses: ['unknown' as 'present'] },
+        },
+        { userId, role: 'organization_owner' },
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
   });
 
   it('rejects settings updates from non-manager roles', async () => {
