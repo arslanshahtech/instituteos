@@ -121,6 +121,25 @@ export class AuthService {
     return this.issueSession(user);
   }
 
+  async updateProfile(
+    userId: string,
+    displayNameInput: string,
+  ): Promise<PublicUser> {
+    const displayName = displayNameInput.trim();
+    if (displayName.length < 2 || displayName.length > 120) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Display name must be 2 to 120 characters.',
+      );
+    }
+    const updated = await this.repository.updateUser(userId, { displayName });
+    if (!updated) {
+      throw new AppError(404, 'ACCOUNT_NOT_FOUND', 'The account is unavailable.');
+    }
+    return publicUser(updated);
+  }
+
   async authenticate(
     token: string,
   ): Promise<{ user: PublicUser; session: AuthSession } | null> {

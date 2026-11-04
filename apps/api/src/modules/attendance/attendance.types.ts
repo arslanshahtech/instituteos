@@ -20,6 +20,7 @@ export interface TeacherAttendanceAssignment {
   id: string;
   classId: string;
   className: string;
+  subjectName?: string;
   sectionId: string;
   sectionName: string;
   academicYearId: string;

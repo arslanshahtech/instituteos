@@ -1,9 +1,25 @@
 import { apiRequest } from '../api/client.js';
 
+export interface TeacherProfile {
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  designation?: string;
+  department?: string;
+  email?: string;
+}
+
+export function getTeacherProfile(organizationId: string) {
+  return apiRequest<{ profile: TeacherProfile | null }>(
+    `${organizationPath(organizationId)}/attendance/teacher-profile`,
+  );
+}
+
 export interface TeacherAttendanceAssignment {
   id: string;
   classId: string;
   className: string;
+  subjectName?: string;
   sectionId: string;
   sectionName: string;
   academicYearId: string;

@@ -5,6 +5,7 @@ import {
   AcademicClassModel,
   AcademicSectionModel,
   AcademicYearModel,
+  SubjectModel,
   TeacherAssignmentModel,
 } from '../academics/academics.model.js';
 import { AuthUserModel } from '../auth/auth.model.js';
@@ -209,7 +210,10 @@ export class MongoAttendanceRepository implements AttendanceRepository {
     const yearIds = [
       ...new Set(assignments.map((item) => String(item.academicYearId))),
     ];
-    const [classes, sections, years] = await Promise.all([
+    const subjectIds = [
+      ...new Set(assignments.map((item) => String(item.subjectId))),
+    ];
+    const [classes, sections, years, subjects] = await Promise.all([
       AcademicClassModel.find({
         _id: { $in: classIds.map(oid) },
         organizationId: oid(organizationId),
@@ -226,6 +230,12 @@ export class MongoAttendanceRepository implements AttendanceRepository {
         _id: { $in: yearIds.map(oid) },
         organizationId: oid(organizationId),
         status: 'active',
+      })
+        .select({ _id: 1, name: 1 })
+        .lean(),
+      SubjectModel.find({
+        _id: { $in: subjectIds.map(oid) },
+        organizationId: oid(organizationId),
       })
         .select({ _id: 1, name: 1 })
         .lean(),
@@ -246,6 +256,9 @@ export class MongoAttendanceRepository implements AttendanceRepository {
       sections.map((item) => [String(item._id), item]),
     );
     const yearById = new Map(years.map((item) => [String(item._id), item]));
+    const subjectById = new Map(
+      subjects.map((item) => [String(item._id), item]),
+    );
     const campusById = new Map(
       campuses.map((item) => [String(item._id), item]),
     );
@@ -269,6 +282,13 @@ export class MongoAttendanceRepository implements AttendanceRepository {
           id: String(assignment._id),
           classId: String(classRecord._id),
           className: String(classRecord.name),
+          ...(subjectById.get(String(assignment.subjectId))?.name
+            ? {
+                subjectName: String(
+                  subjectById.get(String(assignment.subjectId))!.name,
+                ),
+              }
+            : {}),
           sectionId: String(sectionRecord._id),
           sectionName: String(sectionRecord.name),
           academicYearId: String(yearRecord._id),

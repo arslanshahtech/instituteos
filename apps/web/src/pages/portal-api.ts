@@ -46,6 +46,11 @@ export interface StudentPortalRecord {
 
 export interface PortalMeResponse {
   role: 'parent_guardian' | 'student';
+  guardian?: {
+    firstName: string;
+    lastName: string;
+    displayName: string;
+  } | null;
   students: StudentPortalRecord[];
 }
 

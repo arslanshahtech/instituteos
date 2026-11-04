@@ -38,6 +38,8 @@ import type { RoleLayoutConfig } from '../../layouts/layoutTypes.js';
 import { useAuth } from '../../auth/AuthProvider.js';
 import { ApiError } from '../../api/client.js';
 import { getOrganizationAccessContext } from '../../tenancy/tenancy-api.js';
+import { getTeacherProfile } from '../../attendance/attendance-api.js';
+import { getPortalMe } from '../../pages/portal-api.js';
 import { getRoleLayout } from '../../layouts/layoutTypes.js';
 import {
   ErrorState,
@@ -207,6 +209,7 @@ function getNavigationItems(
       { label: 'Messages', to: base + '/communications', icon: Megaphone },
       { label: 'Reports & Export', to: base + '/reports', icon: BarChart3 },
       { label: 'Settings', to: base + '/settings', icon: Settings2 },
+      { label: 'My Profile', to: base + '/profile', icon: UserCheck },
     );
   } else if (role.key === 'teacher') {
     items.push(
@@ -223,6 +226,7 @@ function getNavigationItems(
         icon: ClipboardList,
       },
       { label: 'Messages', to: base + '/communications', icon: Megaphone },
+      { label: 'Settings', to: base + '/settings', icon: Settings2 },
     );
   } else if (role.key === 'accountant') {
     items.push(
@@ -236,6 +240,7 @@ function getNavigationItems(
       { label: 'Fees & receipts', to: base + '/fees', icon: WalletCards },
       { label: 'Results', to: base + '/results', icon: ClipboardList },
       { label: 'Messages', to: base + '/messages', icon: Megaphone },
+      { label: 'Settings', to: base + '/settings', icon: Settings2 },
     );
   } else if (role.key === 'student') {
     items.push(
@@ -278,6 +283,35 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
     retry: false,
     staleTime: 30_000,
   });
+  const teacherProfile = useQuery({
+    queryKey: ['teacher-profile', organizationId],
+    queryFn: () => getTeacherProfile(organizationId!),
+    enabled: Boolean(
+      organizationId &&
+      role.key === 'teacher' &&
+      organizationAccess.data?.role === 'teacher',
+    ),
+    retry: false,
+  });
+  const parentPortal = useQuery({
+    queryKey: ['portal-me', organizationId],
+    queryFn: () => getPortalMe(organizationId!),
+    enabled: Boolean(
+      organizationId &&
+      role.key === 'parent' &&
+      organizationAccess.data?.role === 'parent_guardian',
+    ),
+    retry: false,
+  });
+  const workspaceDisplayName =
+    (role.key === 'teacher'
+      ? teacherProfile.data?.profile?.displayName
+      : undefined) ||
+    (role.key === 'parent'
+      ? parentPortal.data?.guardian?.displayName
+      : undefined) ||
+    auth.user?.displayName ||
+    'Signed-in user';
   const authorizedRoleKey = organizationAccess.data
     ? workspaceKeyForMembershipRole(organizationAccess.data.role)
     : null;
@@ -560,11 +594,9 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
         <div className="mobile-account-actions">
           <div className="account-identity">
             <span className="user-avatar" aria-hidden="true">
-              {(auth.user?.displayName?.trim().charAt(0) || 'U').toUpperCase()}
+              {(workspaceDisplayName.trim().charAt(0) || 'U').toUpperCase()}
             </span>
-            <span className="current-user-name">
-              {auth.user?.displayName ?? 'Signed-in user'}
-            </span>
+            <span className="current-user-name">{workspaceDisplayName}</span>
           </div>
           <Button
             className="sign-out-button"
@@ -607,7 +639,7 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
             </button>
             <div className="mobile-workspace-identity">
               <strong>{role.label}</strong>
-              <span>{auth.user?.displayName ?? 'Signed-in user'}</span>
+              <span>{workspaceDisplayName}</span>
             </div>
           </div>
 
@@ -731,10 +763,10 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
               )}
             </div>
             <span className="user-avatar topbar-user-avatar" aria-hidden="true">
-              {(auth.user?.displayName?.trim().charAt(0) || 'U').toUpperCase()}
+              {(workspaceDisplayName.trim().charAt(0) || 'U').toUpperCase()}
             </span>
             <span className="current-user-name topbar-user-name">
-              {auth.user?.displayName ?? 'Signed-in user'}
+              {workspaceDisplayName}
             </span>
             <Button
               className="sign-out-button"

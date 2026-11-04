@@ -43,6 +43,15 @@ export function registerRequest(input: {
   });
 }
 
+export function updateProfileRequest(input: {
+  displayName: string;
+}): Promise<UserResponse> {
+  return apiRequest<UserResponse>('/auth/profile', {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
 export function logoutRequest(): Promise<void> {
   return apiRequest<void>('/auth/logout', { method: 'POST' });
 }

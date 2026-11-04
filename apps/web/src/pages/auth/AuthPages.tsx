@@ -113,7 +113,11 @@ function FormStatus({ error, success }: { error?: string; success?: string }) {
   return null;
 }
 
-export function LoginPage() {
+export function LoginPage({
+  workspaceRole,
+}: {
+  workspaceRole?: 'admin' | 'teacher' | 'parent';
+} = {}) {
   const auth = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -124,7 +128,12 @@ export function LoginPage() {
     mode: 'onBlur',
   });
   if (auth.status === 'authenticated')
-    return <Navigate to="/dashboard" replace />;
+    return (
+      <Navigate
+        to={workspaceRole ? `/${workspaceRole}/dashboard` : '/dashboard'}
+        replace
+      />
+    );
 
   const submit = form.handleSubmit(async (values) => {
     setError('');
@@ -134,7 +143,9 @@ export function LoginPage() {
       navigate(
         destination?.startsWith('/') && !destination.startsWith('//')
           ? destination
-          : '/dashboard',
+          : workspaceRole
+            ? `/${workspaceRole}/dashboard`
+            : '/dashboard',
         { replace: true },
       );
     } catch (cause) {
@@ -144,17 +155,27 @@ export function LoginPage() {
 
   return (
     <AuthFrame
-      eyebrow="Welcome back"
-      title="Sign in to InstituteOS"
-      description="Use your account email and password. InstituteOS will open the workspace your account has actually been authorized to access."
+      eyebrow={workspaceRole ? `${workspaceRole} workspace` : 'Welcome back'}
+      title={
+        workspaceRole
+          ? `Sign in to your ${workspaceRole === 'admin' ? 'organization admin' : workspaceRole} workspace`
+          : 'Sign in to InstituteOS'
+      }
+      description={
+        workspaceRole
+          ? `Use the email and password associated with your ${workspaceRole} account. Access is verified against your active organization membership.`
+          : 'Use your account email and password. InstituteOS will open the workspace your account has actually been authorized to access.'
+      }
       footer={
         <>
           New to InstituteOS?{' '}
           <Link
             to="/register"
-            state={safeReturnPath(location.state)
-              ? { from: safeReturnPath(location.state) }
-              : undefined}
+            state={
+              safeReturnPath(location.state)
+                ? { from: safeReturnPath(location.state) }
+                : undefined
+            }
           >
             Create an account
           </Link>
@@ -235,14 +256,10 @@ export function RegistrationPage() {
       footer={
         <>
           Already have an account?{' '}
-          <Link
-            to="/login"
-            state={returnTo ? { from: returnTo } : undefined}
-          >
+          <Link to="/login" state={returnTo ? { from: returnTo } : undefined}>
             Sign in
           </Link>{' '}
-          or{' '}
-          <Link to="/forgot-password">reset your password</Link>.
+          or <Link to="/forgot-password">reset your password</Link>.
         </>
       }
     >
@@ -487,8 +504,7 @@ export function VerificationPendingPage() {
       {invitationReturn && (
         <p className="auth-notice" role="status">
           After verifying your email, return here and continue to your institute
-          invitation.{' '}
-          <Link to={invitationReturn}>Continue to invitation</Link>
+          invitation. <Link to={invitationReturn}>Continue to invitation</Link>
         </p>
       )}
     </AuthFrame>

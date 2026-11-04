@@ -189,25 +189,32 @@ describe('authentication HTTP routes', () => {
     ).toBe(200);
   });
 
-  it('rate limits login by requester IP before validation and does not reset for a new email', async () => {
+  it('rate limits login per requester IP and normalized account email', async () => {
     const { app } = makeTestApp();
     const firstTen = await Promise.all(
-      Array.from({ length: 10 }, (_, index) =>
+      Array.from({ length: 10 }, () =>
         request(app)
           .post('/api/v1/auth/login')
-          .send({ email: `new-address-${index}@example.test` }),
+          .send({ email: 'same-account@example.test' }),
       ),
     );
     expect(firstTen.every((response) => response.status === 400)).toBe(true);
 
     const limited = await request(app)
       .post('/api/v1/auth/login')
-      .send({ email: 'another-new-address@example.test' });
+      .send({ email: 'SAME-ACCOUNT@example.test' });
     expect(limited.status).toBe(429);
     expect(limited.body.error).toMatchObject({
       code: 'AUTH_RATE_LIMITED',
-      message: 'Too many attempts. Please wait and try again.',
+      message: 'Too many attempts for this account. Please wait and try again.',
     });
+
+    // A different family/member account on the same shared IP gets its own
+    // attempt bucket and is not locked out by the first account's failures.
+    const anotherAccount = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'another-account@example.test' });
+    expect(anotherAccount.status).toBe(400);
 
     // Each router instance owns an isolated limiter store in tests.
     const isolatedApp = makeTestApp().app;

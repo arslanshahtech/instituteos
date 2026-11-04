@@ -7,10 +7,16 @@
     "node": ">=20.19.0"
   },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File ../../scripts/dev-api-local.ps1",
+    "dev:watch": "tsx watch src/index.ts",
     "clean": "node scripts/clean-dist.mjs",
     "build": "npm run clean && tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
+    "seed:dev": "tsx scripts/seed-dev-workspaces.ts",
+    "verify:dev": "tsx scripts/verify-dev-workspaces.ts",
+    "seed:invitation-teacher": "tsx scripts/seed-invitation-teacher.ts",
+    "verify:invitation": "tsx scripts/verify-invitation-acceptance.ts",
+    "inspect:dev-workspaces": "tsx scripts/inspect-dev-workspaces.ts",
     "bootstrap:platform-admin": "tsx scripts/bootstrap-platform-admin.ts",
     "lint": "eslint src",
     "typecheck": "tsc -p tsconfig.json --noEmit",

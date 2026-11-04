@@ -402,7 +402,34 @@ async function getPortalMe(
       ),
     )
   ).filter((student) => student !== null);
-  return { role, students };
+  if (role === 'student') return { role, students };
+
+  const user = await AuthUserModel.findById(oid(userId))
+    .select({ email: 1 })
+    .lean();
+  const email =
+    typeof user?.email === 'string' ? user.email.trim().toLowerCase() : '';
+  const guardian = email
+    ? await GuardianModel.findOne({
+        organizationId: oid(organizationId),
+        email,
+      })
+        .select({ firstName: 1, lastName: 1 })
+        .lean()
+    : null;
+  return {
+    role,
+    guardian: guardian
+      ? {
+          firstName: String(guardian.firstName),
+          lastName: String(guardian.lastName),
+          displayName: [guardian.firstName, guardian.lastName]
+            .filter(Boolean)
+            .join(' '),
+        }
+      : null,
+    students,
+  };
 }
 
 export function createPortalRouter(

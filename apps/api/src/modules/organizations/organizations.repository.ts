@@ -750,7 +750,13 @@ export class MongoOrganizationRepository implements OrganizationRepository {
           .select('+tokenHash')
           .session(session)
           .lean()) as Record<string, unknown> | null;
-        if (!invite || invite.email !== input.email.toLowerCase()) return;
+        if (!invite) return;
+        if (invite.email !== input.email.toLowerCase())
+          throw new AppError(
+            403,
+            'INVITATION_EMAIL_MISMATCH',
+            'This invitation was sent to a different email address. Sign out and sign in using the invited email, then open the invitation link again.',
+          );
         const organization = await OrganizationModel.findOne({
           _id: invite.organizationId,
           status: 'active',

@@ -9,11 +9,24 @@ import {
 import { getPlatformOrganizations } from './platform-api.js';
 import '../styles/workspace-redirect.css';
 
+type WorkspaceTarget = 'admin' | 'teacher' | 'parent';
 type RedirectState =
   | { destination: string }
   | { organizations: AccessibleOrganization[] }
   | { message: string }
   | null;
+
+const rolesForWorkspace: Record<WorkspaceTarget, readonly string[]> = {
+  admin: [
+    'organization_owner',
+    'organization_admin',
+    'campus_admin',
+    'principal_director',
+    'academic_coordinator',
+  ],
+  teacher: ['teacher'],
+  parent: ['parent_guardian'],
+};
 
 function pathForRole(role: string, organizationId: string) {
   const encodedId = encodeURIComponent(organizationId);
@@ -35,30 +48,40 @@ function pathForRole(role: string, organizationId: string) {
   return null;
 }
 
-export function WorkspaceRedirectPage() {
+export function WorkspaceRedirectPage({
+  expectedWorkspace,
+}: {
+  expectedWorkspace?: WorkspaceTarget;
+}) {
   const [state, setState] = useState<RedirectState>(null);
 
   useEffect(() => {
     let active = true;
     async function resolve() {
-      try {
-        await getPlatformOrganizations();
-        if (active) setState({ destination: '/super-admin' });
-        return;
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.status !== 403) {
-          if (active)
-            setState({
-              message:
-                'We could not verify your workspace permissions. Please try again or contact support.',
-            });
+      if (!expectedWorkspace) {
+        try {
+          await getPlatformOrganizations();
+          if (active) setState({ destination: '/super-admin' });
           return;
+        } catch (error) {
+          if (!(error instanceof ApiError) || error.status !== 403) {
+            if (active)
+              setState({
+                message:
+                  'We could not verify your workspace permissions. Please try again or contact support.',
+              });
+            return;
+          }
         }
       }
       try {
         const result = await getAccessibleOrganizations();
         const organizations = result.organizations.filter(
-          (item) => item.status === 'active' && pathForRole(item.role, item.id),
+          (item) =>
+            item.status === 'active' &&
+            pathForRole(item.role, item.id) &&
+            (!expectedWorkspace ||
+              rolesForWorkspace[expectedWorkspace].includes(item.role)),
         );
         if (organizations.length === 1) {
           const organization = organizations[0]!;
@@ -74,8 +97,9 @@ export function WorkspaceRedirectPage() {
         }
         if (active)
           setState({
-            message:
-              'Your account is signed in, but no active workspace has been assigned yet. Ask your institute administrator for an invitation.',
+            message: expectedWorkspace
+              ? `Your account does not have an active ${expectedWorkspace} workspace. Accept the matching organization invitation or contact your institute administrator.`
+              : 'Your account is signed in, but no active workspace has been assigned yet. Ask your institute administrator for an invitation.',
           });
       } catch {
         if (active)
@@ -89,7 +113,7 @@ export function WorkspaceRedirectPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [expectedWorkspace]);
 
   if (!state)
     return (

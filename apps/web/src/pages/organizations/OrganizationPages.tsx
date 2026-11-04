@@ -57,6 +57,7 @@ import {
   ORGANIZATION_ROLES,
   ORGANIZATION_PERMISSIONS,
   restoreOrganization,
+  revokeInvitation,
   updateCampus,
   updateMember,
   updateOrganization,
@@ -2132,6 +2133,10 @@ function InvitationsPanel({
   canInvite: boolean;
 }) {
   const navigate = useNavigate();
+  const revoke = useMutation({
+    mutationFn: (email: string) => revokeInvitation(organizationId, email),
+    onSuccess: () => void query.refetch(),
+  });
   if (query.isPending) return <LoadingState message="Loading invitations…" />;
   if (query.isError)
     return (
@@ -2144,6 +2149,11 @@ function InvitationsPanel({
   return (
     <section className="organization-section invitation-management">
       <h2>Pending invitations</h2>
+      {revoke.isError && (
+        <p className="admin-inline-message" role="alert">
+          {apiMessage(revoke.error)}
+        </p>
+      )}
       {canInvite && (
         <div className="invitation-empty-action invitation-empty-action--centered">
           <p className="muted-copy">
@@ -2176,6 +2186,16 @@ function InvitationsPanel({
                   {new Date(item.expiresAt).toLocaleDateString()}
                 </span>
               </div>
+              {canInvite && (
+                <Button
+                  disabled={revoke.isPending}
+                  onClick={() => revoke.mutate(item.email)}
+                  type="button"
+                  variant="secondary"
+                >
+                  Cancel invitation
+                </Button>
+              )}
             </article>
           ))}
         </div>
@@ -2186,8 +2206,11 @@ function InvitationsPanel({
 
 export function AcceptOrganizationInvitationPage() {
   const navigate = useNavigate();
+  const auth = useAuth();
   const [status, setStatus] = useState<'pending' | 'done' | 'error'>('pending');
   const [error, setError] = useState('');
+  const [emailMismatch, setEmailMismatch] = useState(false);
+  const [sessionCheckFailed, setSessionCheckFailed] = useState(false);
   const started = useRef(false);
   const token = useMemo(
     () => new URLSearchParams(window.location.hash.slice(1)).get('token') ?? '',
@@ -2202,24 +2225,85 @@ export function AcceptOrganizationInvitationPage() {
     },
     onError: (reason) => {
       setStatus('error');
+      setEmailMismatch(
+        reason instanceof ApiError &&
+          reason.code === 'INVITATION_EMAIL_MISMATCH',
+      );
       setError(apiMessage(reason));
     },
   });
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    if (token) accept.mutate(token);
-    else {
+    if (started.current || auth.status === 'loading') return;
+    if (!token) {
+      started.current = true;
       setStatus('error');
       setError('This invitation link is invalid or expired.');
+      return;
     }
-  }, [token]);
+    if (auth.status === 'anonymous') {
+      started.current = true;
+      const invitationPath =
+        window.location.pathname +
+        window.location.search +
+        window.location.hash;
+      navigate('/login', {
+        replace: true,
+        state: { from: invitationPath },
+      });
+      return;
+    }
+    if (auth.status === 'error') {
+      started.current = true;
+      setSessionCheckFailed(true);
+      setStatus('error');
+      setError('We could not verify your sign-in session. Check your connection and try again.');
+      return;
+    }
+    started.current = true;
+    accept.mutate(token);
+  }, [token, auth.status, auth.retryBootstrap, navigate, accept]);
   if (status === 'pending')
     return <LoadingState message="Accepting your organization invitation…" />;
   if (status === 'error')
     return (
       <main className="page-stack">
-        <ErrorState title="Invitation unavailable" description={error} />
+        <ErrorState
+          title="Invitation unavailable"
+          description={error}
+          onRetry={
+            sessionCheckFailed
+              ? () => {
+                  started.current = false;
+                  setStatus('pending');
+                  setSessionCheckFailed(false);
+                  setError('');
+                  void auth.retryBootstrap();
+                }
+              : undefined
+          }
+        />
+        {emailMismatch && (
+          <Button
+            type="button"
+            onClick={() => {
+              const invitationPath =
+                window.location.pathname +
+                window.location.search +
+                window.location.hash;
+              void auth
+                .logout()
+                .then(() =>
+                  navigate('/login', {
+                    replace: true,
+                    state: { from: invitationPath },
+                  }),
+                )
+                .catch((reason: unknown) => setError(apiMessage(reason)));
+            }}
+          >
+            Sign out and use the invited email
+          </Button>
+        )}
       </main>
     );
   return <LoadingState message="Opening your organization…" />;

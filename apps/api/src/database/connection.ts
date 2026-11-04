@@ -29,9 +29,27 @@ export async function connectDatabase(
   serverSelectionTimeoutMs: number,
 ): Promise<void> {
   tenancyModelsInitialized = false;
+  const expectedDevelopmentDatabase =
+    (process.env.NODE_ENV ?? 'development') === 'development'
+      ? 'instituteos_dev'
+      : undefined;
+
   await mongoose.connect(uri, {
     serverSelectionTimeoutMS: serverSelectionTimeoutMs,
+    ...(expectedDevelopmentDatabase
+      ? { dbName: expectedDevelopmentDatabase }
+      : {}),
   });
+
+  if (
+    expectedDevelopmentDatabase &&
+    mongoose.connection.name !== expectedDevelopmentDatabase
+  ) {
+    await mongoose.disconnect().catch(() => undefined);
+    throw new Error(
+      `Refusing development database connection: expected ${expectedDevelopmentDatabase}.`,
+    );
+  }
 
   try {
     await Promise.all([

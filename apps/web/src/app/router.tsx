@@ -188,6 +188,11 @@ const SettingsPage = lazy(() =>
     default: module.SettingsPage,
   })),
 );
+const ProfileSettingsPage = lazy(() =>
+  import('../settings/ProfileSettingsPage.js').then((module) => ({
+    default: module.ProfileSettingsPage,
+  })),
+);
 const StaffCreatePage = lazy(() =>
   import('../staff/StaffPages.js').then((module) => ({
     default: module.StaffCreatePage,
@@ -260,6 +265,10 @@ const roleRoutes: RouteObject[] = [
     element: <AdminLayout />,
     errorElement: <RouteErrorPage />,
     children: [
+      {
+        path: 'dashboard',
+        element: <WorkspaceRedirectPage expectedWorkspace="admin" />,
+      },
       { index: true, element: <MyOrganizationsPage redirectSingle /> },
       { path: 'foundations', element: <FoundationsPage /> },
       { path: 'organizations', element: <MyOrganizationsPage /> },
@@ -319,6 +328,10 @@ const roleRoutes: RouteObject[] = [
       {
         path: 'organizations/:organizationId/settings',
         element: <SettingsPage />,
+      },
+      {
+        path: 'organizations/:organizationId/profile',
+        element: <ProfileSettingsPage />,
       },
       {
         path: 'organizations/:organizationId/admissions/applications/:applicationId',
@@ -388,6 +401,10 @@ const roleRoutes: RouteObject[] = [
     element: <TeacherLayout />,
     errorElement: <RouteErrorPage />,
     children: [
+      {
+        path: 'dashboard',
+        element: <WorkspaceRedirectPage expectedWorkspace="teacher" />,
+      },
       { index: true, element: <OverviewPage /> },
       { path: 'foundations', element: <FoundationsPage /> },
       { path: 'organizations/preview', element: <OverviewPage /> },
@@ -419,6 +436,10 @@ const roleRoutes: RouteObject[] = [
       {
         path: 'organizations/:organizationId/communications',
         element: <CommunicationsDashboard />,
+      },
+      {
+        path: 'organizations/:organizationId/settings',
+        element: <ProfileSettingsPage />,
       },
       { path: '*', element: <NotFoundPage /> },
     ],
@@ -484,6 +505,10 @@ const roleRoutes: RouteObject[] = [
     element: <ParentLayout />,
     errorElement: <RouteErrorPage />,
     children: [
+      {
+        path: 'dashboard',
+        element: <WorkspaceRedirectPage expectedWorkspace="parent" />,
+      },
       { index: true, element: <OverviewPage /> },
       { path: 'foundations', element: <FoundationsPage /> },
       { path: 'organizations/preview', element: <OverviewPage /> },
@@ -497,6 +522,10 @@ const roleRoutes: RouteObject[] = [
       },
       { path: 'organizations/:organizationId', element: <ParentPortalPage /> },
       {
+        path: 'organizations/:organizationId/settings',
+        element: <ProfileSettingsPage />,
+      },
+      {
         path: 'organizations/:organizationId/:section',
         element: <ParentPortalPage />,
       },
@@ -507,6 +536,9 @@ const roleRoutes: RouteObject[] = [
 
 const routes: RouteObject[] = [
   { path: '/', element: <LandingPage /> },
+  { path: '/admin/login', element: <LoginPage workspaceRole="admin" /> },
+  { path: '/teacher/login', element: <LoginPage workspaceRole="teacher" /> },
+  { path: '/parent/login', element: <LoginPage workspaceRole="parent" /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegistrationPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },

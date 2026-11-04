@@ -630,7 +630,18 @@ describe('frontend application foundation', () => {
     ).toMatchObject({ role: 'organization_admin' });
   });
 
-  it('shows the API rate-limit message on the sign-in form', async () => {
+  it.each([
+    ['/admin/login', 'Sign in to your organization admin workspace'],
+    ['/teacher/login', 'Sign in to your teacher workspace'],
+    ['/parent/login', 'Sign in to your parent workspace'],
+  ])('renders the dedicated role login at %s', async (path, heading) => {
+    renderPath(path, false);
+    expect(
+      await screen.findByRole('heading', { name: heading }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders the API rate-limit message on the sign-in form', async () => {
     const user = userEvent.setup();
     authMocks.loginRequest.mockRejectedValueOnce(
       new ApiError(
@@ -687,6 +698,12 @@ describe('frontend application foundation', () => {
     });
 
     renderPath(invitationPath, false);
+    expect(
+      await screen.findByRole('heading', { name: 'Sign in to InstituteOS' }),
+    ).toBeInTheDocument();
+    expect(
+      organizationMocks.acceptOrganizationInvitation,
+    ).not.toHaveBeenCalled();
     await user.click(
       await screen.findByRole('link', { name: 'Create an account' }),
     );
@@ -1402,6 +1419,34 @@ describe('frontend application foundation', () => {
       organizationMocks.acceptOrganizationInvitation.mock.calls[0]?.[0],
     ).toBe(token);
     expect(window.location.hash).toBe('');
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('lets an invitee switch to the invited email after an authenticated email mismatch', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(
+      null,
+      '',
+      '/invitations/accept#token=one-time-test-token',
+    );
+    organizationMocks.acceptOrganizationInvitation.mockRejectedValueOnce(
+      new ApiError(
+        'This invitation was sent to a different email address.',
+        403,
+        'INVITATION_EMAIL_MISMATCH',
+      ),
+    );
+    renderPath('/invitations/accept');
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Sign out and use the invited email',
+      }),
+    );
+    expect(authMocks.logoutRequest).toHaveBeenCalledOnce();
+    expect(
+      await screen.findByRole('heading', { name: 'Sign in to InstituteOS' }),
+    ).toBeInTheDocument();
     window.history.replaceState(null, '', '/');
   });
 

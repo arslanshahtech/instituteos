@@ -8,7 +8,6 @@ const transport =
         host: env.smtpHost,
         port: env.smtpPort,
         secure: env.smtpSecure,
-        requireTLS: !env.smtpSecure,
         auth: { user: env.smtpUser, pass: env.smtpPassword },
       })
     : null;

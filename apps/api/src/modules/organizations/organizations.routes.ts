@@ -716,6 +716,22 @@ export function createOrganizationRouter(
   );
 
   router.post(
+    '/:organizationId/invitations/revoke',
+    authenticate,
+    resolveOrganization,
+    requireOrganizationPermission('member.manage'),
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const body = bodyObject(request.body);
+      await service.revokeInvitation(
+        organizationContext(response),
+        email(body.email),
+      );
+      response.status(204).end();
+    }),
+  );
+
+  router.post(
     '/:organizationId/invitations',
     authenticate,
     resolveOrganization,

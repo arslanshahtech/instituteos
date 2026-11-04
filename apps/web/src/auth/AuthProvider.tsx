@@ -14,6 +14,7 @@ import {
   registerRequest,
   resendVerificationRequest,
   resetPasswordRequest,
+  updateProfileRequest,
   verifyEmailRequest,
 } from './auth-api.js';
 import type { AuthUser, RegistrationResponse } from './auth-api.js';
@@ -31,6 +32,7 @@ interface AuthContextValue {
     password: string;
   }): Promise<RegistrationResponse>;
   logout(): Promise<void>;
+  updateProfile(input: { displayName: string }): Promise<void>;
   forgotPassword(email: string): Promise<{ message: string }>;
   resetPassword(input: {
     token: string;
@@ -93,6 +95,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       },
       async register(input) {
         return registerRequest(input);
+      },
+      async updateProfile(input) {
+        const result = await updateProfileRequest(input);
+        queryClient.setQueryData(CURRENT_USER_KEY, result.user);
+        return;
       },
       async logout() {
         // Cancel in-flight requests and clear all user-scoped cache entries so

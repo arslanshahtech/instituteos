@@ -31,6 +31,11 @@ const organizationId = '650000000000000000000001';
 
 const portalResponse = {
   role: 'parent_guardian' as const,
+  guardian: {
+    firstName: 'Nadia',
+    lastName: 'Rao',
+    displayName: 'Nadia Rao',
+  },
   students: [
     {
       id: 'student-1',
@@ -134,6 +139,16 @@ describe('parent workspace', () => {
 
     expect(
       await screen.findByRole('heading', { name: 'Mina Rao' }),
+    ).toBeVisible();
+    expect(screen.getByText('Welcome back, Nadia Rao')).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Your linked children' }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: /Mina Rao.*First Year/ }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: /Arman Rao.*Second Year/ }),
     ).toBeVisible();
     const picker = await screen.findByRole('combobox', {
       name: 'Select linked student',

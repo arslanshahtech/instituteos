@@ -239,6 +239,13 @@ export function getInvitations(organizationId: string) {
   );
 }
 
+export function revokeInvitation(organizationId: string, email: string) {
+  return apiRequest<void>(`${base(organizationId)}/invitations/revoke`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
 export function inviteMember(
   organizationId: string,
   input: {

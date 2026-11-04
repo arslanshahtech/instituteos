@@ -179,6 +179,9 @@ export function TeacherStudentsPage() {
                     {assignment.className} · {assignment.sectionName}
                   </strong>
                   <span>Assigned teaching section</span>
+                  {assignment.subjectName && (
+                    <span>Subject: {assignment.subjectName}</span>
+                  )}
                   <span>
                     {assignment.campusName} · {assignment.academicYearName}
                   </span>

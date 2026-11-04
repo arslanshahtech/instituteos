@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  connection: { readyState: 0 },
+  connection: { readyState: 0, name: 'test' },
   connect: vi.fn(),
   disconnect: vi.fn(),
   modelInit: [
@@ -66,14 +66,50 @@ import {
 describe('database connection readiness', () => {
   beforeEach(() => {
     mocks.connection.readyState = 0;
-    mocks.connect.mockReset().mockImplementation(async () => {
+    mocks.connect.mockReset().mockImplementation(async (_uri, options) => {
       mocks.connection.readyState = 1;
+      mocks.connection.name = options?.dbName ?? 'test';
     });
     mocks.disconnect.mockReset().mockImplementation(async () => {
       mocks.connection.readyState = 0;
     });
     for (const modelInit of mocks.modelInit) {
       modelInit.mockReset().mockResolvedValue(undefined);
+    }
+  });
+
+  it('pins local development connections to instituteos_dev', async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    try {
+      await connectDatabase('mongodb://test.invalid/another_db', 1000);
+      expect(mocks.connect).toHaveBeenCalledWith(
+        'mongodb://test.invalid/another_db',
+        { serverSelectionTimeoutMS: 1000, dbName: 'instituteos_dev' },
+      );
+      expect(isDatabaseReady()).toBe(true);
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
+  it('rejects a development connection if the selected database is not instituteos_dev', async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    mocks.connect.mockImplementationOnce(async () => {
+      mocks.connection.readyState = 1;
+      mocks.connection.name = 'wrong_database';
+    });
+    try {
+      await expect(
+        connectDatabase('mongodb://test.invalid/wrong_database', 1000),
+      ).rejects.toThrow('expected instituteos_dev');
+      expect(mocks.disconnect).toHaveBeenCalledOnce();
+      expect(isDatabaseReady()).toBe(false);
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
     }
   });
 

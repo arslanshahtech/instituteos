@@ -384,6 +384,13 @@ export class OrganizationService implements OrganizationServices {
     return this.repository.listInvitations(context.organizationId);
   }
 
+  async revokeInvitation(context: OrganizationContext, email: string) {
+    await this.repository.revokeInvitation(
+      context.organizationId,
+      email.trim().toLowerCase(),
+    );
+  }
+
   async acceptInvitation(user: { id: string; email: string }, token: string) {
     if (token.length < 32 || token.length > 128)
       throw new AppError(

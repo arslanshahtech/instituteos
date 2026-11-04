@@ -202,6 +202,7 @@ export interface OrganizationServices {
   listInvitations(
     context: OrganizationContext,
   ): Promise<Record<string, unknown>[]>;
+  revokeInvitation(context: OrganizationContext, email: string): Promise<void>;
   acceptInvitation(
     user: { id: string; email: string },
     token: string,

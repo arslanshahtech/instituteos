@@ -161,6 +161,14 @@ function StudentFamilyPortalPage({ mode }: { mode: PortalMode }) {
               ? 'Your current college information, fees, and attendance.'
               : 'College information connected to your verified guardian account.'}
           </p>
+          {mode === 'parent_guardian' && (
+            <p className="reference-dashboard-greeting">
+              Welcome back,{' '}
+              {portal.data?.guardian?.displayName ||
+                user?.displayName ||
+                'Parent'}
+            </p>
+          )}
         </div>
         {students.length > 1 && (
           <label className="portal-student-picker">
@@ -191,6 +199,48 @@ function StudentFamilyPortalPage({ mode }: { mode: PortalMode }) {
         />
       ) : (
         <>
+          {mode === 'parent_guardian' && (
+            <section
+              className="reference-dashboard-panel"
+              aria-label="All linked children"
+            >
+              <div className="reference-panel-heading">
+                <h2>Your linked children</h2>
+                <span>
+                  {students.length}{' '}
+                  {students.length === 1 ? 'child' : 'children'}
+                </span>
+              </div>
+              <div className="reference-activity-list">
+                {students.map((student) => (
+                  <button
+                    aria-pressed={selectedStudent?.id === student.id}
+                    className="reference-activity-row"
+                    key={student.id}
+                    onClick={() => setSelectedStudentId(student.id)}
+                    type="button"
+                  >
+                    <span
+                      className="reference-activity-dot"
+                      aria-hidden="true"
+                    />
+                    <span className="reference-activity-copy">
+                      <strong>{student.displayName}</strong>
+                      <small>
+                        {student.className} · {student.sectionName} ·{' '}
+                        {student.campusName}
+                      </small>
+                    </span>
+                    <span className="reference-status reference-status-info">
+                      {selectedStudent?.id === student.id
+                        ? 'Selected'
+                        : 'View details'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
           {selectedStudent && (
             <section className="parent-student-card panel">
               <div className="parent-student-avatar" aria-hidden="true">

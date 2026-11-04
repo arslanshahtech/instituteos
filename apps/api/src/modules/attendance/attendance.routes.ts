@@ -10,6 +10,7 @@ import {
 } from '../auth/auth.middleware.js';
 import { MongoAuthRepository } from '../auth/auth.repository.js';
 import { AuthService } from '../auth/auth.service.js';
+import { AuthUserModel } from '../auth/auth.model.js';
 import { MongoOrganizationAccessRepository } from '../tenancy/tenancy.repository.js';
 import type { OrganizationAccessRepository } from '../tenancy/tenancy.types.js';
 import {
@@ -19,6 +20,7 @@ import {
 } from '../tenancy/tenant-context.middleware.js';
 import { MongoAttendanceRepository } from './attendance.repository.js';
 import { AttendanceService } from './attendance.service.js';
+import { StaffMemberModel } from '../people/people.model.js';
 import type {
   AttendanceContext,
   StaffAttendanceStatus,
@@ -178,6 +180,91 @@ export function createAttendanceRouter(
         organizationContext(response),
       );
       response.status(200).json({ items: assignments });
+    }),
+  );
+
+  router.get(
+    `${base}/attendance/teacher-profile`,
+    ...protectTeacherAttendance,
+    asyncHandler(async (_request, response) => {
+      const context = organizationContext(response);
+      if (!context.userId) {
+        throw new AppError(401, 'UNAUTHENTICATED', 'Please sign in again.');
+      }
+      const organizationObjectId = new mongoose.Types.ObjectId(
+        context.organizationId,
+      );
+      const userObjectId = new mongoose.Types.ObjectId(context.userId);
+      let matches = await StaffMemberModel.find({
+        organizationId: organizationObjectId,
+        userId: userObjectId,
+        status: 'active',
+      })
+        .select({
+          firstName: 1,
+          lastName: 1,
+          designation: 1,
+          department: 1,
+          email: 1,
+        })
+        .limit(2)
+        .lean();
+      if (matches.length === 0) {
+        const user = await AuthUserModel.findById(userObjectId)
+          .select({ email: 1 })
+          .lean();
+        const email =
+          typeof user?.email === 'string'
+            ? user.email.trim().toLowerCase()
+            : '';
+        if (email) {
+          matches = await StaffMemberModel.find({
+            organizationId: organizationObjectId,
+            email,
+            status: 'active',
+            $or: [
+              { userId: { $exists: false } },
+              { userId: null },
+              { userId: userObjectId },
+            ],
+          })
+            .select({
+              firstName: 1,
+              lastName: 1,
+              designation: 1,
+              department: 1,
+              email: 1,
+            })
+            .limit(2)
+            .lean();
+        }
+      }
+      if (matches.length > 1) {
+        throw new AppError(
+          409,
+          'TEACHER_PROFILE_AMBIGUOUS',
+          'More than one active staff profile is linked to this teacher account. Ask the administrator to resolve the duplicate profiles.',
+        );
+      }
+      const profile = matches[0];
+      response.status(200).json({
+        profile: profile
+          ? {
+              firstName: String(profile.firstName),
+              lastName: String(profile.lastName),
+              displayName: [profile.firstName, profile.lastName]
+                .filter(Boolean)
+                .join(' '),
+              ...(profile.designation
+                ? { designation: String(profile.designation) }
+                : {}),
+              ...(profile.department
+                ? { department: String(profile.department) }
+                : {}),
+              ...(profile.email ? { email: String(profile.email) } : {}),
+            }
+          : null,
+      });
     }),
   );
 

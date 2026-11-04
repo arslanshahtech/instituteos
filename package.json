@@ -13,6 +13,8 @@
   ],
   "scripts": {
     "dev": "concurrently -k -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:local-email": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-local-mailpit.ps1",
+    "seed:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/seed-local-workspaces.ps1",
     "dev:api": "npm run dev --workspace @instituteos/api",
     "dev:web": "npm run dev --workspace @instituteos/web",
     "build": "npm run build --workspaces --if-present",

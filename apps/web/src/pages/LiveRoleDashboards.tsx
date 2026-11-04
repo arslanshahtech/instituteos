@@ -13,6 +13,7 @@ import {
 import { Link } from 'react-router-dom';
 import {
   getStudentRoster,
+  getTeacherProfile,
   getTeacherSelfAttendance,
   listStudentAttendance,
   listTeacherAttendanceAssignments,
@@ -139,6 +140,13 @@ export function TeacherLiveDashboard({
   const [selfAttendanceRemarks, setSelfAttendanceRemarks] = useState('');
   const days = useMemo(lastSevenDays, []);
   const dateFrom = days[0]!;
+  const teacherProfileQuery = useQuery({
+    queryKey: ['teacher-profile', organizationId],
+    queryFn: () => getTeacherProfile(organizationId),
+    retry: false,
+  });
+  const teacherDisplayName =
+    teacherProfileQuery.data?.profile?.displayName || userName;
   const assignmentsQuery = useQuery({
     queryKey: ['attendance', organizationId, 'teacher-assignments'],
     queryFn: () => listTeacherAttendanceAssignments(organizationId),
@@ -229,11 +237,21 @@ export function TeacherLiveDashboard({
           <p className="page-description">
             Your assigned classes, student records and daily attendance.
           </p>
-          {userName && (
+          {teacherDisplayName && (
             <p className="reference-dashboard-greeting">
-              Welcome back, {userName}
+              Welcome back, {teacherDisplayName}
+              {teacherProfileQuery.data?.profile?.designation
+                ? ` · ${teacherProfileQuery.data.profile.designation}`
+                : ''}
             </p>
           )}
+          {teacherProfileQuery.isSuccess &&
+            !teacherProfileQuery.data.profile && (
+              <p className="reference-scope-note" role="status">
+                Your teacher account is not linked to an active staff profile
+                yet. Ask the administrator to check your staff record.
+              </p>
+            )}
         </div>
       </section>
       <nav
@@ -477,6 +495,9 @@ export function TeacherLiveDashboard({
                         <strong>
                           {item.className} · {item.sectionName}
                         </strong>
+                        {item.subjectName && (
+                          <small>Subject: {item.subjectName}</small>
+                        )}
                         <small>
                           {item.campusName} · {item.academicYearName}
                         </small>

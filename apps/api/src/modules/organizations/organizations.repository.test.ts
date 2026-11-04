@@ -487,6 +487,24 @@ describe('teacher invitation account linking', () => {
     return session;
   }
 
+  it('explains when a valid invitation is opened by a different signed-in email', async () => {
+    const session = mockTeacherInvitation();
+
+    await expect(
+      new MongoOrganizationRepository().acceptInvitation({
+        tokenHash: 'hashed-token',
+        userId: teacherUserId,
+        email: 'different@example.edu',
+        now: new Date('2026-11-01T00:00:00.000Z'),
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'INVITATION_EMAIL_MISMATCH',
+    });
+
+    expect(session.endSession).toHaveBeenCalledOnce();
+  });
+
   it('links exactly one active teaching profile in the same transaction as invitation activation', async () => {
     const session = mockTeacherInvitation();
     const profile = {

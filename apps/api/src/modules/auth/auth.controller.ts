@@ -1,4 +1,4 @@
-import { rateLimit } from 'express-rate-limit';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import { Router } from 'express';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { AppError } from '../../errors/app-error.js';
@@ -28,6 +28,35 @@ function sensitiveLimit(limit: number) {
         error: {
           code: 'AUTH_RATE_LIMITED',
           message: 'Too many attempts. Please wait and try again.',
+          requestId: response.locals.requestId,
+        },
+      });
+    },
+  });
+}
+
+function loginLimit(limit: number) {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit,
+    // A shared office/home IP may legitimately serve several organization
+    // accounts. Keep the brute-force bucket scoped to IP + normalized email.
+    keyGenerator: (request) => {
+      const body =
+        typeof request.body === 'object' && request.body !== null
+          ? (request.body as Record<string, unknown>)
+          : {};
+      const email =
+        typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+      return `${ipKeyGenerator(request.ip ?? '')}:${email || 'missing-email'}`;
+    },
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    handler: (_request, response) => {
+      response.status(429).json({
+        error: {
+          code: 'AUTH_RATE_LIMITED',
+          message: 'Too many attempts for this account. Please wait and try again.',
           requestId: response.locals.requestId,
         },
       });
@@ -120,7 +149,7 @@ export function createAuthRouter(
 
   router.post(
     '/login',
-    sensitiveLimit(10),
+    loginLimit(10),
     asyncHandler(async (request, response) => {
       const body = objectBody(request.body);
       const session = await service.login(
@@ -129,6 +158,21 @@ export function createAuthRouter(
       );
       setAuthCookies(response, session);
       response.status(200).json({ user: session.user });
+    }),
+  );
+
+  router.patch(
+    '/profile',
+    authenticate,
+    csrfProtection,
+    sensitiveLimit(10),
+    asyncHandler(async (request, response) => {
+      const body = objectBody(request.body);
+      const user = await service.updateProfile(
+        response.locals.auth.user.id,
+        requiredString(body, 'displayName'),
+      );
+      response.status(200).json({ user });
     }),
   );
 

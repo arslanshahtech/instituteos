@@ -154,6 +154,7 @@ describe('organization administration routes', () => {
       updateMember: vi.fn(),
       invite: vi.fn(),
       listInvitations: vi.fn(),
+      revokeInvitation: vi.fn().mockResolvedValue(undefined),
       acceptInvitation: vi.fn(),
       updateOrganizationStatus: vi.fn(),
       setOwnerOrganizationStatus: vi.fn().mockResolvedValue({
