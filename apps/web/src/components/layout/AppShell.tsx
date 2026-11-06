@@ -4,6 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   ArrowUpRight,
   BarChart3,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   BookOpenText,
@@ -54,6 +55,7 @@ interface NavigationItem {
   icon: LucideIcon;
   end?: boolean;
   queryTab?: string;
+  children?: NavigationItem[];
 }
 
 const previewRoleOptions = [
@@ -97,7 +99,7 @@ function getNavigationItems(
 ): NavigationItem[] {
   const base = workspaceBasePath(role, organizationId);
   const items: NavigationItem[] = [
-    { label: 'Overview', to: base, icon: LayoutDashboard, end: true },
+    { label: 'Dashboard', to: base, icon: LayoutDashboard, end: true },
   ];
 
   if (!organizationId) {
@@ -186,9 +188,41 @@ function getNavigationItems(
     items.push(
       { label: 'Students', to: base + '/students', icon: Users },
       {
-        label: 'Academics & Classes',
+        label: 'Curriculum',
         to: base + '/academics',
         icon: BookOpenText,
+        children: [
+          {
+            label: 'Sessions',
+            to: base + '/academics?tab=curriculum-sessions',
+            icon: BookOpenText,
+            queryTab: 'curriculum-sessions',
+          },
+          {
+            label: 'Classes',
+            to: base + '/academics?tab=curriculum-classes',
+            icon: GraduationCap,
+            queryTab: 'curriculum-classes',
+          },
+          {
+            label: 'Sections',
+            to: base + '/academics?tab=curriculum-sections',
+            icon: Users,
+            queryTab: 'curriculum-sections',
+          },
+          {
+            label: 'Subjects',
+            to: base + '/academics?tab=curriculum-subjects',
+            icon: ClipboardList,
+            queryTab: 'curriculum-subjects',
+          },
+        ],
+      },
+      {
+        label: 'Timetable',
+        to: base + '/academics?tab=timetable',
+        icon: ClipboardCheck,
+        queryTab: 'timetable',
       },
       { label: 'Guardians', to: base + '/guardians', icon: UserCheck },
       { label: 'Teachers / Staff', to: base + '/staff', icon: GraduationCap },
@@ -264,8 +298,18 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
   const [globalQuery, setGlobalQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const [curriculumExpanded, setCurriculumExpanded] = useState(
+    () =>
+      new URLSearchParams(window.location.search)
+        .get('tab')
+        ?.startsWith('curriculum-') ?? false,
+  );
   const navigate = useNavigate();
   const location = useLocation();
+  useEffect(() => {
+    const activeTab = new URLSearchParams(location.search).get('tab');
+    setCurriculumExpanded(activeTab?.startsWith('curriculum-') ?? false);
+  }, [location.pathname, location.search]);
   const { organizationId } = useParams();
   const auth = useAuth();
   const isDevelopment = import.meta.env.DEV;
@@ -326,6 +370,64 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
     () => getNavigationItems(role, navigationOrganizationId, isDemoPreview),
     [role, navigationOrganizationId, isDemoPreview],
   );
+  const navigationGroups = useMemo(() => {
+    const sectionFor = (label: string) => {
+      if (label === 'Overview' || label === 'Dashboard') return 'Overview';
+      if (
+        [
+          'Curriculum',
+          'Timetable',
+          'Homework & Tests',
+          'Examinations',
+          'Examinations & Marks',
+        ].includes(label)
+      )
+        return 'Academics';
+      if (
+        [
+          'Students',
+          'My classes & students',
+          'Guardians',
+          'Teachers / Staff',
+          'Admissions',
+          'Your colleges',
+        ].includes(label)
+      )
+        return 'People';
+      if (label === 'Attendance') return 'Attendance & Leaves';
+      if (['Finance', 'Fees & receipts', 'Concessions'].includes(label))
+        return 'Finance';
+      if (label === 'Reports & Export' || label === 'Results')
+        return 'Accounting & Reports';
+      if (label === 'Messages') return 'Communication';
+      if (label === 'Settings' || label === 'My Profile') return 'System';
+      return 'Workspace';
+    };
+    const groups = new Map<string, NavigationItem[]>();
+    for (const item of items) {
+      const section = sectionFor(item.label);
+      const group = groups.get(section) ?? [];
+      group.push(item);
+      groups.set(section, group);
+    }
+    const sectionOrder = [
+      'Overview',
+      'Academics',
+      'People',
+      'Attendance & Leaves',
+      'Finance',
+      'Accounting & Reports',
+      'Communication',
+      'System',
+      'Workspace',
+    ];
+    return [...groups.entries()]
+      .sort(
+        ([left], [right]) =>
+          sectionOrder.indexOf(left) - sectionOrder.indexOf(right),
+      )
+      .map(([label, groupItems]) => ({ label, items: groupItems }));
+  }, [items]);
   const homePath = workspaceBasePath(role, navigationOrganizationId);
   const searchResults = useMemo(() => {
     const query = globalQuery.trim().toLowerCase();
@@ -555,29 +657,93 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
           className="primary-navigation sidebar-navigation-scroll"
           id="main-navigation"
         >
-          {items.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.label}
-                className={({ isActive }) => {
-                  const activeTab = new URLSearchParams(location.search).get(
-                    'tab',
-                  );
-                  const tabMatches = item.queryTab
-                    ? activeTab === item.queryTab
-                    : !activeTab;
-                  return `navigation-link${isActive && tabMatches ? ' navigation-link-active' : ''}`;
-                }}
-                end={item.end}
-                onClick={closeMobileNav}
-                to={item.to}
-              >
-                <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
-                <span>{item.label}</span>
-              </NavLink>
-            );
-          })}
+          {navigationGroups.map((group) => (
+            <div className="navigation-group" key={group.label}>
+              <div className="navigation-group-heading">{group.label}</div>
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div className="navigation-item-group" key={item.label}>
+                    <div className="navigation-parent-row">
+                      <NavLink
+                        key={item.label}
+                        aria-expanded={
+                          item.children ? curriculumExpanded : undefined
+                        }
+                        className={({ isActive }) => {
+                          const activeTab = new URLSearchParams(
+                            location.search,
+                          ).get('tab');
+                          const tabMatches = item.children
+                            ? !activeTab
+                            : item.queryTab
+                              ? activeTab === item.queryTab
+                              : !activeTab;
+                          const pathMatches = item.children
+                            ? location.pathname ===
+                              new URL(item.to, window.location.origin).pathname
+                            : item.queryTab
+                              ? true
+                              : isActive;
+                          return `navigation-link${item.children ? ' navigation-parent-toggle' : ''}${pathMatches && tabMatches ? ' navigation-link-active' : ''}`;
+                        }}
+                        end={item.end}
+                        onClick={
+                          item.children
+                            ? (event) => {
+                                event.preventDefault();
+                                setCurriculumExpanded((expanded) => !expanded);
+                              }
+                            : closeMobileNav
+                        }
+                        title={sidebarCollapsed ? item.label : undefined}
+                        to={item.to}
+                      >
+                        <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
+                        <span>{item.label}</span>
+                        {item.children && (
+                          <ChevronDown
+                            className="navigation-expand-icon"
+                            size={15}
+                            aria-hidden="true"
+                          />
+                        )}
+                      </NavLink>
+                    </div>
+                    {item.children &&
+                      curriculumExpanded &&
+                      item.children.map((child) => {
+                        const ChildIcon = child.icon;
+                        return (
+                          <NavLink
+                            key={child.label}
+                            className={({ isActive }) => {
+                              const activeTab = new URLSearchParams(
+                                location.search,
+                              ).get('tab');
+                              return `navigation-link navigation-sublink${isActive && activeTab === child.queryTab ? ' navigation-sublink-active' : ''}`;
+                            }}
+                            onClick={() => {
+                              setCurriculumExpanded(true);
+                              closeMobileNav();
+                            }}
+                            title={sidebarCollapsed ? child.label : undefined}
+                            to={child.to}
+                          >
+                            <ChildIcon
+                              size={16}
+                              strokeWidth={1.8}
+                              aria-hidden="true"
+                            />
+                            <span>{child.label}</span>
+                          </NavLink>
+                        );
+                      })}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {isDevelopment && !isDemoPreview && role.key !== 'platform' && (

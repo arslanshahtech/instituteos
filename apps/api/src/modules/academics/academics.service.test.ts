@@ -224,6 +224,8 @@ describe('AcademicsService', () => {
         name: 'Biology',
         code: 'BIO',
         classIds: [],
+        totalMarks: 100,
+        passingPercentage: 40,
       }),
     ).rejects.toMatchObject({ code: 'SUBJECT_CLASS_REQUIRED' });
     expect(repo.createSubject).not.toHaveBeenCalled();
@@ -236,6 +238,8 @@ describe('AcademicsService', () => {
       name: 'Biology',
       code: 'BIO',
       classIds: [classRecord.id],
+      totalMarks: 100,
+      passingPercentage: 40,
     });
     expect(repo.getClass).toHaveBeenCalledWith(
       context.organizationId,

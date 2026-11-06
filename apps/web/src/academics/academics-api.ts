@@ -11,6 +11,21 @@ export interface AcademicYear {
   updatedAt: string;
 }
 
+export interface AcademicYearSummary {
+  totals: { classes: number; sections: number; students: number };
+  bySession: Array<{
+    academicYearId: string;
+    classes: number;
+    sections: number;
+    students: number;
+  }>;
+  bySection: Array<{
+    academicYearId: string;
+    sectionId: string;
+    students: number;
+  }>;
+}
+
 export interface AcademicTerm {
   id: string;
   organizationId: string;
@@ -50,8 +65,10 @@ export interface AcademicSubject {
   organizationId: string;
   name: string;
   code: string;
-  department?: string;
   classIds?: string[];
+  totalMarks?: number;
+  passingPercentage?: number;
+  description?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -74,12 +91,7 @@ export interface AcademicCampus {
 }
 
 export type AcademicsResource =
-  | 'academic-years'
-  | 'terms'
-  | 'classes'
-  | 'sections'
-  | 'subjects'
-  | 'teacher-assignments';
+  'academic-years' | 'terms' | 'classes' | 'sections' | 'subjects';
 
 export type AcademicsFormPayload = Record<string, string | number | string[]>;
 
@@ -94,6 +106,11 @@ function list<T>(organizationId: string, resource: AcademicsResource) {
 
 export const listAcademicYears = (organizationId: string) =>
   list<AcademicYear>(organizationId, 'academic-years');
+export function getAcademicYearSummary(organizationId: string) {
+  return apiRequest<{ summary: AcademicYearSummary }>(
+    organizationPath(organizationId) + '/academic-years/summary',
+  );
+}
 export const listTerms = (organizationId: string) =>
   list<AcademicTerm>(organizationId, 'terms');
 export const listAcademicClasses = (organizationId: string) =>
@@ -102,8 +119,11 @@ export const listAcademicSections = (organizationId: string) =>
   list<AcademicSection>(organizationId, 'sections');
 export const listAcademicSubjects = (organizationId: string) =>
   list<AcademicSubject>(organizationId, 'subjects');
+
 export const listTeacherAssignments = (organizationId: string) =>
-  list<TeacherAssignment>(organizationId, 'teacher-assignments');
+  apiRequest<{ items: TeacherAssignment[] }>(
+    `${organizationPath(organizationId)}/teacher-assignments`,
+  );
 
 export function listAcademicCampuses(organizationId: string) {
   return apiRequest<{ campuses: AcademicCampus[] }>(
@@ -168,4 +188,83 @@ export function deleteTeacherTimetable(organizationId: string, id: string) {
     `${organizationPath(organizationId)}/teacher-timetable/${encodeURIComponent(id)}`,
     { method: 'DELETE' },
   );
+}
+
+export type TimetableEntryType = 'class' | 'break' | 'activity';
+export type AcademicWeekDay =
+  | 'sunday'
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday';
+export interface SectionTimetableEntry {
+  id?: string;
+  type: TimetableEntryType;
+  dayOfWeek: AcademicWeekDay;
+  startTime: string;
+  endTime: string;
+  subjectId?: string;
+  teacherStaffId?: string;
+  additionalTeacherStaffId?: string;
+  room?: string;
+  name?: string;
+  description?: string;
+}
+export interface SectionTimetable {
+  id: string;
+  organizationId: string;
+  academicYearId: string;
+  sectionId: string;
+  workingDays: AcademicWeekDay[];
+  entries: SectionTimetableEntry[];
+  createdAt: string;
+  updatedAt: string;
+}
+export interface SectionTimetableInput {
+  academicYearId: string;
+  sectionId: string;
+  workingDays: AcademicWeekDay[];
+  entries: SectionTimetableEntry[];
+}
+export function listSectionTimetables(
+  organizationId: string,
+  academicYearId: string,
+) {
+  return apiRequest<{ items: SectionTimetable[] }>(
+    `${organizationPath(organizationId)}/section-timetables?academicYearId=${encodeURIComponent(academicYearId)}`,
+  );
+}
+export function saveSectionTimetable(
+  organizationId: string,
+  input: SectionTimetableInput,
+) {
+  return apiRequest<{ item: SectionTimetable }>(
+    `${organizationPath(organizationId)}/section-timetables`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+}
+export function deleteSectionTimetable(organizationId: string, id: string) {
+  return apiRequest<void>(
+    `${organizationPath(organizationId)}/section-timetables/${encodeURIComponent(id)}`,
+    { method: 'DELETE' },
+  );
+}
+export interface BulkBreakInput {
+  academicYearId: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  days: AcademicWeekDay[];
+  sectionIds?: string[];
+}
+export function addBulkBreak(organizationId: string, input: BulkBreakInput) {
+  return apiRequest<{
+    added: number;
+    skipped: Array<{ sectionId: string; sectionName: string; day: string }>;
+  }>(`${organizationPath(organizationId)}/section-timetables/bulk-break`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }

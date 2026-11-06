@@ -1,0 +1,945 @@
+.academic-section-timetable {
+  min-width: 0;
+}
+.academic-timetable-heading,
+.academic-timetable-header-actions,
+.academic-weekly-schedule-heading,
+.academic-timetable-table-title,
+.academic-timetable-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.academic-timetable-heading h2 {
+  margin: 0;
+}
+.academic-timetable-heading p,
+.academic-working-days p,
+.academic-weekly-schedule-heading p {
+  margin: 5px 0 0;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.9rem;
+}
+.academic-timetable-header-actions {
+  flex-wrap: wrap;
+}
+.academic-timetable-year {
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--muted-foreground, #64748b);
+}
+.academic-timetable-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.academic-timetable-stats article {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--card, #fff);
+  padding: 18px;
+  display: grid;
+  gap: 7px;
+}
+.academic-timetable-stats span {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.academic-timetable-stats strong {
+  font-size: 1.8rem;
+  line-height: 1.1;
+}
+.academic-timetable-stats small {
+  color: var(--muted-foreground, #64748b);
+}
+.academic-timetable-filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 190px 190px;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--card, #fff);
+}
+.academic-timetable-search,
+.academic-timetable-filter-control {
+  position: relative;
+  min-width: 0;
+}
+.academic-timetable-search input,
+.academic-timetable-filter-control select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 8px;
+  padding: 9px 36px 9px 11px;
+  background: var(--background, #fff);
+  color: inherit;
+  font: inherit;
+}
+.academic-timetable-search > button,
+.academic-timetable-filter-control > button {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: var(--muted, #f1f5f9);
+  color: var(--muted-foreground, #64748b);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.academic-timetable-filter-control select {
+  appearance: auto;
+}
+.academic-timetable-table-wrap,
+.academic-timetable-editor-card {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--card, #fff);
+  overflow: hidden;
+}
+.academic-timetable-table-title {
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+.academic-timetable-table-title h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.academic-timetable-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.academic-timetable-table th,
+.academic-timetable-table td {
+  text-align: left;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  font-size: 0.9rem;
+}
+.academic-timetable-table th {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.73rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.academic-timetable-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.academic-timetable-row-actions {
+  display: flex;
+  align-items: center;
+}
+.academic-timetable-row-actions button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+}
+.academic-timetable-empty {
+  text-align: center !important;
+  padding: 32px !important;
+  color: var(--muted-foreground, #64748b);
+}
+.academic-timetable-field {
+  display: grid;
+  gap: 7px;
+  color: var(--foreground, #1e293b);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.academic-timetable-field input,
+.academic-timetable-field select,
+.academic-timetable-field textarea,
+.academic-timetable-filters input,
+.academic-timetable-filters select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: var(--background, #fff);
+  color: inherit;
+  font: inherit;
+}
+.academic-timetable-section-field {
+  max-width: 460px;
+}
+.academic-working-days {
+  display: grid;
+  gap: 14px;
+}
+.academic-working-days h3,
+.academic-weekly-schedule-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.academic-day-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.academic-day-toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 8px;
+  padding: 9px 12px;
+  cursor: pointer;
+  font-size: 0.84rem;
+}
+.academic-day-toggles label.is-selected {
+  background: var(--accent, #e6f4f1);
+  border-color: var(--primary, #0f766e);
+  color: var(--primary, #0f766e);
+}
+.academic-day-toggles input {
+  accent-color: var(--primary, #0f766e);
+}
+.academic-weekly-schedule-heading {
+  padding-top: 18px;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+.academic-weekly-schedule-heading span {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.85rem;
+}
+.academic-week-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.academic-week-column {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--background, #f8fafc);
+}
+.academic-week-column h4 {
+  margin: 0 0 10px;
+  text-align: center;
+  font-size: 0.9rem;
+}
+.academic-period-card {
+  position: relative;
+  margin-bottom: 9px;
+  border: 1px solid var(--border, #dbe3e9);
+  border-radius: 8px;
+  background: var(--card, #fff);
+  overflow: hidden;
+}
+.academic-period-edit {
+  display: grid;
+  width: 100%;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 11px;
+  padding-right: 30px;
+  cursor: pointer;
+  color: inherit;
+}
+.academic-period-edit small {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+}
+.academic-period-edit strong {
+  font-size: 0.88rem;
+}
+.academic-period-edit span,
+.academic-period-edit time {
+  font-size: 0.74rem;
+  color: var(--muted-foreground, #64748b);
+}
+.academic-period-remove {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--muted-foreground, #64748b);
+  cursor: pointer;
+  font-size: 1.1rem;
+}
+.academic-add-period {
+  width: 100%;
+  min-height: 40px;
+  border: 1px dashed var(--border, #94a3b8);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--primary, #0f766e);
+  cursor: pointer;
+}
+.academic-timetable-form-actions {
+  justify-content: flex-end;
+  padding-top: 18px;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+.academic-timetable-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.48);
+}
+.academic-period-dialog {
+  overflow: auto;
+  background: var(--card, #fff);
+  display: grid;
+}
+.academic-period-dialog header,
+.academic-period-dialog footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.academic-period-dialog header h3 {
+  margin: 2px 0 0;
+}
+.academic-period-dialog header small {
+  color: var(--muted-foreground, #64748b);
+  text-transform: uppercase;
+}
+.academic-period-dialog header p {
+  margin: 7px 0 0;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.academic-period-dialog header > button {
+  border: 0;
+  background: transparent;
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+.academic-entry-type-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-radius: 9px;
+  background: var(--muted, #f1f5f9);
+}
+.academic-entry-type-tabs button {
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+.academic-entry-type-tabs button.is-active {
+  background: var(--card, #fff);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+}
+.academic-period-time-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.academic-field-help {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.4;
+}
+.academic-bulk-section-list {
+  display: grid;
+  gap: 8px;
+  max-height: 160px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+}
+.academic-bulk-section-list label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.84rem;
+}
+@media (max-width: 760px) {
+  .academic-timetable-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .academic-timetable-filters {
+    grid-template-columns: 1fr;
+  }
+  .academic-timetable-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .academic-timetable-header-actions {
+    width: 100%;
+  }
+  .academic-timetable-table-wrap {
+    overflow-x: auto;
+  }
+  .academic-timetable-table {
+    min-width: 720px;
+  }
+}
+@media (max-width: 480px) {
+  .academic-timetable-stats {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .academic-timetable-stats article {
+    padding: 12px;
+  }
+  .academic-period-time-fields {
+    grid-template-columns: 1fr;
+  }
+  .academic-timetable-editor-card {
+    padding: 14px;
+  }
+}
+
+/* Timetable overview follows the supplied timetable.png reference. */
+.academic-timetable-table-title {
+  min-height: 72px;
+  padding: 14px 20px;
+}
+.academic-timetable-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 7px;
+  background: var(--card, #fff);
+  color: var(--foreground, #1e293b);
+  font: inherit;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+.academic-timetable-search {
+  display: flex;
+  align-items: center;
+}
+.academic-timetable-search > svg {
+  position: absolute;
+  left: 14px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+.academic-timetable-search input {
+  padding-left: 40px;
+}
+.academic-timetable-table {
+  table-layout: fixed;
+}
+.academic-timetable-table .timetable-col-section {
+  width: 22%;
+}
+.academic-timetable-table .timetable-col-class {
+  width: 30%;
+}
+.academic-timetable-table .timetable-col-entries {
+  width: 28%;
+}
+.academic-timetable-table .timetable-col-actions {
+  width: 20%;
+}
+.academic-timetable-table th,
+.academic-timetable-table td {
+  padding: 16px 20px;
+}
+.academic-timetable-table th:nth-child(3),
+.academic-timetable-table td:nth-child(3) {
+  padding-left: 20px;
+  padding-right: 20px;
+  text-align: center;
+}
+.academic-timetable-table th.academic-timetable-actions-heading {
+  text-align: right;
+  padding-right: 24px;
+}
+.academic-timetable-entries-heading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.academic-timetable-entries-heading svg {
+  color: #84cc16;
+}
+.academic-timetable-entry-count {
+  display: inline-block;
+  min-width: 24px;
+  text-align: center;
+}
+.academic-timetable-row-actions {
+  justify-content: flex-end;
+  gap: 16px;
+  padding-right: 4px;
+}
+.academic-timetable-row-actions button {
+  display: inline-grid;
+  place-items: center;
+  color: #94a3b8;
+  padding: 4px;
+}
+.academic-timetable-row-actions button.is-danger {
+  color: #fb7185;
+}
+.academic-timetable-notice {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #087b57;
+  font-size: 0.86rem;
+}
+@media (max-width: 760px) {
+  .academic-timetable-table {
+    min-width: 620px;
+  }
+}
+
+/* Add/Edit timetable editor — weekly grid reference layout */
+.academic-editor-section-select {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--card, #fff);
+}
+.academic-editor-section-select > p {
+  margin: 8px 0 0;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.78rem;
+}
+.academic-editor-weekly {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--card, #fff);
+  min-width: 0;
+}
+.academic-editor-weekly .academic-weekly-schedule-heading {
+  padding: 0 0 14px;
+  border: 0;
+}
+.academic-week-grid-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+.academic-week-grid-reference {
+  display: grid;
+  grid-template-columns: minmax(78px, 0.72fr) repeat(5, minmax(135px, 1fr));
+  gap: 8px;
+  min-width: 820px;
+  align-items: stretch;
+}
+.academic-week-grid-head {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  color: var(--muted-foreground, #475569);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.academic-week-grid-head.academic-period-label {
+  justify-content: flex-start;
+  padding-left: 12px;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+}
+.academic-period-index {
+  min-height: 82px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+.academic-period-index small {
+  color: var(--muted-foreground, #94a3b8);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+}
+.academic-period-index strong {
+  font-size: 1.05rem;
+  color: var(--foreground, #164e63);
+}
+.academic-week-cell {
+  min-width: 0;
+  min-height: 82px;
+  padding: 3px 0 8px;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+.academic-week-cell .academic-period-card {
+  height: 100%;
+  min-height: 68px;
+  margin: 0;
+}
+.academic-week-cell .academic-period-edit {
+  min-height: 68px;
+  padding: 10px;
+  padding-right: 34px;
+  gap: 5px;
+}
+.academic-week-cell .academic-period-edit strong {
+  color: var(--foreground, #164e63);
+  font-size: 0.78rem;
+}
+.academic-week-cell .academic-period-edit span,
+.academic-week-cell .academic-period-edit time {
+  font-size: 0.66rem;
+}
+.academic-period-card-tools {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: flex;
+  gap: 2px;
+}
+.academic-period-card-tools button {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: var(--muted, #f1f5f9);
+  color: var(--muted-foreground, #64748b);
+  cursor: pointer;
+}
+.academic-period-card-tools button:hover {
+  background: var(--accent, #e6f4f1);
+  color: var(--primary, #0f766e);
+}
+.academic-add-period-cell {
+  min-height: 68px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--muted-foreground, #94a3b8);
+  border-style: dashed;
+}
+.academic-add-period-cell:hover:not(:disabled),
+.academic-add-day:hover:not(:disabled) {
+  border-color: var(--primary, #0f766e);
+  background: var(--accent, #e6f4f1);
+  color: var(--primary, #0f766e);
+}
+.academic-period-footer-label {
+  display: flex;
+  align-items: center;
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.7rem;
+}
+.academic-add-day {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px dashed var(--border, #cbd5e1);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--foreground, #475569);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.academic-add-day:disabled,
+.academic-add-period-cell:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.academic-copy-hint {
+  margin: 0;
+  color: var(--primary, #0f766e);
+  font-size: 0.76rem;
+}
+.academic-period-card.is-break {
+  background: #f7fafc;
+}
+.academic-period-card.is-activity {
+  background: #fbf8ff;
+}
+@media (max-width: 760px) {
+  .academic-timetable-editor-card {
+    padding: 12px;
+  }
+  .academic-editor-weekly,
+  .academic-editor-section-select {
+    padding: 14px;
+  }
+}
+
+/* Final timetable spacing and editor-card separation. */
+.academic-timetable-editor-card {
+  display: grid;
+  gap: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+.academic-editor-section-select,
+.academic-editor-weekly {
+  border: 1px solid var(--border, #dbe3e9);
+  border-radius: 12px;
+  background: var(--card, #fff);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.035);
+}
+.academic-editor-section-select select {
+  min-height: 40px;
+}
+.academic-optional {
+  display: inline-block;
+  margin-left: 3px;
+  color: var(--muted-foreground, #94a3b8);
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1;
+}
+.academic-period-dialog {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
+}
+@media (max-width: 760px) {
+  .academic-section-timetable.page-stack {
+    gap: 18px;
+  }
+  .academic-editor-section-select,
+  .academic-editor-weekly {
+    padding: 14px;
+  }
+  .academic-period-dialog {
+    width: min(100%, 390px);
+    padding: 16px;
+  }
+}
+
+/* Compact period editor; preserve the reference visual language. */
+.academic-period-dialog {
+  width: min(100%, 340px);
+  max-height: min(82vh, 590px);
+  padding: 14px;
+  gap: 10px;
+  border-radius: 12px;
+}
+.academic-period-dialog .academic-timetable-field {
+  gap: 4px;
+  font-size: 0.76rem;
+}
+.academic-period-dialog .academic-timetable-field input,
+.academic-period-dialog .academic-timetable-field select,
+.academic-period-dialog .academic-timetable-field textarea {
+  min-height: 34px;
+  padding: 6px 9px;
+  font-size: 0.82rem;
+}
+.academic-period-dialog header h3 {
+  font-size: 0.96rem;
+}
+.academic-period-dialog header small {
+  font-size: 0.63rem;
+}
+.academic-entry-type-tabs {
+  gap: 4px;
+  padding: 3px;
+}
+.academic-entry-type-tabs button {
+  padding: 7px 5px;
+  font-size: 0.78rem;
+}
+.academic-period-time-fields {
+  gap: 8px;
+}
+.academic-period-dialog footer .button {
+  min-height: 34px;
+  padding: 7px 12px;
+  font-size: 0.8rem;
+}
+.academic-period-pending {
+  min-height: 68px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px;
+  border-style: dashed;
+  border-color: var(--primary, #0f766e);
+  background: var(--accent, #e6f4f1);
+}
+.academic-period-pending strong {
+  font-size: 0.8rem;
+  color: var(--primary, #0f766e);
+}
+.academic-period-pending span {
+  font-size: 0.68rem;
+  color: var(--muted-foreground, #64748b);
+}
+.academic-period-pending time {
+  font-size: 0.68rem;
+}
+@media (max-width: 760px) {
+  .academic-period-dialog {
+    width: min(100%, 340px);
+    padding: 13px;
+  }
+}
+
+/* Final timetable polish: clearer hierarchy, breathing room and editor actions. */
+.academic-section-timetable.page-stack {
+  gap: 30px;
+}
+.academic-timetable-heading {
+  align-items: center;
+  margin: 0 0 4px;
+  gap: 20px;
+}
+.academic-timetable-heading h2 {
+  font-size: 1.42rem;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+.academic-timetable-heading p {
+  margin-top: 8px;
+  line-height: 1.5;
+}
+.academic-timetable-editor-heading {
+  justify-content: space-between;
+}
+.academic-timetable-editor-title {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+}
+.academic-editor-back {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--border, #dbe3e9);
+  border-radius: 10px;
+  background: var(--card, #fff);
+  color: var(--foreground, #334155);
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease;
+}
+.academic-editor-back:hover {
+  border-color: var(--primary, #0f766e);
+  background: var(--accent, #e6f4f1);
+  color: var(--primary, #0f766e);
+  transform: translateX(-1px);
+}
+.academic-editor-section-select {
+  width: 100%;
+  padding: 20px 22px;
+}
+.academic-editor-section-select .academic-timetable-field {
+  width: 100%;
+  max-width: none;
+}
+.academic-editor-section-select select {
+  width: 100%;
+}
+.academic-editor-section-select > p {
+  margin-top: 10px;
+  line-height: 1.5;
+}
+.academic-editor-weekly {
+  padding: 22px;
+}
+.academic-editor-weekly .academic-weekly-schedule-heading {
+  padding-bottom: 18px;
+}
+.academic-period-dialog footer {
+  justify-content: space-between;
+  padding-top: 5px;
+}
+.academic-period-delete {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  background: #fff7f8;
+  color: #be4055;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.academic-period-delete:hover {
+  border-color: #fda4af;
+  background: #fff0f2;
+}
+@media (max-width: 760px) {
+  .academic-section-timetable.page-stack {
+    gap: 22px;
+  }
+  .academic-timetable-heading {
+    gap: 14px;
+  }
+  .academic-timetable-editor-heading {
+    align-items: flex-start;
+  }
+  .academic-timetable-editor-title {
+    gap: 10px;
+  }
+  .academic-editor-back {
+    width: 35px;
+    height: 35px;
+    flex-basis: 35px;
+  }
+  .academic-editor-section-select {
+    padding: 16px;
+  }
+  .academic-editor-weekly {
+    padding: 16px;
+  }
+}
+
+/* Keep the session selector compact and on a single line. */
+.academic-timetable-year {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  gap: 9px;
+  font-weight: 600;
+}
+.academic-timetable-year span {
+  color: var(--foreground, #334155);
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+}
+.academic-timetable-year select {
+  min-width: 150px;
+  max-width: 190px;
+}

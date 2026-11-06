@@ -2,6 +2,7 @@ import mongoose, { Types } from 'mongoose';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AcademicSectionModel,
+  SectionTimetableModel,
   TeacherAssignmentModel,
 } from '../academics/academics.model.js';
 import { AuditLogModel } from '../audit/audit.model.js';
@@ -198,6 +199,9 @@ describe('MongoAttendanceRepository teacher identity resolution', () => {
       .spyOn(TeacherAssignmentModel, 'find')
       .mockReturnValue(assignmentQuery as never);
     const userFind = vi.spyOn(AuthUserModel, 'find');
+    vi.spyOn(SectionTimetableModel, 'find').mockReturnValue({
+      lean: vi.fn().mockResolvedValue([]),
+    } as never);
 
     const result =
       await new MongoAttendanceRepository().listTeacherAssignmentsForUser(

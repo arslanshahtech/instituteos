@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { errorHandler } from '../../middleware/error-handler.js';
 import { hashOpaqueToken } from '../auth/auth.service.js';
 import { createAcademicsRouter } from './academics.routes.js';
+import { SectionTimetableModel } from './academics.model.js';
 import { AcademicsService } from './academics.service.js';
 import type {
   OrganizationAccessRepository,
@@ -78,6 +79,39 @@ describe('Academics routes', () => {
 
     expect(response.status).toBe(400);
     expect(service.createClass).not.toHaveBeenCalled();
+  });
+
+  it('keeps section timetable reads restricted to academic management roles', async () => {
+    const { app, organizationId } = appForRole('teacher');
+    const response = await request(app).get(
+      '/' + organizationId + '/section-timetables',
+    );
+    expect(response.status).toBe(403);
+  });
+
+  it('lists section timetables within the resolved organization and academic year', async () => {
+    const { app, organizationId } = appForRole('academic_coordinator');
+    const academicYearId = '650000000000000000000004';
+    const query = {
+      sort: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue([]),
+    };
+    const find = vi
+      .spyOn(SectionTimetableModel, 'find')
+      .mockReturnValue(query as never);
+    const response = await request(app).get(
+      '/' +
+        organizationId +
+        '/section-timetables?academicYearId=' +
+        academicYearId,
+    );
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ items: [] });
+    expect(find).toHaveBeenCalledWith({
+      organizationId: expect.anything(),
+      academicYearId: expect.anything(),
+    });
+    expect(query.sort).toHaveBeenCalledWith({ sectionId: 1 });
   });
 
   it('resolves organization context before returning academic data', async () => {

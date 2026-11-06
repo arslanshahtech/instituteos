@@ -489,3 +489,68 @@
     font-size: 34px;
   }
 }
+
+/* The reference theme must respect the desktop collapsed state as well. */
+@media (min-width: 821px) {
+  .app-frame-live-organization .sidebar.sidebar-collapsed,
+  .app-frame-demo-preview .sidebar.sidebar-collapsed {
+    width: 76px;
+  }
+  .app-frame-live-organization .sidebar.sidebar-collapsed + .main-column,
+  .app-frame-demo-preview .sidebar.sidebar-collapsed + .main-column {
+    margin-left: 76px;
+  }
+}
+
+/* Neutral guide line for the Curriculum submenu; offset slightly lower to align with child items. */
+.app-frame-live-organization .navigation-item-group:has(.navigation-sublink),
+.app-frame-demo-preview .navigation-item-group:has(.navigation-sublink) {
+  position: relative;
+}
+
+.app-frame-live-organization
+  .navigation-item-group:has(.navigation-sublink)::after,
+.app-frame-demo-preview .navigation-item-group:has(.navigation-sublink)::after {
+  position: absolute;
+  top: 51px;
+  bottom: 10px;
+  left: 31px;
+  z-index: 0;
+  width: 1px;
+  background: rgb(15 23 42 / 14%);
+  content: '';
+  pointer-events: none;
+}
+
+.app-frame-live-organization .navigation-sublink,
+.app-frame-demo-preview .navigation-sublink {
+  position: relative;
+  z-index: 1;
+}
+
+.app-frame-live-organization .navigation-sublink-active,
+.app-frame-live-organization .navigation-sublink-active:hover,
+.app-frame-demo-preview .navigation-sublink-active,
+.app-frame-demo-preview .navigation-sublink-active:hover {
+  background: transparent;
+  color: #111;
+  font-weight: 700;
+}
+
+.app-frame-live-organization .navigation-sublink-active svg,
+.app-frame-demo-preview .navigation-sublink-active svg {
+  color: #111;
+}
+
+.app-frame-live-organization .navigation-sublink-active::before,
+.app-frame-demo-preview .navigation-sublink-active::before {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  width: 5px;
+  height: 5px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: #111;
+  content: '';
+}

@@ -22,6 +22,7 @@ import {
   SubjectModel,
   TeacherAssignmentModel,
   TeacherTimetableModel,
+  SectionTimetableModel,
   TermModel,
 } from './academics.model.js';
 import type {
@@ -113,7 +114,9 @@ function subjectRecord(record: Record<string, unknown>): SubjectRecord {
     organizationId: String(record.organizationId),
     name: String(record.name),
     code: String(record.code),
-    ...(record.department ? { department: String(record.department) } : {}),
+    totalMarks: Number(record.totalMarks ?? 100),
+    passingPercentage: Number(record.passingPercentage ?? 40),
+    description: String(record.description ?? ''),
     classIds: Array.isArray(record.classIds) ? record.classIds.map(String) : [],
     createdAt: timestamp(record.createdAt as Date),
     updatedAt: timestamp(record.updatedAt as Date),
@@ -169,9 +172,105 @@ export class MongoAcademicsRepository implements AcademicsRepository {
     const records = await AcademicYearModel.find({
       organizationId: oid(organizationId),
     })
+      .select({
+        _id: 1,
+        organizationId: 1,
+        name: 1,
+        startDate: 1,
+        endDate: 1,
+        status: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      })
       .sort({ startDate: -1 })
       .lean();
     return records.map((record) => yearRecord(record));
+  }
+  async getAcademicYearSummary(organizationId: string, campusIds?: string[]) {
+    const match = {
+      organizationId: oid(organizationId),
+      status: 'active',
+      ...(campusIds !== undefined
+        ? { campusId: { $in: campusIds.map(oid) } }
+        : {}),
+    };
+    const [groups, [totals], sectionGroups] = await Promise.all([
+      StudentSectionPlacementModel.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: '$academicYearId',
+            classes: { $addToSet: '$classId' },
+            sections: { $addToSet: '$sectionId' },
+            students: { $addToSet: '$studentId' },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            academicYearId: { $toString: '$_id' },
+            classes: { $size: '$classes' },
+            sections: { $size: '$sections' },
+            students: { $size: '$students' },
+          },
+        },
+      ]),
+      StudentSectionPlacementModel.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: null,
+            classes: { $addToSet: '$classId' },
+            sections: { $addToSet: '$sectionId' },
+            students: { $addToSet: '$studentId' },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            classes: { $size: '$classes' },
+            sections: { $size: '$sections' },
+            students: { $size: '$students' },
+          },
+        },
+      ]),
+      StudentSectionPlacementModel.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: { academicYearId: '$academicYearId', sectionId: '$sectionId' },
+            students: { $addToSet: '$studentId' },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            academicYearId: { $toString: '$_id.academicYearId' },
+            sectionId: { $toString: '$_id.sectionId' },
+            students: { $size: '$students' },
+          },
+        },
+      ]),
+    ]);
+
+    return {
+      totals: {
+        classes: Number(totals?.classes ?? 0),
+        sections: Number(totals?.sections ?? 0),
+        students: Number(totals?.students ?? 0),
+      },
+      bySession: groups.map((group) => ({
+        academicYearId: String(group.academicYearId),
+        classes: Number(group.classes ?? 0),
+        sections: Number(group.sections ?? 0),
+        students: Number(group.students ?? 0),
+      })),
+      bySection: sectionGroups.map((group) => ({
+        academicYearId: String(group.academicYearId),
+        sectionId: String(group.sectionId),
+        students: Number(group.students ?? 0),
+      })),
+    };
   }
   async getAcademicYear(
     organizationId: string,
@@ -894,6 +993,10 @@ export class MongoAcademicsRepository implements AcademicsRepository {
               organizationId: organization,
               academicYearId: value,
             }),
+            SectionTimetableModel.exists({
+              organizationId: organization,
+              academicYearId: value,
+            }),
             StudentSectionPlacementModel.exists({
               organizationId: organization,
               academicYearId: value,
@@ -982,6 +1085,10 @@ export class MongoAcademicsRepository implements AcademicsRepository {
               organizationId: organization,
               sectionId: value,
             }),
+            SectionTimetableModel.exists({
+              organizationId: organization,
+              sectionId: value,
+            }),
             StudentSectionPlacementModel.exists({
               organizationId: organization,
               sectionId: value,
@@ -1006,6 +1113,10 @@ export class MongoAcademicsRepository implements AcademicsRepository {
             TeacherAssignmentModel.exists({
               organizationId: organization,
               subjectId: value,
+            }),
+            SectionTimetableModel.exists({
+              organizationId: organization,
+              'entries.subjectId': value,
             }),
             ExamScheduleModel.exists({
               organizationId: organization,

@@ -750,3 +750,89 @@
     max-height: 42px;
   }
 }
+
+/* Curriculum is a collapsible parent within the Academics workspace. */
+.navigation-parent-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 2px;
+  border-radius: 7px;
+  transition: background-color 120ms ease;
+}
+.navigation-parent-row:hover {
+  background: #f0efeb;
+}
+.navigation-parent-row > .navigation-parent-toggle {
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-start;
+}
+.navigation-parent-toggle .navigation-expand-icon {
+  flex: 0 0 auto;
+  margin-left: auto;
+  transition: transform 160ms ease;
+}
+.navigation-parent-toggle[aria-expanded='true'] .navigation-expand-icon {
+  transform: rotate(180deg);
+}
+.sidebar.sidebar-collapsed .navigation-parent-toggle .navigation-expand-icon {
+  display: none;
+}
+
+/* Nested curriculum links stay visually subordinate to their parent. */
+.navigation-item-group {
+  display: grid;
+  gap: 3px;
+}
+.navigation-item-group:has(.navigation-sublink) {
+  border-radius: 7px;
+  background: linear-gradient(to bottom, transparent 0 41px, #f5f5f3 41px 100%);
+  padding-bottom: 4px;
+}
+.navigation-sublink {
+  min-height: 34px !important;
+  margin-left: 18px;
+  padding-left: 30px !important;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar.sidebar-collapsed .navigation-sublink {
+  margin-left: 0;
+  padding-left: 0 !important;
+  justify-content: center;
+}
+
+/* Section labels keep the sidebar scannable without changing its routes. */
+.navigation-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
+  min-width: 0;
+}
+.navigation-group-heading {
+  padding: 15px 11px 5px;
+  color: #929292;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.navigation-group:first-child .navigation-group-heading {
+  padding-top: 7px;
+}
+@media (min-width: 821px) {
+  .sidebar.sidebar-collapsed .navigation-group-heading {
+    display: none;
+  }
+  .sidebar.sidebar-collapsed .navigation-group {
+    gap: 4px;
+  }
+}
+
+.primary-navigation {
+  grid-auto-rows: auto;
+}

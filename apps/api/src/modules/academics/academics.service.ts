@@ -84,6 +84,12 @@ export class AcademicsService {
   listAcademicYears(context: AcademicsContext) {
     return this.repository.listAcademicYears(context.organizationId);
   }
+  getAcademicYearSummary(context: AcademicsContext) {
+    return this.repository.getAcademicYearSummary(
+      context.organizationId,
+      this.scope(context),
+    );
+  }
   getAcademicYear(context: AcademicsContext, id: string) {
     return this.required(
       this.repository.getAcademicYear(context.organizationId, id),
@@ -560,6 +566,21 @@ export class AcademicsService {
     };
   }
 
+  private subjectMarks(
+    value: number,
+    field: string,
+    min: number,
+    max: number,
+  ): number {
+    if (!Number.isInteger(value) || value < min || value > max)
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Enter ' + field + ' between ' + min + ' and ' + max + '.',
+      );
+    return value;
+  }
+
   private async subjectInput(
     context: AcademicsContext,
     input: SubjectInput,
@@ -578,9 +599,26 @@ export class AcademicsService {
       for (const classId of classIds) await this.getClass(context, classId);
     return {
       name: requiredText(input.name, 'subject name', 120),
-      code: requiredText(input.code, 'subject code', 30).toUpperCase(),
-      ...(input.department?.trim()
-        ? { department: requiredText(input.department, 'department', 100) }
+      code: requiredText(
+        input.code ??
+          (input.name
+            .replace(/[^a-z0-9]+/gi, '-')
+            .replace(/^-|-$/g, '')
+            .slice(0, 22) || 'SUBJECT') +
+            '-' +
+            (classIds?.[0]?.slice(-6) ?? 'GENERAL'),
+        'subject code',
+        30,
+      ).toUpperCase(),
+      totalMarks: this.subjectMarks(input.totalMarks, 'total marks', 1, 100000),
+      passingPercentage: this.subjectMarks(
+        input.passingPercentage,
+        'passing percentage',
+        0,
+        100,
+      ),
+      ...(input.description?.trim()
+        ? { description: requiredText(input.description, 'description', 1000) }
         : {}),
       ...(classIds !== undefined ? { classIds } : {}),
     };

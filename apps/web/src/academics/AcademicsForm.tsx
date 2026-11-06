@@ -21,12 +21,14 @@ interface FormValues {
   classId: string;
   capacity: string;
   department: string;
-  teacherStaffId: string;
   subjectId: string;
   sectionId: string;
   studyLevel: '' | 'first_year' | 'second_year' | 'other';
   programName: string;
   classIds: string[];
+  totalMarks: string;
+  passingPercentage: string;
+  description: string;
 }
 
 interface Choice {
@@ -38,21 +40,21 @@ interface Choice {
 interface Field {
   name: keyof FormValues;
   label: string;
-  type?: 'date' | 'number' | 'select' | 'multiselect';
+  type?: 'date' | 'number' | 'select' | 'multiselect' | 'textarea';
   choices?: Choice[];
 }
 
-function schemaForResource(resource: AcademicsResource, isEditing: boolean) {
+function schemaForResource(resource: AcademicsResource) {
   return z
     .object({
-      name: z.string().trim().max(120, 'Use 120 characters or fewer.'),
-      code: z.string().trim().max(30, 'Use 30 characters or fewer.'),
+      name: z.string().trim().max(120, 'Max 120 characters.'),
+      code: z.string().trim().max(30, 'Max 30 characters.'),
       sortOrder: z
         .string()
         .refine(
           (value) =>
             value === '' || (/^\d+$/.test(value) && Number(value) <= 100000),
-          'Enter a whole number from 0 to 100,000.',
+          'Enter 0 to 100,000.',
         ),
       startDate: z.string(),
       endDate: z.string(),
@@ -68,15 +70,27 @@ function schemaForResource(resource: AcademicsResource, isEditing: boolean) {
             (/^\d+$/.test(value) &&
               Number(value) >= 1 &&
               Number(value) <= 10000),
-          'Enter a whole number from 1 to 10,000.',
+          'Enter 1 to 10,000.',
         ),
-      department: z.string().trim().max(100, 'Use 100 characters or fewer.'),
-      teacherStaffId: z.string(),
+      department: z.string().trim().max(100, 'Max 100 characters.'),
       subjectId: z.string(),
       sectionId: z.string(),
       studyLevel: z.enum(['', 'first_year', 'second_year', 'other']),
-      programName: z.string().trim().max(120, 'Use 120 characters or fewer.'),
+      programName: z.string().trim().max(120, 'Max 120 characters.'),
       classIds: z.array(z.string()),
+      totalMarks: z
+        .string()
+        .refine(
+          (v) => /^\d+$/.test(v) && Number(v) >= 1 && Number(v) <= 100000,
+          'Enter 1 to 100,000.',
+        ),
+      passingPercentage: z
+        .string()
+        .refine(
+          (v) => /^\d+$/.test(v) && Number(v) >= 0 && Number(v) <= 100,
+          'Enter 0 to 100.',
+        ),
+      description: z.string().trim().max(1000, 'Maximum 1,000 characters.'),
     })
     .superRefine((values, context) => {
       const requiredByResource: Record<
@@ -87,20 +101,13 @@ function schemaForResource(resource: AcademicsResource, isEditing: boolean) {
         terms: ['name', 'academicYearId', 'startDate', 'endDate'],
         classes: ['name', 'code', 'campusId'],
         sections: ['name', 'classId'],
-        subjects: ['name', 'code'],
-        'teacher-assignments': [
-          'teacherStaffId',
-          'subjectId',
-          'classId',
-          'sectionId',
-          'academicYearId',
-        ],
+        subjects: ['name', 'totalMarks', 'passingPercentage'],
       };
-      if (resource === 'subjects' && !isEditing && values.classIds.length === 0)
+      if (resource === 'subjects' && values.classIds.length === 0)
         context.addIssue({
           code: 'custom',
           path: ['classIds'],
-          message: 'Choose at least one class or college group.',
+          message: 'Choose a class.',
         });
       if (
         resource === 'classes' &&
@@ -110,14 +117,14 @@ function schemaForResource(resource: AcademicsResource, isEditing: boolean) {
         context.addIssue({
           code: 'custom',
           path: ['programName'],
-          message: 'Enter the college program/group name.',
+          message: 'Enter a program name.',
         });
       for (const key of requiredByResource[resource] ?? []) {
         if (typeof values[key] !== 'string' || !values[key].trim())
           context.addIssue({
             code: 'custom',
             path: [key],
-            message: 'This field is required.',
+            message: 'Required.',
           });
       }
       if (resource === 'academic-years' || resource === 'terms') {
@@ -146,7 +153,7 @@ function schemaForResource(resource: AcademicsResource, isEditing: boolean) {
           context.addIssue({
             code: 'custom',
             path: ['endDate'],
-            message: 'End date must be after start date.',
+            message: 'End date must be later.',
           });
         }
       }
@@ -155,7 +162,7 @@ function schemaForResource(resource: AcademicsResource, isEditing: boolean) {
 
 const fieldsByResource: Record<AcademicsResource, Field[]> = {
   'academic-years': [
-    { name: 'name', label: 'Academic year name' },
+    { name: 'name', label: 'Session name' },
     { name: 'startDate', label: 'Start date', type: 'date' },
     { name: 'endDate', label: 'End date', type: 'date' },
     {
@@ -175,12 +182,12 @@ const fieldsByResource: Record<AcademicsResource, Field[]> = {
     { name: 'endDate', label: 'End date', type: 'date' },
   ],
   classes: [
-    { name: 'name', label: 'Class / study level name (e.g. First Year)' },
+    { name: 'name', label: 'Class Name' },
     { name: 'code', label: 'Class code' },
     { name: 'sortOrder', label: 'Display order', type: 'number' },
     {
       name: 'studyLevel',
-      label: 'Study level',
+      label: 'Level',
       type: 'select',
       choices: [
         { value: 'first_year', label: 'First Year' },
@@ -188,7 +195,7 @@ const fieldsByResource: Record<AcademicsResource, Field[]> = {
         { value: 'other', label: 'Other' },
       ],
     },
-    { name: 'programName', label: 'Program name (e.g. FSc Pre-Medical)' },
+    { name: 'programName', label: 'Program' },
     { name: 'campusId', label: 'Campus', type: 'select' },
   ],
   sections: [
@@ -197,21 +204,11 @@ const fieldsByResource: Record<AcademicsResource, Field[]> = {
     { name: 'capacity', label: 'Capacity', type: 'number' },
   ],
   subjects: [
-    { name: 'name', label: 'Subject name' },
-    { name: 'code', label: 'Subject code' },
-    { name: 'department', label: 'Department' },
-    {
-      name: 'classIds',
-      label: 'Available for classes / groups',
-      type: 'multiselect',
-    },
-  ],
-  'teacher-assignments': [
-    { name: 'teacherStaffId', label: 'Teacher', type: 'select' },
-    { name: 'subjectId', label: 'Subject', type: 'select' },
-    { name: 'classId', label: 'Class', type: 'select' },
-    { name: 'sectionId', label: 'Section', type: 'select' },
-    { name: 'academicYearId', label: 'Academic year', type: 'select' },
+    { name: 'name', label: 'Subject Name' },
+    { name: 'classIds', label: 'Select Classes', type: 'multiselect' },
+    { name: 'totalMarks', label: 'Total Marks', type: 'number' },
+    { name: 'passingPercentage', label: 'Passing Percentage', type: 'number' },
+    { name: 'description', label: 'Description', type: 'textarea' },
   ],
 };
 
@@ -227,12 +224,14 @@ const emptyValues: FormValues = {
   classId: '',
   capacity: '',
   department: '',
-  teacherStaffId: '',
   subjectId: '',
   sectionId: '',
   studyLevel: '',
   programName: '',
   classIds: [],
+  totalMarks: '100',
+  passingPercentage: '40',
+  description: '',
 };
 
 export function AcademicsForm({
@@ -242,6 +241,7 @@ export function AcademicsForm({
   isSaving,
   saveError,
   onSubmit,
+  onCancel,
 }: {
   resource: AcademicsResource;
   record?: Record<string, unknown>;
@@ -249,6 +249,7 @@ export function AcademicsForm({
   isSaving: boolean;
   saveError?: string;
   onSubmit: (input: AcademicsFormPayload) => void;
+  onCancel?: () => void;
 }) {
   const initialValues = useMemo(() => {
     const value = (key: Exclude<keyof FormValues, 'classIds'>): string =>
@@ -271,10 +272,12 @@ export function AcademicsForm({
         (resource === 'classes' && choices.campusId?.length === 1
           ? choices.campusId[0]!.value
           : ''),
-      classId: value('classId'),
+      classId: String(
+        record?.classId ??
+          (Array.isArray(record?.classIds) ? (record.classIds[0] ?? '') : ''),
+      ),
       capacity: value('capacity'),
       department: value('department'),
-      teacherStaffId: value('teacherStaffId'),
       subjectId: value('subjectId'),
       sectionId: value('sectionId'),
       studyLevel: value('studyLevel') as FormValues['studyLevel'],
@@ -282,6 +285,9 @@ export function AcademicsForm({
       classIds: Array.isArray(record?.classIds)
         ? record.classIds.map(String)
         : [],
+      totalMarks: String(record?.totalMarks ?? 100),
+      passingPercentage: String(record?.passingPercentage ?? 40),
+      description: String(record?.description ?? ''),
     };
   }, [
     record,
@@ -290,38 +296,24 @@ export function AcademicsForm({
     choices.campusId?.[0]?.value,
   ]);
   const form = useForm<FormValues>({
-    resolver: zodResolver(schemaForResource(resource, Boolean(record))),
+    resolver: zodResolver(schemaForResource(resource)),
     defaultValues: initialValues,
     mode: 'onBlur',
   });
   const { reset } = form;
   const selectedClassId = form.watch('classId');
-  const selectedSubjectId = form.watch('subjectId');
-  useEffect(() => {
-    if (
-      resource !== 'teacher-assignments' ||
-      !selectedSubjectId ||
-      !selectedClassId
-    )
-      return;
-    const selectedSubject = choices.subjectId?.find(
-      (choice) => choice.value === selectedSubjectId,
-    );
-    if (
-      selectedSubject?.classIds?.length &&
-      !selectedSubject.classIds.includes(selectedClassId)
-    )
-      form.setValue('subjectId', '', {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
-  }, [choices.subjectId, form, resource, selectedClassId, selectedSubjectId]);
   useEffect(() => {
     reset(initialValues);
   }, [initialValues, resource, reset]);
 
   const submit = form.handleSubmit((values) => {
     const input: AcademicsFormPayload = { ...values };
+    if (resource === 'subjects') {
+      input.totalMarks = Number(values.totalMarks);
+      input.passingPercentage = Number(values.passingPercentage);
+      delete input.code;
+      delete input.department;
+    }
     if (resource === 'classes')
       input.sortOrder = values.sortOrder === '' ? 0 : Number(values.sortOrder);
     else delete input.sortOrder;
@@ -331,7 +323,7 @@ export function AcademicsForm({
     if (resource !== 'subjects') {
       delete input.department;
       delete input.classIds;
-    } else if (record && values.classIds.length === 0) delete input.classIds;
+    }
     if (resource !== 'classes') {
       delete input.studyLevel;
       delete input.programName;
@@ -357,7 +349,11 @@ export function AcademicsForm({
       <div className="student-form-grid">
         {fieldsByResource[resource].map((field) => {
           const error = form.formState.errors[field.name]?.message;
-          const fieldChoices = choices[field.name] ?? field.choices ?? [];
+          const fieldChoices =
+            choices[field.name] ??
+            (field.name === 'classIds' ? choices.classId : undefined) ??
+            field.choices ??
+            [];
           const visibleChoices =
             field.name === 'subjectId' && selectedClassId
               ? fieldChoices.filter(
@@ -400,16 +396,10 @@ export function AcademicsForm({
                     </label>
                   ))}
                   {!fieldChoices.length && (
-                    <p className="form-help-text">
-                      Pehle Classes mein college groups create karein.
-                    </p>
+                    <p className="form-help-text">Create a class first.</p>
                   )}
                 </div>
-                <p className="form-help-text">
-                  Subject sirf selected classes/groups mein teacher assignment
-                  aur exams ke liye available hoga. Purane global subjects
-                  existing records ke liye compatible rahenge.
-                </p>
+                <p className="form-help-text">Used for exam scheduling.</p>
               </FormField>
             );
           }
@@ -421,7 +411,15 @@ export function AcademicsForm({
                 label={field.label}
                 name={field.name}
               >
-                <select id={field.name} {...form.register(field.name)}>
+                <select
+                  id={field.name}
+                  disabled={
+                    resource === 'subjects' &&
+                    field.name === 'classId' &&
+                    Boolean(record)
+                  }
+                  {...form.register(field.name)}
+                >
                   <option value="">Select {field.label.toLowerCase()}</option>
                   {visibleChoices.map((choice) => (
                     <option key={choice.value} value={choice.value}>
@@ -431,16 +429,31 @@ export function AcademicsForm({
                 </select>
                 {field.name === 'campusId' && fieldChoices.length === 0 && (
                   <p className="form-help-text">
-                    No campus is set up yet. A campus means your school branch
-                    or location. Create one in organization campus settings,
-                    then return here to create the class.
+                    Add a campus in Settings first.
                   </p>
                 )}
                 {field.name === 'campusId' && fieldChoices.length === 1 && (
                   <p className="form-help-text">
-                    Your only campus is selected automatically.
+                    Campus selected automatically.
                   </p>
                 )}
+              </FormField>
+            );
+          }
+          if (field.type === 'textarea') {
+            return (
+              <FormField
+                error={error}
+                key={field.name}
+                label={field.label}
+                name={field.name}
+              >
+                <textarea
+                  id={field.name}
+                  rows={4}
+                  maxLength={1000}
+                  {...form.register(field.name)}
+                />
               </FormField>
             );
           }
@@ -461,9 +474,33 @@ export function AcademicsForm({
           {saveError}
         </p>
       )}
-      <div className="button-row">
+      <div
+        className={
+          resource === 'subjects'
+            ? 'academic-subject-form-actions'
+            : 'button-row'
+        }
+      >
+        {resource === 'subjects' && onCancel && (
+          <Button
+            disabled={isSaving}
+            onClick={onCancel}
+            type="button"
+            variant="secondary"
+          >
+            Back to Subjects
+          </Button>
+        )}
         <Button disabled={isSaving} type="submit" variant="primary">
-          {isSaving ? 'Saving…' : record ? 'Save changes' : 'Create record'}
+          {isSaving
+            ? 'Saving…'
+            : resource === 'subjects'
+              ? record
+                ? 'Update Subject'
+                : 'Add Subject'
+              : record
+                ? 'Save changes'
+                : 'Create record'}
         </Button>
       </div>
     </form>

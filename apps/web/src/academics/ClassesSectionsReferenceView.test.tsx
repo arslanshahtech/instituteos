@@ -1,6 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+afterEach(() => cleanup());
 import { ClassesSectionsReferenceView } from './ClassesSectionsReferenceView.js';
+import type {
+  AcademicClass,
+  AcademicSection,
+  AcademicYear,
+  AcademicSubject,
+} from './academics-api.js';
 
 describe('ClassesSectionsReferenceView', () => {
   const baseProps = () => ({
@@ -9,13 +17,27 @@ describe('ClassesSectionsReferenceView', () => {
         id: 'class-1',
         organizationId: 'org-1',
         campusId: 'campus-1',
-        name: 'Class 5',
-        code: 'C5',
-        sortOrder: 0,
+        name: 'Class Five',
+        code: 'FIVE',
+        sortOrder: 5,
+        studyLevel: 'other' as const,
+        programName: 'Primary',
         createdAt: '',
         updatedAt: '',
       },
-    ],
+      {
+        id: 'class-2',
+        organizationId: 'org-1',
+        campusId: 'campus-1',
+        name: 'First Year',
+        code: 'FY',
+        sortOrder: 6,
+        studyLevel: 'first_year' as const,
+        programName: 'FSc Pre-Medical',
+        createdAt: '',
+        updatedAt: '',
+      },
+    ] as AcademicClass[],
     sections: [
       {
         id: 'section-1',
@@ -26,7 +48,7 @@ describe('ClassesSectionsReferenceView', () => {
         createdAt: '',
         updatedAt: '',
       },
-    ],
+    ] as AcademicSection[],
     years: [
       {
         id: 'year-1',
@@ -38,142 +60,130 @@ describe('ClassesSectionsReferenceView', () => {
         createdAt: '',
         updatedAt: '',
       },
-    ],
+    ] as AcademicYear[],
     campuses: [{ id: 'campus-1', name: 'Main Campus' }],
-    subjects: [],
-    assignments: [],
-    teachers: [],
+    subjects: [
+      {
+        id: 'subject-1',
+        organizationId: 'org-1',
+        name: 'Mathematics',
+        code: 'MATH',
+        classIds: ['class-1'],
+        createdAt: '',
+        updatedAt: '',
+      },
+    ] as AcademicSubject[],
+    studentsCount: 20,
     onCreate: vi.fn(),
-    onCreateSubject: vi.fn(),
     onEdit: vi.fn(),
     onDelete: vi.fn(),
-    onOpenEnrollment: vi.fn(),
     onOpenCampusSetup: vi.fn(),
   });
 
-  it('preselects the current class when adding a section from its details', () => {
-    const props = baseProps();
-    render(<ClassesSectionsReferenceView {...props} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /Class 5/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Add Section/ }));
-
-    expect(props.onCreate).toHaveBeenCalledWith('sections', 'class-1');
-  });
-
-  it('opens the Add Student view directly from the selected class actions', () => {
-    const props = baseProps();
-    render(<ClassesSectionsReferenceView {...props} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /Class 5/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add Student' }));
-
-    expect(props.onOpenEnrollment).toHaveBeenCalledWith(
-      'section-1',
-      'class-1',
-      'add-students',
-    );
-  });
-
-  it('shows only the shared Academics page heading, not a duplicate class heading', () => {
+  it('renders the dedicated Classes heading, requested actions and four summary metrics', () => {
     render(<ClassesSectionsReferenceView {...baseProps()} />);
 
     expect(
-      screen.queryByRole('heading', {
-        level: 1,
-        name: 'Classes & Sections',
-      }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('heading', { level: 1, name: 'Classes' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('Manage All Classes in Your Institute.'),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: /Education Levels/ }),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Add Class' })).toBeTruthy();
+    expect(screen.getByText('20')).toBeTruthy();
+    expect(screen.getAllByText('Sections').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Subjects').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('tab')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Add section to/ })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /Manage students in/ }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /Assign teacher to/ }),
+    ).toBeNull();
   });
 
-  it('opens teacher assignment even when the class still needs a section', () => {
+  it('shows the PDF-aligned class table and related counts from available data', () => {
+    render(<ClassesSectionsReferenceView {...baseProps()} />);
+
+    expect(screen.getByRole('table')).toBeTruthy();
+    for (const heading of [
+      'Class',
+      'Level / Grade',
+      'Session',
+      'Sections',
+      'Subjects',
+      'Students',
+      'Actions',
+    ]) {
+      expect(screen.getByRole('columnheader', { name: heading })).toBeTruthy();
+    }
+    expect(screen.getByText('Class Five')).toBeTruthy();
+    expect(screen.getAllByText('2026-2027').length).toBe(2);
+    expect(
+      screen.getByRole('button', { name: 'Edit Class Five' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Delete Class Five' }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('button', { name: /View Class Five details/ }),
+    ).toBeNull();
+  });
+
+  it('filters classes by search and education level', () => {
+    render(<ClassesSectionsReferenceView {...baseProps()} />);
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search classes' }), {
+      target: { value: 'First Year' },
+    });
+    expect(screen.getAllByText('First Year').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Class Five')).toBeNull();
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search classes' }), {
+      target: { value: '' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Education Levels/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Other 1/ }));
+    expect(screen.getByText('Class Five')).toBeTruthy();
+    expect(screen.queryByRole('row', { name: /First Year/ })).toBeNull();
+  });
+
+  it('uses the Education Levels action to choose an available level', () => {
+    render(<ClassesSectionsReferenceView {...baseProps()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Education Levels/ }));
+    expect(screen.getByRole('menu')).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: /All Levels 2/ })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: /First Year 1/ })).toBeTruthy();
+    expect(
+      screen.getByRole('menuitem', { name: /Second Year 0/ }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('menuitem', { name: /First Year 1/ }));
+
+    expect(screen.getAllByText('First Year').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Class Five')).toBeNull();
+  });
+
+  it('keeps pagination controls compact and changes page size', () => {
     const props = baseProps();
-    props.sections = [];
+    props.classes = Array.from({ length: 12 }, (_, index) => ({
+      ...props.classes[0]!,
+      id: 'class-' + index,
+      name: 'Class ' + index,
+      code: 'C' + index,
+    }));
     render(<ClassesSectionsReferenceView {...props} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Class 5/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Assign Teacher/ }));
-
-    expect(props.onOpenEnrollment).toHaveBeenCalledWith(
-      undefined,
-      'class-1',
-      'teacher',
-    );
-    expect(props.onCreate).not.toHaveBeenCalled();
-  });
-
-  it('opens the student roster for the selected class and section', () => {
-    const props = baseProps();
-    render(<ClassesSectionsReferenceView {...props} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /Class 5/ }));
-    fireEvent.click(screen.getByRole('button', { name: /View Students/ }));
-
-    expect(props.onOpenEnrollment).toHaveBeenCalledWith(
-      'section-1',
-      'class-1',
-      'students',
-    );
-  });
-
-  it('opens subject creation from the teachers and subjects detail tab', () => {
-    const props = baseProps();
-    render(<ClassesSectionsReferenceView {...props} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /Class 5/ }));
-    fireEvent.click(screen.getByRole('tab', { name: /Teachers & Subjects/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Add Subject/ }));
-
-    expect(props.onCreateSubject).toHaveBeenCalledTimes(1);
-  });
-
-  it('respects read-only Admin permissions without hiding class data', () => {
-    const props = {
-      ...baseProps(),
-      canWriteAcademics: false,
-      canReadStudents: true,
-      canAddStudents: false,
-      canAssignTeachers: false,
-    };
-    render(<ClassesSectionsReferenceView {...props} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /Class 5/ }));
-
-    expect(
-      screen.getByRole('button', { name: /View Students/ }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Create Class' }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /Add Section/ }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Add Student' }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /Assign Teacher/ }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Edit Class' }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Delete Class' }),
-    ).not.toBeInTheDocument();
-  });
-
-  it('keeps Assign Teacher available from the teachers and subjects tab', () => {
-    const props = baseProps();
-    render(<ClassesSectionsReferenceView {...props} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /Class 5/ }));
-    fireEvent.click(screen.getByRole('tab', { name: /Teachers & Subjects/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Assign Teacher/ }));
-
-    expect(props.onOpenEnrollment).toHaveBeenCalledWith(
-      'section-1',
-      'class-1',
-      'teacher',
-    );
+    expect(screen.getByText(/Showing 1/)).toBeTruthy();
+    expect(screen.getByText('Page 1 of 2')).toBeTruthy();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Rows per page' }), {
+      target: { value: '25' },
+    });
+    expect(screen.getByText(/Showing 1/)).toBeTruthy();
+    expect(screen.getByText('Page 1 of 1')).toBeTruthy();
   });
 });

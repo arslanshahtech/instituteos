@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
     vi.fn(),
     vi.fn(),
     vi.fn(),
+    vi.fn(),
   ],
 }));
 
@@ -55,6 +56,7 @@ vi.mock('../modules/academics/academics.model.js', () => ({
   SubjectModel: { init: mocks.modelInit[13] },
   TeacherAssignmentModel: { init: mocks.modelInit[14] },
   TeacherTimetableModel: { init: mocks.modelInit[15] },
+  SectionTimetableModel: { init: mocks.modelInit[16] },
 }));
 
 import {

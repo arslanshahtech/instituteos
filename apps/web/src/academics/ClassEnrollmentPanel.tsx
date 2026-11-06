@@ -12,10 +12,8 @@ import {
 import type {
   AcademicClass,
   AcademicSection,
-  AcademicSubject,
   AcademicYear,
 } from './academics-api.js';
-import { saveAcademicsResource } from './academics-api.js';
 import { createStudent } from '../students/students-api.js';
 
 interface Props {
@@ -23,22 +21,13 @@ interface Props {
   classes: AcademicClass[];
   sections: AcademicSection[];
   years: AcademicYear[];
-  subjects: AcademicSubject[];
-  teachers: Array<{ id: string; firstName: string; lastName: string }>;
-  teachersLoading?: boolean;
-  teachersError?: string;
-  onRetryTeachers?: () => void;
-  onManageStaff?: () => void;
   initialSectionId?: string;
   initialClassId?: string;
-  initialView?: 'students' | 'add-students' | 'teacher';
+  initialView?: 'students' | 'add-students';
   focusRequest?: number;
-  onViewChange?: (view: 'students' | 'add-students' | 'teacher') => void;
-  onCreateSection?: (classId: string) => void;
+  onViewChange?: (view: 'students' | 'add-students') => void;
   canReadStudents?: boolean;
   canAddStudents?: boolean;
-  canAssignTeachers?: boolean;
-  canWriteAcademics?: boolean;
 }
 
 export function ClassEnrollmentPanel({
@@ -46,35 +35,23 @@ export function ClassEnrollmentPanel({
   classes,
   sections,
   years,
-  subjects,
-  teachers,
-  teachersLoading = false,
-  teachersError,
-  onRetryTeachers,
-  onManageStaff,
   initialSectionId,
   initialClassId,
   initialView = 'students',
   focusRequest = 0,
   onViewChange,
-  onCreateSection,
   canReadStudents = true,
   canAddStudents = true,
-  canAssignTeachers = true,
-  canWriteAcademics = true,
 }: Props) {
   const resolveAllowedView = useCallback(
-    (
-      requested: 'students' | 'add-students' | 'teacher',
-    ): 'students' | 'add-students' | 'teacher' => {
-      if (requested === 'teacher' && canAssignTeachers) return 'teacher';
+    (requested: 'students' | 'add-students'): 'students' | 'add-students' => {
       if (requested === 'add-students' && canAddStudents) return 'add-students';
       if (requested === 'students' && canReadStudents) return 'students';
       if (canReadStudents) return 'students';
       if (canAddStudents) return 'add-students';
       return 'students';
     },
-    [canReadStudents, canAddStudents, canAssignTeachers],
+    [canReadStudents, canAddStudents],
   );
   const [activeView, setActiveView] = useState(() =>
     resolveAllowedView(initialView),
@@ -84,7 +61,6 @@ export function ClassEnrollmentPanel({
     setActiveView(resolveAllowedView(initialView));
   }, [initialView, resolveAllowedView]);
   const [rosterSelectionMode, setRosterSelectionMode] = useState(false);
-  const teacherViewRef = useRef<HTMLElement | null>(null);
   const studentsViewRef = useRef<HTMLDivElement | null>(null);
   const addStudentsViewRef = useRef<HTMLDivElement | null>(null);
   const [rosterSearch, setRosterSearch] = useState('');
@@ -107,22 +83,17 @@ export function ClassEnrollmentPanel({
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedRosterIds, setSelectedRosterIds] = useState<string[]>([]);
-  const [teacherStaffId, setTeacherStaffId] = useState('');
-  const [teacherSearch, setTeacherSearch] = useState('');
-  const [subjectId, setSubjectId] = useState('');
   const [showNewStudent, setShowNewStudent] = useState(false);
   const [newFirstName, setNewFirstName] = useState('');
   const [newLastName, setNewLastName] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const queryClient = useQueryClient();
-  const scrollToView = (view: 'students' | 'add-students' | 'teacher') => {
+  const scrollToView = (view: 'students' | 'add-students') => {
     const target =
-      view === 'teacher'
-        ? teacherViewRef.current
-        : view === 'add-students'
-          ? addStudentsViewRef.current
-          : studentsViewRef.current;
+      view === 'add-students'
+        ? addStudentsViewRef.current
+        : studentsViewRef.current;
     if (target && typeof target.scrollIntoView === 'function') {
       target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -147,11 +118,10 @@ export function ClassEnrollmentPanel({
       if (secondFrame) window.cancelAnimationFrame(secondFrame);
     };
   }, [focusRequest, initialView]);
-  const navigateToView = (view: 'students' | 'add-students' | 'teacher') => {
+  const navigateToView = (view: 'students' | 'add-students') => {
     if (
       (view === 'students' && !canReadStudents) ||
-      (view === 'add-students' && !canAddStudents) ||
-      (view === 'teacher' && !canAssignTeachers)
+      (view === 'add-students' && !canAddStudents)
     )
       return;
     setActiveView(view);
@@ -168,22 +138,6 @@ export function ClassEnrollmentPanel({
   const classSections = sections.filter(
     (item) => item.classId === selectedClassId,
   );
-  const availableSubjects = useMemo(
-    () =>
-      subjects.filter(
-        (subject) =>
-          !subject.classIds?.length ||
-          subject.classIds.includes(selectedClassId),
-      ),
-    [subjects, selectedClassId],
-  );
-  useEffect(() => {
-    if (
-      subjectId &&
-      !availableSubjects.some((subject) => subject.id === subjectId)
-    )
-      setSubjectId('');
-  }, [availableSubjects, subjectId]);
   useEffect(() => {
     if (
       !sections.some(
@@ -264,19 +218,6 @@ export function ClassEnrollmentPanel({
         )
       : students;
   }, [students, search]);
-  const filteredTeachers = useMemo(() => {
-    const term = teacherSearch.trim().toLocaleLowerCase();
-    return term
-      ? teachers.filter((teacher) =>
-          `${teacher.firstName} ${teacher.lastName}`
-            .toLocaleLowerCase()
-            .includes(term),
-        )
-      : teachers;
-  }, [teachers, teacherSearch]);
-  const selectedTeacher = teachers.find(
-    (teacher) => teacher.id === teacherStaffId,
-  );
   const allShownSelected =
     filteredStudents.length > 0 &&
     filteredStudents.every((student) => selectedIds.includes(student.id));
@@ -389,26 +330,6 @@ export function ClassEnrollmentPanel({
       await Promise.all([studentsQuery.refetch(), rosterQuery.refetch()]);
     },
   });
-  const assignTeacher = useMutation({
-    mutationFn: (input: {
-      teacherStaffId: string;
-      subjectId: string;
-      classId: string;
-      sectionId: string;
-      academicYearId: string;
-    }) =>
-      saveAcademicsResource(
-        organizationId,
-        'teacher-assignments',
-        undefined,
-        input,
-      ),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ['academics', organizationId],
-      });
-    },
-  });
   const toggleStudent = (id: string, checked: boolean) => {
     setSelectedIds((current) =>
       checked
@@ -436,10 +357,7 @@ export function ClassEnrollmentPanel({
       <div className="academics-panel-heading">
         <div>
           <h2>Class enrollment</h2>
-          <p>
-            Choose a class, session and section. Existing students at that
-            campus can be added together.
-          </p>
+          <p>Choose a class, year and section.</p>
         </div>
       </div>
       <div
@@ -467,17 +385,6 @@ export function ClassEnrollmentPanel({
             onClick={() => navigateToView('add-students')}
           >
             Add Student
-          </button>
-        )}
-        {canAssignTeachers && (
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeView === 'teacher'}
-            className={activeView === 'teacher' ? 'active' : ''}
-            onClick={() => navigateToView('teacher')}
-          >
-            Assign Teacher
           </button>
         )}
       </div>
@@ -554,515 +461,137 @@ export function ClassEnrollmentPanel({
       classSections.length > 0 &&
       section ? (
         <>
-          {activeView === 'teacher' && (
-            <section
-              ref={teacherViewRef}
-              className="class-teacher-assignment class-enrollment-anchor"
-              aria-label="Assign class teacher"
+          <>
+            <div
+              ref={studentsViewRef}
+              className="class-enrollment-students-view class-enrollment-anchor"
             >
-              <h3>Assign teacher</h3>
-              <div className="form-grid">
-                <div className="class-teacher-picker">
-                  <label className="form-field" htmlFor="class-teacher-search">
-                    Search and choose teacher
-                    <input
-                      id="class-teacher-search"
-                      type="search"
-                      autoComplete="off"
-                      value={teacherSearch}
-                      onChange={(event) => setTeacherSearch(event.target.value)}
-                      placeholder="Search teacher by name"
-                      disabled={teachersLoading || Boolean(teachersError)}
-                    />
-                  </label>
-                  {selectedTeacher && (
-                    <p className="class-teacher-selected" role="status">
-                      Selected:{' '}
-                      <strong>
-                        {selectedTeacher.firstName} {selectedTeacher.lastName}
-                      </strong>
-                    </p>
-                  )}
-                  {teachersLoading ? (
-                    <p className="class-teacher-picker-status" role="status">
-                      Loading active teachers…
-                    </p>
-                  ) : teachersError ? (
-                    <div className="class-teacher-picker-error" role="alert">
-                      <p>Teacher list could not be loaded. {teachersError}</p>
-                      <div className="class-enrollment-actions">
+              {canReadStudents && (
+                <section
+                  className="class-roster-section"
+                  aria-label="Enrolled students"
+                >
+                  <div className="academics-panel-heading">
+                    <div>
+                      <h3>Currently enrolled students</h3>
+                      <p>
+                        {selectedClass.name} · {section.name}
+                      </p>
+                    </div>
+                    <div className="class-roster-heading-actions">
+                      <span className="class-roster-count">
+                        {rosterQuery.data?.items.length ?? 0} students
+                      </span>
+                      {canAddStudents && rosterStudents.length > 0 && (
                         <Button
                           type="button"
                           variant="secondary"
-                          onClick={onRetryTeachers}
+                          onClick={() => {
+                            setRosterSelectionMode((current) => !current);
+                            setSelectedRosterIds([]);
+                          }}
+                          aria-expanded={rosterSelectionMode}
                         >
-                          Retry teacher list
+                          {rosterSelectionMode
+                            ? 'Cancel selection'
+                            : '... Select students'}
                         </Button>
-                        <Button
-                          type="button"
-                          variant="quiet"
-                          onClick={onManageStaff}
-                        >
-                          Open Teachers &amp; Staff
-                        </Button>
-                      </div>
+                      )}
                     </div>
-                  ) : teachers.length === 0 ? (
-                    <div className="class-teacher-picker-empty" role="status">
-                      <p>No active teaching staff are available to assign.</p>
-                      <small>
-                        Set the staff designation to Teacher, Lecturer or
-                        another teaching title, or add their teaching subjects.
-                      </small>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={onManageStaff}
-                      >
-                        Open Teachers &amp; Staff
-                      </Button>
-                    </div>
-                  ) : filteredTeachers.length ? (
-                    <div
-                      className="class-teacher-choice-list"
-                      role="group"
-                      aria-label="Available teachers"
-                    >
-                      {filteredTeachers.map((teacher) => (
-                        <button
-                          className={
-                            teacherStaffId === teacher.id
-                              ? 'class-teacher-choice is-selected'
-                              : 'class-teacher-choice'
-                          }
-                          type="button"
-                          key={teacher.id}
-                          aria-pressed={teacherStaffId === teacher.id}
-                          onClick={() => setTeacherStaffId(teacher.id)}
-                        >
-                          <span className="class-teacher-choice-avatar">
-                            {teacher.firstName.slice(0, 1).toUpperCase()}
-                            {teacher.lastName.slice(0, 1).toUpperCase()}
-                          </span>
-                          <span>
-                            {teacher.firstName} {teacher.lastName}
-                          </span>
-                          <span
-                            className="class-teacher-choice-check"
-                            aria-hidden="true"
-                          >
-                            {teacherStaffId === teacher.id
-                              ? 'Selected'
-                              : 'Choose'}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="class-teacher-picker-status" role="status">
-                      No teachers match “{teacherSearch.trim()}”. Try another
-                      name.
+                  </div>
+                  {rosterQuery.isSuccess && rosterStudents.length > 0 && (
+                    <label className="form-field">
+                      Search enrolled students
+                      <input
+                        aria-label="Search enrolled students"
+                        value={rosterSearch}
+                        onChange={(event) =>
+                          setRosterSearch(event.target.value)
+                        }
+                        placeholder="Search this class roster by name"
+                      />
+                    </label>
+                  )}
+                  {rosterQuery.isPending ? (
+                    <p>Loading class roster…</p>
+                  ) : rosterQuery.isError ? (
+                    <p className="form-error" role="alert">
+                      {apiMessage(rosterQuery.error)}
                     </p>
-                  )}
-                </div>
-                <label>
-                  Subject
-                  <select
-                    value={subjectId}
-                    onChange={(event) => setSubjectId(event.target.value)}
-                  >
-                    <option value="">Choose subject</option>
-                    {availableSubjects.map((subject) => (
-                      <option key={subject.id} value={subject.id}>
-                        {subject.name} ({subject.code})
-                      </option>
-                    ))}
-                  </select>
-                  {availableSubjects.length === 0 && (
-                    <small>
-                      Is class/group ke liye abhi koi subject mapped nahi hai.
-                      Class details mein subject create ya edit karke is group
-                      ko select karein.
-                    </small>
-                  )}
-                </label>
-                <div className="class-enrollment-actions">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={
-                      !teacherStaffId ||
-                      !subjectId ||
-                      !sectionId ||
-                      !academicYearId ||
-                      teachersLoading ||
-                      Boolean(teachersError) ||
-                      assignTeacher.isPending
-                    }
-                    onClick={() =>
-                      assignTeacher.mutate({
-                        teacherStaffId,
-                        subjectId,
-                        classId: section.classId,
-                        sectionId,
-                        academicYearId,
-                      })
-                    }
-                  >
-                    {assignTeacher.isPending ? 'Assigning…' : 'Assign teacher'}
-                  </Button>
-                </div>
-              </div>
-              {assignTeacher.isError && (
-                <p className="form-error" role="alert">
-                  {apiMessage(assignTeacher.error)}
-                </p>
-              )}
-              {assignTeacher.isSuccess && (
-                <p className="success-note" role="status">
-                  Teacher assigned to this class section and subject.
-                </p>
-              )}
-            </section>
-          )}
-          {activeView !== 'teacher' && (
-            <>
-              <div
-                ref={studentsViewRef}
-                className="class-enrollment-students-view class-enrollment-anchor"
-              >
-                {canReadStudents && (
-                  <section
-                    className="class-roster-section"
-                    aria-label="Currently enrolled students"
-                  >
-                    <div className="academics-panel-heading">
-                      <div>
-                        <h3>Currently enrolled students</h3>
-                        <p>
-                          Students already assigned to {selectedClass.name} ·{' '}
-                          {section.name}.
-                        </p>
-                      </div>
-                      <div className="class-roster-heading-actions">
-                        <span className="class-roster-count">
-                          {rosterQuery.data?.items.length ?? 0} students
-                        </span>
-                        {canAddStudents && rosterStudents.length > 0 && (
+                  ) : rosterStudents.length ? (
+                    <>
+                      {canAddStudents && rosterSelectionMode && (
+                        <div className="class-roster-select-toolbar">
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={
+                                filteredRosterStudents.length > 0 &&
+                                filteredRosterStudents.every((student) =>
+                                  selectedRosterIds.includes(student.id),
+                                )
+                              }
+                              onChange={(event) =>
+                                setSelectedRosterIds(
+                                  event.target.checked
+                                    ? [
+                                        ...new Set([
+                                          ...selectedRosterIds,
+                                          ...filteredRosterStudents.map(
+                                            (student) => student.id,
+                                          ),
+                                        ]),
+                                      ]
+                                    : selectedRosterIds.filter(
+                                        (id) =>
+                                          !filteredRosterStudents.some(
+                                            (student) => student.id === id,
+                                          ),
+                                      ),
+                                )
+                              }
+                            />{' '}
+                            Select all shown
+                          </label>
+                          <span>{selectedRosterIds.length} selected</span>
                           <Button
                             type="button"
                             variant="secondary"
-                            onClick={() => {
-                              setRosterSelectionMode((current) => !current);
-                              setSelectedRosterIds([]);
-                            }}
-                            aria-expanded={rosterSelectionMode}
-                          >
-                            {rosterSelectionMode
-                              ? 'Cancel selection'
-                              : '... Select students'}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                    {rosterQuery.isSuccess && rosterStudents.length > 0 && (
-                      <label className="form-field">
-                        Search enrolled students
-                        <input
-                          aria-label="Search enrolled students"
-                          value={rosterSearch}
-                          onChange={(event) =>
-                            setRosterSearch(event.target.value)
-                          }
-                          placeholder="Search this class roster by name"
-                        />
-                      </label>
-                    )}
-                    {rosterQuery.isPending ? (
-                      <p>Loading class roster…</p>
-                    ) : rosterQuery.isError ? (
-                      <p className="form-error" role="alert">
-                        {apiMessage(rosterQuery.error)}
-                      </p>
-                    ) : rosterStudents.length ? (
-                      <>
-                        {canAddStudents && rosterSelectionMode && (
-                          <div className="class-roster-select-toolbar">
-                            <label>
-                              <input
-                                type="checkbox"
-                                checked={
-                                  filteredRosterStudents.length > 0 &&
-                                  filteredRosterStudents.every((student) =>
-                                    selectedRosterIds.includes(student.id),
-                                  )
-                                }
-                                onChange={(event) =>
-                                  setSelectedRosterIds(
-                                    event.target.checked
-                                      ? [
-                                          ...new Set([
-                                            ...selectedRosterIds,
-                                            ...filteredRosterStudents.map(
-                                              (student) => student.id,
-                                            ),
-                                          ]),
-                                        ]
-                                      : selectedRosterIds.filter(
-                                          (id) =>
-                                            !filteredRosterStudents.some(
-                                              (student) => student.id === id,
-                                            ),
-                                        ),
-                                  )
-                                }
-                              />{' '}
-                              Select all shown
-                            </label>
-                            <span>{selectedRosterIds.length} selected</span>
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              disabled={
-                                !selectedRosterIds.length ||
-                                removeRosterStudent.isPending
-                              }
-                              onClick={() =>
-                                removeRosterStudent.mutate(selectedRosterIds)
-                              }
-                            >
-                              Remove selected
-                            </Button>
-                          </div>
-                        )}
-                        <div className="class-enrollment-list">
-                          {filteredRosterStudents.map((student) => (
-                            <div
-                              className="class-enrollment-student"
-                              key={student.id}
-                            >
-                              {canAddStudents && rosterSelectionMode && (
-                                <input
-                                  aria-label={`Select ${student.firstName} ${student.lastName}`}
-                                  type="checkbox"
-                                  checked={selectedRosterIds.includes(
-                                    student.id,
-                                  )}
-                                  onChange={(event) =>
-                                    setSelectedRosterIds((current) =>
-                                      event.target.checked
-                                        ? [...current, student.id]
-                                        : current.filter(
-                                            (id) => id !== student.id,
-                                          ),
-                                    )
-                                  }
-                                />
-                              )}
-                              <span className="class-roster-student-name">
-                                <strong>
-                                  {student.preferredName ||
-                                    `${student.firstName} ${student.lastName}`}
-                                </strong>
-                                <small>
-                                  {student.firstName} {student.lastName}
-                                </small>
-                              </span>
-                              <span className="class-roster-status">
-                                Enrolled
-                              </span>
-                              {canAddStudents && (
-                                <button
-                                  className="class-roster-remove-button"
-                                  type="button"
-                                  disabled={removeRosterStudent.isPending}
-                                  onClick={() =>
-                                    removeRosterStudent.mutate([student.id])
-                                  }
-                                >
-                                  Remove
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                        {rosterSearch.trim() &&
-                          filteredRosterStudents.length === 0 && (
-                            <p className="class-roster-empty" role="status">
-                              No enrolled students match "{rosterSearch.trim()}
-                              ". Try another name or clear the search.
-                            </p>
-                          )}
-                        {removeRosterStudent.isError && (
-                          <p className="form-error" role="alert">
-                            {apiMessage(removeRosterStudent.error)}
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="class-roster-empty">
-                        {canAddStudents
-                          ? 'No students assigned yet. Select existing students below to add them in bulk.'
-                          : 'No students are currently assigned to this section.'}
-                      </p>
-                    )}
-                  </section>
-                )}
-                {canAddStudents && (
-                  <section className="class-add-students">
-                    <div
-                      ref={addStudentsViewRef}
-                      className="academics-panel-heading class-enrollment-actions class-enrollment-anchor"
-                    >
-                      <div>
-                        <h3>Add students</h3>
-                        <p>
-                          Select one or many existing students, or register a
-                          new student directly into this section.
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => setShowNewStudent((value) => !value)}
-                      >
-                        {showNewStudent
-                          ? 'Cancel new student'
-                          : 'Add new student'}
-                      </Button>
-                    </div>
-                    {showNewStudent && (
-                      <form
-                        className="student-form"
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          addNewStudent.mutate();
-                        }}
-                      >
-                        <div className="student-form-grid">
-                          <label className="form-field">
-                            First name
-                            <input
-                              required
-                              maxLength={80}
-                              value={newFirstName}
-                              onChange={(event) =>
-                                setNewFirstName(event.target.value)
-                              }
-                            />
-                          </label>
-                          <label className="form-field">
-                            Last name
-                            <input
-                              required
-                              maxLength={80}
-                              value={newLastName}
-                              onChange={(event) =>
-                                setNewLastName(event.target.value)
-                              }
-                            />
-                          </label>
-                          <label className="form-field">
-                            Phone (optional)
-                            <input
-                              maxLength={40}
-                              value={newPhone}
-                              onChange={(event) =>
-                                setNewPhone(event.target.value)
-                              }
-                            />
-                          </label>
-                          <label className="form-field">
-                            Email (optional)
-                            <input
-                              type="email"
-                              maxLength={254}
-                              value={newEmail}
-                              onChange={(event) =>
-                                setNewEmail(event.target.value)
-                              }
-                            />
-                          </label>
-                        </div>
-                        {addNewStudent.isError && (
-                          <p className="form-error" role="alert">
-                            {apiMessage(addNewStudent.error)}. If the student
-                            was created but enrollment failed, add that student
-                            from the existing-student list.
-                          </p>
-                        )}
-                        <div className="class-enrollment-actions">
-                          <Button
-                            type="submit"
-                            variant="primary"
                             disabled={
-                              !newFirstName.trim() ||
-                              !newLastName.trim() ||
-                              addNewStudent.isPending
+                              !selectedRosterIds.length ||
+                              removeRosterStudent.isPending
+                            }
+                            onClick={() =>
+                              removeRosterStudent.mutate(selectedRosterIds)
                             }
                           >
-                            {addNewStudent.isPending
-                              ? 'Creating and adding…'
-                              : 'Create student and add to section'}
+                            Remove selected
                           </Button>
                         </div>
-                      </form>
-                    )}
-                    {addNewStudent.isError && !showNewStudent && (
-                      <p className="form-error" role="alert">
-                        {apiMessage(addNewStudent.error)}. If the student was
-                        created but enrollment failed, the eligible list has
-                        been refreshed and the same student is selected below.
-                        Add that existing record instead of creating another
-                        one.
-                      </p>
-                    )}
-                    <label className="form-field">
-                      Search eligible students to add
-                      <input
-                        aria-label="Search eligible students to add"
-                        autoComplete="off"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Type a student name"
-                      />
-                    </label>
-                    <div className="academics-panel-heading">
-                      <p>
-                        {selectedIds.length} selected ·{' '}
-                        {filteredStudents.length} available students
-                      </p>
-                      <Button
-                        type="button"
-                        variant="quiet"
-                        onClick={toggleAllShown}
-                      >
-                        {allShownSelected
-                          ? 'Deselect all shown'
-                          : 'Select all shown'}
-                      </Button>
-                    </div>
-                    {studentsQuery.isPending ? (
-                      <p>Loading available students…</p>
-                    ) : studentsQuery.isError ? (
-                      <p className="form-error" role="alert">
-                        {apiMessage(studentsQuery.error)}
-                      </p>
-                    ) : filteredStudents.length ? (
+                      )}
                       <div className="class-enrollment-list">
-                        {filteredStudents.map((student) => (
-                          <label
+                        {filteredRosterStudents.map((student) => (
+                          <div
                             className="class-enrollment-student"
                             key={student.id}
                           >
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.includes(student.id)}
-                              onChange={(event) =>
-                                toggleStudent(student.id, event.target.checked)
-                              }
-                            />
-                            <span>
+                            {canAddStudents && rosterSelectionMode && (
+                              <input
+                                aria-label={`Select ${student.firstName} ${student.lastName}`}
+                                type="checkbox"
+                                checked={selectedRosterIds.includes(student.id)}
+                                onChange={(event) =>
+                                  setSelectedRosterIds((current) =>
+                                    event.target.checked
+                                      ? [...current, student.id]
+                                      : current.filter(
+                                          (id) => id !== student.id,
+                                        ),
+                                  )
+                                }
+                              />
+                            )}
+                            <span className="class-roster-student-name">
                               <strong>
                                 {student.preferredName ||
                                   `${student.firstName} ${student.lastName}`}
@@ -1071,100 +600,289 @@ export function ClassEnrollmentPanel({
                                 {student.firstName} {student.lastName}
                               </small>
                             </span>
-                          </label>
+                            <span className="class-roster-status">
+                              Enrolled
+                            </span>
+                            {canAddStudents && (
+                              <button
+                                className="class-roster-remove-button"
+                                type="button"
+                                disabled={removeRosterStudent.isPending}
+                                onClick={() =>
+                                  removeRosterStudent.mutate([student.id])
+                                }
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
                         ))}
                       </div>
-                    ) : search.trim() ? (
-                      <div className="class-roster-empty" role="status">
-                        <p>No students match “{search.trim()}”.</p>
+                      {rosterSearch.trim() &&
+                        filteredRosterStudents.length === 0 && (
+                          <p className="class-roster-empty" role="status">
+                            No enrolled students match "{rosterSearch.trim()}
+                            ". Try another name or clear the search.
+                          </p>
+                        )}
+                      {removeRosterStudent.isError && (
+                        <p className="form-error" role="alert">
+                          {apiMessage(removeRosterStudent.error)}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="class-roster-empty">
+                      {canAddStudents
+                        ? 'No students assigned yet. Select existing students below to add them in bulk.'
+                        : 'No students in this section.'}
+                    </p>
+                  )}
+                </section>
+              )}
+              {canAddStudents && (
+                <section className="class-add-students">
+                  <div
+                    ref={addStudentsViewRef}
+                    className="academics-panel-heading class-enrollment-actions class-enrollment-anchor"
+                  >
+                    <div>
+                      <h3>Add students</h3>
+                      <p>
+                        Select one or many existing students, or register a new
+                        student directly into this section.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setShowNewStudent((value) => !value)}
+                    >
+                      {showNewStudent
+                        ? 'Cancel new student'
+                        : 'Add new student'}
+                    </Button>
+                  </div>
+                  {showNewStudent && (
+                    <form
+                      className="student-form"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        addNewStudent.mutate();
+                      }}
+                    >
+                      <div className="student-form-grid">
+                        <label className="form-field">
+                          First name
+                          <input
+                            required
+                            maxLength={80}
+                            value={newFirstName}
+                            onChange={(event) =>
+                              setNewFirstName(event.target.value)
+                            }
+                          />
+                        </label>
+                        <label className="form-field">
+                          Last name
+                          <input
+                            required
+                            maxLength={80}
+                            value={newLastName}
+                            onChange={(event) =>
+                              setNewLastName(event.target.value)
+                            }
+                          />
+                        </label>
+                        <label className="form-field">
+                          Phone (optional)
+                          <input
+                            maxLength={40}
+                            value={newPhone}
+                            onChange={(event) =>
+                              setNewPhone(event.target.value)
+                            }
+                          />
+                        </label>
+                        <label className="form-field">
+                          Email (optional)
+                          <input
+                            type="email"
+                            maxLength={254}
+                            value={newEmail}
+                            onChange={(event) =>
+                              setNewEmail(event.target.value)
+                            }
+                          />
+                        </label>
+                      </div>
+                      {addNewStudent.isError && (
+                        <p className="form-error" role="alert">
+                          {apiMessage(addNewStudent.error)}. If the student was
+                          created but enrollment failed, add that student from
+                          the existing-student list.
+                        </p>
+                      )}
+                      <div className="class-enrollment-actions">
                         <Button
-                          type="button"
-                          variant="quiet"
-                          onClick={() => setSearch('')}
+                          type="submit"
+                          variant="primary"
+                          disabled={
+                            !newFirstName.trim() ||
+                            !newLastName.trim() ||
+                            addNewStudent.isPending
+                          }
                         >
-                          Clear search
+                          {addNewStudent.isPending
+                            ? 'Creating and adding…'
+                            : 'Create student and add to section'}
                         </Button>
                       </div>
-                    ) : (
-                      <p className="class-roster-empty" role="status">
-                        No unassigned students are available for this campus and
-                        academic session. If the student is already in this
-                        section, find them in the enrolled-students list above.
-                      </p>
-                    )}
-                    {(bulk.isError || bulk.isSuccess) && (
-                      <div
-                        className={
-                          bulk.isError || bulk.data.failed.length
-                            ? 'enrollment-result enrollment-result-error'
-                            : 'enrollment-result enrollment-result-success'
-                        }
-                        role={bulk.isError ? 'alert' : 'status'}
-                      >
-                        {bulk.isError ? (
-                          apiMessage(bulk.error)
-                        ) : (
-                          <>
-                            <strong>Enrollment result</strong>
-                            <p>
-                              {bulk.data.added.length} added ·{' '}
-                              {bulk.data.skipped.length} already enrolled ·{' '}
-                              {bulk.data.failed.length} failed
-                            </p>
-                            {bulk.data.failed.length > 0 && (
-                              <ul>
-                                {bulk.data.failed.map((item) => (
-                                  <li key={item.studentId}>{item.message}</li>
-                                ))}
-                              </ul>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    )}
-                    <div className="academics-panel-heading class-enrollment-actions">
-                      <span />
+                    </form>
+                  )}
+                  {addNewStudent.isError && !showNewStudent && (
+                    <p className="form-error" role="alert">
+                      {apiMessage(addNewStudent.error)}. If the student was
+                      created but enrollment failed, the eligible list has been
+                      refreshed and the same student is selected below. Add that
+                      existing record instead of creating another one.
+                    </p>
+                  )}
+                  <label className="form-field">
+                    Search eligible students to add
+                    <input
+                      aria-label="Search eligible students to add"
+                      autoComplete="off"
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                      placeholder="Type a student name"
+                    />
+                  </label>
+                  <div className="academics-panel-heading">
+                    <p>
+                      {selectedIds.length} selected · {filteredStudents.length}{' '}
+                      available students
+                    </p>
+                    <Button
+                      type="button"
+                      variant="quiet"
+                      onClick={toggleAllShown}
+                    >
+                      {allShownSelected
+                        ? 'Deselect all shown'
+                        : 'Select all shown'}
+                    </Button>
+                  </div>
+                  {studentsQuery.isPending ? (
+                    <p>Loading available students…</p>
+                  ) : studentsQuery.isError ? (
+                    <p className="form-error" role="alert">
+                      {apiMessage(studentsQuery.error)}
+                    </p>
+                  ) : filteredStudents.length ? (
+                    <div className="class-enrollment-list">
+                      {filteredStudents.map((student) => (
+                        <label
+                          className="class-enrollment-student"
+                          key={student.id}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(student.id)}
+                            onChange={(event) =>
+                              toggleStudent(student.id, event.target.checked)
+                            }
+                          />
+                          <span>
+                            <strong>
+                              {student.preferredName ||
+                                `${student.firstName} ${student.lastName}`}
+                            </strong>
+                            <small>
+                              {student.firstName} {student.lastName}
+                            </small>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  ) : search.trim() ? (
+                    <div className="class-roster-empty" role="status">
+                      <p>No students match “{search.trim()}”.</p>
                       <Button
                         type="button"
-                        variant="primary"
-                        disabled={
-                          !selectedIds.length ||
-                          bulk.isPending ||
-                          !section ||
-                          !selectedClass
-                        }
-                        onClick={() => bulk.mutate()}
+                        variant="quiet"
+                        onClick={() => setSearch('')}
                       >
-                        {bulk.isPending
-                          ? 'Adding students…'
-                          : `Add ${selectedIds.length} students to section`}
+                        Clear search
                       </Button>
                     </div>
-                  </section>
-                )}
-              </div>
-            </>
-          )}
+                  ) : (
+                    <p className="class-roster-empty" role="status">
+                      No unassigned students are available for this campus and
+                      academic session. If the student is already in this
+                      section, find them in the enrolled-students list above.
+                    </p>
+                  )}
+                  {(bulk.isError || bulk.isSuccess) && (
+                    <div
+                      className={
+                        bulk.isError || bulk.data.failed.length
+                          ? 'enrollment-result enrollment-result-error'
+                          : 'enrollment-result enrollment-result-success'
+                      }
+                      role={bulk.isError ? 'alert' : 'status'}
+                    >
+                      {bulk.isError ? (
+                        apiMessage(bulk.error)
+                      ) : (
+                        <>
+                          <strong>Enrollment result</strong>
+                          <p>
+                            {bulk.data.added.length} added ·{' '}
+                            {bulk.data.skipped.length} already enrolled ·{' '}
+                            {bulk.data.failed.length} failed
+                          </p>
+                          {bulk.data.failed.length > 0 && (
+                            <ul>
+                              {bulk.data.failed.map((item) => (
+                                <li key={item.studentId}>{item.message}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                  <div className="academics-panel-heading class-enrollment-actions">
+                    <span />
+                    <Button
+                      type="button"
+                      variant="primary"
+                      disabled={
+                        !selectedIds.length ||
+                        bulk.isPending ||
+                        !section ||
+                        !selectedClass
+                      }
+                      onClick={() => bulk.mutate()}
+                    >
+                      {bulk.isPending
+                        ? 'Adding students…'
+                        : `Add ${selectedIds.length} students to section`}
+                    </Button>
+                  </div>
+                </section>
+              )}
+            </div>
+          </>
         </>
       ) : selectedClass && academicYearId && classSections.length === 0 ? (
         <div className="class-enrollment-setup-hint">
           <h3>This class needs a section first</h3>
           <p>
-            {activeView === 'teacher'
-              ? 'Teacher assignments are linked to a class section. Create a section first, then return here to assign its subject teacher.'
-              : 'Students are added to a section inside the class. Create a section (for example, A) and then return here to add students.'}
+            Students are added to a section inside the class. Create a section
+            (for example, A) and then return here to add students.
           </p>
-          {canWriteAcademics && (
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() =>
-                selectedClass && onCreateSection?.(selectedClass.id)
-              }
-            >
-              Create section
-            </Button>
-          )}
         </div>
       ) : (
         <p>Select a class and academic year to manage its students.</p>

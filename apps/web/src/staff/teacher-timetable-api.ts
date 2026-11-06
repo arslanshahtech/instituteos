@@ -19,6 +19,11 @@ export interface TeacherTimetableEntry {
   room?: string;
   createdAt: string;
   updatedAt: string;
+  type?: 'class' | 'break' | 'activity';
+  subjectName?: string;
+  sectionName?: string;
+  academicYearName?: string;
+  isAdditionalTeacher?: boolean;
 }
 
 export interface TeacherTimetableInput {

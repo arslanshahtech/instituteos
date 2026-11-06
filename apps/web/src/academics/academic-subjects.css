@@ -1,0 +1,281 @@
+.academic-subjects-page {
+  gap: 22px;
+}
+.academic-subjects-toolbar-panel,
+.academic-subjects-table-panel {
+  overflow: hidden;
+  border: 1px solid #e9e6e1;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 3%),
+    0 6px 18px rgb(15 23 42 / 3%);
+}
+.academic-subjects-toolbar-panel {
+  gap: 12px;
+  padding: 14px 16px;
+}
+.academic-subjects-toolbar-panel .academic-sessions-search {
+  min-height: 42px;
+  border-radius: 9px;
+}
+.academic-subjects-filter {
+  flex: 0 0 190px;
+}
+.academic-subjects-filter select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #e5e2dc;
+  border-radius: 9px;
+  background: #fff;
+  color: #333;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 12px;
+}
+.academic-subjects-table-panel {
+  animation: academic-session-enter 360ms ease both;
+  animation-delay: 90ms;
+}
+.academic-subjects-table thead th {
+  color: #77736d;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+.academic-subjects-table tbody tr {
+  transition: background-color 140ms ease;
+}
+.academic-subjects-table tbody tr:hover {
+  background: #faf9f7;
+}
+.academic-subjects-table tbody td {
+  padding-block: 13px;
+  vertical-align: middle;
+}
+.academic-subjects-table th.align-center,
+.academic-subjects-table td.align-center {
+  text-align: center;
+}
+.academic-subject-name {
+  display: block;
+  color: #24221e;
+  font-size: 12px;
+  font-weight: 650;
+}
+.academic-subject-code {
+  display: block;
+  margin-top: 3px;
+  color: #858078;
+  font-size: 10px;
+}
+.academic-subject-class {
+  color: #55514a;
+  font-size: 11px;
+}
+.academic-subject-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.academic-subject-actions .button {
+  width: 31px;
+  min-width: 31px;
+  min-height: 31px;
+  height: 31px;
+  padding: 0;
+  color: #77736d;
+}
+.academic-subject-actions .button:hover {
+  background: #f6f5f2;
+  color: #171715;
+}
+.academic-subjects-empty {
+  padding: 36px 20px !important;
+  text-align: center;
+}
+.academic-subjects-empty strong {
+  color: #25231f;
+  font-size: 13px;
+}
+.academic-subjects-empty p {
+  margin: 6px 0 14px;
+  color: #858078;
+  font-size: 11px;
+}
+.academic-subjects-empty .button {
+  margin-inline: auto;
+}
+.academic-subjects-pagination {
+  gap: 18px;
+  border-top: 1px solid #eeeae4;
+  padding: 12px 16px;
+  white-space: nowrap;
+}
+.academic-subjects-pagination > .academic-subjects-pagination-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  margin-left: 0;
+}
+.academic-subjects-pagination > div:not(.academic-subjects-pagination-summary) {
+  margin-left: auto;
+}
+.academic-subjects-pagination-summary label {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+@media (max-width: 620px) {
+  .academic-subjects-page {
+    gap: 16px;
+  }
+  .academic-subjects-toolbar-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .academic-subjects-filter {
+    flex-basis: auto;
+  }
+  .academic-subjects-pagination {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+  .academic-subjects-pagination-summary {
+    width: 100%;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .academic-subjects-pagination > div {
+    width: 100%;
+    justify-content: space-between;
+    margin-left: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .academic-subjects-table-panel {
+    animation: none;
+  }
+  .academic-subjects-table tbody tr {
+    transition: none;
+  }
+}
+
+/* Subject create/edit page */
+.academic-subject-form-page {
+  gap: 20px;
+}
+.academic-subject-form-card {
+  width: 100%;
+  border: 1px solid #e7e5e4;
+  border-radius: 12px;
+  background: #fff;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 5%);
+}
+.academic-subject-form-card > header {
+  margin-bottom: 22px;
+}
+.academic-subject-form-card > header h2 {
+  margin: 0;
+  color: #24221e;
+  font-size: 16px;
+  font-weight: 650;
+}
+.academic-subject-form-card > header p {
+  margin: 5px 0 0;
+  color: #77736d;
+  font-size: 13px;
+}
+.academic-subject-form-card .academics-form {
+  width: 100%;
+}
+.academic-subject-form-card .student-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 16px;
+}
+.academic-subject-form-card .academics-form > .student-form-grid > * {
+  min-width: 0;
+}
+.academic-subject-form-card .academics-class-choice-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid #dedbd5;
+  border-radius: 8px;
+  background: #fff;
+}
+.academic-subject-form-card .academics-class-choice {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border: 1px solid #eeeae4;
+  border-radius: 7px;
+  cursor: pointer;
+  color: #37342f;
+  font-size: 13px;
+}
+.academic-subject-form-card .academics-class-choice:focus-within {
+  outline: 2px solid var(--color-focus, #2563eb);
+  outline-offset: 2px;
+}
+.academic-subject-form-card .academics-class-choice input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary, #0f766e);
+}
+.academic-subject-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid #eeeae4;
+}
+@media (max-width: 680px) {
+  .academic-subject-form-card {
+    padding: 17px;
+  }
+  .academic-subject-form-card .student-form-grid,
+  .academic-subject-form-card .academics-class-choice-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .academic-subject-form-actions {
+    flex-direction: column-reverse;
+  }
+  .academic-subject-form-actions .button {
+    width: 100%;
+  }
+}
+
+.academic-subject-form-card textarea {
+  width: 100%;
+  min-height: 90px;
+  resize: vertical;
+  border: 1px solid #d9d6d0;
+  border-radius: 7px;
+  padding: 10px 12px;
+  color: #292722;
+  background: #fff;
+  font: inherit;
+}
+.academic-subject-form-card textarea:focus,
+.academic-subject-form-card input:focus,
+.academic-subject-form-card select:focus {
+  outline: 2px solid var(--color-focus, #2563eb);
+  outline-offset: 2px;
+}
+.academic-subject-form-card select:disabled {
+  background: #f7f7f6;
+  color: #555;
+  cursor: not-allowed;
+}
+.academic-subject-form-card .student-form-grid > :last-child {
+  grid-column: 1 / -1;
+}

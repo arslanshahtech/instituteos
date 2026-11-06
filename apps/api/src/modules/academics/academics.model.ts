@@ -24,6 +24,11 @@ academicYearSchema.index(
   { organizationId: 1, name: 1 },
   { unique: true, name: 'uniq_academic_year_name' },
 );
+// Supports organization-scoped session lists ordered newest first.
+academicYearSchema.index(
+  { organizationId: 1, startDate: -1 },
+  { name: 'academic_years_by_organization_start_date' },
+);
 // Database-enforced invariant: no two active years for the same organization.
 academicYearSchema.index(
   { organizationId: 1 },
@@ -123,7 +128,21 @@ const subjectSchema = new Schema(
       uppercase: true,
       maxlength: 30,
     },
-    department: { type: String, trim: true, maxlength: 100 },
+    totalMarks: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 100000,
+      default: 100,
+    },
+    passingPercentage: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 100,
+      default: 40,
+    },
+    description: { type: String, trim: true, maxlength: 1000, default: '' },
     // Empty/missing classIds keeps legacy organization-wide subject behavior.
     classIds: [
       { type: Schema.Types.ObjectId, ref: 'AcademicClass', default: [] },
@@ -233,6 +252,138 @@ teacherTimetableSchema.index(
 export const TeacherTimetableModel =
   mongoose.models.TeacherTimetable ??
   mongoose.model('TeacherTimetable', teacherTimetableSchema);
+
+export type SectionTimetableEntryRecord = {
+  _id?: mongoose.Types.ObjectId;
+  type: 'class' | 'break' | 'activity';
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  subjectId?: mongoose.Types.ObjectId | { name?: string };
+  teacherStaffId?: mongoose.Types.ObjectId;
+  additionalTeacherStaffId?: mongoose.Types.ObjectId;
+  room?: string;
+  name?: string;
+  description?: string;
+};
+
+export type SectionTimetableRecord = {
+  _id?: mongoose.Types.ObjectId;
+  organizationId: mongoose.Types.ObjectId;
+  academicYearId: mongoose.Types.ObjectId | { name?: string };
+  sectionId:
+    | mongoose.Types.ObjectId
+    | { name?: string; classId?: mongoose.Types.ObjectId };
+  workingDays: string[];
+  entries: SectionTimetableEntryRecord[];
+  createdAt: Date;
+  updatedAt: Date;
+};
+const sectionTimetableEntrySchema = new Schema(
+  {
+    type: {
+      type: String,
+      enum: ['class', 'break', 'activity'],
+      required: true,
+    },
+    dayOfWeek: {
+      type: String,
+      enum: [
+        'sunday',
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+      ],
+      required: true,
+    },
+    startTime: {
+      type: String,
+      required: true,
+      match: /^([01]\d|2[0-3]):[0-5]\d$/,
+    },
+    endTime: {
+      type: String,
+      required: true,
+      match: /^([01]\d|2[0-3]):[0-5]\d$/,
+    },
+    subjectId: { type: Schema.Types.ObjectId, ref: 'Subject' },
+    teacherStaffId: { type: Schema.Types.ObjectId, ref: 'StaffMember' },
+    additionalTeacherStaffId: {
+      type: Schema.Types.ObjectId,
+      ref: 'StaffMember',
+    },
+    room: { type: String, trim: true, maxlength: 80 },
+    name: { type: String, trim: true, maxlength: 100 },
+    description: { type: String, trim: true, maxlength: 500 },
+  },
+  { _id: true },
+);
+
+const sectionTimetableSchema = new Schema(
+  {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: true,
+    },
+    academicYearId: {
+      type: Schema.Types.ObjectId,
+      ref: 'AcademicYear',
+      required: true,
+    },
+    sectionId: {
+      type: Schema.Types.ObjectId,
+      ref: 'AcademicSection',
+      required: true,
+    },
+    workingDays: {
+      type: [String],
+      enum: [
+        'sunday',
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+      ],
+      default: [
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+      ],
+      required: true,
+    },
+    entries: { type: [sectionTimetableEntrySchema], default: [] },
+  },
+  { timestamps: true, versionKey: false },
+);
+sectionTimetableSchema.index(
+  { organizationId: 1, academicYearId: 1, sectionId: 1 },
+  { unique: true, name: 'uniq_section_timetable_per_year' },
+);
+sectionTimetableSchema.index(
+  { organizationId: 1, 'entries.teacherStaffId': 1, 'entries.dayOfWeek': 1 },
+  { name: 'section_timetable_main_teacher_lookup' },
+);
+sectionTimetableSchema.index(
+  {
+    organizationId: 1,
+    'entries.additionalTeacherStaffId': 1,
+    'entries.dayOfWeek': 1,
+  },
+  { name: 'section_timetable_additional_teacher_lookup' },
+);
+
+export const SectionTimetableModel =
+  mongoose.models.SectionTimetable ??
+  mongoose.model('SectionTimetable', sectionTimetableSchema);
 
 export const AcademicYearModel =
   mongoose.models.AcademicYear ??

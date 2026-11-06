@@ -11,7 +11,7 @@ describe('AcademicOverview', () => {
           {
             id: 'year-1',
             organizationId: 'org-1',
-            name: '2026–2027',
+            name: '2026-2027',
             startDate: '2026-04-01',
             endDate: '2027-03-31',
             status: 'active',
@@ -64,32 +64,18 @@ describe('AcademicOverview', () => {
             updatedAt: '',
           },
         ]}
-        assignments={[
-          {
-            id: 'assignment-1',
-            organizationId: 'org-1',
-            teacherStaffId: 'teacher-1',
-            subjectId: 'subject-1',
-            classId: 'class-1',
-            sectionId: 'section-1',
-            academicYearId: 'year-1',
-            createdAt: '',
-            updatedAt: '',
-          },
-        ]}
         campuses={[{ id: 'campus-1', name: 'Main Campus' }]}
         onOpen={onOpen}
       />,
     );
 
     expect(screen.getByText('Academic Overview')).toBeInTheDocument();
-    expect(screen.getByText('2026–2027')).toBeInTheDocument();
-    expect(screen.getByText('Current: 2026–2027')).toBeInTheDocument();
+    expect(screen.queryByText('Teacher assignments')).not.toBeInTheDocument();
+    expect(screen.getByText('2026-2027')).toBeInTheDocument();
+    expect(screen.getByText('Current: 2026-2027')).toBeInTheDocument();
     expect(screen.getByText('1 term(s) configured')).toBeInTheDocument();
     screen.getByRole('button', { name: 'Manage academic years' }).click();
     expect(onOpen).toHaveBeenCalledWith('academic-years');
-    screen.getByRole('button', { name: 'Manage teacher assignments' }).click();
-    expect(onOpen).toHaveBeenCalledWith('teacher-assignments');
   });
 
   it('prompts the operator to create an active year when none exists', () => {
@@ -101,7 +87,6 @@ describe('AcademicOverview', () => {
         classes={[]}
         sections={[]}
         subjects={[]}
-        assignments={[]}
         campuses={[]}
         onOpen={onOpen}
       />,

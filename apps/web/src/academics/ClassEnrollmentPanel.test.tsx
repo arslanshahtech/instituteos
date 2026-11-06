@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClassEnrollmentPanel } from './ClassEnrollmentPanel.js';
@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
   bulkPlaceStudents: vi.fn(),
   placeStudent: vi.fn(),
   createStudent: vi.fn(),
-  saveAcademicsResource: vi.fn(),
 }));
 
 vi.mock('../attendance/attendance-api.js', () => ({
@@ -27,23 +26,13 @@ vi.mock('../students/students-api.js', () => ({
 vi.mock('../staff/StaffPageShared.js', () => ({
   apiMessage: () => 'Request failed.',
 }));
-vi.mock('./academics-api.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./academics-api.js')>()),
-  saveAcademicsResource: mocks.saveAcademicsResource,
-}));
 
 function renderPanel(
-  initialView: 'students' | 'teacher' = 'students',
+  initialView: 'students' | 'add-students' = 'students',
   teacherOptions: {
-    teachersError?: string;
-    teachersLoading?: boolean;
-    onRetryTeachers?: () => void;
-    onManageStaff?: () => void;
     focusRequest?: number;
     canReadStudents?: boolean;
     canAddStudents?: boolean;
-    canAssignTeachers?: boolean;
-    canWriteAcademics?: boolean;
   } = {},
 ) {
   const client = new QueryClient({
@@ -87,36 +76,10 @@ function renderPanel(
             updatedAt: '',
           },
         ]}
-        subjects={[
-          {
-            id: 'subject-1',
-            organizationId: 'org-1',
-            name: 'English',
-            code: 'ENG',
-            createdAt: '',
-            updatedAt: '',
-          },
-          {
-            id: 'subject-2',
-            organizationId: 'org-1',
-            name: 'Biology',
-            code: 'BIO',
-            classIds: ['class-2'],
-            createdAt: '',
-            updatedAt: '',
-          },
-        ]}
-        teachers={[{ id: 'teacher-1', firstName: 'Ayesha', lastName: 'Khan' }]}
-        teachersError={teacherOptions.teachersError}
-        teachersLoading={teacherOptions.teachersLoading}
-        onRetryTeachers={teacherOptions.onRetryTeachers}
-        onManageStaff={teacherOptions.onManageStaff}
         initialView={initialView}
         focusRequest={teacherOptions.focusRequest ?? 0}
         canReadStudents={teacherOptions.canReadStudents}
         canAddStudents={teacherOptions.canAddStudents}
-        canAssignTeachers={teacherOptions.canAssignTeachers}
-        canWriteAcademics={teacherOptions.canWriteAcademics}
       />
     </QueryClientProvider>,
   );
@@ -136,18 +99,30 @@ beforeEach(() => {
   mocks.createStudent.mockResolvedValue({
     student: { id: 'student-new', firstName: 'New', lastName: 'Learner' },
   });
-  mocks.saveAcademicsResource.mockResolvedValue({
-    assignment: { id: 'assignment-1' },
-  });
 });
 
 describe('ClassEnrollmentPanel', () => {
-  it('keeps student roster read-only and avoids loading eligible students without write permissions', async () => {
+  it('keeps enrollment focused on students and omits manual teacher assignment', () => {
+    renderPanel();
+
+    expect(
+      screen.getByRole('tab', { name: 'View Students' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: 'Add Student' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('tab', { name: 'Assign Teacher' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Assign teacher' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps student roster read-only and avoids loading eligible students without add permissions', async () => {
     renderPanel('students', {
       canReadStudents: true,
       canAddStudents: false,
-      canAssignTeachers: false,
-      canWriteAcademics: false,
     });
 
     expect(
@@ -157,33 +132,10 @@ describe('ClassEnrollmentPanel', () => {
       screen.queryByRole('tab', { name: 'Add Student' }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('tab', { name: 'Assign Teacher' }),
-    ).not.toBeInTheDocument();
-    expect(
       screen.queryByRole('button', { name: 'Add new student' }),
     ).not.toBeInTheDocument();
     await waitFor(() => expect(mocks.getStudentRoster).toHaveBeenCalled());
     expect(mocks.getEligibleStudents).not.toHaveBeenCalled();
-  });
-
-  it('shows a teacher-list error with retry and staff-directory actions', () => {
-    const retry = vi.fn();
-    const manageStaff = vi.fn();
-    renderPanel('teacher', {
-      teachersError: 'You do not have permission to view staff.',
-      onRetryTeachers: retry,
-      onManageStaff: manageStaff,
-    });
-
-    expect(
-      screen.getByText(/Teacher list could not be loaded/),
-    ).toHaveTextContent('You do not have permission to view staff.');
-    fireEvent.click(screen.getByRole('button', { name: 'Retry teacher list' }));
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Open Teachers & Staff' }),
-    );
-    expect(retry).toHaveBeenCalledTimes(1);
-    expect(manageStaff).toHaveBeenCalledTimes(1);
   });
 
   it('opens the Add Student destination and keeps it selected when requested', async () => {
@@ -198,167 +150,6 @@ describe('ClassEnrollmentPanel', () => {
     );
     expect(
       screen.getByRole('heading', { name: 'Add students' }),
-    ).toBeInTheDocument();
-  });
-
-  it('re-scrolls to the same teacher panel when the parent sends another focus request', async () => {
-    const scrollIntoView = vi.fn();
-    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
-      configurable: true,
-      value: scrollIntoView,
-    });
-    const view = renderPanel('teacher', { focusRequest: 1 });
-
-    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
-    const callsAfterFirstRequest = scrollIntoView.mock.calls.length;
-
-    view.rerender(
-      <QueryClientProvider
-        client={
-          new QueryClient({
-            defaultOptions: {
-              queries: { retry: false },
-              mutations: { retry: false },
-            },
-          })
-        }
-      >
-        <ClassEnrollmentPanel
-          organizationId="org-1"
-          classes={[
-            {
-              id: 'class-1',
-              organizationId: 'org-1',
-              campusId: 'campus-1',
-              name: 'Class 1',
-              code: 'C1',
-              sortOrder: 0,
-              createdAt: '',
-              updatedAt: '',
-            },
-          ]}
-          sections={[
-            {
-              id: 'section-1',
-              organizationId: 'org-1',
-              classId: 'class-1',
-              name: 'A',
-              createdAt: '',
-              updatedAt: '',
-            },
-          ]}
-          years={[
-            {
-              id: 'year-1',
-              organizationId: 'org-1',
-              name: '2026-27',
-              startDate: '2026-04-01',
-              endDate: '2027-03-31',
-              status: 'active',
-              createdAt: '',
-              updatedAt: '',
-            },
-          ]}
-          subjects={[
-            {
-              id: 'subject-1',
-              organizationId: 'org-1',
-              name: 'English',
-              code: 'ENG',
-              createdAt: '',
-              updatedAt: '',
-            },
-          ]}
-          teachers={[
-            { id: 'teacher-1', firstName: 'Ayesha', lastName: 'Khan' },
-          ]}
-          initialView="teacher"
-          focusRequest={2}
-        />
-      </QueryClientProvider>,
-    );
-
-    await waitFor(() =>
-      expect(scrollIntoView.mock.calls.length).toBeGreaterThan(
-        callsAfterFirstRequest,
-      ),
-    );
-  });
-
-  it('switches repeatedly between student management and teacher assignment', async () => {
-    const user = userEvent.setup();
-    renderPanel('students');
-
-    expect(
-      await screen.findByText('Currently enrolled students'),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole('tab', { name: 'Assign Teacher' }));
-    expect(
-      await screen.findByRole('heading', { name: 'Assign teacher' }),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole('tab', { name: 'View Students' }));
-    expect(
-      await screen.findByText('Currently enrolled students'),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole('tab', { name: 'Assign Teacher' }));
-    expect(
-      await screen.findByRole('heading', { name: 'Assign teacher' }),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole('tab', { name: 'View Students' }));
-    expect(
-      await screen.findByText('Currently enrolled students'),
-    ).toBeInTheDocument();
-  });
-
-  it('assigns a selected teacher to the chosen class section, subject, and academic year', async () => {
-    const user = userEvent.setup();
-    renderPanel('teacher');
-    expect(
-      screen.getByRole('heading', { name: 'Assign teacher' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { name: 'Currently enrolled students' }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('heading', { name: 'Add students' }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('option', { name: 'English (ENG)' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('option', { name: 'Biology (BIO)' }),
-    ).not.toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText('Section'), 'section-1');
-    await user.type(
-      screen.getByRole('searchbox', { name: 'Search and choose teacher' }),
-      'Ayesha',
-    );
-    await user.click(screen.getByRole('button', { name: /Ayesha Khan/ }));
-    await user.selectOptions(screen.getByLabelText('Subject'), 'subject-1');
-    await user.click(screen.getByRole('button', { name: 'Assign teacher' }));
-
-    await waitFor(() => {
-      expect(mocks.saveAcademicsResource).toHaveBeenCalledWith(
-        'org-1',
-        'teacher-assignments',
-        undefined,
-        {
-          teacherStaffId: 'teacher-1',
-          subjectId: 'subject-1',
-          classId: 'class-1',
-          sectionId: 'section-1',
-          academicYearId: 'year-1',
-        },
-      );
-    });
-    expect(
-      await screen.findByText(
-        'Teacher assigned to this class section and subject.',
-      ),
     ).toBeInTheDocument();
   });
 

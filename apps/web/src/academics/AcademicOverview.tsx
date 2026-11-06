@@ -5,7 +5,6 @@ import type {
   AcademicSubject,
   AcademicTerm,
   AcademicYear,
-  TeacherAssignment,
 } from './academics-api.js';
 
 interface Props {
@@ -14,16 +13,8 @@ interface Props {
   classes: AcademicClass[];
   sections: AcademicSection[];
   subjects: AcademicSubject[];
-  assignments: TeacherAssignment[];
   campuses: AcademicCampus[];
-  onOpen: (
-    area:
-      | 'academic-years'
-      | 'terms'
-      | 'classes'
-      | 'subjects'
-      | 'teacher-assignments',
-  ) => void;
+  onOpen: (area: 'academic-years' | 'terms' | 'classes' | 'subjects') => void;
 }
 
 function Metric({
@@ -50,7 +41,6 @@ export function AcademicOverview({
   classes,
   sections,
   subjects,
-  assignments,
   campuses,
   onOpen,
 }: Props) {
@@ -69,8 +59,8 @@ export function AcademicOverview({
           <span className="academic-overview-eyebrow">ACADEMIC CENTRE</span>
           <h2 id="academic-overview-title">Academic Overview</h2>
           <p>
-            Institute ke academic calendar, classes, sections aur teaching setup
-            ki overall situation.
+            Institute ke academic calendar, classes, sections aur subjects ki
+            overall situation.
           </p>
         </div>
         <span
@@ -115,11 +105,6 @@ export function AcademicOverview({
           hint="Available subject catalogue"
         />
         <Metric
-          label="Teacher assignments"
-          value={assignments.length}
-          hint="Subject and class assignments"
-        />
-        <Metric
           label="Campuses"
           value={campuses.length}
           hint="Institute locations"
@@ -161,9 +146,6 @@ export function AcademicOverview({
             </button>
             <button type="button" onClick={() => onOpen('subjects')}>
               Open subject catalogue
-            </button>
-            <button type="button" onClick={() => onOpen('teacher-assignments')}>
-              Manage teacher assignments
             </button>
           </div>
         </article>

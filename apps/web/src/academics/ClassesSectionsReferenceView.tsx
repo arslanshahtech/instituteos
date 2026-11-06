@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Archive,
   BookOpen,
-  ChevronRight,
+  ChevronDown,
+  Pencil,
   Plus,
   Search,
+  Trash2,
   Users,
-  X,
 } from 'lucide-react';
 import type {
   AcademicClass,
@@ -14,7 +14,6 @@ import type {
   AcademicYear,
   AcademicCampus,
   AcademicSubject,
-  TeacherAssignment,
 } from './academics-api.js';
 
 interface Props {
@@ -23,29 +22,12 @@ interface Props {
   years: AcademicYear[];
   campuses: AcademicCampus[];
   subjects: AcademicSubject[];
-  assignments: TeacherAssignment[];
-  teachers: Array<{ id: string; firstName: string; lastName: string }>;
-  onCreate: (resource: 'classes' | 'sections', classId?: string) => void;
-  onCreateSubject: () => void;
-  onEdit: (
-    resource: 'classes' | 'sections',
-    record: AcademicClass | AcademicSection,
-  ) => void;
-  onDelete: (
-    resource: 'classes' | 'sections',
-    id: string,
-    title: string,
-  ) => void;
-  onOpenEnrollment: (
-    sectionId?: string,
-    classId?: string,
-    view?: 'students' | 'add-students' | 'teacher',
-  ) => void;
+  studentsCount?: number;
+  onCreate: (resource: 'classes') => void;
+  onEdit: (resource: 'classes', record: AcademicClass) => void;
+  onDelete: (resource: 'classes', id: string, title: string) => void;
   onOpenCampusSetup: () => void;
   canWriteAcademics?: boolean;
-  canReadStudents?: boolean;
-  canAddStudents?: boolean;
-  canAssignTeachers?: boolean;
   canCreateCampuses?: boolean;
 }
 
@@ -55,95 +37,155 @@ export function ClassesSectionsReferenceView({
   years,
   campuses,
   subjects,
-  assignments,
-  teachers,
+  studentsCount,
   onCreate,
-  onCreateSubject,
   onEdit,
   onDelete,
-  onOpenEnrollment,
   onOpenCampusSetup,
   canWriteAcademics = true,
-  canReadStudents = true,
-  canAddStudents = true,
-  canAssignTeachers = true,
   canCreateCampuses = true,
 }: Props) {
-  const [campusFilter, setCampusFilter] = useState('all');
-  const [yearId, setYearId] = useState(
-    years.find((year) => year.status === 'active')?.id ?? years[0]?.id ?? '',
-  );
+  const [levelFilter, setLevelFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [drawerTab, setDrawerTab] = useState<'sections' | 'teachers'>(
-    'sections',
-  );
-  useEffect(() => {
-    if (!yearId && years.length)
-      setYearId(
-        years.find((year) => year.status === 'active')?.id ?? years[0]!.id,
-      );
-  }, [yearId, years]);
+  const [showEducationLevels, setShowEducationLevels] = useState(false);
+  const activeYear = years.find((year) => year.status === 'active') ?? years[0];
 
   const campusNames = useMemo(
     () => new Map(campuses.map((campus) => [campus.id, campus.name])),
     [campuses],
   );
+  const levelOptions = useMemo(() => {
+    const options = new Map<string, { label: string; count: number }>([
+      ['first_year', { label: 'First Year', count: 0 }],
+      ['second_year', { label: 'Second Year', count: 0 }],
+    ]);
+    classes.forEach((item) => {
+      const key = item.studyLevel ?? (item.programName ? 'program' : 'general');
+      const label =
+        key === 'first_year'
+          ? 'First Year'
+          : key === 'second_year'
+            ? 'Second Year'
+            : key === 'other'
+              ? 'Other'
+              : key === 'program'
+                ? 'College Program'
+                : 'General Class';
+      const current = options.get(key);
+      options.set(key, { label, count: (current?.count ?? 0) + 1 });
+    });
+    return Array.from(options, ([value, option]) => ({ value, ...option }));
+  }, [classes]);
+
   const filteredClasses = useMemo(() => {
     const term = search.trim().toLocaleLowerCase();
     return classes.filter((item) => {
-      const matchesCampus =
-        campusFilter === 'all' || item.campusId === campusFilter;
+      const key = item.studyLevel ?? (item.programName ? 'program' : 'general');
+      const matchesLevel = levelFilter === 'all' || key === levelFilter;
       const matchesSearch =
         !term ||
-        `${item.name} ${item.programName ?? ''} ${item.studyLevel ?? ''} ${item.code} ${campusNames.get(item.campusId) ?? ''}`
+        (
+          item.name +
+          ' ' +
+          item.code +
+          ' ' +
+          (item.programName ?? '') +
+          ' ' +
+          (item.studyLevel ?? '') +
+          ' ' +
+          (campusNames.get(item.campusId) ?? '')
+        )
           .toLocaleLowerCase()
           .includes(term);
-      return matchesCampus && matchesSearch;
+      return matchesLevel && matchesSearch;
     });
-  }, [classes, campusFilter, campusNames, search]);
-  const selectedClass = classes.find((item) => item.id === selectedId) ?? null;
-  const selectedSections = selectedClass
-    ? sections.filter((item) => item.classId === selectedClass.id)
-    : [];
-  const selectedAssignments = selectedClass
-    ? assignments.filter(
-        (item) =>
-          item.classId === selectedClass.id &&
-          (!yearId || item.academicYearId === yearId),
-      )
-    : [];
+  }, [classes, campusNames, levelFilter, search]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredClasses.length / pageSize));
+  const visibleClasses = filteredClasses.slice(
+    (page - 1) * pageSize,
+    page * pageSize,
+  );
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
+
+  const openCreate = () => {
+    if (!canWriteAcademics) return;
+    if (campuses.length) onCreate('classes');
+    else if (canCreateCampuses) onOpenCampusSetup();
+  };
 
   return (
     <main className="page-stack classes-reference-page">
-      <header className="cr-header">
-        <div className="cr-header-actions">
-          <label className="cr-session-control">
-            <span>Session</span>
-            <select
-              aria-label="Academic session"
-              value={yearId}
-              onChange={(event) => setYearId(event.target.value)}
+      <header className="classes-page-heading">
+        <div>
+          <span className="cr-eyebrow">ACADEMIC MANAGEMENT</span>
+          <h1>Classes</h1>
+          <p>Manage All Classes in Your Institute.</p>
+        </div>
+        <div className="classes-page-actions">
+          <div className="cr-education-level-control">
+            <button
+              className="cr-secondary-button"
+              type="button"
+              aria-expanded={showEducationLevels}
+              aria-haspopup="menu"
+              onClick={() => setShowEducationLevels((current) => !current)}
             >
-              {years.length === 0 && <option value="">No sessions</option>}
-              {years.map((year) => (
-                <option key={year.id} value={year.id}>
-                  {year.name}
-                  {year.status === 'active' ? ' • Current' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-          {canWriteAcademics && (campuses.length > 0 || canCreateCampuses) && (
+              Education Levels <ChevronDown size={15} />
+            </button>
+            {showEducationLevels && (
+              <div
+                className="cr-education-levels"
+                role="menu"
+                aria-label="Education levels"
+              >
+                <button
+                  className={levelFilter === 'all' ? 'is-active' : ''}
+                  type="button"
+                  role="menuitem"
+                  aria-current={levelFilter === 'all' ? 'true' : undefined}
+                  onClick={() => {
+                    setLevelFilter('all');
+                    setPage(1);
+                    setShowEducationLevels(false);
+                  }}
+                >
+                  <span>All Levels</span>
+                  <small>{classes.length}</small>
+                </button>
+                {levelOptions.map((option) => (
+                  <button
+                    className={levelFilter === option.value ? 'is-active' : ''}
+                    key={option.value}
+                    type="button"
+                    role="menuitem"
+                    aria-current={
+                      levelFilter === option.value ? 'true' : undefined
+                    }
+                    onClick={() => {
+                      setLevelFilter(option.value);
+                      setPage(1);
+                      setShowEducationLevels(false);
+                    }}
+                  >
+                    <span>{option.label}</span>
+                    <small>{option.count}</small>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {canWriteAcademics && (
             <button
               className="cr-primary-button"
               type="button"
-              onClick={() =>
-                campuses.length ? onCreate('classes') : onOpenCampusSetup()
-              }
+              onClick={openCreate}
             >
-              <Plus size={16} />{' '}
-              {campuses.length ? 'Create Class' : 'Create Campus'}
+              <Plus size={16} /> Add Class
             </button>
           )}
         </div>
@@ -152,11 +194,8 @@ export function ClassesSectionsReferenceView({
       {campuses.length === 0 && (
         <section className="cr-campus-setup-alert" role="status">
           <div>
-            <strong>Campus setup is needed before creating a class</strong>
-            <p>
-              Campus aapke institute ki branch/location hoti hai. Pehle campus
-              banayein, phir class us campus ke saath assign karein.
-            </p>
+            <strong>Set up a campus before adding a class</strong>
+            <p>Every class must belong to one of your institute’s campuses.</p>
           </div>
           {canCreateCampuses && (
             <button
@@ -175,485 +214,241 @@ export function ClassesSectionsReferenceView({
           <span className="cr-stat-icon">
             <BookOpen size={17} />
           </span>
-          <p>Total Classes</p>
-          <strong>{classes.length}</strong>
-          <small>Across this organization</small>
+          <p>Classes</p>
+          <strong>{classes.length.toLocaleString()}</strong>
+          <small>In this institute</small>
         </article>
         <article className="cr-stat-card">
           <span className="cr-stat-icon">
             <Users size={17} />
           </span>
-          <p>Total Sections</p>
-          <strong>{sections.length}</strong>
-          <small>Across {classes.length} classes</small>
-        </article>
-        <article className="cr-stat-card">
-          <span className="cr-stat-icon">
-            <Users size={17} />
-          </span>
-          <p>Campuses</p>
-          <strong>{campuses.length}</strong>
-          <small>Locations available to classes</small>
+          <p>Sections</p>
+          <strong>{sections.length.toLocaleString()}</strong>
+          <small>Across all classes</small>
         </article>
         <article className="cr-stat-card">
           <span className="cr-stat-icon">
             <BookOpen size={17} />
           </span>
-          <p>Academic Sessions</p>
-          <strong>{years.length}</strong>
-          <small>
-            {years.some((year) => year.status === 'active')
-              ? 'An active session is configured'
-              : 'Set up an active session'}
-          </small>
+          <p>Subjects</p>
+          <strong>{subjects.length.toLocaleString()}</strong>
+          <small>Available in this institute</small>
+        </article>
+        <article className="cr-stat-card">
+          <span className="cr-stat-icon">
+            <Users size={17} />
+          </span>
+          <p>Students</p>
+          <strong>
+            {studentsCount === undefined ? '—' : studentsCount.toLocaleString()}
+          </strong>
+          <small>Active student records</small>
         </article>
       </section>
 
-      <section className="cr-workspace">
-        <div className="cr-list-column">
-          <div className="cr-toolbar">
-            <div className="cr-search">
-              <Search size={16} />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search classes, sections, code..."
-                aria-label="Search classes"
-              />
-            </div>
-            <select
-              className="cr-filter-select"
-              value={campusFilter}
-              onChange={(event) => setCampusFilter(event.target.value)}
-              aria-label="Filter by campus"
-            >
-              <option value="all">All Campuses</option>
-              {campuses.map((campus) => (
-                <option key={campus.id} value={campus.id}>
-                  {campus.name}
-                </option>
-              ))}
-            </select>
+      <section className="cr-class-list-card">
+        <div className="cr-search-panel">
+          <div className="cr-search">
+            <Search size={17} />
+            <input
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+              placeholder="Search by class name or class code..."
+              aria-label="Search classes"
+            />
           </div>
-
-          <div className="cr-section-title">
-            <div>
-              <span className="cr-eyebrow">ACADEMIC STRUCTURE</span>
-              <h2>Classes</h2>
-            </div>
-            <span className="cr-count">{filteredClasses.length} total</span>
-          </div>
-
-          {filteredClasses.length ? (
-            <div className="cr-class-grid">
-              {filteredClasses.map((item) => {
-                const itemSections = sections.filter(
-                  (section) => section.classId === item.id,
-                );
-                const active = item.id === selectedId;
-                return (
-                  <button
-                    className={`cr-class-card${active ? ' is-selected' : ''}`}
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedId(item.id);
-                      setDrawerTab('sections');
-                    }}
-                  >
-                    <div className="cr-class-card-top">
-                      <span className="cr-class-avatar">
-                        {item.name
-                          .split(/\s+/)
-                          .map((part) => part[0])
-                          .slice(0, 2)
-                          .join('')
-                          .toUpperCase()}
-                      </span>
-                      <span className="cr-card-code">{item.code}</span>
-                    </div>
-                    <h3>{item.name}</h3>
-                    {item.programName && (
-                      <p className="cr-card-campus">
-                        {item.programName} ·{' '}
-                        {item.studyLevel === 'first_year'
-                          ? 'First Year'
-                          : item.studyLevel === 'second_year'
-                            ? 'Second Year'
-                            : 'Other level'}
-                      </p>
-                    )}
-                    <p className="cr-card-campus">
-                      {campusNames.get(item.campusId) ?? 'Campus not available'}
-                    </p>
-                    <div className="cr-card-footer">
-                      <span>
-                        <Users size={14} /> {itemSections.length} sections
-                      </span>
-                      <ChevronRight size={16} />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="cr-empty-state">
-              <span className="cr-empty-icon">
-                <BookOpen size={22} />
-              </span>
-              <h3>No classes found</h3>
-              <p>
-                {search || campusFilter !== 'all'
-                  ? 'Try changing your search or academy filter.'
-                  : 'Create the first class for this organization.'}
-              </p>
-              {!search &&
-                campusFilter === 'all' &&
-                canWriteAcademics &&
-                (campuses.length > 0 || canCreateCampuses) && (
-                  <button
-                    className="cr-primary-button"
-                    type="button"
-                    onClick={() =>
-                      campuses.length
-                        ? onCreate('classes')
-                        : onOpenCampusSetup()
-                    }
-                  >
-                    <Plus size={16} /> Create Class
-                  </button>
-                )}
-            </div>
-          )}
         </div>
 
-        <aside className="cr-detail-column">
-          {selectedClass ? (
-            <>
-              <div className="cr-detail-header">
-                <div className="cr-detail-title">
-                  <span className="cr-class-avatar cr-detail-avatar">
-                    {selectedClass.name
-                      .split(/\s+/)
-                      .map((part) => part[0])
-                      .slice(0, 2)
-                      .join('')
-                      .toUpperCase()}
-                  </span>
-                  <div>
-                    <h2>{selectedClass.name}</h2>
-                    <p>
-                      {selectedClass.code} ·{' '}
-                      {selectedClass.programName
-                        ? `${selectedClass.programName} · `
-                        : ''}
-                      {selectedClass.studyLevel === 'first_year'
+        <div className="cr-section-title">
+          <div>
+            <span className="cr-eyebrow">CLASS DIRECTORY</span>
+            <h2>All Classes</h2>
+          </div>
+          <span className="cr-count">{filteredClasses.length} classes</span>
+        </div>
+
+        {filteredClasses.length ? (
+          <>
+            <div className="cr-class-table-wrap">
+              <table className="cr-class-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Class</th>
+                    <th scope="col">Level / Grade</th>
+                    <th scope="col">Session</th>
+                    <th scope="col" className="cr-number-heading">
+                      Sections
+                    </th>
+                    <th scope="col" className="cr-number-heading">
+                      Subjects
+                    </th>
+                    <th scope="col" className="cr-number-heading">
+                      Students
+                    </th>
+                    <th scope="col" className="cr-actions-heading">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleClasses.map((item) => {
+                    const itemSections = sections.filter(
+                      (section) => section.classId === item.id,
+                    );
+                    const itemSubjects = subjects.filter((subject) =>
+                      subject.classIds?.includes(item.id),
+                    );
+                    const levelLabel =
+                      item.studyLevel === 'first_year'
                         ? 'First Year'
-                        : selectedClass.studyLevel === 'second_year'
+                        : item.studyLevel === 'second_year'
                           ? 'Second Year'
-                          : selectedClass.studyLevel === 'other'
-                            ? 'Other level'
-                            : ''}
-                      {selectedClass.studyLevel ? ' · ' : ''}
-                      {campusNames.get(selectedClass.campusId) ?? 'Campus'}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  className="cr-icon-button"
-                  type="button"
-                  aria-label="Close class details"
-                  onClick={() => setSelectedId(null)}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <div
-                className="cr-detail-tabs"
-                role="tablist"
-                aria-label="Class details"
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={drawerTab === 'sections'}
-                  className={drawerTab === 'sections' ? 'active' : ''}
-                  onClick={() => setDrawerTab('sections')}
-                >
-                  Sections ({selectedSections.length})
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={drawerTab === 'teachers'}
-                  className={drawerTab === 'teachers' ? 'active' : ''}
-                  onClick={() => setDrawerTab('teachers')}
-                >
-                  Teachers &amp; Subjects ({selectedAssignments.length})
-                </button>
-              </div>
-              {drawerTab === 'sections' ? (
-                <div className="cr-detail-body">
-                  <div className="cr-detail-section-heading">
-                    <div>
-                      <h3>Class Sections</h3>
-                      <p>Sections configured for this class.</p>
-                    </div>
-                    {canWriteAcademics && (
-                      <button
-                        className="cr-small-dark-button"
-                        type="button"
-                        onClick={() => onCreate('sections', selectedClass.id)}
-                      >
-                        <Plus size={14} /> Add Section
-                      </button>
-                    )}
-                  </div>
-                  {selectedSections.length ? (
-                    <div className="cr-section-list">
-                      {selectedSections.map((section) => (
-                        <article className="cr-section-row" key={section.id}>
-                          <span className="cr-section-letter">
-                            {section.name.slice(0, 1).toUpperCase()}
-                          </span>
-                          <div className="cr-section-row-copy">
-                            <strong>{section.name}</strong>
-                            <small>
-                              {section.capacity
-                                ? `Capacity ${section.capacity}`
-                                : 'Capacity not set'}
-                            </small>
+                          : item.studyLevel === 'other'
+                            ? 'Other'
+                            : (item.programName ?? 'General');
+                    return (
+                      <tr key={item.id}>
+                        <td>
+                          <div className="cr-class-name">
+                            <strong>{item.name}</strong>
+                            <small>{item.code}</small>
                           </div>
-                          {canWriteAcademics && (
-                            <>
-                              <button
-                                className="cr-text-button"
-                                type="button"
-                                onClick={() => onEdit('sections', section)}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                className="cr-text-button danger"
-                                type="button"
-                                onClick={() =>
-                                  onDelete('sections', section.id, section.name)
-                                }
-                              >
-                                Delete
-                              </button>
-                            </>
-                          )}
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="cr-empty-inline">
-                      <p>No sections created for this class yet.</p>
-                      {canWriteAcademics && (
-                        <button
-                          className="cr-text-button"
-                          type="button"
-                          onClick={() => onCreate('sections', selectedClass.id)}
-                        >
-                          Add the first section
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  <div className="cr-detail-actions">
-                    {canReadStudents && (
-                      <button
-                        className="cr-secondary-button"
-                        type="button"
-                        onClick={() =>
-                          onOpenEnrollment(
-                            selectedSections[0]?.id,
-                            selectedClass.id,
-                            'students',
-                          )
-                        }
-                      >
-                        <Users size={15} /> View Students
-                      </button>
-                    )}
-                    {canAddStudents && (
-                      <button
-                        className="cr-primary-button"
-                        type="button"
-                        onClick={() =>
-                          onOpenEnrollment(
-                            selectedSections[0]?.id,
-                            selectedClass.id,
-                            'add-students',
-                          )
-                        }
-                      >
-                        <Plus size={15} /> Add Student
-                      </button>
-                    )}
-                    {canAssignTeachers && (
-                      <button
-                        className="cr-secondary-button"
-                        type="button"
-                        onClick={() =>
-                          onOpenEnrollment(
-                            selectedSections[0]?.id,
-                            selectedClass.id,
-                            'teacher',
-                          )
-                        }
-                      >
-                        <BookOpen size={15} /> Assign Teacher
-                      </button>
-                    )}
-                    {canWriteAcademics && (
-                      <>
-                        <button
-                          className="cr-secondary-button"
-                          type="button"
-                          onClick={() => onEdit('classes', selectedClass)}
-                        >
-                          Edit Class
-                        </button>
-                        <button
-                          className="cr-danger-button"
-                          type="button"
-                          onClick={() =>
-                            onDelete(
-                              'classes',
-                              selectedClass.id,
-                              selectedClass.name,
-                            )
-                          }
-                        >
-                          <Archive size={15} /> Delete Class
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="cr-detail-body">
-                  <div className="cr-detail-section-heading">
-                    <div>
-                      <h3>Subjects &amp; Teachers</h3>
-                      <p>
-                        Add subjects, then assign a teacher for each section and
-                        academic year.
-                      </p>
-                    </div>
-                    <div className="cr-detail-heading-actions">
-                      {canAssignTeachers && (
-                        <button
-                          className="cr-secondary-button"
-                          type="button"
-                          onClick={() =>
-                            onOpenEnrollment(
-                              selectedSections[0]?.id,
-                              selectedClass.id,
-                              'teacher',
-                            )
-                          }
-                        >
-                          <Users size={14} /> Assign Teacher
-                        </button>
-                      )}
-                      {canWriteAcademics && (
-                        <button
-                          className="cr-small-dark-button"
-                          type="button"
-                          onClick={onCreateSubject}
-                        >
-                          <Plus size={14} /> Add Subject
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {selectedAssignments.length ? (
-                    <div className="cr-section-list">
-                      {selectedAssignments.map((assignment) => {
-                        const subject = subjects.find(
-                          (item) => item.id === assignment.subjectId,
-                        );
-                        return (
-                          <article
-                            className="cr-section-row"
-                            key={assignment.id}
+                        </td>
+                        <td>
+                          <span className="cr-level-label">{levelLabel}</span>
+                          <small className="cr-grade-unavailable">
+                            {item.programName ?? 'Grade not set'}
+                          </small>
+                        </td>
+                        <td>{activeYear?.name ?? '—'}</td>
+                        <td className="cr-number-cell">
+                          <span className="cr-table-count">
+                            {itemSections.length}
+                          </span>
+                        </td>
+                        <td className="cr-number-cell">
+                          <span className="cr-table-count">
+                            {itemSubjects.length}
+                          </span>
+                        </td>
+                        <td className="cr-number-cell">
+                          <span
+                            className="cr-table-count"
+                            title="Per-class placement count is not provided by the current class list API"
                           >
-                            <span className="cr-section-letter">
-                              <BookOpen size={15} />
-                            </span>
-                            <div className="cr-section-row-copy">
-                              <strong>{subject?.name ?? 'Subject'}</strong>
-                              <small>
-                                {teachers.find(
-                                  (item) =>
-                                    item.id === assignment.teacherStaffId,
-                                )?.firstName ?? 'Teacher'}{' '}
-                                {teachers.find(
-                                  (item) =>
-                                    item.id === assignment.teacherStaffId,
-                                )?.lastName ?? ''}{' '}
-                                · {subject?.code ?? 'No subject code'} ·{' '}
-                                {sections.find(
-                                  (item) => item.id === assignment.sectionId,
-                                )?.name ?? 'Section'}{' '}
-                                ·{' '}
-                                {years.find(
-                                  (item) =>
-                                    item.id === assignment.academicYearId,
-                                )?.name ?? 'Academic year'}
-                              </small>
-                            </div>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="cr-empty-inline">
-                      <p>No teacher assignments for this class yet.</p>
-                      <span>
-                        Add a subject first, then open Assign Teacher to choose
-                        the subject, section, year and teacher.
-                      </span>
-                      {canAssignTeachers && (
-                        <button
-                          className="cr-text-button"
-                          type="button"
-                          onClick={() =>
-                            onOpenEnrollment(
-                              selectedSections[0]?.id,
-                              selectedClass.id,
-                              'teacher',
-                            )
-                          }
-                        >
-                          Open teacher assignment
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="cr-detail-placeholder">
-              <span className="cr-empty-icon">
-                <BookOpen size={22} />
-              </span>
-              <h3>Select a class</h3>
-              <p>
-                Choose a class to view its sections, manage details, and review
-                teacher assignments.
-              </p>
+                            —
+                          </span>
+                        </td>
+                        <td>
+                          <div className="cr-table-actions">
+                            {canWriteAcademics && (
+                              <>
+                                <button
+                                  className="cr-table-icon-button"
+                                  type="button"
+                                  aria-label={'Edit ' + item.name}
+                                  onClick={() => onEdit('classes', item)}
+                                >
+                                  <Pencil size={15} />
+                                </button>
+                                <button
+                                  className="cr-table-icon-button danger"
+                                  type="button"
+                                  aria-label={'Delete ' + item.name}
+                                  onClick={() =>
+                                    onDelete('classes', item.id, item.name)
+                                  }
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          )}
-        </aside>
+            <div className="cr-pagination">
+              <div className="cr-pagination-summary">
+                <span>
+                  Showing{' '}
+                  {filteredClasses.length ? (page - 1) * pageSize + 1 : 0}–
+                  {Math.min(page * pageSize, filteredClasses.length)} of{' '}
+                  {filteredClasses.length}
+                </span>
+                <label>
+                  <span>Rows per page</span>
+                  <select
+                    aria-label="Rows per page"
+                    value={pageSize}
+                    onChange={(event) => {
+                      setPageSize(Number(event.target.value));
+                      setPage(1);
+                    }}
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                  </select>
+                </label>
+              </div>
+              <div className="cr-pagination-controls">
+                <button
+                  type="button"
+                  aria-label="Previous page"
+                  disabled={page <= 1}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                >
+                  ‹
+                </button>
+                <span>
+                  Page {page} of {pageCount}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Next page"
+                  disabled={page >= pageCount}
+                  onClick={() =>
+                    setPage((current) => Math.min(pageCount, current + 1))
+                  }
+                >
+                  ›
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="cr-empty-state">
+            <span className="cr-empty-icon">
+              <BookOpen size={22} />
+            </span>
+            <h3>No classes found</h3>
+            <p>
+              {search || levelFilter !== 'all'
+                ? 'Try a different search or education level.'
+                : 'Add the first class for your institute.'}
+            </p>
+            {!search && levelFilter === 'all' && canWriteAcademics && (
+              <button
+                className="cr-primary-button"
+                type="button"
+                onClick={openCreate}
+              >
+                <Plus size={16} /> Add Class
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
       <footer className="cr-footer">
-        <span>InstituteOS · Classes &amp; Sections</span>
+        <span>InstituteOS · Classes</span>
         <span>
           <span className="cr-live-dot" /> Live organization data
         </span>

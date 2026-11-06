@@ -18,6 +18,21 @@ export interface AcademicYearInput {
   status?: AcademicYearStatus;
 }
 
+export interface AcademicYearSessionStats {
+  academicYearId: string;
+  classes: number;
+  sections: number;
+  students: number;
+}
+
+export interface AcademicYearSummary {
+  totals: {
+    classes: number;
+    sections: number;
+    students: number;
+  };
+  bySession: AcademicYearSessionStats[];
+}
 export interface AcademicYearRecord extends AcademicYearInput {
   id: string;
   organizationId: string;
@@ -75,9 +90,11 @@ export interface SectionRecord extends Omit<SectionInput, 'capacity'> {
 
 export interface SubjectInput {
   name: string;
-  code: string;
-  department?: string;
+  code?: string;
   classIds?: string[];
+  totalMarks: number;
+  passingPercentage: number;
+  description?: string;
 }
 
 export interface SubjectRecord extends SubjectInput {
@@ -108,6 +125,10 @@ export interface AcademicsRepository {
     campusIds?: string[],
   ): Promise<AcademicCampusChoice[]>;
   listAcademicYears(organizationId: string): Promise<AcademicYearRecord[]>;
+  getAcademicYearSummary(
+    organizationId: string,
+    campusIds?: string[],
+  ): Promise<AcademicYearSummary>;
   getAcademicYear(
     organizationId: string,
     id: string,

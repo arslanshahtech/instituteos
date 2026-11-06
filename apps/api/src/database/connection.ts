@@ -19,6 +19,7 @@ import {
   SubjectModel,
   TeacherAssignmentModel,
   TeacherTimetableModel,
+  SectionTimetableModel,
   TermModel,
 } from '../modules/academics/academics.model.js';
 
@@ -69,6 +70,7 @@ export async function connectDatabase(
       SubjectModel.init(),
       TeacherAssignmentModel.init(),
       TeacherTimetableModel.init(),
+      SectionTimetableModel.init(),
     ]);
     tenancyModelsInitialized = true;
   } catch (error) {

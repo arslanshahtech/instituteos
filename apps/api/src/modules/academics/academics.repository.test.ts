@@ -5,6 +5,7 @@ import {
   AcademicSectionModel,
   AcademicYearModel,
   SubjectModel,
+  SectionTimetableModel,
   TeacherAssignmentModel,
   TeacherTimetableModel,
   TermModel,
@@ -273,6 +274,7 @@ describe('Academic structure deletion guards', () => {
   it('protects academic years referenced by placements, fees, exams, attendance, or homework', async () => {
     vi.spyOn(TermModel, 'exists').mockResolvedValue(null);
     vi.spyOn(TeacherAssignmentModel, 'exists').mockResolvedValue(null);
+    vi.spyOn(SectionTimetableModel, 'exists').mockResolvedValue(null);
     vi.spyOn(StudentSectionPlacementModel, 'exists').mockResolvedValue({
       _id: recordId,
     } as never);
@@ -337,6 +339,7 @@ describe('Academic structure deletion guards', () => {
 
   it('protects sections referenced by student attendance and placements', async () => {
     vi.spyOn(TeacherAssignmentModel, 'exists').mockResolvedValue(null);
+    vi.spyOn(SectionTimetableModel, 'exists').mockResolvedValue(null);
     vi.spyOn(StudentSectionPlacementModel, 'exists').mockResolvedValue(null);
     vi.spyOn(StudentAttendanceModel, 'exists').mockResolvedValue({
       _id: recordId,
@@ -355,6 +358,7 @@ describe('Academic structure deletion guards', () => {
 
   it('protects subjects referenced by exam schedules and homework', async () => {
     vi.spyOn(TeacherAssignmentModel, 'exists').mockResolvedValue(null);
+    vi.spyOn(SectionTimetableModel, 'exists').mockResolvedValue(null);
     vi.spyOn(ExamScheduleModel, 'exists').mockResolvedValue(null);
     vi.spyOn(HomeworkTestModel, 'exists').mockResolvedValue({
       _id: recordId,

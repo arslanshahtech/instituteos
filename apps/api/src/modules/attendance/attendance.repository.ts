@@ -7,6 +7,8 @@ import {
   AcademicYearModel,
   SubjectModel,
   TeacherAssignmentModel,
+  SectionTimetableModel,
+  type SectionTimetableRecord,
 } from '../academics/academics.model.js';
 import { AuthUserModel } from '../auth/auth.model.js';
 import { CampusModel } from '../tenancy/tenancy.model.js';
@@ -193,12 +195,78 @@ export class MongoAttendanceRepository implements AttendanceRepository {
       staffId = staffMatches[0]!._id;
     }
 
-    const assignments = await TeacherAssignmentModel.find({
+    const assignedRecords = await TeacherAssignmentModel.find({
       organizationId: oid(organizationId),
       teacherStaffId: staffId,
     })
       .sort({ createdAt: 1 })
       .lean();
+    const sectionTimetables = (await SectionTimetableModel.find({
+      organizationId: oid(organizationId),
+      'entries.additionalTeacherStaffId': staffId,
+      'entries.type': 'class',
+    }).lean()) as unknown as SectionTimetableRecord[];
+    const additionalSectionIds = [
+      ...new Set(sectionTimetables.map((item) => String(item.sectionId))),
+    ];
+    const additionalSections = additionalSectionIds.length
+      ? await AcademicSectionModel.find({
+          organizationId: oid(organizationId),
+          _id: { $in: additionalSectionIds.map(oid) },
+        })
+          .select({ _id: 1, classId: 1 })
+          .lean()
+      : [];
+    const additionalClassBySection = new Map(
+      additionalSections.map((item) => [
+        String(item._id),
+        String(item.classId),
+      ]),
+    );
+    const additionalRecords = sectionTimetables.flatMap((timetable) =>
+      (timetable.entries ?? [])
+        .filter(
+          (entry) =>
+            entry.type === 'class' &&
+            (timetable.workingDays ?? []).includes(String(entry.dayOfWeek)) &&
+            String(entry.additionalTeacherStaffId ?? '') === String(staffId) &&
+            Boolean(entry.subjectId) &&
+            additionalClassBySection.has(String(timetable.sectionId)),
+        )
+        .map((entry) => ({
+          _id: entry._id,
+          classId: oid(
+            additionalClassBySection.get(String(timetable.sectionId))!,
+          ),
+          sectionId: timetable.sectionId,
+          academicYearId: timetable.academicYearId,
+          subjectId: entry.subjectId,
+        })),
+    );
+    const assignmentKeys = new Set(
+      assignedRecords.map((item) =>
+        [
+          String(item.classId),
+          String(item.sectionId),
+          String(item.academicYearId),
+          String(item.subjectId),
+        ].join(':'),
+      ),
+    );
+    const assignments = [
+      ...assignedRecords,
+      ...additionalRecords.filter((item) => {
+        const key = [
+          String(item.classId),
+          String(item.sectionId),
+          String(item.academicYearId),
+          String(item.subjectId),
+        ].join(':');
+        if (assignmentKeys.has(key)) return false;
+        assignmentKeys.add(key);
+        return true;
+      }),
+    ];
     if (!assignments.length) return [];
 
     const classIds = [

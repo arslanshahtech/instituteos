@@ -509,7 +509,7 @@ describe('frontend application foundation', () => {
     expect(
       screen.queryByRole('link', { name: 'UI foundations' }),
     ).not.toBeInTheDocument();
-    await user.click(await screen.findByRole('link', { name: 'Overview' }));
+    await user.click(await screen.findByRole('link', { name: 'Dashboard' }));
     await waitFor(() =>
       expect(menuButton).toHaveAttribute('aria-expanded', 'false'),
     );
@@ -867,7 +867,7 @@ describe('frontend application foundation', () => {
     });
     const base = '/admin/organizations/650000000000000000000001';
     for (const [label, path] of [
-      ['Academics & Classes', '/academics'],
+      ['Curriculum', '/academics'],
       ['Students', '/students'],
       ['Guardians', '/guardians'],
       ['Teachers / Staff', '/staff'],
@@ -881,6 +881,16 @@ describe('frontend application foundation', () => {
         within(navigation).getByRole('link', { name: label }),
       ).toHaveAttribute('href', base + path);
     }
+
+    const curriculumLink = within(navigation).getByRole('link', {
+      name: 'Curriculum',
+    });
+    expect(curriculumLink).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(curriculumLink);
+    expect(curriculumLink).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(curriculumLink);
+    expect(curriculumLink).toHaveAttribute('aria-expanded', 'false');
+    expect(curriculumLink).not.toHaveClass('navigation-link-active');
   });
 
   it('redirects a manually requested admin URL to the server-authorized teacher workspace', async () => {

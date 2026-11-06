@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { apiMessage, useOrganizationAccess } from '../staff/StaffPageShared.js';
 import { listStaff } from '../staff/staff-api.js';
 import { Button } from '../components/ui/Button.js';
@@ -12,6 +12,11 @@ import {
   LoadingState,
   PermissionDeniedState,
 } from '../components/ui/States.js';
+import { getAcademicYearSummary } from './academics-api.js';
+import {
+  listExams,
+  listExamSchedules,
+} from '../examinations/examinations-api.js';
 import type { TableColumn } from '../components/ui/DataTable.js';
 import {
   useAcademicsWorkspace,
@@ -26,7 +31,6 @@ import type {
   AcademicSubject,
   AcademicTerm,
   AcademicYear,
-  TeacherAssignment,
 } from './academics-api.js';
 import { AcademicsForm } from './AcademicsForm.js';
 import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
@@ -35,6 +39,10 @@ import { ClassesSectionsReferenceView } from './ClassesSectionsReferenceView.js'
 import { AcademicOverview } from './AcademicOverview.js';
 import { AcademicTimetable } from './AcademicTimetable.js';
 import { getAcademicsRosterPermissions } from './academics-permissions.js';
+import { AcademicSessionsReferenceView } from './AcademicSessionsReferenceView.js';
+import { AcademicSectionsReferenceView } from './AcademicSectionsReferenceView.js';
+import { AcademicSubjectsReferenceView } from './AcademicSubjectsReferenceView.js';
+import { useOrganizationSummary } from '../reporting/reporting-api.js';
 
 const managerRoles = [
   'organization_owner',
@@ -45,21 +53,19 @@ const managerRoles = [
 ];
 
 const tabs: Array<{ resource: AcademicsResource; label: string }> = [
-  { resource: 'academic-years', label: 'Academic years' },
+  { resource: 'academic-years', label: 'Sessions' },
   { resource: 'terms', label: 'Terms' },
   { resource: 'classes', label: 'Classes' },
   { resource: 'sections', label: 'Sections' },
   { resource: 'subjects', label: 'Subjects' },
-  { resource: 'teacher-assignments', label: 'Teacher assignments' },
 ];
 
 const resourceNames: Record<AcademicsResource, string> = {
-  'academic-years': 'academic year',
+  'academic-years': 'session',
   terms: 'term',
   classes: 'class',
   sections: 'section',
   subjects: 'subject',
-  'teacher-assignments': 'teacher assignment',
 };
 
 interface AcademicsRow {
@@ -82,10 +88,6 @@ function row(
   };
 }
 
-function displayName(firstName: string, lastName: string) {
-  return `${firstName} ${lastName}`;
-}
-
 function isTeachingStaff(person: {
   designation?: string;
   subjects?: string[];
@@ -100,21 +102,34 @@ function isTeachingStaff(person: {
 export function AcademicsDashboard() {
   const { organizationId = '' } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
   const access = useOrganizationAccess(organizationId);
   const canReadAcademics =
     access.data?.permissions.includes('academics.read') ?? false;
   const canWriteAcademics =
     access.data?.permissions.includes('academics.write') ?? false;
   const canReadStaff = access.data?.permissions.includes('staff.read') ?? false;
-  const { canReadStudents, canAddStudents } =
-    getAcademicsRosterPermissions(access.data?.permissions ?? []);
-  const canAssignTeachers = canWriteAcademics && canReadStaff;
+  const { canReadStudents, canAddStudents } = getAcademicsRosterPermissions(
+    access.data?.permissions ?? [],
+  );
   const canCreateCampuses =
     access.data?.permissions.includes('campus.create') ?? false;
   const canManage =
     managerRoles.includes(access.data?.role ?? '') && canReadAcademics;
   const workspace = useAcademicsWorkspace(
     organizationId,
+    Boolean(access.data && canManage),
+  );
+  const sessionSummary = useQuery({
+    queryKey: ['academics', organizationId, 'session-summary'],
+    queryFn: () => getAcademicYearSummary(organizationId),
+    enabled: Boolean(access.data && canManage),
+    retry: false,
+  });
+  const organizationSummary = useOrganizationSummary(
+    organizationId,
+    undefined,
     Boolean(access.data && canManage),
   );
   const staff = useQuery({
@@ -134,33 +149,87 @@ export function AcademicsDashboard() {
   const save = useSaveAcademicsResource(organizationId);
   const remove = useDeleteAcademicsResource(organizationId);
   const [resource, setResource] = useState<AcademicsResource>('classes');
-  const canWriteResource =
-    canWriteAcademics &&
-    (resource !== 'teacher-assignments' || canAssignTeachers);
+  const canWriteResource = canWriteAcademics;
   const [resourceSearch, setResourceSearch] = useState('');
   const [activeArea, setActiveArea] = useState<
     | 'overview'
     | 'academic-years'
     | 'terms'
     | 'classes'
+    | 'sections'
     | 'subjects'
-    | 'teacher-assignments'
     | 'timetable'
   >('overview');
+  useEffect(() => {
+    const tabAreas: Record<string, typeof activeArea> = {
+      'curriculum-sessions': 'academic-years',
+      'curriculum-classes': 'classes',
+      'curriculum-sections': 'sections',
+      'curriculum-subjects': 'subjects',
+      timetable: 'timetable',
+    };
+    const nextArea = requestedTab ? tabAreas[requestedTab] : undefined;
+    if (nextArea) {
+      setSubjectFormOpen(false);
+      setEditing(undefined);
+      setActiveArea(nextArea);
+      if (nextArea !== 'timetable')
+        setResource(
+          nextArea === 'academic-years'
+            ? 'academic-years'
+            : nextArea === 'classes'
+              ? 'classes'
+              : nextArea === 'subjects'
+                ? 'subjects'
+                : nextArea === 'sections'
+                  ? 'sections'
+                  : 'classes',
+        );
+    } else if (!requestedTab) {
+      setActiveArea('overview');
+    }
+  }, [requestedTab]);
   const [editing, setEditing] = useState<AcademicsRow>();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showEnrollment, setShowEnrollment] = useState(false);
   const [enrollmentView, setEnrollmentView] = useState<
-    'students' | 'add-students' | 'teacher'
+    'students' | 'add-students'
   >('students');
-  const [enrollmentFocusRequest, setEnrollmentFocusRequest] = useState(0);
+  const [enrollmentFocusRequest] = useState(0);
   const [subjectDialogOpen, setSubjectDialogOpen] = useState(false);
+  const [subjectFormOpen, setSubjectFormOpen] = useState(false);
   const [enrollmentSectionId, setEnrollmentSectionId] = useState<
     string | undefined
   >();
   const [enrollmentClassId, setEnrollmentClassId] = useState<
     string | undefined
   >();
+  const activeAcademicYear =
+    (workspace.years.data?.items ?? []).find(
+      (item) => item.status === 'active',
+    ) ?? (workspace.years.data?.items ?? [])[0];
+  const subjectAssessments = useQuery({
+    queryKey: [
+      'academics',
+      organizationId,
+      'subject-assessments',
+      activeAcademicYear?.id,
+    ],
+    enabled: Boolean(
+      canManage && activeArea === 'subjects' && activeAcademicYear?.id,
+    ),
+    retry: false,
+    queryFn: async () => {
+      const exams = await listExams(organizationId);
+      const sessionExams = exams.items.filter(
+        (exam) => exam.academicYearId === activeAcademicYear?.id,
+      );
+      const schedules = await Promise.all(
+        sessionExams.map((exam) => listExamSchedules(organizationId, exam.id)),
+      );
+      return schedules.flatMap((result) => result.items);
+    },
+  });
   const [newSectionClassId, setNewSectionClassId] = useState<
     string | undefined
   >();
@@ -187,21 +256,6 @@ export function AcademicsDashboard() {
     (workspace.classes.data?.items ?? []).map((item) => [
       item.id,
       `${item.name}${item.programName ? ` · ${item.programName}` : ''} (${item.code})`,
-    ]),
-  );
-  const sectionNames = new Map(
-    (workspace.sections.data?.items ?? []).map((item) => [
-      item.id,
-      `${classNames.get(item.classId) ?? 'Class'} · ${item.name}`,
-    ]),
-  );
-  const subjectNames = new Map(
-    (workspace.subjects.data?.items ?? []).map((item) => [item.id, item.name]),
-  );
-  const staffNames = new Map(
-    (staff.data?.items ?? []).map((person) => [
-      person.id,
-      displayName(person.firstName, person.lastName),
     ]),
   );
 
@@ -243,21 +297,7 @@ export function AcademicsDashboard() {
         );
       case 'subjects':
         return (workspace.subjects.data?.items ?? []).map(
-          (item: AcademicSubject) =>
-            row(
-              item,
-              item.name,
-              `${item.code}${item.department ? ` · ${item.department}` : ''}`,
-            ),
-        );
-      case 'teacher-assignments':
-        return (workspace.assignments.data?.items ?? []).map(
-          (item: TeacherAssignment) =>
-            row(
-              item,
-              staffNames.get(item.teacherStaffId) ?? 'Teacher',
-              `${subjectNames.get(item.subjectId) ?? 'Subject'} · ${classNames.get(item.classId) ?? 'Class'} · ${sectionNames.get(item.sectionId)?.split(' · ').slice(-1)[0] ?? 'Section'} · ${yearNames.get(item.academicYearId) ?? 'Academic year'}`,
-            ),
+          (item: AcademicSubject) => row(item, item.name, item.code),
         );
     }
   };
@@ -268,7 +308,6 @@ export function AcademicsDashboard() {
     classes: workspace.classes,
     sections: workspace.sections,
     subjects: workspace.subjects,
-    'teacher-assignments': workspace.assignments,
   }[resource];
 
   const choices: Parameters<typeof AcademicsForm>[0]['choices'] = {
@@ -296,10 +335,6 @@ export function AcademicsDashboard() {
     sectionId: (workspace.sections.data?.items ?? []).map((item) => ({
       value: item.id,
       label: `${classNames.get(item.classId) ?? 'Class'} · ${item.name}`,
-    })),
-    teacherStaffId: teacherCandidates.map((item) => ({
-      value: item.id,
-      label: displayName(item.firstName, item.lastName),
     })),
   };
 
@@ -351,11 +386,10 @@ export function AcademicsDashboard() {
         {(
           [
             ['overview', 'Overview'],
-            ['academic-years', 'Academic Years'],
+            ['academic-years', 'Sessions'],
             ['terms', 'Terms'],
             ['classes', 'Classes & Sections'],
             ['subjects', 'Subjects'],
-            ['teacher-assignments', 'Teacher Assignments'],
             ['timetable', 'Timetable'],
           ] as const
         ).map(([area, label]) => (
@@ -366,10 +400,12 @@ export function AcademicsDashboard() {
             onClick={() => {
               save.reset();
               remove.reset();
+              setSubjectFormOpen(false);
+              setEditing(undefined);
               setActiveArea(area);
               setResourceSearch('');
               // Returning to Classes & Sections must always open its overview,
-              // never a previously opened student/teacher assignment panel.
+              // never a previously opened student panel.
               setShowEnrollment(false);
               setEnrollmentSectionId(undefined);
               setEnrollmentClassId(undefined);
@@ -378,8 +414,7 @@ export function AcademicsDashboard() {
               else if (
                 area === 'academic-years' ||
                 area === 'terms' ||
-                area === 'subjects' ||
-                area === 'teacher-assignments'
+                area === 'subjects'
               )
                 setResource(area);
             }}
@@ -413,7 +448,6 @@ export function AcademicsDashboard() {
           classes={workspace.classes.data?.items ?? []}
           sections={workspace.sections.data?.items ?? []}
           subjects={workspace.subjects.data?.items ?? []}
-          assignments={workspace.assignments.data?.items ?? []}
           campuses={workspace.campuses.data?.campuses ?? []}
           onOpen={(area) => {
             setShowEnrollment(false);
@@ -432,12 +466,6 @@ export function AcademicsDashboard() {
   if (activeArea === 'timetable') {
     return (
       <main className="page-stack academics-page">
-        <WorkspacePageHeading
-          eyebrow="Academic centre"
-          title="Timetable"
-          description="Teacher-wise weekly periods and assignment schedule."
-        />
-        {areaNavigation}
         <AcademicTimetable
           organizationId={organizationId}
           teachers={teacherCandidates.map(({ id, firstName, lastName }) => ({
@@ -445,7 +473,6 @@ export function AcademicsDashboard() {
             firstName,
             lastName,
           }))}
-          assignments={workspace.assignments.data?.items ?? []}
           classes={workspace.classes.data?.items ?? []}
           sections={workspace.sections.data?.items ?? []}
           subjects={workspace.subjects.data?.items ?? []}
@@ -461,14 +488,107 @@ export function AcademicsDashboard() {
     );
   }
 
+  if (activeArea === 'sections') {
+    if (
+      workspace.sections.isPending ||
+      workspace.classes.isPending ||
+      workspace.years.isPending ||
+      sessionSummary.isPending
+    )
+      return <LoadingState message="Loading sections..." />;
+    const failedQuery = [
+      workspace.sections,
+      workspace.classes,
+      workspace.years,
+      sessionSummary,
+    ].find((query) => query.isError);
+    if (failedQuery) {
+      return (
+        <ErrorState
+          title="Sections unavailable"
+          description={apiMessage(failedQuery.error)}
+          onRetry={() => {
+            void workspace.sections.refetch();
+            void workspace.classes.refetch();
+            void workspace.years.refetch();
+            void sessionSummary.refetch();
+          }}
+        />
+      );
+    }
+    const openSectionCreate = () => {
+      if (!canWriteAcademics) return;
+      save.reset();
+      remove.reset();
+      setResource('sections');
+      setEditing(undefined);
+      setNewSectionClassId(undefined);
+      setDialogOpen(true);
+    };
+    const openSectionEdit = (section: AcademicSection) => {
+      if (!canWriteAcademics) return;
+      save.reset();
+      setResource('sections');
+      setNewSectionClassId(undefined);
+      setEditing(
+        row(section, section.name, classNames.get(section.classId) ?? 'Class'),
+      );
+      setDialogOpen(true);
+    };
+    const deleteSection = (section: AcademicSection) => {
+      if (!canWriteAcademics || !window.confirm('Delete ' + section.name + '?'))
+        return;
+      remove.mutate({ resource: 'sections', id: section.id });
+    };
+    return (
+      <>
+        <AcademicSectionsReferenceView
+          sections={workspace.sections.data?.items ?? []}
+          classes={workspace.classes.data?.items ?? []}
+          sessions={workspace.years.data?.items ?? []}
+          summary={
+            sessionSummary.data?.summary ?? {
+              totals: { classes: 0, sections: 0, students: 0 },
+              bySession: [],
+              bySection: [],
+            }
+          }
+          canWrite={canWriteAcademics}
+          onCreate={openSectionCreate}
+          onEdit={openSectionEdit}
+          onDelete={deleteSection}
+        />
+        {(save.isError || remove.isError) && (
+          <p className="form-error" role="alert">
+            {apiMessage(save.error ?? remove.error)}
+          </p>
+        )}
+        <Dialog
+          description="Create or update a section in the selected class."
+          onOpenChange={setDialogOpen}
+          open={dialogOpen && resource === 'sections'}
+          title={editing ? 'Edit section' : 'Add section'}
+        >
+          <AcademicsForm
+            choices={choices}
+            isSaving={save.isPending}
+            onSubmit={saveRecord}
+            record={editing?.values}
+            resource="sections"
+            saveError={save.error ? apiMessage(save.error) : undefined}
+          />
+        </Dialog>
+      </>
+    );
+  }
+
   if (activeArea === 'classes') {
     const classWorkspaceQueries = [
       { label: 'classes', query: workspace.classes },
       { label: 'sections', query: workspace.sections },
-      { label: 'academic years', query: workspace.years },
+      { label: 'sessions', query: workspace.years },
       { label: 'campuses', query: workspace.campuses },
       { label: 'subjects', query: workspace.subjects },
-      { label: 'teacher assignments', query: workspace.assignments },
     ];
     const failedClassQuery = classWorkspaceQueries.find(
       ({ query }) => query.isError,
@@ -476,7 +596,6 @@ export function AcademicsDashboard() {
     if (classWorkspaceQueries.some(({ query }) => query.isPending)) {
       return (
         <main className="page-stack academics-page">
-          {areaNavigation}
           <LoadingState message="Loading classes, sections and academic records…" />
         </main>
       );
@@ -484,7 +603,6 @@ export function AcademicsDashboard() {
     if (failedClassQuery) {
       return (
         <main className="page-stack academics-page">
-          {areaNavigation}
           <ErrorState
             title={`Could not load ${failedClassQuery.label}`}
             description={apiMessage(failedClassQuery.query.error)}
@@ -538,54 +656,23 @@ export function AcademicsDashboard() {
 
     return (
       <div className="page-stack academics-page">
-        <WorkspacePageHeading
-          eyebrow="Organization workspace"
-          title="Academics"
-          description="Manage classes, sections, student placement and subject-teacher assignments."
-        />
-        {areaNavigation}
         <ClassesSectionsReferenceView
           classes={workspace.classes.data?.items ?? []}
           sections={workspace.sections.data?.items ?? []}
           years={workspace.years.data?.items ?? []}
           campuses={workspace.campuses.data?.campuses ?? []}
           subjects={workspace.subjects.data?.items ?? []}
-          assignments={workspace.assignments.data?.items ?? []}
-          teachers={teacherCandidates.map(({ id, firstName, lastName }) => ({
-            id,
-            firstName,
-            lastName,
-          }))}
+          studentsCount={organizationSummary.data?.summary.activeStudentCount}
           onCreate={openCreate}
-          onCreateSubject={() => {
-            if (!canWriteAcademics) return;
-            save.reset();
-            setSubjectDialogOpen(true);
-          }}
           onEdit={openEdit}
           onDelete={deleteAcademicRecord}
           canWriteAcademics={canWriteAcademics}
-          canReadStudents={canReadStudents}
-          canAddStudents={canAddStudents}
-          canAssignTeachers={canAssignTeachers}
           canCreateCampuses={canCreateCampuses}
-          onOpenEnrollment={(sectionId, classId, view = 'students') => {
-            if (
-              (view === 'students' && !canReadStudents) ||
-              (view === 'add-students' && !canAddStudents) ||
-              (view === 'teacher' && !canAssignTeachers)
-            )
-              return;
-            setEnrollmentSectionId(sectionId);
-            setEnrollmentClassId(classId);
-            setEnrollmentView(view);
-            setShowEnrollment(true);
-            // Re-trigger the inner panel scroll even when the same view is already open.
-            setEnrollmentFocusRequest((request) => request + 1);
-          }}
           onOpenCampusSetup={() =>
             navigate(
-              `/admin/organizations/${encodeURIComponent(organizationId)}?tab=campuses`,
+              '/admin/organizations/' +
+                encodeURIComponent(organizationId) +
+                '?tab=campuses',
             )
           }
         />
@@ -596,15 +683,10 @@ export function AcademicsDashboard() {
           >
             <div className="class-enrollment-shell-heading">
               <div>
-                <strong>
-                  {enrollmentView === 'students'
-                    ? 'Student Management'
-                    : 'Assign Subject Teacher'}
-                </strong>
+                <strong>Student Management</strong>
                 <p>
-                  {enrollmentView === 'students'
-                    ? 'View enrolled students, search the roster, add students, or remove selected students.'
-                    : 'Choose the academic session, section, subject and teacher for this assignment.'}
+                  View enrolled students, search the roster, add students, or
+                  remove selected students.
                 </p>
               </div>
               <Button
@@ -621,40 +703,13 @@ export function AcademicsDashboard() {
               classes={workspace.classes.data?.items ?? []}
               sections={workspace.sections.data?.items ?? []}
               years={workspace.years.data?.items ?? []}
-              subjects={workspace.subjects.data?.items ?? []}
-              teachers={teacherCandidates.map(
-                ({ id, firstName, lastName }) => ({
-                  id,
-                  firstName,
-                  lastName,
-                }),
-              )}
-              teachersLoading={canReadStaff && staff.isFetching}
-              teachersError={
-                !canReadStaff
-                  ? 'Your Admin role does not have staff.read permission.'
-                  : staff.isError
-                    ? apiMessage(staff.error)
-                    : undefined
-              }
-              onRetryTeachers={() => {
-                if (canReadStaff) void staff.refetch();
-              }}
-              onManageStaff={() =>
-                navigate(
-                  `/admin/organizations/${encodeURIComponent(organizationId)}/staff`,
-                )
-              }
               initialSectionId={enrollmentSectionId}
               initialClassId={enrollmentClassId}
               initialView={enrollmentView}
               focusRequest={enrollmentFocusRequest}
               onViewChange={setEnrollmentView}
-              onCreateSection={(classId) => openCreate('sections', classId)}
-              canWriteAcademics={canWriteAcademics}
               canReadStudents={canReadStudents}
               canAddStudents={canAddStudents}
-              canAssignTeachers={canAssignTeachers}
             />
           </div>
         )}
@@ -701,6 +756,196 @@ export function AcademicsDashboard() {
     );
   }
 
+  if (activeArea === 'subjects') {
+    if (
+      workspace.subjects.isPending ||
+      workspace.classes.isPending ||
+      subjectAssessments.isPending
+    ) {
+      return <LoadingState message="Loading subjects..." />;
+    }
+    if (
+      workspace.subjects.isError ||
+      workspace.classes.isError ||
+      subjectAssessments.isError
+    ) {
+      const failed = workspace.subjects.isError
+        ? workspace.subjects
+        : workspace.classes.isError
+          ? workspace.classes
+          : subjectAssessments;
+      return (
+        <ErrorState
+          title="Could not load subjects"
+          description={apiMessage(failed.error)}
+          onRetry={() => {
+            void workspace.subjects.refetch();
+            void workspace.classes.refetch();
+            void subjectAssessments.refetch();
+          }}
+        />
+      );
+    }
+    const openSubjectCreate = () => {
+      if (!canWriteAcademics) return;
+      save.reset();
+      setEditing(undefined);
+      setSubjectFormOpen(true);
+    };
+    const openSubjectEdit = (subject: AcademicSubject) => {
+      if (!canWriteAcademics) return;
+      save.reset();
+      setEditing(row(subject, subject.name, subject.code));
+      setSubjectFormOpen(true);
+    };
+    const deleteSubject = (subject: AcademicSubject) => {
+      if (!canWriteAcademics || !window.confirm('Delete ' + subject.name + '?'))
+        return;
+      remove.mutate({ resource: 'subjects', id: subject.id });
+    };
+    const subjectFormRecord = editing?.values;
+    return subjectFormOpen ? (
+      <main className="page-stack academic-subject-form-page">
+        <WorkspacePageHeading
+          eyebrow="Curriculum"
+          title={editing ? 'Edit Subject' : 'Add Subject'}
+          description={
+            editing
+              ? 'Update subject information'
+              : 'Add a new subject to your curriculum'
+          }
+        />
+        <section
+          className="academic-subject-form-card"
+          aria-labelledby="subject-information-title"
+        >
+          <header>
+            <h2 id="subject-information-title">Subject Information</h2>
+            <p>
+              {editing
+                ? 'Update the details for this subject'
+                : 'Enter the details for this subject'}
+            </p>
+          </header>
+          <AcademicsForm
+            choices={choices}
+            isSaving={save.isPending}
+            onCancel={() => {
+              setSubjectFormOpen(false);
+              setEditing(undefined);
+              save.reset();
+            }}
+            onSubmit={(input) =>
+              save.mutate(
+                { resource: 'subjects', id: editing?.id, data: input },
+                {
+                  onSuccess: () => {
+                    setSubjectFormOpen(false);
+                    setEditing(undefined);
+                  },
+                },
+              )
+            }
+            record={subjectFormRecord}
+            resource="subjects"
+            saveError={save.error ? apiMessage(save.error) : undefined}
+          />
+        </section>
+      </main>
+    ) : (
+      <>
+        <AcademicSubjectsReferenceView
+          subjects={workspace.subjects.data?.items ?? []}
+          classes={workspace.classes.data?.items ?? []}
+          schedules={subjectAssessments.data ?? []}
+          canWrite={canWriteAcademics}
+          onCreate={openSubjectCreate}
+          onEdit={openSubjectEdit}
+          onDelete={deleteSubject}
+        />
+        {(save.isError || remove.isError) && (
+          <p className="form-error" role="alert">
+            {apiMessage(save.error ?? remove.error)}
+          </p>
+        )}
+      </>
+    );
+  }
+
+  if (activeArea === 'academic-years') {
+    if (workspace.years.isPending || sessionSummary.isPending) {
+      return <LoadingState message="Loading sessions..." />;
+    }
+    if (workspace.years.isError || sessionSummary.isError) {
+      return (
+        <ErrorState
+          title="Sessions unavailable"
+          description={apiMessage(
+            workspace.years.error ?? sessionSummary.error,
+          )}
+          onRetry={() => {
+            void workspace.years.refetch();
+            void sessionSummary.refetch();
+          }}
+        />
+      );
+    }
+    return (
+      <>
+        <AcademicSessionsReferenceView
+          sessions={workspace.years.data?.items ?? []}
+          summary={
+            sessionSummary.data?.summary ?? {
+              totals: { classes: 0, sections: 0, students: 0 },
+              bySession: [],
+              bySection: [],
+            }
+          }
+          canWrite={canWriteResource}
+          onCreate={beginCreate}
+          onEdit={(session) =>
+            beginEdit(
+              row(
+                session,
+                session.name,
+                `${session.startDate} – ${session.endDate} · ${session.status}`,
+              ),
+            )
+          }
+          onDelete={(session) =>
+            deleteRecord(
+              row(
+                session,
+                session.name,
+                `${session.startDate} – ${session.endDate} · ${session.status}`,
+              ),
+            )
+          }
+        />
+        {(save.isError || remove.isError) && (
+          <p className="form-error" role="alert">
+            {apiMessage(save.error ?? remove.error)}
+          </p>
+        )}
+        <Dialog
+          description={`${editing ? 'Update' : 'Create'} session for this organization.`}
+          onOpenChange={(open) => setDialogOpen(open)}
+          open={dialogOpen}
+          title={`${editing ? 'Edit' : 'Add'} session`}
+        >
+          <AcademicsForm
+            choices={choices}
+            isSaving={save.isPending}
+            onSubmit={saveRecord}
+            record={editing?.values}
+            resource="academic-years"
+            saveError={save.error ? apiMessage(save.error) : undefined}
+          />
+        </Dialog>
+      </>
+    );
+  }
+
   const rows = recordsByResource();
   const filteredRows = rows.filter((item) =>
     `${item.title} ${item.details}`
@@ -744,7 +989,7 @@ export function AcademicsDashboard() {
       <WorkspacePageHeading
         eyebrow="Organization workspace"
         title="Academics"
-        description="Set up academic calendars, class structures, subjects, and teacher assignments."
+        description="Set up academic sessions, classes, sections, subjects, and timetables."
         aside={
           canWriteResource ? (
             <Button onClick={beginCreate} type="button" variant="primary">
@@ -800,7 +1045,7 @@ export function AcademicsDashboard() {
             columns={columns}
             emptyDescription={
               resourceSearch.trim()
-                ? `No ${resourceNames[resource]} matches “${resourceSearch.trim()}”. Try another search.`
+                ? `No ${resourceNames[resource]} matches "${resourceSearch.trim()}". Try another search.`
                 : `Add the first ${selectedTab.label.toLowerCase()} record for this organization.`
             }
             emptyTitle={
@@ -811,11 +1056,6 @@ export function AcademicsDashboard() {
             rowKey={(item) => item.id}
             rows={filteredRows}
           />
-        )}
-        {resource === 'teacher-assignments' && staff.isError && (
-          <p className="form-error" role="alert">
-            Teacher choices are unavailable: {apiMessage(staff.error)}
-          </p>
         )}
         {(save.isError || remove.isError) && (
           <p className="form-error" role="alert">
