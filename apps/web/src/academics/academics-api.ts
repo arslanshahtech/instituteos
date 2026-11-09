@@ -4,6 +4,7 @@ export interface AcademicYear {
   id: string;
   organizationId: string;
   name: string;
+  description?: string;
   startDate: string;
   endDate: string;
   status: 'active' | 'archived';
@@ -60,6 +61,16 @@ export interface AcademicSection {
   updatedAt: string;
 }
 
+export type SubjectMarkComponentKey = 'theory' | 'practical' | 'viva';
+
+export interface SubjectMarkComponent {
+  key: SubjectMarkComponentKey;
+  label: string;
+  totalMarks: number;
+  passingMarks: number;
+  enabled: boolean;
+}
+
 export interface AcademicSubject {
   id: string;
   organizationId: string;
@@ -68,6 +79,7 @@ export interface AcademicSubject {
   classIds?: string[];
   totalMarks?: number;
   passingPercentage?: number;
+  markComponents?: SubjectMarkComponent[];
   description?: string;
   createdAt: string;
   updatedAt: string;
@@ -93,7 +105,10 @@ export interface AcademicCampus {
 export type AcademicsResource =
   'academic-years' | 'terms' | 'classes' | 'sections' | 'subjects';
 
-export type AcademicsFormPayload = Record<string, string | number | string[]>;
+export type AcademicsFormPayload = Record<
+  string,
+  string | number | boolean | string[] | SubjectMarkComponent[]
+>;
 
 const organizationPath = (organizationId: string) =>
   `/organizations/${encodeURIComponent(organizationId)}`;

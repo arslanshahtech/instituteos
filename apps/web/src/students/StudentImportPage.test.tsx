@@ -32,9 +32,9 @@ vi.mock('./student-import-parser.js', () => ({
     { value: 'contactEmail', label: 'Student email' },
     { value: 'phone', label: 'Student phone' },
     { value: 'status', label: 'Status' },
-    { value: 'guardianName', label: 'Parent / guardian name' },
-    { value: 'guardianPhone', label: 'Parent / guardian phone' },
-    { value: 'guardianEmail', label: 'Parent / guardian email' },
+    { value: 'guardianName', label: 'Family contact name' },
+    { value: 'guardianPhone', label: 'Family contact phone' },
+    { value: 'guardianEmail', label: 'Family contact email' },
     {
       value: 'guardianRelationship',
       label: 'Relationship to student',
@@ -203,10 +203,10 @@ describe('student import page', () => {
       sheetName: 'Students',
       headers: [
         'Student Name',
-        'Guardian Name',
-        'Guardian Phone',
-        'Guardian Email',
-        'Guardian Relationship',
+        'Family contact Name',
+        'Family contact Phone',
+        'Family contact Email',
+        'Family contact Relationship',
       ],
       rows: [
         {
@@ -239,16 +239,16 @@ describe('student import page', () => {
     });
 
     await screen.findByText(/Selected:/);
-    expect(screen.getByLabelText('Map Guardian Name')).toHaveValue(
+    expect(screen.getByLabelText('Map Family contact Name')).toHaveValue(
       'guardianName',
     );
-    expect(screen.getByLabelText('Map Guardian Phone')).toHaveValue(
+    expect(screen.getByLabelText('Map Family contact Phone')).toHaveValue(
       'guardianPhone',
     );
-    expect(screen.getByLabelText('Map Guardian Email')).toHaveValue(
+    expect(screen.getByLabelText('Map Family contact Email')).toHaveValue(
       'guardianEmail',
     );
-    expect(screen.getByLabelText('Map Guardian Relationship')).toHaveValue(
+    expect(screen.getByLabelText('Map Family contact Relationship')).toHaveValue(
       'guardianRelationship',
     );
 

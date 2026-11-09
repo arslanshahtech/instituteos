@@ -228,6 +228,7 @@ function present(
     sections: Map<string, string>;
     subjects: Map<string, string>;
     years: Map<string, string>;
+    teachers?: Map<string, string>;
   },
 ) {
   return {
@@ -245,6 +246,8 @@ function present(
     totalMarks: item.totalMarks,
     status: item.status,
     createdBy: String(item.createdBy),
+    createdByName:
+      names.teachers?.get(String(item.createdBy)) ?? 'School administration',
     createdAt: new Date(item.createdAt).toISOString(),
     updatedAt: new Date(item.updatedAt).toISOString(),
     campusName: '',
@@ -333,7 +336,7 @@ export function createHomeworkRouter(
         .limit(500)
         .lean();
       const ids = (values: unknown[]) => values.map(String);
-      const [classes, sections, subjects, years] = await Promise.all([
+      const [classes, sections, subjects, years, teachers] = await Promise.all([
         AcademicClassModel.find({
           organizationId: context.organizationId,
           _id: { $in: [...new Set(ids(records.map((x) => x.classId)))] },
@@ -358,12 +361,24 @@ export function createHomeworkRouter(
         })
           .select({ name: 1 })
           .lean(),
+        StaffMemberModel.find({
+          organizationId: context.organizationId,
+          userId: { $in: [...new Set(ids(records.map((x) => x.createdBy)))] },
+        })
+          .select({ userId: 1, firstName: 1, lastName: 1 })
+          .lean(),
       ]);
       const names = {
         classes: new Map(classes.map((x) => [String(x._id), x.name])),
         sections: new Map(sections.map((x) => [String(x._id), x.name])),
         subjects: new Map(subjects.map((x) => [String(x._id), x.name])),
         years: new Map(years.map((x) => [String(x._id), x.name])),
+        teachers: new Map(
+          teachers.map((x) => [
+            String(x.userId),
+            [x.firstName, x.lastName].filter(Boolean).join(' ') || 'Teacher',
+          ]),
+        ),
       };
       response
         .status(200)
@@ -396,7 +411,7 @@ export function createHomeworkRouter(
         ...(body.totalMarks === undefined || body.totalMarks === ''
           ? {}
           : { totalMarks: Number(body.totalMarks) }),
-        status: statusOf(body.status ?? 'published'),
+        status: statusOf(body.status ?? 'draft'),
       };
       if (
         input.totalMarks !== undefined &&
@@ -449,10 +464,10 @@ export function createHomeworkRouter(
       if (!isManager(context) && context.role !== 'teacher')
         throw new AppError(
           403,
-          'HOMEWORK_ACCESS_DENIED',
+          'HOMEWORK_CREATION_ACCESS_DENIED',
           'This role cannot create homework or tests.',
         );
-      if (context.role === 'teacher') await verifyTeacherScope(context, input);
+      await verifyTeacherScope(context, input);
       const created = await HomeworkTestModel.create({
         organizationId: context.organizationId,
         ...input,
@@ -469,25 +484,18 @@ export function createHomeworkRouter(
   );
 
   router.patch(
-    '/:organizationId/homework-tests/:itemId/status',
+    '/:organizationId/homework-tests/:itemId',
     ...write,
     csrfProtection,
     asyncHandler(async (request, response) => {
       const context = contextOf(response);
       const itemId = idOf(request.params.itemId, 'homework item');
-      const status = statusOf(bodyOf(request.body).status);
+      const body = bodyOf(request.body);
+      const status = statusOf(body.status ?? 'draft');
       const item = await HomeworkTestModel.findOne({
         _id: itemId,
         organizationId: context.organizationId,
-      })
-        .select({
-          campusId: 1,
-          classId: 1,
-          sectionId: 1,
-          academicYearId: 1,
-          subjectId: 1,
-        })
-        .lean();
+      }).lean();
       if (!item)
         throw new AppError(
           404,
@@ -507,20 +515,134 @@ export function createHomeworkRouter(
         throw new AppError(
           403,
           'HOMEWORK_ACCESS_DENIED',
-          'This role cannot manage homework or tests.',
+          'This role cannot edit homework or tests.',
         );
-      if (context.role === 'teacher')
+      if (
+        context.role === 'teacher' &&
+        String(item.createdBy) !== context.userId
+      )
+        throw new AppError(
+          403,
+          'HOMEWORK_CREATOR_ONLY',
+          'Teachers can edit only the homework or tests they created.',
+        );
+      if (context.role === 'teacher') {
         await verifyTeacherScope(context, {
           classId: String(item.classId),
           sectionId: String(item.sectionId),
           academicYearId: String(item.academicYearId),
           subjectId: String(item.subjectId),
         });
-      await HomeworkTestModel.updateOne(
+      }
+      if (Object.keys(body).length === 1 && 'status' in body) {
+        const moderated = await HomeworkTestModel.findOneAndUpdate(
+          { _id: itemId, organizationId: context.organizationId },
+          { $set: { status } },
+          { new: true, runValidators: true },
+        ).lean();
+        if (!moderated)
+          throw new AppError(
+            404,
+            'HOMEWORK_NOT_FOUND',
+            'Homework or test not found.',
+          );
+        response.status(200).json({
+          item: present(moderated, {
+            classes: new Map(),
+            sections: new Map(),
+            subjects: new Map(),
+            years: new Map(),
+          }),
+        });
+        return;
+      }
+      const input = {
+        campusId: idOf(body.campusId, 'campus'),
+        academicYearId: idOf(body.academicYearId, 'academic year'),
+        classId: idOf(body.classId, 'class'),
+        sectionId: idOf(body.sectionId, 'section'),
+        subjectId: idOf(body.subjectId, 'subject'),
+        title: stringOf(body.title, 'title', 160),
+        instructions: stringOf(
+          body.instructions ?? '',
+          'instructions',
+          5000,
+          true,
+        ),
+        type: typeOf(body.type),
+        dueDate: dateOf(body.dueDate),
+        ...(body.totalMarks === undefined || body.totalMarks === ''
+          ? {}
+          : { totalMarks: Number(body.totalMarks) }),
+        status,
+      };
+      if (
+        input.totalMarks !== undefined &&
+        (!Number.isFinite(input.totalMarks) ||
+          input.totalMarks < 0 ||
+          input.totalMarks > 100000)
+      )
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Total marks must be between 0 and 100000.',
+        );
+      const [validClass, validSection, validSubject, validYear] =
+        await Promise.all([
+          AcademicClassModel.exists({
+            _id: input.classId,
+            organizationId: context.organizationId,
+            campusId: input.campusId,
+          }),
+          AcademicSectionModel.exists({
+            _id: input.sectionId,
+            organizationId: context.organizationId,
+            classId: input.classId,
+          }),
+          SubjectModel.exists({
+            _id: input.subjectId,
+            organizationId: context.organizationId,
+          }),
+          AcademicYearModel.exists({
+            _id: input.academicYearId,
+            organizationId: context.organizationId,
+            status: 'active',
+          }),
+        ]);
+      if (!validClass || !validSection || !validSubject || !validYear)
+        throw new AppError(
+          400,
+          'INVALID_ACADEMIC_SCOPE',
+          'Choose a campus, active academic year, class, section, and subject belonging to this college.',
+        );
+      if (
+        context.campusIds.length &&
+        !context.campusIds.includes(input.campusId)
+      )
+        throw new AppError(
+          403,
+          'CAMPUS_ACCESS_DENIED',
+          'You do not have access to this campus.',
+        );
+      await verifyTeacherScope(context, input);
+      const updated = await HomeworkTestModel.findOneAndUpdate(
         { _id: itemId, organizationId: context.organizationId },
-        { $set: { status } },
-      );
-      response.status(200).json({ id: itemId, status });
+        { $set: input },
+        { new: true, runValidators: true },
+      ).lean();
+      if (!updated)
+        throw new AppError(
+          404,
+          'HOMEWORK_NOT_FOUND',
+          'Homework or test not found.',
+        );
+      const names = {
+        classes: new Map([[String(updated.classId), 'Class']]),
+        sections: new Map([[String(updated.sectionId), 'Section']]),
+        subjects: new Map([[String(updated.subjectId), 'Subject']]),
+        years: new Map([[String(updated.academicYearId), 'Academic year']]),
+      };
+      response.status(200).json({ item: present(updated, names) });
     }),
   );
 
@@ -541,6 +663,7 @@ export function createHomeworkRouter(
           sectionId: 1,
           academicYearId: 1,
           subjectId: 1,
+          createdBy: 1,
         })
         .lean();
       if (!item)
@@ -562,7 +685,16 @@ export function createHomeworkRouter(
         throw new AppError(
           403,
           'HOMEWORK_ACCESS_DENIED',
-          'This role cannot manage homework or tests.',
+          'This role cannot delete homework or tests.',
+        );
+      if (
+        context.role === 'teacher' &&
+        String(item.createdBy) !== context.userId
+      )
+        throw new AppError(
+          403,
+          'HOMEWORK_CREATOR_ONLY',
+          'Teachers can delete only the homework or tests they created.',
         );
       if (context.role === 'teacher')
         await verifyTeacherScope(context, {

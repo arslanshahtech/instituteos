@@ -112,6 +112,11 @@ const studentSectionPlacementSchema = new Schema(
       required: true,
     },
     campusId: { type: Schema.Types.ObjectId, ref: 'Campus', required: true },
+    feeOverrideAmount: { type: Schema.Types.Decimal128, min: 0 },
+    feeOverrideMode: {
+      type: String,
+      enum: ['custom', 'current'],
+    },
     status: {
       type: String,
       enum: ['active', 'inactive'],

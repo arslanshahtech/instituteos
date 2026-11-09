@@ -34,6 +34,7 @@ export interface StudentPortalRecord {
     id: string;
     examName: string;
     subjectName: string;
+    teacherName?: string;
     date: string | null;
     marksObtained: number | null;
     totalMarks: number;
@@ -42,6 +43,16 @@ export interface StudentPortalRecord {
     isAbsent: boolean;
   }>;
   resultsAvailable: boolean;
+  homework: Array<{
+    id: string;
+    title: string;
+    instructions: string;
+    type: string;
+    dueDate: string | null;
+    totalMarks: number | null;
+    subjectName: string;
+    teacherName?: string;
+  }>;
 }
 
 export interface PortalMeResponse {

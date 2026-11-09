@@ -440,7 +440,7 @@ export function StudentImportPage() {
                 <tr>
                   <th>Row</th>
                   <th>Student</th>
-                  <th>Parent / guardian</th>
+                  <th>Family contact</th>
                   <th>Status</th>
                   <th>Review notes</th>
                 </tr>
@@ -453,7 +453,7 @@ export function StudentImportPage() {
                       {row.firstName || row.input?.firstName || '—'}{' '}
                       {row.lastName || row.input?.lastName || ''}
                     </td>
-                    <td data-label="Parent / guardian">
+                    <td data-label="Family contact">
                       {row.guardian
                         ? `${row.guardian.firstName} ${row.guardian.lastName}`
                         : 'Not provided'}

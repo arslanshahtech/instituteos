@@ -227,7 +227,12 @@ export function AcademicSessionsReferenceView({
                           {session.name}
                         </strong>
                         <small className="academic-session-created">
-                          {session.status === 'active' ? 'Current' : 'Archived'}
+                          {session.status === 'active'
+                            ? 'Current'
+                            : activeSession &&
+                                session.startDate > activeSession.startDate
+                              ? 'Upcoming'
+                              : 'Archived'}
                         </small>
                       </td>
                       <td data-label="Description">

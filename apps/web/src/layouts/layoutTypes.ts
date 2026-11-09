@@ -40,7 +40,7 @@ export const roleLayouts = [
   },
   {
     key: 'parent',
-    label: 'Parent / guardian',
+    label: 'Family contact',
     workspaceTitle: 'Family workspace',
     description: 'Your child’s fees, attendance, results and college messages.',
   },

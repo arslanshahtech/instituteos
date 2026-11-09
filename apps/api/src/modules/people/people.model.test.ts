@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { StaffMemberModel, StudentModel } from './people.model.js';
+import { EnrollmentModel, StaffMemberModel, StudentModel } from './people.model.js';
 
 describe('student schema indexes', () => {
+  it('enforces registration uniqueness only for actual registration strings', () => {
+    const index = StudentModel.schema
+      .indexes()
+      .find(([, options]) => options.name === 'uniq_student_registration_number');
+
+    expect(index).toBeDefined();
+    expect(index?.[0]).toEqual({ organizationId: 1, registrationNumber: 1 });
+    expect(index?.[1]).toMatchObject({
+      unique: true,
+      partialFilterExpression: { registrationNumber: { $type: 'string' } },
+    });
+    expect(index?.[1]).not.toHaveProperty('sparse');
+  });
+
   it('keeps standalone source application IDs null ObjectId fields', () => {
     const sourceApplicationPath = StudentModel.schema.path(
       'sourceApplicationId',
@@ -52,6 +66,22 @@ describe('student schema indexes', () => {
       partialFilterExpression: {
         sourceApplicationId: { $type: 'objectId' },
       },
+    });
+    expect(index?.[1]).not.toHaveProperty('sparse');
+  });
+});
+
+describe('enrollment schema indexes', () => {
+  it('enforces application uniqueness only when a source application ObjectId exists', () => {
+    const index = EnrollmentModel.schema
+      .indexes()
+      .find(([, options]) => options.name === 'uniq_enrollment_application_record');
+
+    expect(index).toBeDefined();
+    expect(index?.[0]).toEqual({ organizationId: 1, sourceApplicationId: 1 });
+    expect(index?.[1]).toMatchObject({
+      unique: true,
+      partialFilterExpression: { sourceApplicationId: { $type: 'objectId' } },
     });
     expect(index?.[1]).not.toHaveProperty('sparse');
   });

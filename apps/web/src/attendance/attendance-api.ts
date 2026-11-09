@@ -32,6 +32,20 @@ export type StudentAttendanceStatus = 'present' | 'absent' | 'leave' | 'late';
 export type StaffAttendanceStatus =
   'present' | 'absent' | 'half-day' | 'on-leave';
 
+export interface StudentAttendancePolicy {
+  timezone: string;
+  markingCutoffTime: string;
+  autoMarkUnmarkedAbsent: boolean;
+  allowAdminOverride: boolean;
+  workingDays: string[];
+}
+
+export function getStudentAttendancePolicy(organizationId: string) {
+  return apiRequest<{ policy: StudentAttendancePolicy }>(
+    organizationPath(organizationId) + '/attendance/policy',
+  );
+}
+
 export interface AttendancePerson {
   id: string;
   firstName: string;
@@ -65,6 +79,8 @@ export interface StaffAttendanceRecord {
   date: string;
   status: StaffAttendanceStatus;
   remarks?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 const organizationPath = (organizationId: string) =>
@@ -180,7 +196,14 @@ export function saveStudentAttendance(
 
 export function listStudentAttendance(
   organizationId: string,
-  input: { dateFrom?: string; dateTo?: string; sectionId?: string },
+  input: {
+    dateFrom?: string;
+    dateTo?: string;
+    sectionId?: string;
+    classId?: string;
+    campusId?: string;
+    academicYearId?: string;
+  },
 ) {
   const query = Object.fromEntries(
     Object.entries(input).filter((entry): entry is [string, string] =>
@@ -194,7 +217,12 @@ export function listStudentAttendance(
 
 export function listStaffAttendance(
   organizationId: string,
-  input: { dateFrom?: string; dateTo?: string; campusId?: string },
+  input: {
+    dateFrom?: string;
+    dateTo?: string;
+    campusId?: string;
+    staffId?: string;
+  },
 ) {
   const query = Object.fromEntries(
     Object.entries(input).filter((entry): entry is [string, string] =>

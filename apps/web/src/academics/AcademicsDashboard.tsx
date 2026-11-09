@@ -191,6 +191,20 @@ export function AcademicsDashboard() {
   }, [requestedTab]);
   const [editing, setEditing] = useState<AcademicsRow>();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [sessionCreatePageOpen, setSessionCreatePageOpen] = useState(false);
+  const requestedAction = searchParams.get('action');
+  const returnTo = searchParams.get('returnTo');
+  useEffect(() => {
+    if (
+      requestedTab === 'curriculum-sessions' &&
+      requestedAction === 'create'
+    ) {
+      setActiveArea('academic-years');
+      setResource('academic-years');
+      setEditing(undefined);
+      setSessionCreatePageOpen(true);
+    }
+  }, [requestedTab, requestedAction]);
   const [showEnrollment, setShowEnrollment] = useState(false);
   const [enrollmentView, setEnrollmentView] = useState<
     'students' | 'add-students'
@@ -344,6 +358,13 @@ export function AcademicsDashboard() {
     setEditing(undefined);
     setDialogOpen(true);
   };
+  const openSessionCreate = () => {
+    if (!canWriteAcademics) return;
+    save.reset();
+    setEditing(undefined);
+    setResource('academic-years');
+    setSessionCreatePageOpen(true);
+  };
   const beginEdit = (item: AcademicsRow) => {
     if (!canWriteResource) return;
     save.reset();
@@ -401,6 +422,7 @@ export function AcademicsDashboard() {
               save.reset();
               remove.reset();
               setSubjectFormOpen(false);
+              setSessionCreatePageOpen(false);
               setEditing(undefined);
               setActiveArea(area);
               setResourceSearch('');
@@ -890,6 +912,59 @@ export function AcademicsDashboard() {
         />
       );
     }
+    if (sessionCreatePageOpen) {
+      return (
+        <main className="page-stack academic-session-create-page">
+          <WorkspacePageHeading
+            eyebrow="Curriculum"
+            title="Create New Session"
+            description="Add a new academic session to your school."
+          />
+          <section
+            aria-labelledby="academic-session-information-title"
+            className="academic-session-create-card"
+          >
+            <header>
+              <h2 id="academic-session-information-title">
+                Session Information
+              </h2>
+              <p>Enter the details for the new academic session</p>
+            </header>
+            <AcademicsForm
+              choices={choices}
+              isSaving={save.isPending}
+              onCancel={() => {
+                setSessionCreatePageOpen(false);
+                save.reset();
+              }}
+              onSubmit={(input) =>
+                save.mutate(
+                  { resource: 'academic-years', data: input },
+                  {
+                    onSuccess: (result) => {
+                      setSessionCreatePageOpen(false);
+                      if (returnTo?.startsWith('/admin/organizations/')) {
+                        const createdSessionId = (
+                          result as
+                            { academicYear?: { id?: string } } | undefined
+                        )?.academicYear?.id;
+                        const destination = createdSessionId
+                          ? `${returnTo}${returnTo.includes('?') ? '&' : '?'}createdSessionId=${encodeURIComponent(createdSessionId)}`
+                          : returnTo;
+                        navigate(destination);
+                      }
+                    },
+                  },
+                )
+              }
+              resource="academic-years"
+              saveError={save.error ? apiMessage(save.error) : undefined}
+              submitLabel="Create Session"
+            />
+          </section>
+        </main>
+      );
+    }
     return (
       <>
         <AcademicSessionsReferenceView
@@ -902,7 +977,7 @@ export function AcademicsDashboard() {
             }
           }
           canWrite={canWriteResource}
-          onCreate={beginCreate}
+          onCreate={openSessionCreate}
           onEdit={(session) =>
             beginEdit(
               row(
@@ -928,10 +1003,10 @@ export function AcademicsDashboard() {
           </p>
         )}
         <Dialog
-          description={`${editing ? 'Update' : 'Create'} session for this organization.`}
+          description="Update session information for this organization."
           onOpenChange={(open) => setDialogOpen(open)}
           open={dialogOpen}
-          title={`${editing ? 'Edit' : 'Add'} session`}
+          title="Edit Session"
         >
           <AcademicsForm
             choices={choices}

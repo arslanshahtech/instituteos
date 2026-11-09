@@ -85,32 +85,48 @@ export function StaffHeading({
   description,
   organizationId,
   action,
+  showDirectoryLink = false,
+  backTo,
+  backLabel = 'Members',
   eyebrow = 'Organization workspace',
 }: {
   title: string;
   description: string;
   organizationId: string;
   action?: ReactNode;
+  showDirectoryLink?: boolean;
+  backTo?: string;
+  backLabel?: string;
   eyebrow?: string;
 }) {
   return (
-    <WorkspacePageHeading
+    <>
+      {backTo && (
+        <Link className="staff-heading-back-link" to={backTo}>
+          <span aria-hidden="true">←</span>
+          {backLabel}
+        </Link>
+      )}
+      <WorkspacePageHeading
       className="student-page-heading"
       eyebrow={eyebrow}
       title={title}
       description={description}
       aside={
         <div className="student-page-actions">
-          <Link
-            className="button button-secondary"
-            to={`/admin/organizations/${encodeURIComponent(organizationId)}/staff`}
-          >
-            Staff directory
-          </Link>
+          {showDirectoryLink && (
+            <Link
+              className="button button-secondary"
+              to={`/admin/organizations/${encodeURIComponent(organizationId)}/staff`}
+            >
+              Staff directory
+            </Link>
+          )}
           {action}
         </div>
       }
-    />
+      />
+    </>
   );
 }
 

@@ -3,6 +3,7 @@ import { EmptyState } from './States.js';
 
 export interface TableColumn<T> {
   header: string;
+  headerRender?: () => ReactNode;
   render: (row: T, index: number) => ReactNode;
   align?: 'left' | 'center' | 'right';
 }
@@ -38,13 +39,13 @@ export function DataTable<T>({
         <caption className="visually-hidden">{caption}</caption>
         <thead>
           <tr>
-            {columns.map((column) => (
+            {columns.map((column, columnIndex) => (
               <th
-                key={column.header}
+                key={`${column.header}-${columnIndex}`}
                 scope="col"
                 className={column.align ? `align-${column.align}` : undefined}
               >
-                {column.header}
+                {column.headerRender ? column.headerRender() : column.header}
               </th>
             ))}
           </tr>

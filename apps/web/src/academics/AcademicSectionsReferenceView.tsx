@@ -7,6 +7,7 @@ import {
   Trash2,
   Users,
   BookOpen,
+  Armchair,
 } from 'lucide-react';
 import type {
   AcademicClass,
@@ -85,6 +86,10 @@ export function AcademicSectionsReferenceView({
     (page - 1) * pageSize,
     page * pageSize,
   );
+  const totalCapacity = sections.reduce(
+    (total, section) => total + (section.capacity ?? 0),
+    0,
+  );
   const metrics = [
     {
       label: 'Sections',
@@ -106,6 +111,13 @@ export function AcademicSectionsReferenceView({
       value: String(sessionStats?.students ?? 0),
       detail: 'Enrolled this academic year',
       icon: Users,
+    },
+    {
+      label: 'Seat Capacity',
+      value: String(totalCapacity),
+      detail: 'Configured across all sections',
+      icon: Armchair,
+      className: 'academic-sections-metric-capacity',
     },
   ];
 

@@ -7,7 +7,7 @@ import {
   WorkspaceSearchField,
   WorkspaceModuleSection,
   WorkspaceModuleToolbar,
-  WorkspaceGuardianCard,
+  WorkspaceFamilyContactCard,
 } from '../components/ui/WorkspacePrimitives.js';
 import { ApiError } from '../api/client.js';
 import { Pagination } from '../components/ui/Pagination.js';
@@ -21,19 +21,19 @@ import { useToast } from '../components/ui/ToastProvider.js';
 import { listStudents } from '../students/students-api.js';
 import { getOrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import type { OrganizationAccessContext } from '../tenancy/tenancy-api.js';
-import { GuardianForm } from './GuardianForm.js';
-import type { GuardianInput } from './guardians-api.js';
-import { getGuardian, listGuardians } from './guardians-api.js';
-import type { GuardianRelationship } from './guardians-api.js';
+import { FamilyContactForm } from './FamilyContactForm.js';
+import type { FamilyContactInput } from './family-contacts-api.js';
+import { getFamilyContact, listFamilyContacts } from './family-contacts-api.js';
+import type { FamilyContactRelationship } from './family-contacts-api.js';
 import {
-  useCreateGuardian,
-  useGuardian,
-  useGuardians,
-  useLinkGuardian,
-  useStudentGuardians,
-  useUnlinkGuardian,
-  useUpdateGuardian,
-} from './guardian-queries.js';
+  useCreateFamilyContact,
+  useFamilyContact,
+  useFamilyContacts,
+  useLinkFamilyContact,
+  useStudentFamilyContacts,
+  useUnlinkFamilyContact,
+  useUpdateFamilyContact,
+} from './family-contact-queries.js';
 
 const PAGE_SIZE = 20;
 const CHOICE_PAGE_SIZE = 20;
@@ -57,7 +57,7 @@ function useOrganizationAccess(organizationId: string) {
   });
 }
 
-function GuardianAccess({
+function FamilyContactAccess({
   organizationId,
   permission,
   children,
@@ -76,7 +76,7 @@ function GuardianAccess({
         description={
           access.error
             ? apiMessage(access.error)
-            : 'Guardian access could not be verified.'
+            : 'Family contact access could not be verified.'
         }
         onRetry={() => void access.refetch()}
       />
@@ -86,7 +86,7 @@ function GuardianAccess({
   return children(access.data);
 }
 
-function GuardianHeading({
+function FamilyContactHeading({
   organizationId,
   title,
   description,
@@ -107,9 +107,9 @@ function GuardianHeading({
         <div className="student-page-actions">
           <Link
             className="button button-secondary"
-            to={`/admin/organizations/${encodeURIComponent(organizationId)}/guardians`}
+            to={`/admin/organizations/${encodeURIComponent(organizationId)}/family-contacts`}
           >
-            Guardian directory
+            Family contact directory
           </Link>
           {action}
         </div>
@@ -118,7 +118,7 @@ function GuardianHeading({
   );
 }
 
-export function GuardiansListPage() {
+export function FamilyContactsListPage() {
   const { organizationId = '' } = useParams();
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -133,7 +133,7 @@ export function GuardiansListPage() {
     return () => window.clearTimeout(timeout);
   }, [searchInput]);
 
-  const guardians = useGuardians(
+  const guardians = useFamilyContacts(
     organizationId,
     { search, page, pageSize: PAGE_SIZE },
     Boolean(access.data?.permissions.includes('guardian.read')),
@@ -142,36 +142,39 @@ export function GuardiansListPage() {
     access.data?.permissions.includes('guardian.create') ?? false;
   const guardianChildrenQueries = useQueries({
     queries: (guardians.data?.items ?? []).map((guardian) => ({
-      queryKey: ['guardian-detail', organizationId, guardian.id],
-      queryFn: () => getGuardian(organizationId, guardian.id),
+      queryKey: ['family-contact-detail', organizationId, guardian.id],
+      queryFn: () => getFamilyContact(organizationId, guardian.id),
       enabled: Boolean(access.data?.permissions.includes('guardian.read')),
       staleTime: 60_000,
     })),
   });
 
   return (
-    <GuardianAccess organizationId={organizationId} permission="guardian.read">
+    <FamilyContactAccess
+      organizationId={organizationId}
+      permission="guardian.read"
+    >
       {() => (
         <main className="page-stack student-management-page reference-live-module">
-          <GuardianHeading
+          <FamilyContactHeading
             action={
               canCreate ? (
                 <Link
                   className="button button-primary"
-                  to={`/admin/organizations/${encodeURIComponent(organizationId)}/guardians/new`}
+                  to={`/admin/organizations/${encodeURIComponent(organizationId)}/family-contacts/new`}
                 >
-                  Add guardian
+                  Add family contact
                 </Link>
               ) : undefined
             }
-            description="Search and manage guardian contact records."
+            description="Search and manage family contact records."
             organizationId={organizationId}
-            title="Guardians"
+            title="Family contacts"
           />
           <WorkspaceModuleSection className="student-list-panel panel">
             <WorkspaceModuleToolbar>
               <WorkspaceSearchField
-                label="Search guardians"
+                label="Search family contacts"
                 onChange={setSearchInput}
                 placeholder="Search name or email..."
                 value={searchInput}
@@ -181,7 +184,7 @@ export function GuardiansListPage() {
               <LoadingState message="Loading guardians…" />
             ) : guardians.isError ? (
               <ErrorState
-                title="Guardians unavailable"
+                title="Family contacts unavailable"
                 description={apiMessage(guardians.error)}
                 onRetry={() => void guardians.refetch()}
               />
@@ -191,7 +194,7 @@ export function GuardiansListPage() {
                   <EmptyState
                     title={
                       search
-                        ? 'No guardians match this search'
+                        ? 'No family contacts match this search'
                         : 'No guardians yet'
                     }
                     description={
@@ -202,14 +205,14 @@ export function GuardiansListPage() {
                   />
                 ) : (
                   <div
-                    className="reference-guardian-grid"
-                    aria-label="Guardian directory"
+                    className="reference-family-contact-grid"
+                    aria-label="Family contact directory"
                   >
                     {guardians.data.items.map((guardian, index) => {
                       const linkedStudents =
                         guardianChildrenQueries[index]?.data?.students ?? [];
                       return (
-                        <WorkspaceGuardianCard
+                        <WorkspaceFamilyContactCard
                           childCount={
                             guardian.studentCount ?? linkedStudents.length
                           }
@@ -228,7 +231,7 @@ export function GuardiansListPage() {
                           name={`${guardian.firstName} ${guardian.lastName}`}
                           phone={guardian.phone}
                           relationship={guardian.relationship}
-                          to={`/admin/organizations/${encodeURIComponent(organizationId)}/guardians/${encodeURIComponent(guardian.id)}`}
+                          to={`/admin/organizations/${encodeURIComponent(organizationId)}/family-contacts/${encodeURIComponent(guardian.id)}`}
                         />
                       );
                     })}
@@ -245,11 +248,11 @@ export function GuardiansListPage() {
           </WorkspaceModuleSection>
         </main>
       )}
-    </GuardianAccess>
+    </FamilyContactAccess>
   );
 }
 
-export function GuardianCreatePage() {
+export function FamilyContactCreatePage() {
   const { organizationId = '' } = useParams();
   const navigate = useNavigate();
   const access = useOrganizationAccess(organizationId);
@@ -269,7 +272,7 @@ export function GuardianCreatePage() {
     return () => window.clearTimeout(timeout);
   }, [studentSearchInput]);
   const students = useQuery({
-    queryKey: ['guardian-student-choices', organizationId, studentSearch],
+    queryKey: ['family-contact-student-choices', organizationId, studentSearch],
     queryFn: () =>
       listStudents(organizationId, {
         search: studentSearch,
@@ -280,17 +283,17 @@ export function GuardianCreatePage() {
     retry: false,
   });
   const [studentId, setStudentId] = useState('');
-  const mutation = useCreateGuardian(organizationId);
+  const mutation = useCreateFamilyContact(organizationId);
   const { showToast } = useToast();
 
-  const submit = (input: GuardianInput, selectedStudentId?: string) => {
+  const submit = (input: FamilyContactInput, selectedStudentId?: string) => {
     mutation.mutate(
       { ...input, studentId: selectedStudentId },
       {
         onSuccess: ({ guardian }) => {
-          showToast('Guardian created successfully.');
+          showToast('Family contact created successfully.');
           navigate(
-            `/admin/organizations/${encodeURIComponent(organizationId)}/guardians/${encodeURIComponent(guardian.id)}`,
+            `/admin/organizations/${encodeURIComponent(organizationId)}/family-contacts/${encodeURIComponent(guardian.id)}`,
           );
         },
       },
@@ -298,19 +301,19 @@ export function GuardianCreatePage() {
   };
 
   return (
-    <GuardianAccess
+    <FamilyContactAccess
       organizationId={organizationId}
       permission="guardian.create"
     >
       {() => (
         <main className="page-stack student-management-page reference-live-module">
-          <GuardianHeading
-            description="Add a guardian contact record to this organization."
+          <FamilyContactHeading
+            description="Add a family contact record to this organization."
             organizationId={organizationId}
-            title="Add guardian"
+            title="Add family contact"
           />
           <section className="student-form-panel panel">
-            <GuardianForm
+            <FamilyContactForm
               canLinkStudent={canLinkStudent}
               isSaving={mutation.isPending}
               onStudentChange={setStudentId}
@@ -330,14 +333,14 @@ export function GuardianCreatePage() {
           </section>
         </main>
       )}
-    </GuardianAccess>
+    </FamilyContactAccess>
   );
 }
 
-export function GuardianDetailPage() {
+export function FamilyContactDetailPage() {
   const { organizationId = '', guardianId = '' } = useParams();
   const access = useOrganizationAccess(organizationId);
-  const guardian = useGuardian(
+  const guardian = useFamilyContact(
     organizationId,
     guardianId,
     Boolean(access.data?.permissions.includes('guardian.read')),
@@ -349,7 +352,7 @@ export function GuardianDetailPage() {
     return (
       <ErrorState
         title="Organization unavailable"
-        description="Guardian access could not be verified."
+        description="Family contact access could not be verified."
         onRetry={() => void access.refetch()}
       />
     );
@@ -359,7 +362,7 @@ export function GuardianDetailPage() {
   if (guardian.isError)
     return (
       <ErrorState
-        title="Guardian unavailable"
+        title="Family contact unavailable"
         description={apiMessage(guardian.error)}
         onRetry={() => void guardian.refetch()}
       />
@@ -369,24 +372,24 @@ export function GuardianDetailPage() {
   const canUpdate = access.data.permissions.includes('guardian.update');
   return (
     <main className="page-stack student-management-page reference-live-module">
-      <GuardianHeading
+      <FamilyContactHeading
         action={
           canUpdate ? (
             <Link
               className="button button-primary"
-              to={`/admin/organizations/${encodeURIComponent(organizationId)}/guardians/${encodeURIComponent(guardianId)}/edit`}
+              to={`/admin/organizations/${encodeURIComponent(organizationId)}/family-contacts/${encodeURIComponent(guardianId)}/edit`}
             >
-              Edit guardian
+              Edit family contact
             </Link>
           ) : undefined
         }
 
-        description="Guardian contact details and linked students."
+        description="Family contact details and linked students."
         organizationId={organizationId}
         title={`${record.firstName} ${record.lastName}`}
       />
       <section className="student-detail-panel panel">
-        <h2>Guardian details</h2>
+        <h2>Family contact details</h2>
         <dl className="student-details">
           <div>
             <dt>Relationship</dt>
@@ -409,7 +412,7 @@ export function GuardianDetailPage() {
       <section className="student-detail-panel panel">
         <h2>Linked students</h2>
         {guardian.data.students.length ? (
-          <ul className="guardian-linked-list">
+          <ul className="family-contact-linked-list">
             {guardian.data.students.map((relation) => (
               <li key={relation.id}>
                 <Link
@@ -426,7 +429,7 @@ export function GuardianDetailPage() {
           </ul>
         ) : (
           <p className="page-description">
-            This guardian is not linked to a student.
+            This family contact is not linked to a student.
           </p>
         )}
       </section>
@@ -434,11 +437,11 @@ export function GuardianDetailPage() {
   );
 }
 
-export function GuardianEditPage() {
+export function FamilyContactEditPage() {
   const { organizationId = '', guardianId = '' } = useParams();
   const navigate = useNavigate();
   const access = useOrganizationAccess(organizationId);
-  const guardian = useGuardian(
+  const guardian = useFamilyContact(
     organizationId,
     guardianId,
     Boolean(
@@ -446,21 +449,21 @@ export function GuardianEditPage() {
       access.data.permissions.includes('guardian.read'),
     ),
   );
-  const mutation = useUpdateGuardian(organizationId, guardianId);
+  const mutation = useUpdateFamilyContact(organizationId, guardianId);
   const { showToast } = useToast();
-  const submit = (input: GuardianInput) => {
+  const submit = (input: FamilyContactInput) => {
     mutation.mutate(input, {
       onSuccess: () => {
-        showToast('Guardian changes saved.');
+        showToast('Family contact changes saved.');
         navigate(
-          `/admin/organizations/${encodeURIComponent(organizationId)}/guardians/${encodeURIComponent(guardianId)}`,
+          `/admin/organizations/${encodeURIComponent(organizationId)}/family-contacts/${encodeURIComponent(guardianId)}`,
         );
       },
     });
   };
 
   return (
-    <GuardianAccess
+    <FamilyContactAccess
       organizationId={organizationId}
       permission="guardian.update"
     >
@@ -471,19 +474,19 @@ export function GuardianEditPage() {
           <LoadingState message="Loading guardian…" />
         ) : guardian.isError ? (
           <ErrorState
-            title="Guardian unavailable"
+            title="Family contact unavailable"
             description={apiMessage(guardian.error)}
             onRetry={() => void guardian.refetch()}
           />
         ) : (
           <main className="page-stack student-management-page reference-live-module">
-            <GuardianHeading
-              description="Update guardian contact information."
+            <FamilyContactHeading
+              description="Update family contact information."
               organizationId={organizationId}
-              title="Edit guardian"
+              title="Edit family contact"
             />
             <section className="student-form-panel panel">
-              <GuardianForm
+              <FamilyContactForm
                 canLinkStudent={false}
                 guardian={guardian.data.guardian}
                 isSaving={mutation.isPending}
@@ -502,11 +505,11 @@ export function GuardianEditPage() {
           </main>
         )
       }
-    </GuardianAccess>
+    </FamilyContactAccess>
   );
 }
 
-export function StudentGuardiansSection({
+export function StudentFamilyContactsSection({
   organizationId,
   studentId,
   canRead,
@@ -517,21 +520,25 @@ export function StudentGuardiansSection({
   canRead: boolean;
   canUpdate: boolean;
 }) {
-  const [guardianSearchInput, setGuardianSearchInput] = useState('');
-  const [guardianSearch, setGuardianSearch] = useState('');
+  const [guardianSearchInput, setFamilyContactSearchInput] = useState('');
+  const [guardianSearch, setFamilyContactSearch] = useState('');
   useEffect(() => {
     const timeout = window.setTimeout(
-      () => setGuardianSearch(guardianSearchInput.trim()),
+      () => setFamilyContactSearch(guardianSearchInput.trim()),
       250,
     );
     return () => window.clearTimeout(timeout);
   }, [guardianSearchInput]);
-  const relations = useStudentGuardians(organizationId, studentId, canRead);
+  const relations = useStudentFamilyContacts(
+    organizationId,
+    studentId,
+    canRead,
+  );
   const canManage = canRead && canUpdate;
   const guardianChoices = useQuery({
-    queryKey: ['guardian-link-choices', organizationId, guardianSearch],
+    queryKey: ['family-contact-link-choices', organizationId, guardianSearch],
     queryFn: () =>
-      listGuardians(organizationId, {
+      listFamilyContacts(organizationId, {
         search: guardianSearch,
         page: 1,
         pageSize: CHOICE_PAGE_SIZE,
@@ -539,12 +546,12 @@ export function StudentGuardiansSection({
     enabled: canManage,
     retry: false,
   });
-  const linkMutation = useLinkGuardian(organizationId, studentId);
-  const unlinkMutation = useUnlinkGuardian(organizationId, studentId);
+  const linkMutation = useLinkFamilyContact(organizationId, studentId);
+  const unlinkMutation = useUnlinkFamilyContact(organizationId, studentId);
   const { showToast } = useToast();
-  const [guardianId, setGuardianId] = useState('');
+  const [guardianId, setFamilyContactId] = useState('');
   const [relationship, setRelationship] =
-    useState<GuardianRelationship>('guardian');
+    useState<FamilyContactRelationship>('guardian');
   const [isPrimary, setIsPrimary] = useState(false);
 
   const link = () => {
@@ -553,9 +560,9 @@ export function StudentGuardiansSection({
       { guardianId, relationship, isPrimary },
       {
         onSuccess: () => {
-          setGuardianId('');
+          setFamilyContactId('');
           setIsPrimary(false);
-          showToast('Guardian linked to student.');
+          showToast('Family contact linked to student.');
         },
       },
     );
@@ -563,24 +570,24 @@ export function StudentGuardiansSection({
 
   return (
     <section className="student-detail-panel panel">
-      <h2>Guardians</h2>
+      <h2>Family contacts</h2>
       {!canRead ? (
         <PermissionDeniedState />
       ) : relations.isPending ? (
         <LoadingState message="Loading student guardians…" />
       ) : relations.isError ? (
         <ErrorState
-          title="Guardians unavailable"
+          title="Family contacts unavailable"
           description={apiMessage(relations.error)}
           onRetry={() => void relations.refetch()}
         />
       ) : relations.data.relations.length ? (
-        <ul className="guardian-linked-list">
+        <ul className="family-contact-linked-list">
           {relations.data.relations.map((relation) => (
             <li key={relation.id}>
               <div>
                 <Link
-                  to={`/admin/organizations/${encodeURIComponent(organizationId)}/guardians/${encodeURIComponent(relation.guardian.id)}`}
+                  to={`/admin/organizations/${encodeURIComponent(organizationId)}/family-contacts/${encodeURIComponent(relation.guardian.id)}`}
                 >
                   {relation.guardian.firstName} {relation.guardian.lastName}
                 </Link>
@@ -595,7 +602,7 @@ export function StudentGuardiansSection({
                   disabled={unlinkMutation.isPending}
                   onClick={() =>
                     unlinkMutation.mutate(relation.guardian.id, {
-                      onSuccess: () => showToast('Guardian unlinked.'),
+                      onSuccess: () => showToast('Family contact unlinked.'),
                     })
                   }
                   type="button"
@@ -608,17 +615,19 @@ export function StudentGuardiansSection({
         </ul>
       ) : (
         <p className="page-description">
-          No guardians are linked to this student yet.
+          No family contacts are linked to this student yet.
         </p>
       )}
       {canManage && (
-        <div className="guardian-link-controls">
+        <div className="family-contact-link-controls">
           <label className="form-field">
-            <span>Find guardian</span>
+            <span>Find family contact</span>
             <input
               autoComplete="off"
-              onChange={(event) => setGuardianSearchInput(event.target.value)}
-              placeholder="Search by guardian name or email"
+              onChange={(event) =>
+                setFamilyContactSearchInput(event.target.value)
+              }
+              placeholder="Search by family contact name or email"
               value={guardianSearchInput}
             />
           </label>
@@ -626,19 +635,19 @@ export function StudentGuardiansSection({
             <LoadingState message="Loading guardian choices…" />
           ) : guardianChoices.isError ? (
             <ErrorState
-              title="Guardian choices unavailable"
+              title="Family contact choices unavailable"
               description={apiMessage(guardianChoices.error)}
               onRetry={() => void guardianChoices.refetch()}
             />
           ) : (
             <>
               <label className="form-field">
-                <span>Link existing guardian</span>
+                <span>Link existing family contact</span>
                 <select
-                  onChange={(event) => setGuardianId(event.target.value)}
+                  onChange={(event) => setFamilyContactId(event.target.value)}
                   value={guardianId}
                 >
-                  <option value="">Select a guardian</option>
+                  <option value="">Select a family contact</option>
                   {guardianChoices.data.items
                     .filter(
                       (guardian) =>
@@ -660,15 +669,17 @@ export function StudentGuardiansSection({
               ) && (
                 <p className="page-description" role="status">
                   {guardianChoices.data.items.length
-                    ? 'All matching guardians are already linked.'
-                    : 'No matching guardians found.'}
+                    ? 'All matching family contacts are already linked.'
+                    : 'No matching family contacts found.'}
                 </p>
               )}
               <label className="form-field">
                 <span>Relationship to student</span>
                 <select
                   onChange={(event) =>
-                    setRelationship(event.target.value as GuardianRelationship)
+                    setRelationship(
+                      event.target.value as FamilyContactRelationship,
+                    )
                   }
                   value={relationship}
                 >
@@ -678,7 +689,7 @@ export function StudentGuardiansSection({
                   <option value="other">Other</option>
                 </select>
               </label>
-              <label className="guardian-primary-option">
+              <label className="family-contact-primary-option">
                 <input
                   checked={isPrimary}
                   onChange={(event) => setIsPrimary(event.target.checked)}
@@ -692,7 +703,7 @@ export function StudentGuardiansSection({
                 onClick={link}
                 type="button"
               >
-                {linkMutation.isPending ? 'Linking…' : 'Link guardian'}
+                {linkMutation.isPending ? 'Linking…' : 'Link family contact'}
               </button>
             </>
           )}

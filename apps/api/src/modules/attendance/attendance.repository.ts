@@ -14,6 +14,7 @@ import { AuthUserModel } from '../auth/auth.model.js';
 import { CampusModel } from '../tenancy/tenancy.model.js';
 import { StaffMemberModel, StudentModel } from '../people/people.model.js';
 import { OrganizationSettingsModel } from '../settings/settings.model.js';
+import { AttendanceSettingsModel } from './attendance-settings.model.js';
 import {
   StaffAttendanceModel,
   StudentAttendanceModel,
@@ -103,6 +104,35 @@ function dateRangeFilter(input: {
 }
 
 export class MongoAttendanceRepository implements AttendanceRepository {
+  async getAttendanceSettings(organizationId: string) {
+    const organizationObjectId = oid(organizationId);
+    const settings = await AttendanceSettingsModel.findOneAndUpdate(
+      { organizationId: organizationObjectId },
+      { $setOnInsert: { organizationId: organizationObjectId } },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true,
+        runValidators: true,
+      },
+    )
+      .select({
+        timezone: 1,
+        markingCutoffTime: 1,
+        autoMarkUnmarkedAbsent: 1,
+        allowAdminOverride: 1,
+      })
+      .lean();
+    return settings
+      ? {
+          timezone: settings.timezone || 'Asia/Karachi',
+          markingCutoffTime: settings.markingCutoffTime || '09:00',
+          autoMarkUnmarkedAbsent: settings.autoMarkUnmarkedAbsent === true,
+          allowAdminOverride: settings.allowAdminOverride !== false,
+        }
+      : null;
+  }
+
   async getTeacherSelfAttendanceConfig(
     organizationId: string,
   ): Promise<TeacherSelfAttendanceConfig> {
@@ -810,7 +840,9 @@ export class MongoAttendanceRepository implements AttendanceRepository {
     if (input.studentId) filter.studentId = oid(input.studentId);
     if (input.classId) filter.classId = oid(input.classId);
     if (input.sectionId) filter.sectionId = oid(input.sectionId);
-    if (input.academicYearIds) {
+    if (input.academicYearId) {
+      filter.academicYearId = oid(input.academicYearId);
+    } else if (input.academicYearIds) {
       if (input.academicYearIds.length === 0) return [];
       filter.academicYearId = { $in: input.academicYearIds.map(oid) };
     }

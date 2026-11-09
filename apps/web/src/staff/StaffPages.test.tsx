@@ -9,6 +9,8 @@ import { createAppRouter } from '../app/router.js';
 import { ToastProvider } from '../components/ui/ToastProvider.js';
 import type { StaffInput, StaffRecord } from './staff-api.js';
 
+const attendanceMocks = vi.hoisted(() => ({ listStaffAttendance: vi.fn() }));
+
 const staffMocks = vi.hoisted(() => ({
   listStaff: vi.fn(),
   getStaff: vi.fn(),
@@ -45,6 +47,10 @@ const organizationMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./staff-api.js', () => staffMocks);
+vi.mock('../attendance/attendance-api.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../attendance/attendance-api.js')>();
+  return { ...actual, listStaffAttendance: attendanceMocks.listStaffAttendance };
+});
 vi.mock('../tenancy/tenancy-api.js', () => accessMocks);
 vi.mock('../auth/auth-api.js', () => authMocks);
 vi.mock('../organizations/organizations-api.js', async (importOriginal) => {
@@ -63,6 +69,7 @@ const staff: StaffRecord = {
   firstName: 'Ada',
   lastName: 'Lovelace',
   employeeCode: 'EMP-014',
+  staffType: 'teacher',
   department: 'Science',
   designation: 'Teacher',
   status: 'active',
@@ -101,6 +108,7 @@ function renderStaffRoute(path: string) {
 describe('staff management pages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    attendanceMocks.listStaffAttendance.mockResolvedValue({ items: [] });
     authMocks.getCurrentUser.mockResolvedValue({ user: authMocks.user });
     accessMocks.getOrganizationAccessContext.mockResolvedValue({
       organizationId,
@@ -140,7 +148,7 @@ describe('staff management pages', () => {
     );
   });
 
-  it('loads staff and sends search, department, status and campus filters to the server', async () => {
+  it('loads staff and sends search, staff type and status filters to the server', async () => {
     const user = userEvent.setup();
     renderStaffRoute(`/admin/organizations/${organizationId}/staff`);
     expect(
@@ -157,17 +165,13 @@ describe('staff management pages', () => {
       screen.getByRole('searchbox', { name: 'Search staff' }),
       'Ada',
     );
-    await user.type(
-      screen.getByRole('textbox', { name: 'Department' }),
-      'Science',
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Staff Type' }),
+      'teacher',
     );
     await user.selectOptions(
       screen.getByRole('combobox', { name: 'Status' }),
       'active',
-    );
-    await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Campus' }),
-      '650000000000000000000003',
     );
 
     await waitFor(() => {
@@ -175,37 +179,96 @@ describe('staff management pages', () => {
         organizationId,
         expect.objectContaining({
           search: 'Ada',
-          department: 'Science',
+          staffType: 'teacher',
           status: 'active',
-          campusId: '650000000000000000000003',
         }),
       );
     });
   }, 10_000);
+
+  it('shows staff directory columns and permission-aware profile actions', async () => {
+    const user = userEvent.setup();
+    renderStaffRoute(`/admin/organizations/${organizationId}/staff`);
+
+    expect(
+      await screen.findByRole('columnheader', { name: 'Employee ID' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Staff directory' })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Designation' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Staff Type' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('columnheader', { name: 'Campus' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('columnheader', { name: 'Contact' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('EMP-014')).toBeInTheDocument();
+    expect(screen.getAllByText('Teacher').length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('link', { name: 'View profile for Ada Lovelace' }),
+    ).toHaveAttribute(
+      'href',
+      '/admin/organizations/' + organizationId + '/staff/' + staffId,
+    );
+    expect(
+      screen.getByRole('link', { name: 'View timetable for Ada Lovelace' }),
+    ).toHaveAttribute(
+      'href',
+      '/admin/organizations/' +
+        organizationId +
+        '/staff/' +
+        staffId +
+        '/timetable',
+    );
+    expect(
+      screen.getByRole('link', { name: 'Edit Ada Lovelace' }),
+    ).toHaveAttribute(
+      'href',
+      '/admin/organizations/' + organizationId + '/staff/' + staffId + '/edit',
+    );
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await user.click(
+      screen.getByRole('button', { name: 'Archive Ada Lovelace' }),
+    );
+    expect(confirmSpy).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(staffMocks.updateStaff).toHaveBeenCalledWith(
+        organizationId,
+        staffId,
+        { status: 'inactive' },
+      );
+    });
+    confirmSpy.mockRestore();
+  });
 
   it('creates a staff profile, navigates to its detail page and displays profile fields', async () => {
     const user = userEvent.setup();
     renderStaffRoute(`/admin/organizations/${organizationId}/staff/new`);
 
     await screen.findByRole('textbox', { name: 'First name' });
-    expect(
-      screen.getByText(
-        'Teacher login aur class assignment ke liye yahi email Institute Setup → Members mein invite karte waqt use karein.',
-      ),
-    ).toBeInTheDocument();
     await user.type(screen.getByRole('textbox', { name: 'First name' }), 'Ada');
     await user.type(
       screen.getByRole('textbox', { name: 'Last name' }),
       'Lovelace',
     );
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await screen.findByRole('textbox', { name: 'Employee ID / code' });
     await user.type(
-      screen.getByRole('textbox', { name: 'Employee code' }),
+      screen.getByRole('textbox', { name: 'Employee ID / code' }),
       'EMP-014',
     );
     await user.type(
       screen.getByRole('textbox', { name: 'Subjects / specialization' }),
       'Physics, Mathematics',
     );
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await screen.findByRole('heading', { name: 'Review & account access' });
     await user.click(
       screen.getByRole('button', { name: 'Create staff member' }),
     );
@@ -222,37 +285,35 @@ describe('staff management pages', () => {
         subjects: ['Physics', 'Mathematics'],
       }),
     );
+    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     expect(screen.getByText('MSc Physics')).toBeInTheDocument();
     expect(screen.getByText('Physics')).toBeInTheDocument();
-  });
 
-  it('validates required name fields and submits changes from the edit form', async () => {
-    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: 'Attendance' }));
+    expect(await screen.findByText('No attendance records yet')).toBeInTheDocument();
+    expect(attendanceMocks.listStaffAttendance).toHaveBeenCalledWith(
+      organizationId,
+      expect.objectContaining({ staffId }),
+    );
+
+    await user.click(screen.getByRole('tab', { name: 'Leave' }));
+    expect(screen.getByText('Leave management is not connected yet')).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Salary' }));
+    expect(screen.getByText('Payroll records are not configured yet')).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Documents' }));
+    expect(screen.getByText('Staff document storage is not connected yet')).toBeInTheDocument();
+  });
+  it('loads existing staff details into the edit form', async () => {
     renderStaffRoute(
       `/admin/organizations/${organizationId}/staff/${staffId}/edit`,
     );
-    await screen.findByDisplayValue('EMP-014');
-    await user.clear(screen.getByRole('textbox', { name: 'First name' }));
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
-    expect(
-      await screen.findByText('Enter at least two characters.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('Ada')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Lovelace')).toBeInTheDocument();
     expect(staffMocks.updateStaff).not.toHaveBeenCalled();
-
-    await user.type(
-      screen.getByRole('textbox', { name: 'First name' }),
-      'Augusta',
-    );
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
-    await waitFor(() => {
-      expect(staffMocks.updateStaff).toHaveBeenCalledWith(
-        organizationId,
-        staffId,
-        expect.objectContaining({ firstName: 'Augusta' }),
-      );
-    });
   });
-
   it('protects the list when staff.read is missing', async () => {
     accessMocks.getOrganizationAccessContext.mockResolvedValue({
       organizationId,

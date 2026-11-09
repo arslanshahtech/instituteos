@@ -2,6 +2,7 @@ export type StudentStatus = 'active' | 'inactive' | 'withdrawn';
 export type GuardianRelationshipType =
   'father' | 'mother' | 'guardian' | 'other';
 export type StaffStatus = 'active' | 'on_leave' | 'terminated' | 'inactive';
+export type StaffType = 'teacher' | 'other_staff';
 export type InquiryStatus =
   'new' | 'contacted' | 'qualified' | 'converted' | 'closed';
 export type ApplicationStatus =
@@ -21,6 +22,16 @@ export interface StudentInput {
   firstName: string;
   lastName: string;
   preferredName?: string;
+  registrationNumber?: string;
+  photoUrl?: string;
+  fatherName?: string;
+  motherName?: string;
+  parentMobile?: string;
+  nationality?: string;
+  religion?: string;
+  birthPlace?: string;
+  nationalId?: string;
+  specialNeeds?: string;
   dateOfBirth?: string;
   gender?: string;
   status?: StudentStatus;
@@ -50,6 +61,16 @@ export interface StudentRecord {
   firstName: string;
   lastName: string;
   preferredName?: string;
+  registrationNumber?: string;
+  photoUrl?: string;
+  fatherName?: string;
+  motherName?: string;
+  parentMobile?: string;
+  nationality?: string;
+  religion?: string;
+  birthPlace?: string;
+  nationalId?: string;
+  specialNeeds?: string;
   dateOfBirth?: string;
   gender?: string;
   status: StudentStatus;
@@ -208,6 +229,7 @@ export interface StaffInput {
   firstName: string;
   lastName: string;
   employeeCode?: string;
+  staffType?: StaffType;
   department?: string;
   designation?: string;
   qualification?: string;
@@ -229,6 +251,7 @@ export interface StaffRecord {
   firstName: string;
   lastName: string;
   employeeCode?: string;
+  staffType: StaffType;
   department?: string;
   designation?: string;
   qualification?: string;
@@ -341,6 +364,8 @@ export interface StudentListQuery {
   campusIds?: string[];
   search?: string;
   status?: StudentStatus;
+  classId?: string;
+  sectionId?: string;
   page?: number;
   pageSize?: number;
 }
@@ -434,6 +459,7 @@ export interface PeopleRepository {
     query?: {
       status?: string;
       department?: string;
+      staffType?: StaffType;
       campusId?: string;
       search?: string;
       campusIds?: string[];
@@ -571,6 +597,7 @@ export interface PeopleServices {
     input?: {
       status?: string;
       department?: string;
+      staffType?: StaffType;
       campusId?: string;
       search?: string;
       campusIds?: string[];

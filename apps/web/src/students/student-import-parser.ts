@@ -14,9 +14,9 @@ export const STUDENT_IMPORT_FIELDS = [
   { value: 'contactEmail', label: 'Student email' },
   { value: 'phone', label: 'Student / primary contact phone' },
   { value: 'status', label: 'Status' },
-  { value: 'guardianName', label: 'Parent / guardian full name' },
-  { value: 'guardianPhone', label: 'Parent / guardian phone' },
-  { value: 'guardianEmail', label: 'Parent / guardian email' },
+  { value: 'guardianName', label: 'Family contact full name' },
+  { value: 'guardianPhone', label: 'Family contact phone' },
+  { value: 'guardianEmail', label: 'Family contact email' },
   {
     value: 'guardianRelationship',
     label: 'Relationship (father/mother/guardian/other)',

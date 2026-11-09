@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+﻿import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Suspense } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -144,10 +144,10 @@ describe('student management pages', () => {
     ).toBeVisible();
     expect(document.body).not.toHaveTextContent(studentId);
     expect(
-      screen.getByRole('button', { name: 'Export Students' }),
+      screen.getByRole('button', { name: 'CSV' }),
     ).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Import Students' })).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Add Student' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Bulk Upload' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Enroll Student' })).toBeVisible();
     await user.type(
       screen.getByRole('searchbox', { name: 'Search students' }),
       'Ada',

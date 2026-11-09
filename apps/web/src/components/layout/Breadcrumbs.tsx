@@ -19,7 +19,7 @@ function breadcrumbLabel(
   if (segment === organizationId) return organizationName;
   if (/^[\da-f]{24}$/i.test(segment)) {
     if (previousSegment === 'students') return 'Student details';
-    if (previousSegment === 'guardians') return 'Guardian details';
+    if (previousSegment === 'guardians') return 'Family contact details';
     return 'Record details';
   }
   return segmentLabels[segment] ?? segment;

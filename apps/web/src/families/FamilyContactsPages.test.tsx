@@ -9,16 +9,16 @@ import { AuthProvider } from '../auth/AuthProvider.js';
 import { createAppRouter } from '../app/router.js';
 import { ToastProvider } from '../components/ui/ToastProvider.js';
 import type { StudentRecord } from '../students/students-api.js';
-import type { GuardianRecord, GuardianRelationship } from './guardians-api.js';
+import type { FamilyContactRecord } from './family-contacts-api.js';
 
 const guardianMocks = vi.hoisted(() => ({
-  listGuardians: vi.fn(),
-  getGuardian: vi.fn(),
-  createGuardian: vi.fn(),
-  updateGuardian: vi.fn(),
-  listStudentGuardians: vi.fn(),
-  linkGuardian: vi.fn(),
-  unlinkGuardian: vi.fn(),
+  listFamilyContacts: vi.fn(),
+  getFamilyContact: vi.fn(),
+  createFamilyContact: vi.fn(),
+  updateFamilyContact: vi.fn(),
+  listStudentFamilyContacts: vi.fn(),
+  linkFamilyContact: vi.fn(),
+  unlinkFamilyContact: vi.fn(),
 }));
 
 const studentMocks = vi.hoisted(() => ({
@@ -54,7 +54,7 @@ const organizationMocks = vi.hoisted(() => ({
   getAccessibleOrganizations: vi.fn(),
 }));
 
-vi.mock('./guardians-api.js', () => guardianMocks);
+vi.mock('./family-contacts-api.js', () => guardianMocks);
 vi.mock('../students/students-api.js', () => studentMocks);
 vi.mock('../tenancy/tenancy-api.js', () => accessMocks);
 vi.mock('../auth/auth-api.js', () => authMocks);
@@ -69,7 +69,7 @@ vi.mock('../organizations/organizations-api.js', async (importOriginal) => {
 const organizationId = '650000000000000000000001';
 const studentId = '650000000000000000000002';
 const guardianId = '650000000000000000000003';
-const guardian: GuardianRecord = {
+const guardian: FamilyContactRecord = {
   id: guardianId,
   firstName: 'Leela',
   lastName: 'Rao',
@@ -118,7 +118,7 @@ function renderRoute(path: string) {
   );
 }
 
-describe('guardian management pages', () => {
+describe('family and parent relationship pages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     authMocks.getCurrentUser.mockResolvedValue({ user: authMocks.user });
@@ -132,21 +132,23 @@ describe('guardian management pages', () => {
     organizationMocks.getAccessibleOrganizations.mockResolvedValue({
       organizations: [],
     });
-    guardianMocks.listGuardians.mockResolvedValue({
+    guardianMocks.listFamilyContacts.mockResolvedValue({
       items: [guardian],
       total: 1,
       page: 1,
       pageSize: 20,
     });
-    guardianMocks.getGuardian.mockResolvedValue({
+    guardianMocks.getFamilyContact.mockResolvedValue({
       guardian,
       students: [],
     });
-    guardianMocks.createGuardian.mockResolvedValue({ guardian });
-    guardianMocks.updateGuardian.mockResolvedValue({ guardian });
-    guardianMocks.listStudentGuardians.mockResolvedValue({ relations: [] });
-    guardianMocks.linkGuardian.mockResolvedValue({ link: {} });
-    guardianMocks.unlinkGuardian.mockResolvedValue(undefined);
+    guardianMocks.createFamilyContact.mockResolvedValue({ guardian });
+    guardianMocks.updateFamilyContact.mockResolvedValue({ guardian });
+    guardianMocks.listStudentFamilyContacts.mockResolvedValue({
+      relations: [],
+    });
+    guardianMocks.linkFamilyContact.mockResolvedValue({ link: {} });
+    guardianMocks.unlinkFamilyContact.mockResolvedValue(undefined);
     studentMocks.getStudent.mockResolvedValue({ student });
     studentMocks.listStudents.mockResolvedValue({
       items: [student],
@@ -156,9 +158,9 @@ describe('guardian management pages', () => {
     });
   });
 
-  it('searches the server-backed guardian directory', async () => {
+  it('searches the server-backed family contact directory', async () => {
     const user = userEvent.setup();
-    guardianMocks.listGuardians.mockImplementation(
+    guardianMocks.listFamilyContacts.mockImplementation(
       async (
         _organization: string,
         input: { search?: string; page: number; pageSize: number },
@@ -180,39 +182,41 @@ describe('guardian management pages', () => {
     ).toBeVisible();
     expect(document.body).not.toHaveTextContent(guardianId);
     await user.type(
-      screen.getByRole('searchbox', { name: 'Search guardians' }),
+      screen.getByRole('searchbox', { name: 'Search family contacts' }),
       'unknown',
     );
     expect(
-      await screen.findByText('No guardians match this search'),
+      await screen.findByText('No family contacts match this search'),
     ).toBeVisible();
     await waitFor(() => {
-      expect(guardianMocks.listGuardians).toHaveBeenLastCalledWith(
+      expect(guardianMocks.listFamilyContacts).toHaveBeenLastCalledWith(
         organizationId,
         expect.objectContaining({ search: 'unknown', page: 1 }),
       );
     });
   });
 
-  it('validates and creates a guardian before opening the returned record', async () => {
+  it('validates and creates a family contact before opening the returned record', async () => {
     const user = userEvent.setup();
-    renderRoute(`/admin/organizations/${organizationId}/guardians/new`);
+    renderRoute(`/admin/organizations/${organizationId}/family-contacts/new`);
 
     await user.click(
-      await screen.findByRole('button', { name: 'Create guardian' }),
+      await screen.findByRole('button', { name: 'Create family contact' }),
     );
     expect(
       await screen.findAllByText('Enter at least two characters.'),
     ).toHaveLength(2);
-    expect(guardianMocks.createGuardian).not.toHaveBeenCalled();
+    expect(guardianMocks.createFamilyContact).not.toHaveBeenCalled();
 
     await user.type(screen.getByLabelText('First name'), 'Leela');
     await user.type(screen.getByLabelText('Last name'), 'Rao');
     await user.type(screen.getByLabelText('Email'), 'leela@example.test');
-    await user.click(screen.getByRole('button', { name: 'Create guardian' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Create family contact' }),
+    );
 
     await waitFor(() => {
-      expect(guardianMocks.createGuardian).toHaveBeenCalledWith(
+      expect(guardianMocks.createFamilyContact).toHaveBeenCalledWith(
         organizationId,
         expect.objectContaining({
           firstName: 'Leela',
@@ -225,14 +229,14 @@ describe('guardian management pages', () => {
       await screen.findByRole('heading', { name: 'Leela Rao' }),
     ).toBeVisible();
     expect(await screen.findByRole('status')).toHaveTextContent(
-      'Guardian created successfully.',
+      'Family contact created successfully.',
     );
   });
 
-  it('updates guardian details and confirms the successful save', async () => {
+  it('updates family contact details and confirms the successful save', async () => {
     const user = userEvent.setup();
     renderRoute(
-      `/admin/organizations/${organizationId}/guardians/${guardianId}/edit`,
+      `/admin/organizations/${organizationId}/family-contacts/${guardianId}/edit`,
     );
 
     const firstName = await screen.findByLabelText('First name');
@@ -241,7 +245,7 @@ describe('guardian management pages', () => {
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => {
-      expect(guardianMocks.updateGuardian).toHaveBeenCalledWith(
+      expect(guardianMocks.updateFamilyContact).toHaveBeenCalledWith(
         organizationId,
         guardianId,
         expect.objectContaining({
@@ -254,12 +258,12 @@ describe('guardian management pages', () => {
       await screen.findByRole('heading', { name: 'Leela Rao' }),
     ).toBeVisible();
     expect(await screen.findByRole('status')).toHaveTextContent(
-      'Guardian changes saved.',
+      'Family contact changes saved.',
     );
   });
 
   it('shows linked student names without displaying record identifiers', async () => {
-    guardianMocks.getGuardian.mockResolvedValue({
+    guardianMocks.getFamilyContact.mockResolvedValue({
       guardian,
       students: [
         {
@@ -275,7 +279,7 @@ describe('guardian management pages', () => {
       ],
     });
     renderRoute(
-      `/admin/organizations/${organizationId}/guardians/${guardianId}`,
+      `/admin/organizations/${organizationId}/family-contacts/${guardianId}`,
     );
 
     expect(await screen.findByRole('link', { name: 'Mina Rao' })).toBeVisible();
@@ -283,173 +287,44 @@ describe('guardian management pages', () => {
     expect(document.body).not.toHaveTextContent(guardianId);
   });
 
-  it('links a guardian from the student detail page', async () => {
-    const user = userEvent.setup();
-    let relations: {
-      id: string;
-      relationship: GuardianRelationship;
-      isPrimary: boolean;
-      guardian: GuardianRecord;
-    }[] = [];
-    guardianMocks.listGuardians.mockResolvedValue({
-      items: [guardian],
-      total: 1,
-      page: 1,
-      pageSize: 100,
-    });
-    guardianMocks.listStudentGuardians.mockImplementation(async () => ({
-      relations,
-    }));
-    guardianMocks.linkGuardian.mockImplementation(
-      async (
-        _organizationId: string,
-        _studentId: string,
-        _guardianId: string,
-        input: { relationship: GuardianRelationship; isPrimary: boolean },
-      ) => {
-        relations = [
-          {
-            id: 'link-1',
-            relationship: input.relationship,
-            isPrimary: input.isPrimary,
-            guardian,
-          },
-        ];
-        return { link: {} };
-      },
-    );
-    guardianMocks.unlinkGuardian.mockImplementation(async () => {
-      relations = [];
+  it('shows linked parents in the student Family section', async () => {
+    guardianMocks.listStudentFamilyContacts.mockResolvedValue({
+      relations: [
+        {
+          id: 'link-1',
+          relationship: 'mother',
+          isPrimary: true,
+          guardian,
+        },
+      ],
     });
     renderRoute(`/admin/organizations/${organizationId}/students/${studentId}`);
 
     expect(
-      await screen.findByText(
-        'No guardians are linked to this student yet.',
-        {},
-        { timeout: 5000 },
-      ),
+      await screen.findByRole('heading', { name: 'Family' }),
     ).toBeVisible();
-    await user.selectOptions(
-      screen.getByLabelText('Link existing guardian'),
-      guardianId,
-    );
-    await user.click(screen.getByRole('button', { name: 'Link guardian' }));
-
-    await waitFor(() => {
-      expect(guardianMocks.linkGuardian).toHaveBeenCalledWith(
-        organizationId,
-        studentId,
-        guardianId,
-        { relationship: 'guardian', isPrimary: false },
-      );
-    });
+    expect(await screen.findByText('Leela Rao')).toBeVisible();
+    expect(screen.getByText('mother')).toBeVisible();
+    expect(screen.getByText('Main contact')).toBeVisible();
     expect(
-      await screen.findByText('Guardian linked to student.'),
-    ).toBeVisible();
-    expect(
-      await screen.findByRole('link', { name: 'Leela Rao' }),
-    ).toBeVisible();
-
-    await user.click(screen.getByRole('button', { name: 'Unlink' }));
-    expect(
-      await screen.findByText('No guardians are linked to this student yet.'),
-    ).toBeVisible();
-    expect(await screen.findByText('Guardian unlinked.')).toBeVisible();
-
-    await user.selectOptions(
-      screen.getByLabelText('Link existing guardian'),
-      guardianId,
-    );
-    await user.click(screen.getByRole('button', { name: 'Link guardian' }));
-    expect(
-      await screen.findByRole('link', { name: 'Leela Rao' }),
-    ).toBeVisible();
-    expect(guardianMocks.linkGuardian).toHaveBeenCalledTimes(2);
-    expect(guardianMocks.unlinkGuardian).toHaveBeenCalledWith(
-      organizationId,
-      studentId,
-      guardianId,
-    );
+      screen.getByRole('button', { name: 'Link family contact' }),
+    ).toBeDisabled();
   });
 
-  it('keeps guardian search available while loading and resolves full-name results', async () => {
-    const user = userEvent.setup();
-    guardianMocks.listGuardians.mockImplementation(
-      async (
-        _organization: string,
-        input: { search?: string; page: number; pageSize: number },
-      ) => {
-        const search = input.search?.trim().toLowerCase().replace(/\s+/g, ' ');
-        return {
-          items: !search || search === 'leela rao' ? [guardian] : [],
-          total: !search || search === 'leela rao' ? 1 : 0,
-          page: input.page,
-          pageSize: input.pageSize,
-        };
-      },
+  it('shows a clear message when student Family details cannot load', async () => {
+    guardianMocks.listStudentFamilyContacts.mockRejectedValue(
+      new ApiError('Family details unavailable.', 503),
     );
     renderRoute(`/admin/organizations/${organizationId}/students/${studentId}`);
 
-    const search = await screen.findByRole('textbox', {
-      name: 'Find guardian',
-    });
-    await user.type(search, '  LEELA   RAO  ');
-    await waitFor(() => {
-      expect(guardianMocks.listGuardians).toHaveBeenCalledWith(
-        organizationId,
-        expect.objectContaining({ search: 'LEELA   RAO', page: 1 }),
-      );
-    });
     expect(
-      await screen.findByRole('option', { name: 'Leela Rao' }),
-    ).toBeVisible();
-    expect(
-      screen.queryByText('Loading guardian choices…'),
-    ).not.toBeInTheDocument();
-  });
-
-  it('shows an error instead of remaining in guardian-search loading state', async () => {
-    const user = userEvent.setup();
-    guardianMocks.listGuardians
-      .mockResolvedValueOnce({
-        items: [guardian],
-        total: 1,
-        page: 1,
-        pageSize: 20,
-      })
-      .mockRejectedValueOnce(
-        new ApiError('Guardian search failed.', 503, undefined, 'req-123'),
-      )
-      .mockResolvedValue({
-        items: [guardian],
-        total: 1,
-        page: 1,
-        pageSize: 20,
-      });
-    renderRoute(`/admin/organizations/${organizationId}/students/${studentId}`);
-
-    const search = await screen.findByRole('textbox', {
-      name: 'Find guardian',
-    });
-    await user.type(search, 'Leela');
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Guardian search failed. (Reference: req-123)',
-    );
-    expect(search).toBeInTheDocument();
-    expect(
-      screen.queryByText('Loading guardian choices…'),
-    ).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(
-      await screen.findByRole('option', { name: 'Leela Rao' }),
+      await screen.findByText('Parent details could not be loaded.'),
     ).toBeVisible();
   });
 
   it('shows API errors and hides create actions without permission', async () => {
-    guardianMocks.listGuardians.mockRejectedValue(
-      new ApiError('Guardian records unavailable.', 503),
+    guardianMocks.listFamilyContacts.mockRejectedValue(
+      new ApiError('Family contact records unavailable.', 503),
     );
     accessMocks.getOrganizationAccessContext.mockResolvedValue({
       organizationId,
@@ -460,10 +335,10 @@ describe('guardian management pages', () => {
     renderRoute(`/admin/organizations/${organizationId}/guardians`);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Guardian records unavailable.',
+      'Family contact records unavailable.',
     );
     expect(
-      screen.queryByRole('link', { name: 'Add guardian' }),
+      screen.queryByRole('link', { name: 'Add family contact' }),
     ).not.toBeInTheDocument();
   });
 });

@@ -63,9 +63,9 @@ import {
   updateOrganization,
 } from '../../organizations/organizations-api.js';
 import { getOrganizationAccessContext } from '../../tenancy/tenancy-api.js';
-import { listGuardians } from '../../guardians/guardians-api.js';
+import { listFamilyContacts } from '../../families/family-contacts-api.js';
 import { listDailyCollections } from '../../finance/finance-api.js';
-import type { GuardianListResponse } from '../../guardians/guardians-api.js';
+import type { FamilyContactListResponse } from '../../families/family-contacts-api.js';
 import { useOrganizationSummary } from '../../reporting/reporting-api.js';
 import type { OrganizationSummary } from '../../reporting/reporting-api.js';
 import type {
@@ -438,8 +438,8 @@ export function OrganizationAdminPage() {
     Boolean(organizationId && access.data && tab === 'overview'),
   );
   const guardians = useQuery({
-    queryKey: ['organization-guardian-count', organizationId],
-    queryFn: () => listGuardians(organizationId, { page: 1, pageSize: 1 }),
+    queryKey: ['organization-family-contact-count', organizationId],
+    queryFn: () => listFamilyContacts(organizationId, { page: 1, pageSize: 1 }),
     enabled: Boolean(
       organizationId &&
       access.data?.permissions.includes('guardian.read') &&
@@ -825,7 +825,7 @@ function OverviewPanel({
 }: {
   dashboard: UseQueryResult<OrganizationDashboard>;
   summary: UseQueryResult<{ summary: OrganizationSummary }>;
-  guardians: UseQueryResult<GuardianListResponse>;
+  guardians: UseQueryResult<FamilyContactListResponse>;
   recentAdmissions: UseQueryResult<
     Awaited<ReturnType<typeof listApplications>>
   >;
@@ -902,11 +902,11 @@ function OverviewPanel({
             icon: GraduationCap,
           },
           {
-            label: 'Guardians',
+            label: 'Family contacts',
             value: guardians.data
               ? guardians.data.total.toLocaleString('en-PK')
               : '—',
-            detail: 'Guardian records in your college',
+            detail: 'Family contact records in your college',
             icon: UserCheck,
           },
           {
@@ -1883,7 +1883,7 @@ function MembersPanel({
           </label>
           <small className="field-hint">
             {role === 'parent_guardian'
-              ? 'Parent/guardian ko invite karte waqt wohi verified email use karein jo student ke Guardian record mein saved hai. Is email ka match hona zaroori hai.'
+              ? 'Parent/guardian ko invite karte waqt wohi verified email use karein jo student ke Family contact record mein saved hai. Is email ka match hona zaroori hai.'
               : role === 'teacher'
                 ? 'Teacher ko invite karte waqt wohi email use karein jo Staff / Teachers profile mein save ki hai.'
                 : 'Invitee ko isi email address se account verify karke invitation accept karna hoga.'}
@@ -2256,7 +2256,9 @@ export function AcceptOrganizationInvitationPage() {
       started.current = true;
       setSessionCheckFailed(true);
       setStatus('error');
-      setError('We could not verify your sign-in session. Check your connection and try again.');
+      setError(
+        'We could not verify your sign-in session. Check your connection and try again.',
+      );
       return;
     }
     started.current = true;

@@ -1,0 +1,559 @@
+.promotion-fees {
+  display: grid;
+  gap: 18px;
+  border: 1px solid var(--border, #e1e5ea);
+  border-radius: 14px;
+  padding: clamp(14px, 2vw, 22px);
+  background: var(--surface, #fff);
+}
+.promotion-fees__intro,
+.promotion-fees__toolbar,
+.promotion-fees__selection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.promotion-fees__intro h2 {
+  margin: 0 0 6px;
+}
+.promotion-fees__intro p {
+  margin: 0;
+  color: var(--muted, #718096);
+  max-width: 720px;
+}
+.promotion-fees__summary {
+  display: grid;
+  min-width: 112px;
+  padding: 10px 14px;
+  border: 1px solid var(--border, #e1e5ea);
+  border-radius: 10px;
+  text-align: center;
+}
+.promotion-fees__summary strong {
+  font-size: 22px;
+  line-height: 1.2;
+}
+.promotion-fees__summary span,
+.promotion-fees__selection > span {
+  color: var(--muted, #718096);
+  font-size: 12px;
+}
+.promotion-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--border, #d7dce2);
+  border-radius: 9px;
+  background: var(--surface, #fff);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+.promotion-filter.is-active {
+  border-color: var(--color-primary, #0f766e);
+  background: color-mix(
+    in srgb,
+    var(--color-primary, #0f766e) 8%,
+    var(--surface, #fff)
+  );
+}
+.promotion-filter strong {
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--surface-muted, #eef2f5);
+  font-size: 12px;
+}
+.promotion-filter__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d97706;
+}
+.promotion-fees__classes {
+  display: grid;
+  gap: 12px;
+}
+.promotion-class-card {
+  min-width: 0;
+  border: 1px solid var(--border, #dfe4e9);
+  border-radius: 11px;
+  background: var(--surface, #fff);
+  overflow: clip;
+}
+.promotion-class-card[open] {
+  box-shadow: 0 2px 8px rgb(15 23 42 / 4%);
+}
+.promotion-class-card__summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-height: 58px;
+  padding: 10px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+.promotion-class-card__summary::-webkit-details-marker {
+  display: none;
+}
+.promotion-class-card__chevron {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--muted, #718096);
+  background: var(--surface-muted, #f1f4f6);
+  transition: transform 0.16s ease;
+}
+.promotion-class-card[open] .promotion-class-card__chevron {
+  transform: rotate(90deg);
+}
+.promotion-class-card__title {
+  font-weight: 700;
+}
+.promotion-class-card__count {
+  color: var(--muted, #718096);
+  font-size: 13px;
+}
+.promotion-class-card__needs {
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 600;
+}
+.promotion-class-card__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.promotion-class-card__actions .button {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.promotion-class-card__table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-top: 1px solid var(--border, #e1e5ea);
+}
+.promotion-fees__table {
+  width: 100%;
+  min-width: 790px;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+.promotion-fees__table th:nth-child(1),
+.promotion-fees__table td:nth-child(1) {
+  width: 25%;
+}
+.promotion-fees__table th:nth-child(2),
+.promotion-fees__table td:nth-child(2) {
+  width: 10%;
+}
+.promotion-fees__table th:nth-child(3),
+.promotion-fees__table td:nth-child(3) {
+  width: 12%;
+}
+.promotion-fees__table th:nth-child(4),
+.promotion-fees__table td:nth-child(4) {
+  width: 10%;
+}
+.promotion-fees__table th:nth-child(5),
+.promotion-fees__table td:nth-child(5),
+.promotion-fees__table th:nth-child(6),
+.promotion-fees__table td:nth-child(6) {
+  width: 12%;
+}
+.promotion-fees__table th:nth-child(7),
+.promotion-fees__table td:nth-child(7) {
+  width: 19%;
+}
+.promotion-fees__table th {
+  padding: 10px 9px;
+  color: var(--muted, #64748b);
+  background: var(--surface-muted, #f7f8fa);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.045em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.promotion-fees__table th:first-child {
+  padding-left: 48px;
+}
+.promotion-fees__table td {
+  padding: 10px 9px;
+  border-top: 1px solid var(--border, #edf0f2);
+  vertical-align: middle;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.promotion-student {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  white-space: normal;
+  min-width: 180px;
+}
+.promotion-student input {
+  margin-top: 3px;
+  accent-color: var(--color-primary, #0f766e);
+}
+.promotion-student span {
+  display: grid;
+  gap: 3px;
+}
+.promotion-student strong {
+  font-size: 13px;
+  font-weight: 650;
+}
+.promotion-student small,
+.promotion-fees__subtext {
+  display: block;
+  color: var(--muted, #718096);
+  font-size: 11px;
+}
+.promotion-student__unpaid {
+  color: #b45309 !important;
+}
+.promotion-action-label {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: var(--surface-muted, #f1f4f6);
+  font-size: 12px;
+}
+.promotion-fee-missing {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  max-width: 220px;
+  white-space: normal;
+}
+.promotion-fee-missing .button {
+  min-height: 30px;
+  padding: 5px 9px;
+  font-size: 11px;
+}
+.promotion-fee-choice {
+  display: grid;
+  justify-items: start;
+  gap: 9px;
+  min-width: 0;
+}
+.promotion-fee-select {
+  width: 132px;
+  min-width: 0;
+  min-height: 29px;
+  height: 29px;
+  padding: 4px 7px;
+  border: 1px solid var(--border, #d7dce2);
+  border-radius: 7px;
+  color: inherit;
+  background: var(--surface, #fff);
+  font: inherit;
+  font-size: 12px;
+}
+.promotion-fee-input-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 31px;
+  padding: 0 8px;
+  border: 1px solid var(--border, #d7dce2);
+  border-radius: 7px;
+  color: var(--muted, #718096);
+  background: var(--surface, #fff);
+  font-size: 12px;
+}
+.promotion-fee-input-wrap .promotion-fee-select--amount {
+  width: 105px;
+  min-height: 27px;
+  height: 27px;
+  padding: 3px 0;
+  border: 0;
+  outline-offset: 2px;
+  color: inherit;
+  background: transparent;
+  font-size: 12px;
+}
+.promotion-fees__subtext {
+  margin-top: 1px;
+  line-height: 1.35;
+  font-size: 11px;
+}
+.promotion-fees__empty {
+  padding: 28px 16px;
+  border: 1px dashed var(--border, #d7dce2);
+  border-radius: 10px;
+  color: var(--muted, #718096);
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .promotion-class-card__summary {
+    align-items: flex-start;
+  }
+  .promotion-class-card__actions {
+    width: 100%;
+    margin-left: 32px;
+  }
+  .promotion-class-card__actions .button {
+    flex: 1 1 150px;
+  }
+  .promotion-fees__summary {
+    min-width: 88px;
+  }
+}
+
+/* Promotion review and final confirmation */
+.promotion-review {
+  display: grid;
+  gap: 16px;
+}
+.promotion-review__heading,
+.promotion-review__panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.promotion-review__heading h2,
+.promotion-review__panel-heading h3 {
+  margin: 0;
+}
+.promotion-review__heading p,
+.promotion-review__panel-heading p {
+  margin: 5px 0 0;
+  color: var(--muted, #718096);
+  font-size: 13px;
+}
+.promotion-review__counts {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border, #e1e5ea);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+}
+.promotion-review__count {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 12px 10px;
+  border: 1px solid var(--border, #e1e5ea);
+  border-radius: 9px;
+  background: var(--surface, #fff);
+}
+.promotion-review__count strong {
+  font-size: 20px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.promotion-review__count span {
+  color: var(--muted, #718096);
+  font-size: 12px;
+}
+.promotion-review__panel {
+  overflow: hidden;
+  border: 1px solid var(--border, #e1e5ea);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+}
+.promotion-review__panel-heading {
+  min-height: 52px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border, #e1e5ea);
+}
+.promotion-review__panel-heading h3 {
+  font-size: 16px;
+}
+.promotion-review__options {
+  display: grid;
+  gap: 16px;
+  padding: 16px 18px;
+}
+.promotion-review__options > div > strong {
+  display: block;
+  margin-bottom: 9px;
+  font-size: 13px;
+}
+.promotion-review__choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.promotion-review__choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 35px;
+  padding: 7px 10px;
+  border: 1px solid var(--border, #d7dce2);
+  border-radius: 7px;
+  font-size: 12px;
+}
+.promotion-review__choice.is-selected {
+  border-color: var(--color-primary, #0f766e);
+  background: color-mix(in srgb, var(--color-primary, #0f766e) 6%, white);
+}
+.promotion-review__choice.is-disabled {
+  color: var(--muted, #718096);
+  opacity: 0.72;
+}
+.promotion-review__options small,
+.promotion-review__draft-option small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted, #718096);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.promotion-review__draft-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border, #edf0f2);
+  font-size: 13px;
+}
+.promotion-review__draft-option input {
+  margin-top: 3px;
+}
+.promotion-review__student-list {
+  display: grid;
+}
+.promotion-review__student {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.1fr) minmax(115px, 0.6fr) minmax(
+      220px,
+      1.4fr
+    );
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border, #edf0f2);
+}
+.promotion-review__student:last-child {
+  border-bottom: 0;
+}
+.promotion-review__student-main,
+.promotion-review__student-fee {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.promotion-review__student-main strong,
+.promotion-review__student-fee strong {
+  font-size: 13px;
+}
+.promotion-review__student-main small,
+.promotion-review__student-fee small,
+.promotion-review__student-note {
+  color: var(--muted, #718096);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.promotion-review__empty {
+  padding: 18px;
+  color: var(--muted, #718096);
+}
+.promotion-review__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.promotion-review__actions > span {
+  color: var(--muted, #718096);
+  font-size: 13px;
+}
+.promotion-confirm__backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(15 23 42 / 48%);
+}
+.promotion-confirm {
+  position: relative;
+  width: min(100%, 480px);
+  padding: 24px;
+  border: 1px solid var(--border, #d7dce2);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  box-shadow: 0 20px 60px rgb(15 23 42 / 22%);
+}
+.promotion-confirm__close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted, #718096);
+  font-size: 22px;
+  cursor: pointer;
+}
+.promotion-confirm__title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.promotion-confirm__title-row > span {
+  color: #d97706;
+  font-size: 20px;
+}
+.promotion-confirm__title-row h2 {
+  margin: 0;
+  color: #b45309;
+  font-size: 18px;
+}
+.promotion-confirm > p {
+  color: var(--muted, #64748b);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.promotion-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 20px;
+}
+@media (max-width: 900px) {
+  .promotion-review__counts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .promotion-review__counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 10px;
+  }
+  .promotion-review__student {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+  }
+  .promotion-review__student-note {
+    grid-column: 1 / -1;
+  }
+  .promotion-review__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .promotion-review__actions .button {
+    width: 100%;
+  }
+}

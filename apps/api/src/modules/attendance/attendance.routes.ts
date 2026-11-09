@@ -21,6 +21,8 @@ import {
 import { MongoAttendanceRepository } from './attendance.repository.js';
 import { AttendanceService } from './attendance.service.js';
 import { StaffMemberModel } from '../people/people.model.js';
+import { AuditLogModel } from '../audit/audit.model.js';
+import { AttendanceSettingsModel } from './attendance-settings.model.js';
 import type {
   AttendanceContext,
   StaffAttendanceStatus,
@@ -136,6 +138,25 @@ function queryString(
   return value === undefined ? undefined : objectId(value, field);
 }
 
+async function loadAttendanceSettings(organizationId: mongoose.Types.ObjectId) {
+  return AttendanceSettingsModel.findOneAndUpdate(
+    { organizationId },
+    { $setOnInsert: { organizationId } },
+    { new: true, upsert: true, setDefaultsOnInsert: true, runValidators: true },
+  )
+    .select({
+      organizationId: 1,
+      timezone: 1,
+      schoolStartTime: 1,
+      gracePeriodMinutes: 1,
+      markingCutoffTime: 1,
+      autoMarkUnmarkedAbsent: 1,
+      allowAdminOverride: 1,
+      workingDays: 1,
+    })
+    .lean();
+}
+
 export function createAttendanceRouter(
   service: AttendanceService = new AttendanceService(
     new MongoAttendanceRepository(),
@@ -171,6 +192,192 @@ export function createAttendanceRouter(
   ] as const;
 
   const base = '/:organizationId';
+  const protectAttendanceSettings = [
+    authenticate,
+    resolveOrganization,
+    requireOrganizationRole(['organization_owner', 'organization_admin']),
+    requireOrganizationMethodPermission(
+      'organization.read',
+      'organization.update',
+    ),
+  ] as const;
+
+  router.get(
+    base + '/attendance/policy',
+    ...protectStudentAttendance,
+    asyncHandler(async (_request, response) => {
+      const context = organizationContext(response);
+      const organizationId = new mongoose.Types.ObjectId(
+        context.organizationId,
+      );
+      const settings = await loadAttendanceSettings(organizationId);
+      response.status(200).json({ policy: settings });
+    }),
+  );
+
+  router.get(
+    base + '/attendance/settings',
+    ...protectAttendanceSettings,
+    asyncHandler(async (_request, response) => {
+      const context = organizationContext(response);
+      const organizationId = new mongoose.Types.ObjectId(
+        context.organizationId,
+      );
+      const settings = await loadAttendanceSettings(organizationId);
+      response.status(200).json({ settings });
+    }),
+  );
+
+  router.patch(
+    base + '/attendance/settings',
+    ...protectAttendanceSettings,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const context = organizationContext(response);
+      const body = bodyObject(request.body);
+      const allowed = [
+        'timezone',
+        'schoolStartTime',
+        'gracePeriodMinutes',
+        'markingCutoffTime',
+        'autoMarkUnmarkedAbsent',
+        'allowAdminOverride',
+        'workingDays',
+      ];
+      if (Object.keys(body).some((key) => !allowed.includes(key))) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Attendance settings contain an unsupported field.',
+        );
+      }
+      const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+      if (
+        body.schoolStartTime !== undefined &&
+        (typeof body.schoolStartTime !== 'string' ||
+          !timePattern.test(body.schoolStartTime))
+      ) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Enter a valid school start time.',
+        );
+      }
+      if (
+        body.markingCutoffTime !== undefined &&
+        (typeof body.markingCutoffTime !== 'string' ||
+          !timePattern.test(body.markingCutoffTime))
+      ) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Enter a valid attendance cutoff time.',
+        );
+      }
+      if (
+        body.gracePeriodMinutes !== undefined &&
+        (!Number.isInteger(body.gracePeriodMinutes) ||
+          Number(body.gracePeriodMinutes) < 0 ||
+          Number(body.gracePeriodMinutes) > 120)
+      ) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Grace period must be a whole number between 0 and 120 minutes.',
+        );
+      }
+      for (const key of ['autoMarkUnmarkedAbsent', 'allowAdminOverride']) {
+        if (body[key] !== undefined && typeof body[key] !== 'boolean') {
+          throw new AppError(
+            400,
+            'VALIDATION_ERROR',
+            'Select a valid ' + key + '.',
+          );
+        }
+      }
+      if (body.timezone !== undefined) {
+        if (typeof body.timezone !== 'string' || body.timezone.length > 80)
+          throw new AppError(
+            400,
+            'VALIDATION_ERROR',
+            'Select a valid timezone.',
+          );
+        try {
+          new Intl.DateTimeFormat('en-US', { timeZone: body.timezone });
+        } catch {
+          throw new AppError(
+            400,
+            'VALIDATION_ERROR',
+            'Select a supported timezone.',
+          );
+        }
+      }
+      const dayNames = [
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+        'sunday',
+      ];
+      if (
+        body.workingDays !== undefined &&
+        (!Array.isArray(body.workingDays) ||
+          body.workingDays.length < 1 ||
+          body.workingDays.length > 7 ||
+          new Set(body.workingDays).size !== body.workingDays.length ||
+          body.workingDays.some((day) => !dayNames.includes(String(day))))
+      ) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Select at least one valid working day.',
+        );
+      }
+      if (!Object.keys(body).length)
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Provide at least one attendance setting.',
+        );
+      const organizationId = new mongoose.Types.ObjectId(
+        context.organizationId,
+      );
+      if (!context.userId)
+        throw new AppError(401, 'UNAUTHENTICATED', 'Please sign in again.');
+      const settings = await AttendanceSettingsModel.findOneAndUpdate(
+        { organizationId },
+        { $set: body, $setOnInsert: { organizationId } },
+        {
+          new: true,
+          upsert: true,
+          setDefaultsOnInsert: true,
+          runValidators: true,
+        },
+      )
+        .select({
+          organizationId: 1,
+          timezone: 1,
+          schoolStartTime: 1,
+          gracePeriodMinutes: 1,
+          markingCutoffTime: 1,
+          autoMarkUnmarkedAbsent: 1,
+          allowAdminOverride: 1,
+          workingDays: 1,
+        })
+        .lean();
+      await AuditLogModel.create({
+        organizationId,
+        actorId: new mongoose.Types.ObjectId(context.userId),
+        action: 'ATTENDANCE_SETTINGS_UPDATED',
+        entityType: 'AttendanceSettings',
+        entityId: String(settings?._id ?? organizationId),
+        metadata: { changedFields: Object.keys(body) },
+      });
+      response.status(200).json({ settings });
+    }),
+  );
 
   router.get(
     `${base}/attendance/teacher-assignments`,
@@ -303,14 +510,13 @@ export function createAttendanceRouter(
           'Select a valid staff attendance status.',
         );
       }
+      const remarks = optionalText(body.remarks, 'remarks');
       const attendance = await service.saveTeacherSelfAttendance(
         organizationContext(response),
         {
           date: text(body.date, 'date', 10),
           status: status as StaffAttendanceStatus,
-          ...(optionalText(body.remarks, 'remarks')
-            ? { remarks: optionalText(body.remarks, 'remarks') }
-            : {}),
+          ...(remarks ? { remarks } : {}),
         },
       );
       response.status(201).json({ attendance });
@@ -573,27 +779,23 @@ export function createAttendanceRouter(
     ...protectStudentAttendance,
     asyncHandler(async (request, response) => {
       const query = request.query as Record<string, unknown>;
+      const dateFrom = queryValue(query.dateFrom, 'dateFrom');
+      const dateTo = queryValue(query.dateTo, 'dateTo');
+      const studentId = queryString(query, 'studentId');
+      const classId = queryString(query, 'classId');
+      const sectionId = queryString(query, 'sectionId');
+      const campusId = queryString(query, 'campusId');
+      const academicYearId = queryString(query, 'academicYearId');
       const items = await service.listStudentAttendance(
         organizationContext(response),
         {
-          ...(queryValue(query.dateFrom, 'dateFrom')
-            ? { dateFrom: queryValue(query.dateFrom, 'dateFrom') }
-            : {}),
-          ...(queryValue(query.dateTo, 'dateTo')
-            ? { dateTo: queryValue(query.dateTo, 'dateTo') }
-            : {}),
-          ...(queryString(query, 'studentId')
-            ? { studentId: queryString(query, 'studentId') }
-            : {}),
-          ...(queryString(query, 'classId')
-            ? { classId: queryString(query, 'classId') }
-            : {}),
-          ...(queryString(query, 'sectionId')
-            ? { sectionId: queryString(query, 'sectionId') }
-            : {}),
-          ...(queryString(query, 'campusId')
-            ? { campusId: queryString(query, 'campusId') }
-            : {}),
+          ...(dateFrom ? { dateFrom } : {}),
+          ...(dateTo ? { dateTo } : {}),
+          ...(studentId ? { studentId } : {}),
+          ...(classId ? { classId } : {}),
+          ...(sectionId ? { sectionId } : {}),
+          ...(campusId ? { campusId } : {}),
+          ...(academicYearId ? { academicYearId } : {}),
         },
       );
       response.status(200).json({ items });
@@ -615,15 +817,14 @@ export function createAttendanceRouter(
           'Select a valid staff attendance status.',
         );
       }
+      const remarks = optionalText(body.remarks, 'remarks');
       const record = await service.saveStaffAttendance(
         organizationContext(response),
         {
           staffId: objectId(body.staffId, 'staff member'),
           date: text(body.date, 'date', 10),
           status: status as StaffAttendanceStatus,
-          ...(optionalText(body.remarks, 'remarks')
-            ? { remarks: optionalText(body.remarks, 'remarks') }
-            : {}),
+          ...(remarks ? { remarks } : {}),
         },
       );
       response.status(200).json({ attendance: record });
@@ -635,21 +836,17 @@ export function createAttendanceRouter(
     ...protectStaffAttendance,
     asyncHandler(async (request, response) => {
       const query = request.query as Record<string, unknown>;
+      const dateFrom = queryValue(query.dateFrom, 'dateFrom');
+      const dateTo = queryValue(query.dateTo, 'dateTo');
+      const staffId = queryString(query, 'staffId');
+      const campusId = queryString(query, 'campusId');
       const items = await service.listStaffAttendance(
         organizationContext(response),
         {
-          ...(queryValue(query.dateFrom, 'dateFrom')
-            ? { dateFrom: queryValue(query.dateFrom, 'dateFrom') }
-            : {}),
-          ...(queryValue(query.dateTo, 'dateTo')
-            ? { dateTo: queryValue(query.dateTo, 'dateTo') }
-            : {}),
-          ...(queryString(query, 'staffId')
-            ? { staffId: queryString(query, 'staffId') }
-            : {}),
-          ...(queryString(query, 'campusId')
-            ? { campusId: queryString(query, 'campusId') }
-            : {}),
+          ...(dateFrom ? { dateFrom } : {}),
+          ...(dateTo ? { dateTo } : {}),
+          ...(staffId ? { staffId } : {}),
+          ...(campusId ? { campusId } : {}),
         },
       );
       response.status(200).json({ items });

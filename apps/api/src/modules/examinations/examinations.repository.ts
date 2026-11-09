@@ -42,7 +42,7 @@ function examRecord(record: Record<string, unknown>): ExamRecord {
     name: String(record.name),
     type: record.type as ExamRecord['type'],
     academicYearId: String(record.academicYearId),
-    termId: String(record.termId),
+    ...(record.termId ? { termId: String(record.termId) } : {}),
     campusId: String(record.campusId),
     startDate: iso(record.startDate as Date).slice(0, 10),
     endDate: iso(record.endDate as Date).slice(0, 10),
@@ -71,6 +71,9 @@ function scheduleRecord(record: Record<string, unknown>): ExamScheduleRecord {
     durationMinutes: Number(record.durationMinutes),
     totalMarks: Number(record.totalMarks),
     passingMarks: Number(record.passingMarks),
+    marksReviewStatus: (record.marksReviewStatus as ExamScheduleRecord['marksReviewStatus']) ?? 'draft',
+    marksSubmittedAt: record.marksSubmittedAt instanceof Date ? iso(record.marksSubmittedAt) : null,
+    marksSubmittedBy: record.marksSubmittedBy ? String(record.marksSubmittedBy) : null,
     createdAt: iso(record.createdAt as Date),
     updatedAt: iso(record.updatedAt as Date),
   };
@@ -285,7 +288,11 @@ export class MongoExaminationsRepository implements ExaminationsRepository {
   ): Promise<ExamRecord> {
     const record = await ExamModel.create({
       organizationId: oid(organizationId),
-      ...input,
+      ...(input.termId ? { termId: oid(input.termId) } : {}),
+      name: input.name,
+      type: input.type,
+      academicYearId: oid(input.academicYearId),
+      campusId: oid(input.campusId),
       startDate: new Date(`${input.startDate}T00:00:00.000Z`),
       endDate: new Date(`${input.endDate}T00:00:00.000Z`),
     });
@@ -301,13 +308,23 @@ export class MongoExaminationsRepository implements ExaminationsRepository {
     input: Partial<ExamInput>,
   ) {
     const changes: Record<string, unknown> = { ...input };
+    const unset: Record<string, 1> = {};
+    if (input.termId === null) {
+      delete changes.termId;
+      unset.termId = 1;
+    } else if (input.termId) {
+      changes.termId = oid(input.termId);
+    }
     for (const field of ['startDate', 'endDate'] as const) {
       if (changes[field])
         changes[field] = new Date(`${changes[field]}T00:00:00.000Z`);
     }
     const record = await ExamModel.findOneAndUpdate(
       { _id: oid(id), organizationId: oid(organizationId) },
-      { $set: changes },
+      {
+        ...(Object.keys(changes).length ? { $set: changes } : {}),
+        ...(Object.keys(unset).length ? { $unset: unset } : {}),
+      },
       { new: true, runValidators: true },
     ).lean();
     return record ? examRecord(record) : null;
@@ -371,11 +388,32 @@ export class MongoExaminationsRepository implements ExaminationsRepository {
     return records.map(scheduleRecord);
   }
 
+  async listPendingMarksReviews(organizationId: string, campusIds?: string[]) {
+    if (campusIds?.length === 0) return [];
+    const exams = await ExamModel.find({ organizationId: oid(organizationId), ...(scopedCampus(campusIds) ?? {}) }).select({ _id: 1 }).lean();
+    if (exams.length === 0) return [];
+    const records = await ExamScheduleModel.find({
+      organizationId: oid(organizationId),
+      examId: { $in: exams.map((exam) => exam._id) },
+      marksReviewStatus: 'submitted',
+    }).sort({ marksSubmittedAt: 1 }).limit(100).lean();
+    return records.map(scheduleRecord);
+  }
+
   async getSchedule(organizationId: string, id: string) {
     const record = await ExamScheduleModel.findOne({
       _id: oid(id),
       organizationId: oid(organizationId),
     }).lean();
+    return record ? scheduleRecord(record) : null;
+  }
+
+  async setMarksReviewStatus(organizationId: string, scheduleId: string, status: ExamScheduleRecord['marksReviewStatus'], submittedByUserId: string | null) {
+    const record = await ExamScheduleModel.findOneAndUpdate(
+      { _id: oid(scheduleId), organizationId: oid(organizationId) },
+      { $set: { marksReviewStatus: status, marksSubmittedAt: status === 'submitted' ? new Date() : null, marksSubmittedBy: status === 'submitted' && submittedByUserId ? oid(submittedByUserId) : null } },
+      { new: true, runValidators: true },
+    ).lean();
     return record ? scheduleRecord(record) : null;
   }
 

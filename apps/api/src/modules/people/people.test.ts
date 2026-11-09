@@ -492,6 +492,7 @@ class MemoryPeopleRepository implements PeopleRepository {
       firstName: input.firstName,
       lastName: input.lastName,
       employeeCode: input.employeeCode,
+      staffType: input.staffType ?? 'other_staff',
       department: input.department,
       designation: input.designation ?? input.role,
       qualification: input.qualification,

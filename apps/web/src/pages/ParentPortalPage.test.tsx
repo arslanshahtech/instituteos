@@ -74,6 +74,18 @@ const portalResponse = {
       },
       results: [],
       resultsAvailable: false,
+      homework: [
+        {
+          id: 'homework-1',
+          title: 'Chapter 4 exercises',
+          type: 'homework',
+          subjectName: 'Mathematics',
+          teacherName: 'School administration',
+          dueDate: '2026-11-12',
+          instructions: 'Complete questions 1-5.',
+          totalMarks: null,
+        },
+      ],
     },
     {
       id: 'student-2',
@@ -95,6 +107,7 @@ const portalResponse = {
       fees: { totalOutstanding: 0, invoices: [] },
       results: [],
       resultsAvailable: false,
+      homework: [],
     },
   ],
 };
@@ -157,6 +170,25 @@ describe('parent workspace', () => {
 
     expect(screen.getByRole('heading', { name: 'Arman Rao' })).toBeVisible();
     expect(mocks.getPortalMe).toHaveBeenCalledWith(organizationId);
+  });
+
+  it('opens the Homework & tests section and shows published work for the selected child', async () => {
+    renderParentPortal(`/parent/organizations/${organizationId}/homework`);
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Published homework & tests',
+      }),
+    ).toBeVisible();
+    expect(screen.getByText('Chapter 4 exercises')).toBeVisible();
+    expect(screen.getByText(/Mathematics/)).toBeVisible();
+    expect(screen.getByText(/Assigned by School administration/)).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: /Homework & tests/ }),
+    ).toHaveAttribute(
+      'href',
+      `/parent/organizations/${organizationId}/homework`,
+    );
   });
 
   it('shows attendance history including absences for the selected child', async () => {

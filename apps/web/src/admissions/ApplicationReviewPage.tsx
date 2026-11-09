@@ -203,11 +203,11 @@ export function ApplicationReviewPage() {
             <dd>{record.dateOfBirth ?? '—'}</dd>
           </div>
           <div>
-            <dt>Guardian</dt>
+            <dt>Family contact</dt>
             <dd>{record.guardianName ?? '—'}</dd>
           </div>
           <div>
-            <dt>Guardian phone</dt>
+            <dt>Family contact phone</dt>
             <dd>{record.guardianPhone ?? '—'}</dd>
           </div>
           <div>

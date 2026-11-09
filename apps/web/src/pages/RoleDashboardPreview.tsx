@@ -73,7 +73,7 @@ function previewConfig(
           detail: '3 on leave',
           icon: GraduationCap,
         },
-        { label: 'Guardians', value: '298', detail: '5 new', icon: Users },
+        { label: 'Family contacts', value: '298', detail: '5 new', icon: Users },
         {
           label: 'Monthly collection',
           value: 'Rs 12.4L',

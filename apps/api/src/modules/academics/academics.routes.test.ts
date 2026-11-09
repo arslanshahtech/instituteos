@@ -52,15 +52,25 @@ function appForRole(role: OrganizationRole) {
 }
 
 describe('Academics routes', () => {
-  it('rejects users without an academic management role', async () => {
+  it('allows teachers to read academic reference data without granting management access', async () => {
     const { app, service, organizationId } = appForRole('teacher');
 
     const response = await request(app).get(
       `/${organizationId}/academic-years`,
     );
 
-    expect(response.status).toBe(403);
-    expect(service.listAcademicYears).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ items: [] });
+    expect(service.listAcademicYears).toHaveBeenCalled();
+
+    const writeResponse = await request(app)
+      .post(`/${organizationId}/classes`)
+      .set('Cookie', `instituteos_csrf=${csrfToken}`)
+      .set('X-CSRF-Token', csrfToken)
+      .send({ name: 'Unauthorized class' });
+
+    expect(writeResponse.status).toBe(403);
+    expect(service.createClass).not.toHaveBeenCalled();
   });
 
   it('rejects non-numeric class display order values at the HTTP boundary', async () => {

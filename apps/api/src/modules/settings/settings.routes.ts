@@ -54,6 +54,7 @@ function parseSettingsInput(value: unknown): OrganizationSettingsInput {
       'selfMarkingEnabled',
       'allowedStatuses',
     ],
+    staffSetup: ['departments', 'designations', 'employmentTypes', 'workShifts', 'qualifications', 'documentTypes'],
   } as const;
 
   for (const [section, keys] of Object.entries(definitions)) {
@@ -69,7 +70,12 @@ function parseSettingsInput(value: unknown): OrganizationSettingsInput {
           'Settings contain an unsupported field.',
         );
       }
-      if (section === 'notifications' || section === 'teacherSelfAttendance') {
+      if (section === 'staffSetup') {
+        if (!Array.isArray(item) || item.length > 100 || item.some((entry) => !entry || typeof entry !== 'object' || typeof (entry as { id?: unknown }).id !== 'string' || typeof (entry as { name?: unknown }).name !== 'string' || !(entry as { name: string }).name.trim() || (entry as { name: string }).name.length > 120 || typeof (entry as { isActive?: unknown }).isActive !== 'boolean')) {
+          throw new AppError(400, 'VALIDATION_ERROR', `Enter valid ${key} entries.`);
+        }
+        parsed[key] = item;
+      } else if (section === 'notifications' || section === 'teacherSelfAttendance') {
         if (key === 'allowedStatuses') {
           if (
             !Array.isArray(item) ||

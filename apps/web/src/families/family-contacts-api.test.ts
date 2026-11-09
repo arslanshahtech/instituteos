@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiRequest } from '../api/client.js';
 import {
-  createGuardian,
-  getGuardian,
-  linkGuardian,
-  listGuardians,
-  listStudentGuardians,
-  unlinkGuardian,
-  updateGuardian,
-} from './guardians-api.js';
+  createFamilyContact,
+  getFamilyContact,
+  linkFamilyContact,
+  listFamilyContacts,
+  listStudentFamilyContacts,
+  unlinkFamilyContact,
+  updateFamilyContact,
+} from './family-contacts-api.js';
 
 vi.mock('../api/client.js', () => ({
   apiRequest: vi.fn(),
@@ -25,7 +25,7 @@ describe('guardian API integration', () => {
       pageSize: 20,
     });
 
-    await listGuardians('org/one', {
+    await listFamilyContacts('org/one', {
       search: 'Leela Rao',
       page: 2,
       pageSize: 20,
@@ -45,15 +45,15 @@ describe('guardian API integration', () => {
       email: 'leela@example.test',
     };
 
-    await createGuardian('org-1', input);
-    await getGuardian('org-1', 'guardian-1');
-    await updateGuardian('org-1', 'guardian-1', input);
-    await listStudentGuardians('org-1', 'student-1');
-    await linkGuardian('org-1', 'student-1', 'guardian-1', {
+    await createFamilyContact('org-1', input);
+    await getFamilyContact('org-1', 'guardian-1');
+    await updateFamilyContact('org-1', 'guardian-1', input);
+    await listStudentFamilyContacts('org-1', 'student-1');
+    await linkFamilyContact('org-1', 'student-1', 'guardian-1', {
       relationship: 'mother',
       isPrimary: true,
     });
-    await unlinkGuardian('org-1', 'student-1', 'guardian-1');
+    await unlinkFamilyContact('org-1', 'student-1', 'guardian-1');
 
     expect(apiRequest).toHaveBeenNthCalledWith(
       1,
@@ -87,7 +87,7 @@ describe('guardian API integration', () => {
     );
     expect(apiRequest).toHaveBeenNthCalledWith(
       6,
-      '/organizations/org-1/students/student-1/guardians/guardian-1',
+      '/organizations/org-1/students/student-1/families/guardian-1',
       { method: 'DELETE' },
     );
   });

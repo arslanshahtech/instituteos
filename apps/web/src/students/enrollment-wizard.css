@@ -1,0 +1,53 @@
+
+.enrollment-page{max-width:1120px;margin:0 auto;width:100%;gap:20px}.enroll-heading h1{margin:5px 0;font-size:26px}.enroll-heading p{margin:4px 0;color:var(--color-muted,#64748b)}.enroll-back{display:inline-flex;align-items:center;gap:7px;color:var(--color-accent,#0f766e);text-decoration:none;font-size:13px;font-weight:650}.enroll-panel{background:var(--color-surface,#fff);border:1px solid var(--color-border,#e2e8f0);border-radius:12px;overflow:hidden}.enroll-stepper{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--color-border,#e2e8f0);background:#f8fafc}.enroll-step{display:flex;align-items:center;justify-content:center;gap:10px;padding:18px 10px;border:0;border-bottom:3px solid transparent;background:transparent;color:#64748b;font:inherit;font-size:13px}.enroll-step span{display:grid;place-items:center;width:27px;height:27px;border:1px solid #cbd5e1;border-radius:50%;background:white}.enroll-step.active{border-bottom-color:#0f9b8e;color:#0f766e}.enroll-step.active span,.enroll-step.complete span{background:#0f9b8e;border-color:#0f9b8e;color:white}.enroll-content{padding:26px}.enroll-section-title{margin-bottom:20px}.enroll-section-title h2{margin:0;font-size:18px}.enroll-section-title p{margin:5px 0 0;color:#64748b;font-size:13px}.enroll-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.enroll-field{display:grid;gap:7px;min-width:0;color:#34485a;font-size:12px;font-weight:650}.enroll-field b{color:#dc2626}.enroll-field input,.enroll-field select{width:100%;min-height:40px;border:1px solid #cbd5e1;border-radius:7px;padding:9px 11px;background:white;color:#172033;font:inherit;font-size:13px}.enroll-photo{display:flex;align-items:center;gap:14px;margin-bottom:22px;padding:14px;border:1px dashed #cbd5e1;border-radius:9px}.enroll-photo-preview{width:58px;height:58px;display:grid;place-items:center;border-radius:9px;background:#e8f5f3;color:#0f766e;font-size:12px;font-weight:700}.enroll-photo label{display:flex;align-items:center;gap:7px;color:#0f766e;font-size:13px;font-weight:650;cursor:pointer}.enroll-photo input{display:none}.enroll-photo small{color:#64748b;font-size:11px}.enroll-parent-card{padding:18px;margin-top:14px;border:1px solid #e2e8f0;border-radius:9px}.enroll-parent-card h3{margin:0 0 14px;font-size:14px}.enroll-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 26px;border-top:1px solid #e2e8f0;background:#fbfcfd}.enroll-footer>span{color:#64748b;font-size:12px}.enroll-footer .button{display:inline-flex;align-items:center;gap:8px}.enroll-error{margin:0 26px 12px;color:#b91c1c;font-size:13px}@media(max-width:680px){.enroll-grid{grid-template-columns:1fr}.enroll-content{padding:18px}.enroll-step{flex-direction:column;gap:6px;font-size:11px}.enroll-footer{padding:14px;flex-wrap:wrap}.enroll-photo{align-items:flex-start;flex-wrap:wrap}}
+.enroll-photo>div:last-child{display:grid;gap:6px}.enroll-photo label{width:max-content}.enroll-photo small,.enroll-hint{color:#64748b;font-size:12px}.enroll-inline{display:flex;gap:8px}.enroll-inline input{flex:1;min-width:0}.enroll-inline select{width:112px;min-height:40px;border:1px solid #cbd5e1;border-radius:7px;padding:8px;background:white}.enroll-radio{display:flex;gap:20px;align-items:center;min-height:40px}.enroll-radio label{display:flex;gap:7px;align-items:center;font-weight:500}.enroll-subheading{margin:24px 0 13px;font-size:14px;color:#263849}.enroll-address{margin-top:18px;padding:16px;border:1px solid #e2e8f0;border-radius:9px}.enroll-card-toggle{display:flex;justify-content:space-between;align-items:center;width:100%;padding:0;border:0;background:transparent;color:#263849;font:inherit;font-size:14px;font-weight:700;text-align:left;cursor:pointer}.enroll-card-toggle svg{transition:transform .18s}.enroll-card-toggle svg.rotated{transform:rotate(180deg)}.enroll-address>.enroll-grid{margin-top:16px}.enroll-parent-card{background:#fff}.enroll-parent-card .enroll-grid{row-gap:13px}
+
+
+/* Basic Information reference layout */
+.enroll-photo-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 22px}
+.enroll-photo-option{position:relative;display:flex;min-height:76px;align-items:center;gap:12px;padding:12px;border:1px dashed #cbd5e1;border-radius:7px;background:#fff;color:#334155;text-align:left;cursor:pointer}
+.enroll-photo-option:hover{border-color:#0f9b8e;background:#f8fdfc}
+.enroll-photo-option .enroll-photo-icon{display:grid;place-items:center;flex:0 0 48px;height:48px;border-radius:6px;background:#f1f5f9;color:#64748b}
+.enroll-photo-option strong{display:block;font-size:12px;font-weight:650}
+.enroll-photo-option small{display:block;margin-top:4px;color:#64748b;font-size:10px}
+.enroll-photo-option input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.enroll-photo-selected{display:flex;align-items:center;gap:10px;margin:-10px 0 20px;padding:8px 10px;border:1px solid #dbe7e5;border-radius:7px;background:#f8fdfc;font-size:12px}
+.enroll-photo-selected img{width:38px;height:38px;object-fit:cover;border-radius:6px}
+.enroll-photo-selected span{flex:1;color:#475569}
+.enroll-photo-selected button{border:0;background:none;color:#0f766e;font-size:11px;font-weight:650;cursor:pointer}
+.enroll-basic-group{margin-top:20px}
+.enroll-basic-label{margin:0 0 12px;padding-bottom:9px;border-bottom:1px solid #e2e8f0;color:#526477;font-size:10px;font-weight:700;letter-spacing:.04em}
+.enroll-number-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.enroll-number-heading .enroll-basic-label{flex:1}
+.enroll-mode-switch{display:flex;gap:2px;margin:0 0 10px;padding:2px;border:1px solid #dbe3e8;border-radius:5px;background:#f8fafc}
+.enroll-mode-switch button{padding:4px 8px;border:0;border-radius:3px;background:transparent;color:#526477;font-size:10px;cursor:pointer}
+.enroll-mode-switch button.selected{background:#0f766e;color:white}
+.enroll-registration>input,.enroll-family-number>input{width:100%;min-height:40px;border:1px solid #d5dee5;border-radius:6px;padding:9px 11px;background:#f8fafc;color:#253647;font:inherit;font-size:12px}
+.enroll-registration small,.enroll-family-number small,.enroll-family-name small{color:#64748b;font-size:10px;font-weight:400}
+.enroll-field-help{display:block;margin-top:5px;color:#64748b;font-size:10px;font-weight:400}
+.enroll-admission-options{overflow:hidden;border:1px solid #dbe3e8;border-radius:7px;background:#fff}
+.enroll-admission-choice{display:flex;align-items:flex-start;gap:10px;padding:12px;cursor:pointer}
+.enroll-admission-choice input{margin-top:3px;accent-color:#0f9b8e}
+.enroll-admission-choice strong{display:block;color:#27384a;font-size:12px}
+.enroll-admission-choice small{display:block;margin-top:4px;color:#64748b;font-size:10px;font-weight:400}
+.enroll-admission-note{margin:0;padding:9px 12px 10px 34px;border-top:1px solid #edf1f4;background:#fafcfd;color:#64748b;font-size:10px}
+.enroll-family-choice{margin:0;border:1px solid transparent;border-top:1px solid #e7edf0}
+.enroll-family-choice.selected{border:1px solid #31b69e;border-radius:6px;background:#fcfffe}
+.enroll-family-number{max-width:260px;margin:2px 12px 12px 34px}
+.enroll-family-number .enroll-number-heading{align-items:flex-end}
+.enroll-family-number .enroll-number-heading .enroll-field{margin-bottom:9px}
+.enroll-family-number .enroll-mode-switch{margin-bottom:5px}
+.enroll-family-name{margin:0 12px 12px 34px;max-width:520px}
+.enroll-family-name input{min-height:38px;border:1px solid #d5dee5;border-radius:6px;padding:8px 10px;font:inherit;font-size:12px}
+.enroll-camera-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;background:#0f172a99}
+.enroll-camera-dialog{width:min(560px,100%);padding:18px;border-radius:12px;background:#fff;box-shadow:0 20px 60px #0f172a40}
+.enroll-camera-dialog header,.enroll-camera-dialog footer{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.enroll-camera-dialog h2{margin:0;font-size:16px}
+.enroll-camera-dialog header>button{border:0;background:transparent;font-size:24px;cursor:pointer}
+.enroll-camera-dialog video{display:block;width:100%;max-height:60vh;margin:14px 0;border-radius:8px;background:#0f172a;object-fit:cover}
+.enroll-camera-error{padding:20px 0;color:#b45309;font-size:13px}
+.enroll-camera-dialog footer{justify-content:flex-end;margin-top:14px}
+@media(max-width:680px){.enroll-photo-options{grid-template-columns:1fr}.enroll-number-heading{align-items:flex-start}.enroll-family-number{max-width:none}.enroll-photo-option{min-height:68px}}
+
+/* Registration number label sits below the section divider, beside Auto/Manual. */
+.enroll-registration-heading{align-items:center;margin:0 0 8px}.enroll-registration-heading>label{color:#34485a;font-size:12px;font-weight:650}.enroll-registration-heading .enroll-mode-switch{margin:0}.enroll-phone-error{display:block;margin-top:5px;color:#b91c1c;font-size:11px;font-weight:500}

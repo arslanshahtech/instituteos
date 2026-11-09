@@ -6,11 +6,12 @@ import {
   getExamMarkSheet,
   getStudentExamReport,
   listExamSchedules,
-  listExams,
-  listGradingScales,
-  saveExam,
+  listPendingExamMarksReviews,
+  listExams,  saveExam,
   setExamResultsPublication,
   saveExamMarks,
+  submitExamMarksForReview,
+  requestExamMarksChanges,
   saveExamSchedule,
   saveGradingScale,
 } from './examinations-api.js';
@@ -30,13 +31,11 @@ export function useExaminationWorkspace(
       enabled,
       retry: false,
     }),
-    scales: useQuery({
-      queryKey: [...key, 'grading-scales'],
-      queryFn: () => listGradingScales(organizationId),
-      enabled,
-      retry: false,
-    }),
   };
+}
+
+export function usePendingExamMarksReviews(organizationId: string, enabled: boolean) {
+  return useQuery({ queryKey: [...examinationsQueryKey(organizationId), 'pending-reviews'], queryFn: () => listPendingExamMarksReviews(organizationId), enabled, retry: false });
 }
 
 export function useExamSchedules(
@@ -163,6 +162,16 @@ export function useDeleteGradingScale(organizationId: string) {
     mutationFn: (id: string) => deleteGradingScale(organizationId, id),
     onSuccess: invalidate,
   });
+}
+
+export function useSubmitExamMarksForReview(organizationId: string) {
+  const invalidate = useInvalidateExaminations(organizationId);
+  return useMutation({ mutationFn: (scheduleId: string) => submitExamMarksForReview(organizationId, scheduleId), onSuccess: invalidate });
+}
+
+export function useRequestExamMarksChanges(organizationId: string) {
+  const invalidate = useInvalidateExaminations(organizationId);
+  return useMutation({ mutationFn: (scheduleId: string) => requestExamMarksChanges(organizationId, scheduleId), onSuccess: invalidate });
 }
 
 export function useSaveExamMarks(organizationId: string) {

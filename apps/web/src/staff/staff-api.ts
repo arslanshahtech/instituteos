@@ -1,6 +1,7 @@
 import { apiRequest } from '../api/client.js';
 
 export type StaffStatus = 'active' | 'on_leave' | 'terminated' | 'inactive';
+export type StaffType = 'teacher' | 'other_staff';
 
 export interface StaffRecord {
   id: string;
@@ -9,6 +10,7 @@ export interface StaffRecord {
   firstName: string;
   lastName: string;
   employeeCode?: string;
+  staffType: StaffType;
   department?: string;
   designation?: string;
   qualification?: string;
@@ -44,6 +46,7 @@ export function listStaff(
   input: {
     search?: string;
     department?: string;
+    staffType?: StaffType;
     status?: StaffStatus;
     campusId?: string;
     page: number;
@@ -56,6 +59,7 @@ export function listStaff(
   });
   if (input.search) query.set('search', input.search);
   if (input.department) query.set('department', input.department);
+  if (input.staffType) query.set('staffType', input.staffType);
   if (input.status) query.set('status', input.status);
   if (input.campusId) query.set('campusId', input.campusId);
   return apiRequest<StaffListResponse>(`${staffPath(organizationId)}?${query}`);
@@ -83,7 +87,7 @@ export function createStaff(
 export function updateStaff(
   organizationId: string,
   staffId: string,
-  input: StaffInput,
+  input: Partial<StaffInput>,
 ): Promise<{ staff: StaffRecord }> {
   return apiRequest<{ staff: StaffRecord }>(
     `${staffPath(organizationId)}/${encodeURIComponent(staffId)}`,

@@ -21,19 +21,32 @@ import { MongoAcademicsRepository } from './academics.repository.js';
 import { AcademicsService } from './academics.service.js';
 import {
   AcademicYearModel,
+  AcademicClassModel,
   AcademicSectionModel,
   SubjectModel,
   SectionTimetableModel,
   TeacherTimetableModel,
   type SectionTimetableRecord,
 } from './academics.model.js';
-import { StaffMemberModel } from '../people/people.model.js';
+import {
+  EnrollmentModel,
+  StudentModel,
+  StaffMemberModel,
+} from '../people/people.model.js';
+import { StudentSectionPlacementModel } from '../attendance/attendance.model.js';
+import {
+  FeeStructureModel,
+  StudentInvoiceModel,
+} from '../finance/finance.model.js';
+import { PromotionRunModel } from './promotion.model.js';
 import type {
   AcademicYearInput,
+  AcademicYearCreateInput,
   AcademicsContext,
   ClassInput,
   SectionInput,
   SubjectInput,
+  SubjectMarkComponent,
   TeacherAssignmentInput,
   TermInput,
 } from './academics.types.js';
@@ -99,6 +112,74 @@ function optionalInteger(
     );
   }
   return value;
+}
+
+function parseSubjectMarkComponents(
+  value: unknown,
+): SubjectMarkComponent[] | undefined {
+  if (value === undefined) return undefined;
+  const labels = {
+    theory: 'Theory',
+    practical: 'Practical',
+    viva: 'Viva',
+  } as const;
+  if (!Array.isArray(value) || value.length < 1 || value.length > 3)
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Configure at least one valid subject mark component.',
+    );
+  const seen = new Set<string>();
+  const components = value.map((entry) => {
+    const item = bodyObject(entry);
+    if (
+      typeof item.key !== 'string' ||
+      !(item.key in labels) ||
+      seen.has(item.key)
+    )
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Choose each mark component only once.',
+      );
+    seen.add(item.key);
+    if (typeof item.enabled !== 'boolean')
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Choose whether each component is enabled.',
+      );
+    const totalMarks = item.totalMarks;
+    const passingMarks = item.passingMarks;
+    if (
+      !Number.isSafeInteger(totalMarks) ||
+      !Number.isSafeInteger(passingMarks) ||
+      (totalMarks as number) < 0 ||
+      (totalMarks as number) > 100000 ||
+      (passingMarks as number) < 0 ||
+      (passingMarks as number) > (totalMarks as number) ||
+      (item.enabled && (totalMarks as number) < 1)
+    )
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Enter valid total and passing marks for each enabled component.',
+      );
+    return {
+      key: item.key as SubjectMarkComponent['key'],
+      label: labels[item.key as keyof typeof labels],
+      totalMarks: totalMarks as number,
+      passingMarks: passingMarks as number,
+      enabled: item.enabled,
+    };
+  });
+  if (!components.some((component) => component.enabled))
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Enable at least one subject mark component.',
+    );
+  return components;
 }
 
 function academicYearStatus(
@@ -190,17 +271,29 @@ export function createAcademicsRouter(
   const resolveOrganization =
     createOrganizationContextMiddleware(accessRepository);
   const authorize = requireOrganizationRole(academicManagers);
+  const authorizeAcademicRead = requireOrganizationRole([
+    ...academicManagers,
+    'teacher',
+  ]);
   const protect = [
     authenticate,
     resolveOrganization,
     authorize,
     requireOrganizationMethodPermission('academics.read', 'academics.write'),
   ] as const;
+  // Teachers may read the academic reference data needed for their workspace,
+  // but every mutation remains behind the academic-manager-only guard above.
+  const protectAcademicRead = [
+    authenticate,
+    resolveOrganization,
+    authorizeAcademicRead,
+    requireOrganizationMethodPermission('academics.read', 'academics.write'),
+  ] as const;
   const base = '/:organizationId';
 
   router.get(
     `${base}/academics/campuses`,
-    ...protect,
+    ...protectAcademicRead,
     asyncHandler(async (_request, response) => {
       response.status(200).json({
         campuses: await service.listCampuses(organizationContext(response)),
@@ -209,7 +302,7 @@ export function createAcademicsRouter(
   );
   router.get(
     `${base}/academic-years`,
-    ...protect,
+    ...protectAcademicRead,
     asyncHandler(async (_request, response) => {
       response.status(200).json({
         items: await service.listAcademicYears(organizationContext(response)),
@@ -218,7 +311,7 @@ export function createAcademicsRouter(
   );
   router.get(
     '/:organizationId/academic-years/summary',
-    ...protect,
+    ...protectAcademicRead,
     asyncHandler(async (_request, response) => {
       response.status(200).json({
         summary: await service.getAcademicYearSummary(
@@ -235,10 +328,18 @@ export function createAcademicsRouter(
       const body = bodyObject(request.body);
       if (body.status !== undefined)
         assertAcademicYearLifecycleAuthority(response);
-      const input: AcademicYearInput = {
+      const input: AcademicYearCreateInput = {
         name: requiredString(body, 'name', 100),
-        startDate: requiredString(body, 'startDate', 10),
-        endDate: requiredString(body, 'endDate', 10),
+        description:
+          typeof body.description === 'string'
+            ? body.description.slice(0, 500)
+            : '',
+        ...(body.startDate === undefined
+          ? {}
+          : { startDate: requiredString(body, 'startDate', 10) }),
+        ...(body.endDate === undefined
+          ? {}
+          : { endDate: requiredString(body, 'endDate', 10) }),
         ...(body.status === undefined
           ? {}
           : { status: academicYearStatus(body) }),
@@ -310,7 +411,7 @@ export function createAcademicsRouter(
 
   router.get(
     `${base}/terms`,
-    ...protect,
+    ...protectAcademicRead,
     asyncHandler(async (request, response) => {
       const academicYearId =
         request.query.academicYearId === undefined
@@ -397,7 +498,7 @@ export function createAcademicsRouter(
 
   router.get(
     `${base}/classes`,
-    ...protect,
+    ...protectAcademicRead,
     asyncHandler(async (_request, response) => {
       response.status(200).json({
         items: await service.listClasses(organizationContext(response)),
@@ -504,7 +605,7 @@ export function createAcademicsRouter(
 
   router.get(
     `${base}/sections`,
-    ...protect,
+    ...protectAcademicRead,
     asyncHandler(async (request, response) => {
       const classId =
         request.query.classId === undefined
@@ -598,7 +699,7 @@ export function createAcademicsRouter(
 
   router.get(
     `${base}/subjects`,
-    ...protect,
+    ...protectAcademicRead,
     asyncHandler(async (_request, response) => {
       response.status(200).json({
         items: await service.listSubjects(organizationContext(response)),
@@ -638,11 +739,13 @@ export function createAcademicsRouter(
           'VALIDATION_ERROR',
           'Choose valid classes for this subject.',
         );
+      const markComponents = parseSubjectMarkComponents(body.markComponents);
       const input: SubjectInput = {
         name: requiredString(body, 'name', 120),
         ...(body.code ? { code: requiredString(body, 'code', 30) } : {}),
         totalMarks,
         passingPercentage,
+        ...(markComponents ? { markComponents } : {}),
         ...(description ? { description } : {}),
         ...(body.classIds !== undefined
           ? { classIds: body.classIds as string[] }
@@ -694,6 +797,11 @@ export function createAcademicsRouter(
                 100,
               ),
             }),
+        ...(body.markComponents === undefined
+          ? {}
+          : {
+              markComponents: parseSubjectMarkComponents(body.markComponents),
+            }),
         ...(body.description === undefined
           ? {}
           : { description: optionalString(body, 'description', 1000) ?? '' }),
@@ -740,7 +848,7 @@ export function createAcademicsRouter(
 
   router.get(
     `${base}/teacher-assignments`,
-    ...protect,
+    ...protectAcademicRead,
     asyncHandler(async (_request, response) => {
       response.status(200).json({
         items: await service.listTeacherAssignments(
@@ -1539,6 +1647,753 @@ export function createAcademicsRouter(
           'Timetable entry not found.',
         );
       response.status(204).end();
+    }),
+  );
+
+  router.get(
+    `${base}/promotions/source-count`,
+    ...protect,
+    asyncHandler(async (request, response) => {
+      const context = organizationContext(response);
+      const sourceAcademicYearId = routeId(
+        request.query.sourceAcademicYearId as string,
+        'Source academic year',
+      );
+      const campusId = routeId(request.query.campusId as string, 'Campus');
+      if (context.campusIds.length && !context.campusIds.includes(campusId))
+        throw new AppError(
+          403,
+          'CAMPUS_FORBIDDEN',
+          'You are not authorized for this campus.',
+        );
+      const organizationId = new mongoose.Types.ObjectId(
+        context.organizationId,
+      );
+      const studentIds = await StudentSectionPlacementModel.distinct(
+        'studentId',
+        {
+          organizationId,
+          campusId,
+          academicYearId: sourceAcademicYearId,
+          status: 'active',
+        },
+      );
+      const count = studentIds.length
+        ? await StudentModel.countDocuments({
+            _id: { $in: studentIds },
+            organizationId,
+            status: 'active',
+          })
+        : 0;
+      response.status(200).json({ count });
+    }),
+  );
+
+  router.get(
+    `${base}/promotions/preview`,
+    ...protect,
+    asyncHandler(async (request, response) => {
+      const context = organizationContext(response);
+      const sourceAcademicYearId = routeId(
+        request.query.sourceAcademicYearId as string,
+        'Source academic year',
+      );
+      const targetAcademicYearId = routeId(
+        request.query.targetAcademicYearId as string,
+        'Target academic year',
+      );
+      const campusId = routeId(request.query.campusId as string, 'Campus');
+      if (sourceAcademicYearId === targetAcademicYearId)
+        throw new AppError(
+          400,
+          'INVALID_PROMOTION_SESSIONS',
+          'Choose two different academic sessions.',
+        );
+      if (context.campusIds.length && !context.campusIds.includes(campusId))
+        throw new AppError(
+          403,
+          'CAMPUS_FORBIDDEN',
+          'You are not authorized for this campus.',
+        );
+      const organizationId = new mongoose.Types.ObjectId(
+        context.organizationId,
+      );
+      const [
+        sourceYear,
+        targetYear,
+        classes,
+        sections,
+        feeStructures,
+        sourceFeeStructures,
+        placements,
+        unpaidInvoices,
+        sourceInvoices,
+      ] = await Promise.all([
+        AcademicYearModel.findOne({
+          _id: sourceAcademicYearId,
+          organizationId,
+        }).lean(),
+        AcademicYearModel.findOne({
+          _id: targetAcademicYearId,
+          organizationId,
+        }).lean(),
+        AcademicClassModel.find({ organizationId, campusId })
+          .sort({ sortOrder: 1, name: 1 })
+          .lean(),
+        AcademicSectionModel.find({ organizationId }).lean(),
+        FeeStructureModel.find({
+          organizationId,
+          campusId,
+          academicYearId: targetAcademicYearId,
+        }).lean(),
+        FeeStructureModel.find({
+          organizationId,
+          campusId,
+          academicYearId: sourceAcademicYearId,
+        }).lean(),
+        StudentSectionPlacementModel.find({
+          organizationId,
+          campusId,
+          academicYearId: sourceAcademicYearId,
+          status: 'active',
+        })
+          .populate('studentId', 'firstName lastName registrationNumber status')
+          .populate('classId', 'name code sortOrder studyLevel')
+          .populate('sectionId', 'name')
+          .sort({ createdAt: 1 })
+          .lean(),
+        StudentInvoiceModel.find({
+          organizationId,
+          campusId,
+          academicYearId: sourceAcademicYearId,
+          status: { $in: ['unpaid', 'partial', 'overdue'] },
+        })
+          .sort({ issueDate: -1 })
+          .lean(),
+        StudentInvoiceModel.find({
+          organizationId,
+          campusId,
+          academicYearId: sourceAcademicYearId,
+        })
+          .sort({ issueDate: -1 })
+          .lean(),
+      ]);
+      if (!sourceYear || !targetYear)
+        throw new AppError(
+          404,
+          'ACADEMIC_YEAR_NOT_FOUND',
+          'The selected academic session was not found.',
+        );
+      if (new Date(targetYear.startDate) <= new Date(sourceYear.startDate))
+        throw new AppError(
+          400,
+          'INVALID_PROMOTION_SESSIONS',
+          'Target session must start after the source session.',
+        );
+      const unpaidByStudent = new Map<
+        string,
+        { count: number; outstanding: number; currentFee: number }
+      >();
+      for (const invoice of unpaidInvoices) {
+        const studentId = String(invoice.studentId);
+        const current = unpaidByStudent.get(studentId) ?? {
+          count: 0,
+          outstanding: 0,
+          currentFee: 0,
+        };
+        current.count += 1;
+        current.outstanding +=
+          Number(String(invoice.totalAmount)) -
+          Number(String(invoice.paidAmount ?? 0));
+        if (current.currentFee === 0) {
+          current.currentFee = Number(
+            String(invoice.currentAmount ?? invoice.totalAmount),
+          );
+        }
+        unpaidByStudent.set(studentId, current);
+      }
+      for (const invoice of sourceInvoices) {
+        const studentId = String(invoice.studentId);
+        const current = unpaidByStudent.get(studentId) ?? {
+          count: 0,
+          outstanding: 0,
+          currentFee: 0,
+        };
+        if (current.currentFee === 0) {
+          current.currentFee = Number(
+            String(invoice.currentAmount ?? invoice.totalAmount),
+          );
+        }
+        unpaidByStudent.set(studentId, current);
+      }
+      const studentRows = placements.flatMap((placement) => {
+        const student = placement.studentId as unknown as {
+          _id?: unknown;
+          firstName?: string;
+          lastName?: string;
+          registrationNumber?: string;
+          status?: string;
+        } | null;
+        const classRecord = placement.classId as unknown as {
+          _id?: unknown;
+          name?: string;
+          code?: string;
+          studyLevel?: string;
+        } | null;
+        const sectionRecord = placement.sectionId as unknown as {
+          _id?: unknown;
+          name?: string;
+        } | null;
+        if (
+          !student ||
+          !classRecord ||
+          !sectionRecord ||
+          student.status !== 'active'
+        )
+          return [];
+        return [
+          {
+            id: String(student._id),
+            firstName: student.firstName ?? '',
+            lastName: student.lastName ?? '',
+            registrationNumber: student.registrationNumber ?? '',
+            sourceClassId: String(classRecord._id),
+            sourceClassName: classRecord.name ?? '',
+            sourceClassCode: classRecord.code ?? '',
+            sourceSectionId: String(sectionRecord._id),
+            sourceSectionName: sectionRecord.name ?? '',
+            unpaidInvoiceCount:
+              unpaidByStudent.get(String(student._id))?.count ?? 0,
+            outstandingBalance:
+              unpaidByStudent.get(String(student._id))?.outstanding ?? 0,
+            currentFee:
+              (placement.feeOverrideAmount
+                ? Number(String(placement.feeOverrideAmount))
+                : 0) ||
+              Number(
+                String(
+                  sourceFeeStructures
+                    .find(
+                      (fee) => String(fee.classId) === String(classRecord._id),
+                    )
+                    ?.feeHeads.reduce(
+                      (
+                        sum: number,
+                        head: { amount: unknown; isOptional: boolean },
+                      ) =>
+                        sum +
+                        (head.isOptional ? 0 : Number(String(head.amount))),
+                      0,
+                    ) ?? 0,
+                ),
+              ) ||
+              unpaidByStudent.get(String(student._id))?.currentFee ||
+              0,
+          },
+        ];
+      });
+      response.status(200).json({
+        sourceAcademicYear: {
+          id: String(sourceYear._id),
+          name: sourceYear.name,
+        },
+        targetAcademicYear: {
+          id: String(targetYear._id),
+          name: targetYear.name,
+        },
+        classes: classes.map((item) => ({
+          id: String(item._id),
+          name: item.name,
+          code: item.code,
+          campusId: String(item.campusId),
+          studyLevel: item.studyLevel,
+          sortOrder: item.sortOrder,
+        })),
+        sections: sections.map((item) => ({
+          id: String(item._id),
+          name: item.name,
+          classId: String(item.classId),
+          capacity: item.capacity,
+        })),
+        feeStructures: feeStructures.map((item) => ({
+          id: String(item._id),
+          name: item.name,
+          classId: String(item.classId),
+          feeHeads: item.feeHeads.map(
+            (head: {
+              title: string;
+              amount: unknown;
+              isOptional: boolean;
+            }) => ({
+              title: head.title,
+              amount: Number(String(head.amount)),
+              isOptional: head.isOptional,
+            }),
+          ),
+          total: item.feeHeads.reduce(
+            (sum: number, head: { amount: unknown; isOptional: boolean }) =>
+              sum + (head.isOptional ? 0 : Number(String(head.amount))),
+            0,
+          ),
+        })),
+        students: studentRows,
+      });
+    }),
+  );
+
+  router.post(
+    `${base}/promotions`,
+    ...protect,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const body = bodyObject(request.body);
+      const context = organizationContext(response);
+      const organizationId = new mongoose.Types.ObjectId(
+        context.organizationId,
+      );
+      const sourceAcademicYearId = routeId(
+        body.sourceAcademicYearId as string,
+        'Source academic year',
+      );
+      const targetAcademicYearId = routeId(
+        body.targetAcademicYearId as string,
+        'Target academic year',
+      );
+      const campusId = routeId(body.campusId as string, 'Campus');
+      const effectiveDateValue =
+        typeof body.effectiveDate === 'string'
+          ? new Date(body.effectiveDate)
+          : new Date('invalid');
+      if (Number.isNaN(effectiveDateValue.getTime()))
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Enter a valid effective date.',
+        );
+      if (sourceAcademicYearId === targetAcademicYearId)
+        throw new AppError(
+          400,
+          'INVALID_PROMOTION_SESSIONS',
+          'Choose two different academic sessions.',
+        );
+      if (context.campusIds.length && !context.campusIds.includes(campusId))
+        throw new AppError(
+          403,
+          'CAMPUS_FORBIDDEN',
+          'You are not authorized for this campus.',
+        );
+      if (
+        !Array.isArray(body.studentIds) ||
+        body.studentIds.length < 1 ||
+        body.studentIds.length > 1000
+      )
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Select between 1 and 1000 students.',
+        );
+      if (!Array.isArray(body.mappings))
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Configure class mappings before promotion.',
+        );
+      const studentIds = [
+        ...new Set(body.studentIds.map((id) => routeId(String(id), 'Student'))),
+      ];
+      const studentFeeOverrides = new Map<
+        string,
+        { mode: 'current' | 'custom'; amount: number }
+      >();
+      if (Array.isArray(body.studentFeeOverrides)) {
+        for (const raw of body.studentFeeOverrides) {
+          const override = bodyObject(raw);
+          const studentId = routeId(override.studentId as string, 'Student');
+          if (!studentIds.includes(studentId)) {
+            throw new AppError(
+              400,
+              'INVALID_PROMOTION_FEE_OVERRIDE',
+              'Fee overrides can only be set for selected students.',
+            );
+          }
+          if (
+            (override.mode !== 'current' && override.mode !== 'custom') ||
+            typeof override.amount !== 'number' ||
+            !Number.isFinite(override.amount) ||
+            override.amount <= 0 ||
+            Math.round(override.amount * 100) !== override.amount * 100
+          ) {
+            throw new AppError(
+              400,
+              'INVALID_PROMOTION_FEE_OVERRIDE',
+              'Enter a valid current or custom fee amount.',
+            );
+          }
+          studentFeeOverrides.set(studentId, {
+            mode: override.mode,
+            amount: override.amount,
+          });
+        }
+      }
+      const mappings = new Map<
+        string,
+        {
+          targetClassId?: string;
+          targetSectionId?: string;
+          feeStructureId?: string;
+          sourceSectionId?: string;
+          outcome: 'promoted' | 'repeated' | 'graduated';
+        }
+      >();
+      for (const raw of body.mappings) {
+        const mapping = bodyObject(raw);
+        const sourceClassId = routeId(
+          mapping.sourceClassId as string,
+          'Source class',
+        );
+        const outcome =
+          mapping.outcome === 'graduated'
+            ? 'graduated'
+            : mapping.outcome === 'repeated'
+              ? 'repeated'
+              : 'promoted';
+        const sourceSectionId = routeId(
+          mapping.sourceSectionId as string,
+          'Source section',
+        );
+        if (outcome === 'graduated') {
+          mappings.set(`${sourceClassId}:${sourceSectionId}`, {
+            outcome,
+            sourceSectionId,
+          });
+          continue;
+        }
+        const targetClassId = routeId(
+          mapping.targetClassId as string,
+          'Target class',
+        );
+        const targetSectionId = routeId(
+          mapping.targetSectionId as string,
+          'Target section',
+        );
+        const feeStructureId = routeId(
+          mapping.feeStructureId as string,
+          'Fee structure',
+        );
+        mappings.set(`${sourceClassId}:${sourceSectionId}`, {
+          sourceSectionId,
+          targetClassId,
+          targetSectionId,
+          feeStructureId,
+          outcome,
+        });
+      }
+      const session = await mongoose.startSession();
+      let runId = '';
+      let promotedCount = 0;
+      let graduatedCount = 0;
+      const runStudents: Array<Record<string, unknown>> = [];
+      try {
+        await session.withTransaction(async () => {
+          const [sourceYear, targetYear] = await Promise.all([
+            AcademicYearModel.findOne({
+              _id: sourceAcademicYearId,
+              organizationId,
+            })
+              .session(session)
+              .lean(),
+            AcademicYearModel.findOne({
+              _id: targetAcademicYearId,
+              organizationId,
+            })
+              .session(session)
+              .lean(),
+          ]);
+          if (
+            !sourceYear ||
+            !targetYear ||
+            new Date(targetYear.startDate) <= new Date(sourceYear.startDate)
+          )
+            throw new AppError(
+              400,
+              'INVALID_PROMOTION_SESSIONS',
+              'Choose a valid later target academic session.',
+            );
+          const placements = await StudentSectionPlacementModel.find({
+            organizationId,
+            campusId,
+            academicYearId: sourceAcademicYearId,
+            studentId: { $in: studentIds },
+            status: 'active',
+          })
+            .session(session)
+            .lean();
+          const addedToTargetSections = new Map<string, number>();
+          if (placements.length !== studentIds.length)
+            throw new AppError(
+              409,
+              'PROMOTION_STUDENT_SCOPE_MISMATCH',
+              'Some selected students do not have an active placement in the source session. Refresh the list and try again.',
+            );
+          for (const placement of placements) {
+            const mapping =
+              mappings.get(
+                `${String(placement.classId)}:${String(placement.sectionId)}`,
+              ) ?? mappings.get(`${String(placement.classId)}:`);
+            if (!mapping)
+              throw new AppError(
+                400,
+                'PROMOTION_MAPPING_MISSING',
+                'Every selected source class needs a promotion or graduation decision.',
+              );
+            let targetClassId: mongoose.Types.ObjectId | null = null;
+            let targetSectionId: mongoose.Types.ObjectId | null = null;
+            let feeStructureId: mongoose.Types.ObjectId | null = null;
+            const studentFeeOverride = studentFeeOverrides.get(
+              String(placement.studentId),
+            );
+            if (mapping.outcome !== 'graduated') {
+              targetClassId = new mongoose.Types.ObjectId(
+                mapping.targetClassId,
+              );
+              targetSectionId = new mongoose.Types.ObjectId(
+                mapping.targetSectionId,
+              );
+              const selectedFeeStructureId = mapping.feeStructureId;
+              feeStructureId = new mongoose.Types.ObjectId(
+                selectedFeeStructureId,
+              );
+              const [targetClass, targetSection, feeStructure] =
+                await Promise.all([
+                  AcademicClassModel.findOne({
+                    _id: targetClassId,
+                    organizationId,
+                    campusId,
+                  })
+                    .session(session)
+                    .lean(),
+                  AcademicSectionModel.findOne({
+                    _id: targetSectionId,
+                    organizationId,
+                    classId: targetClassId,
+                  })
+                    .session(session)
+                    .lean(),
+                  FeeStructureModel.findOne({
+                    _id: feeStructureId,
+                    organizationId,
+                    campusId,
+                    academicYearId: targetAcademicYearId,
+                    classId: targetClassId,
+                  })
+                    .session(session)
+                    .lean(),
+                ]);
+              if (!targetClass || !targetSection || !feeStructure)
+                throw new AppError(
+                  400,
+                  'INVALID_PROMOTION_MAPPING',
+                  'The target class, section or target-session fee structure is invalid.',
+                );
+              if (
+                mapping.outcome === 'promoted' &&
+                String(targetClassId) === String(placement.classId)
+              )
+                throw new AppError(
+                  400,
+                  'INVALID_PROMOTION_MAPPING',
+                  'Choose the next class or select Repeat this class.',
+                );
+              if (
+                mapping.outcome === 'repeated' &&
+                (String(targetClassId) !== String(placement.classId) ||
+                  String(targetSectionId) !== String(placement.sectionId))
+              )
+                throw new AppError(
+                  400,
+                  'INVALID_PROMOTION_MAPPING',
+                  'A repeated student must remain in the same class and section.',
+                );
+              const sectionKey = String(targetSectionId);
+              let count = addedToTargetSections.get(sectionKey);
+              if (count === undefined) {
+                count = await StudentSectionPlacementModel.countDocuments({
+                  organizationId,
+                  academicYearId: targetAcademicYearId,
+                  sectionId: targetSectionId,
+                  status: 'active',
+                }).session(session);
+              }
+              if (
+                typeof targetSection.capacity === 'number' &&
+                count >= targetSection.capacity
+              )
+                throw new AppError(
+                  409,
+                  'SECTION_CAPACITY_REACHED',
+                  `The target section ${targetSection.name} has reached capacity.`,
+                );
+              addedToTargetSections.set(sectionKey, count + 1);
+            }
+            const student = await StudentModel.findOne({
+              _id: placement.studentId,
+              organizationId,
+            })
+              .session(session)
+              .lean();
+            if (!student || student.status !== 'active')
+              throw new AppError(
+                409,
+                'STUDENT_NOT_ACTIVE',
+                'A selected student is no longer active.',
+              );
+            await StudentSectionPlacementModel.updateOne(
+              { _id: placement._id, organizationId, status: 'active' },
+              { $set: { status: 'inactive' } },
+              { session },
+            );
+            if (mapping.outcome !== 'graduated') {
+              await StudentSectionPlacementModel.create(
+                [
+                  {
+                    organizationId,
+                    studentId: placement.studentId,
+                    classId: targetClassId,
+                    sectionId: targetSectionId,
+                    academicYearId: new mongoose.Types.ObjectId(
+                      targetAcademicYearId,
+                    ),
+                    campusId,
+                    ...(studentFeeOverride
+                      ? {
+                          feeOverrideAmount:
+                            mongoose.Types.Decimal128.fromString(
+                              studentFeeOverride.amount.toFixed(2),
+                            ),
+                          feeOverrideMode: studentFeeOverride.mode,
+                        }
+                      : {}),
+                    status: 'active',
+                  },
+                ],
+                { session },
+              );
+              promotedCount += 1;
+            } else {
+              await EnrollmentModel.updateMany(
+                {
+                  organizationId,
+                  studentId: placement.studentId,
+                  academicYearId: sourceAcademicYearId,
+                  status: 'active',
+                },
+                { $set: { status: 'completed', endDate: effectiveDateValue } },
+                { session },
+              );
+              await StudentModel.updateOne(
+                { _id: placement.studentId, organizationId },
+                {
+                  $set: { status: 'inactive' },
+                  $push: {
+                    academicHistory: {
+                      qualification: 'Graduated',
+                      year: String(targetYear.name),
+                      notes: `Graduated on ${effectiveDateValue.toISOString().slice(0, 10)}`,
+                    },
+                  },
+                },
+                { session },
+              );
+              graduatedCount += 1;
+            }
+            runStudents.push({
+              studentId: placement.studentId,
+              studentName: `${String(student.firstName)} ${String(student.lastName)}`,
+              registrationNumber: student.registrationNumber,
+              sourceClassId: placement.classId,
+              sourceSectionId: placement.sectionId,
+              targetClassId,
+              targetSectionId,
+              feeStructureId,
+              feeOverrideAmount: studentFeeOverride?.amount,
+              feeOverrideMode: studentFeeOverride?.mode,
+              outcome: mapping.outcome,
+            });
+          }
+          const rawActor = (
+            response.locals.organizationContext as { userId?: string }
+          ).userId;
+          if (!rawActor || !mongoose.isValidObjectId(rawActor))
+            throw new AppError(
+              403,
+              'PROMOTION_ACTOR_REQUIRED',
+              'Your user session could not be verified.',
+            );
+          const [run] = await PromotionRunModel.create(
+            [
+              {
+                organizationId,
+                campusId,
+                sourceAcademicYearId,
+                targetAcademicYearId,
+                effectiveDate: effectiveDateValue,
+                status: 'completed',
+                promotedCount,
+                graduatedCount,
+                students: runStudents,
+                performedBy: new mongoose.Types.ObjectId(rawActor),
+              },
+            ],
+            { session },
+          );
+          runId = String(run._id);
+        });
+      } finally {
+        await session.endSession();
+      }
+      response.status(201).json({
+        promotion: {
+          id: runId,
+          promotedCount,
+          graduatedCount,
+          total: promotedCount + graduatedCount,
+        },
+      });
+    }),
+  );
+
+  router.get(
+    `${base}/promotions/history`,
+    ...protect,
+    asyncHandler(async (_request, response) => {
+      const context = organizationContext(response);
+      const records = await PromotionRunModel.find({
+        organizationId: new mongoose.Types.ObjectId(context.organizationId),
+        ...(context.campusIds.length
+          ? {
+              campusId: {
+                $in: context.campusIds.map(
+                  (id) => new mongoose.Types.ObjectId(id),
+                ),
+              },
+            }
+          : {}),
+      })
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean();
+      response.status(200).json({
+        items: records.map((record) => ({
+          id: String(record._id),
+          sourceAcademicYearId: String(record.sourceAcademicYearId),
+          targetAcademicYearId: String(record.targetAcademicYearId),
+          effectiveDate: new Date(record.effectiveDate).toISOString(),
+          promotedCount: record.promotedCount,
+          graduatedCount: record.graduatedCount,
+          total: record.promotedCount + record.graduatedCount,
+          createdAt: new Date(record.createdAt).toISOString(),
+        })),
+      });
     }),
   );
 

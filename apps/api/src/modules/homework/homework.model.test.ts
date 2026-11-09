@@ -21,10 +21,10 @@ function validInput(overrides: Record<string, unknown> = {}) {
 }
 
 describe('HomeworkTestModel', () => {
-  it('accepts a scoped homework record and defaults it to published', async () => {
+  it('accepts a scoped homework record and defaults it to draft', async () => {
     const record = new HomeworkTestModel(validInput());
     await record.validate();
-    expect(record.status).toBe('published');
+    expect(record.status).toBe('draft');
     expect(record.type).toBe('homework');
   });
 
@@ -34,6 +34,13 @@ describe('HomeworkTestModel', () => {
     );
     await record.validate();
     expect(record.totalMarks).toBe(25);
+  });
+
+  it('rejects the retired archived status', async () => {
+    const record = new HomeworkTestModel(validInput({ status: 'archived' }));
+    await expect(record.validate()).rejects.toMatchObject({
+      errors: { status: expect.any(Object) },
+    });
   });
 
   it('rejects a homework/test type outside the allowed enum', async () => {

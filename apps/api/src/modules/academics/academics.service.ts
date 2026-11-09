@@ -99,16 +99,35 @@ export class AcademicsService {
   }
   async createAcademicYear(
     context: AcademicsContext,
-    input: AcademicYearInput,
+    input: import('./academics.types.js').AcademicYearCreateInput,
   ) {
-    const startDate = validDate(input.startDate, 'start date');
-    const endDate = validDate(input.endDate, 'end date');
+    const name = requiredText(input.name, 'academic year name', 100);
+    let startDate: string;
+    let endDate: string;
+    if (input.startDate && input.endDate) {
+      startDate = validDate(input.startDate, 'start date');
+      endDate = validDate(input.endDate, 'end date');
+    } else {
+      const existingYears = await this.repository.listAcademicYears(context.organizationId);
+      const currentYear = existingYears.find((year) => year.status === 'active');
+      if (!currentYear)
+        throw new AppError(400, 'ACADEMIC_CALENDAR_REQUIRED', 'Create the first academic session with its date range before adding another session.');
+      const shiftOneYear = (value: string) => {
+        const [year, month, day] = value.split('-').map(Number);
+        const next = new Date(Date.UTC(year! + 1, month! - 1, day!));
+        if (next.getUTCMonth() !== month! - 1) next.setUTCDate(0);
+        return next.toISOString().slice(0, 10);
+      };
+      startDate = shiftOneYear(currentYear.startDate);
+      endDate = shiftOneYear(currentYear.endDate);
+    }
     assertDateRange(startDate, endDate);
     return this.repository.createAcademicYear(context.organizationId, {
-      name: requiredText(input.name, 'academic year name', 100),
+      name,
+      description: String(input.description ?? '').trim().slice(0, 500),
       startDate,
       endDate,
-      status: this.yearStatus(input.status),
+      status: input.status ?? 'archived',
     });
   }
   async updateAcademicYear(
@@ -617,6 +636,28 @@ export class AcademicsService {
         0,
         100,
       ),
+      ...(input.markComponents !== undefined
+        ? (() => {
+            const components = input.markComponents!;
+            if (components.length < 1 || components.length > 3 ||
+                new Set(components.map((component) => component.key)).size !== components.length ||
+                !components.some((component) => component.enabled))
+              throw new AppError(400, 'VALIDATION_ERROR', 'Configure at least one unique enabled mark component.');
+            for (const component of components) {
+              if (!Number.isSafeInteger(component.totalMarks) ||
+                  !Number.isSafeInteger(component.passingMarks) ||
+                  component.totalMarks < 0 || component.passingMarks < 0 ||
+                  component.passingMarks > component.totalMarks ||
+                  (component.enabled && component.totalMarks < 1))
+                throw new AppError(400, 'VALIDATION_ERROR', 'Enter valid component total and passing marks.');
+            }
+            const enabledTotal = components.filter((component) => component.enabled)
+              .reduce((sum, component) => sum + component.totalMarks, 0);
+            if (enabledTotal !== input.totalMarks)
+              throw new AppError(400, 'VALIDATION_ERROR', 'Subject total marks must equal the enabled component totals.');
+            return { markComponents: components };
+          })()
+        : {}),
       ...(input.description?.trim()
         ? { description: requiredText(input.description, 'description', 1000) }
         : {}),

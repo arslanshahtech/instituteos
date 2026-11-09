@@ -7,12 +7,21 @@ export interface StudentRecord {
   firstName: string;
   lastName: string;
   preferredName?: string;
+  registrationNumber?: string;
+  fatherName?: string;
+  motherName?: string;
+  parentMobile?: string;
   dateOfBirth?: string;
   gender?: string;
   status: StudentStatus;
   contactEmail?: string;
   phone?: string;
   campusId?: string;
+  nationality?: string;
+  religion?: string;
+  birthPlace?: string;
+  nationalId?: string;
+  specialNeeds?: string;
   address?: {
     line1?: string;
     line2?: string;
@@ -35,6 +44,15 @@ export interface StudentInput {
   firstName: string;
   lastName: string;
   preferredName?: string;
+  registrationNumber?: string;
+  fatherName?: string;
+  motherName?: string;
+  parentMobile?: string;
+  nationality?: string;
+  religion?: string;
+  birthPlace?: string;
+  nationalId?: string;
+  specialNeeds?: string;
   dateOfBirth?: string;
   gender?: string;
   status?: StudentStatus;
@@ -125,6 +143,8 @@ export function listStudents(
   input: {
     search?: string;
     status?: StudentStatus;
+    classId?: string;
+    sectionId?: string;
     page: number;
     pageSize: number;
   },
@@ -135,6 +155,8 @@ export function listStudents(
   });
   if (input.search) query.set('search', input.search);
   if (input.status) query.set('status', input.status);
+  if (input.classId) query.set('classId', input.classId);
+  if (input.sectionId) query.set('sectionId', input.sectionId);
   return apiRequest<StudentListResponse>(
     `${studentsPath(organizationId)}?${query.toString()}`,
   );
@@ -191,4 +213,52 @@ export function importStudents(
       body: JSON.stringify(input),
     },
   );
+}
+
+
+export interface EnrollmentWizardInput {
+  student: {
+    firstName: string; lastName: string; registrationNumber: string;
+    preferredName?: string; dateOfBirth?: string; gender?: string;
+    contactEmail?: string; phone?: string; fatherName?: string; motherName?: string;
+    parentMobile?: string; secondaryNumber?: string; nationality?: string; religion?: string; birthPlace?: string;
+    nationalId?: string; specialNeeds?: string;
+    address?: { line1?: string; line2?: string; city?: string; region?: string; postalCode?: string; country?: string };
+  };
+  parents: Array<{ firstName: string; lastName: string; relationship: 'father' | 'mother' | 'guardian'; phone?: string; email?: string; cnic?: string; occupation?: string; monthlyIncome?: number; isPrimary?: boolean }>;
+  enrollment: {
+    campusId: string; academicYearId: string; classId: string; sectionId: string;
+    startDate?: string; admissionFee?: number; registrationFee?: number; securityDeposit?: number;
+    monthlyFee?: number; discountType?: 'fixed' | 'percentage'; discountValue?: number; discountCategory?: string; admissionType?: string; registrationMode?: 'auto' | 'manual'; familyNumber?: string; familyNumberMode?: 'auto' | 'manual'; familyName?: string;
+    previousSchool?: string; leavingReason?: string;
+  };
+}
+
+export function getEnrollmentIdentifiers(organizationId: string) {
+  return apiRequest<{ registrationNumber: string; familyNumber: string }>(`${studentsPath(organizationId)}/enrollment-identifiers`);
+}
+
+export function enrollStudent(organizationId: string, input: EnrollmentWizardInput) {
+  return apiRequest<{ student: Pick<StudentRecord, 'id' | 'firstName' | 'lastName' | 'registrationNumber' | 'status'> }>(
+    `${studentsPath(organizationId)}/enroll`,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+}
+
+export function getStudentSummary(organizationId: string) {
+  return apiRequest<{ summary: { total: number; girls: number; newAdmissions: number; classes: number } }>(
+    `${studentsPath(organizationId)}/summary`,
+  );
+}
+
+
+export interface StudentPlacement {
+  studentId: string; classId: string; className: string; sectionId: string;
+  sectionName: string; academicYearId: string; academicYearName: string; campusId: string; monthlyFee: number; registrationNumber?: string; familyNumber?: string;
+}
+export function listStudentPlacements(organizationId: string, studentIds: string[], academicYearId?: string) {
+  const query = new URLSearchParams();
+  if (studentIds.length) query.set('studentIds', studentIds.join(','));
+  if (academicYearId) query.set('academicYearId', academicYearId);
+  return apiRequest<{ items: StudentPlacement[] }>(`${studentsPath(organizationId)}/placements?${query.toString()}`);
 }

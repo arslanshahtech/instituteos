@@ -1,6 +1,6 @@
 import { apiRequest } from '../api/client.js';
 
-export type ExamType = 'midterm' | 'final' | 'quiz';
+export type ExamType = 'midterm' | 'final' | 'quiz' | 'monthly_test' | 'class_test' | 'mid_year' | 'send_up' | 'annual' | 'practical' | 'viva' | 'supplementary' | 'improvement';
 
 export interface ExamRecord {
   id: string;
@@ -8,7 +8,7 @@ export interface ExamRecord {
   name: string;
   type: ExamType;
   academicYearId: string;
-  termId: string;
+  termId?: string;
   campusId: string;
   startDate: string;
   endDate: string;
@@ -27,6 +27,9 @@ export interface ExamSchedule {
   durationMinutes: number;
   totalMarks: number;
   passingMarks: number;
+  marksReviewStatus: 'draft' | 'submitted' | 'changes_requested';
+  marksSubmittedAt: string | null;
+  marksSubmittedBy: string | null;
 }
 
 export interface GradeBreakdown {
@@ -79,7 +82,7 @@ export interface ExamInput {
   name: string;
   type: ExamType;
   academicYearId: string;
-  termId: string;
+  termId?: string | null;
   campusId: string;
   startDate: string;
   endDate: string;
@@ -145,6 +148,10 @@ export function setExamResultsPublication(
     `${examPath(organizationId)}/${encodeURIComponent(examId)}/results-publication`,
     { method: 'PATCH', body: JSON.stringify({ published }) },
   );
+}
+
+export function listPendingExamMarksReviews(organizationId: string) {
+  return apiRequest<{ items: ExamSchedule[] }>(`${examPath(organizationId)}/pending-reviews`);
 }
 
 export function listExamSchedules(organizationId: string, examId: string) {
@@ -232,6 +239,20 @@ export function saveExamMarks(
   return apiRequest<{ items: ExamMark[] }>(
     `${examPath(organizationId)}/schedules/${encodeURIComponent(scheduleId)}/marks`,
     { method: 'PUT', body: JSON.stringify({ records }) },
+  );
+}
+
+export function submitExamMarksForReview(organizationId: string, scheduleId: string) {
+  return apiRequest<{ schedule: ExamSchedule }>(
+    `${examPath(organizationId)}/schedules/${encodeURIComponent(scheduleId)}/marks/submission`,
+    { method: 'POST', body: JSON.stringify({}) },
+  );
+}
+
+export function requestExamMarksChanges(organizationId: string, scheduleId: string) {
+  return apiRequest<{ schedule: ExamSchedule }>(
+    `${examPath(organizationId)}/schedules/${encodeURIComponent(scheduleId)}/marks-review`,
+    { method: 'PATCH', body: JSON.stringify({ action: 'request_changes' }) },
   );
 }
 

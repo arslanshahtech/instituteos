@@ -7,6 +7,7 @@ import { FormField } from '../components/ui/FormField.js';
 import type {
   AcademicsFormPayload,
   AcademicsResource,
+  SubjectMarkComponent,
 } from './academics-api.js';
 
 interface FormValues {
@@ -28,6 +29,15 @@ interface FormValues {
   classIds: string[];
   totalMarks: string;
   passingPercentage: string;
+  theoryEnabled: boolean;
+  theoryTotalMarks: string;
+  theoryPassingMarks: string;
+  practicalEnabled: boolean;
+  practicalTotalMarks: string;
+  practicalPassingMarks: string;
+  vivaEnabled: boolean;
+  vivaTotalMarks: string;
+  vivaPassingMarks: string;
   description: string;
 }
 
@@ -40,7 +50,8 @@ interface Choice {
 interface Field {
   name: keyof FormValues;
   label: string;
-  type?: 'date' | 'number' | 'select' | 'multiselect' | 'textarea';
+  type?:
+    'date' | 'number' | 'select' | 'multiselect' | 'textarea' | 'components';
   choices?: Choice[];
 }
 
@@ -90,6 +101,45 @@ function schemaForResource(resource: AcademicsResource) {
           (v) => /^\d+$/.test(v) && Number(v) >= 0 && Number(v) <= 100,
           'Enter 0 to 100.',
         ),
+      theoryEnabled: z.boolean(),
+      theoryTotalMarks: z
+        .string()
+        .refine(
+          (v) => /^\d+$/.test(v) && Number(v) >= 0 && Number(v) <= 100000,
+          'Enter valid marks.',
+        ),
+      theoryPassingMarks: z
+        .string()
+        .refine(
+          (v) => /^\d+$/.test(v) && Number(v) >= 0 && Number(v) <= 100000,
+          'Enter valid marks.',
+        ),
+      practicalEnabled: z.boolean(),
+      practicalTotalMarks: z
+        .string()
+        .refine(
+          (v) => /^\d+$/.test(v) && Number(v) >= 0 && Number(v) <= 100000,
+          'Enter valid marks.',
+        ),
+      practicalPassingMarks: z
+        .string()
+        .refine(
+          (v) => /^\d+$/.test(v) && Number(v) >= 0 && Number(v) <= 100000,
+          'Enter valid marks.',
+        ),
+      vivaEnabled: z.boolean(),
+      vivaTotalMarks: z
+        .string()
+        .refine(
+          (v) => /^\d+$/.test(v) && Number(v) >= 0 && Number(v) <= 100000,
+          'Enter valid marks.',
+        ),
+      vivaPassingMarks: z
+        .string()
+        .refine(
+          (v) => /^\d+$/.test(v) && Number(v) >= 0 && Number(v) <= 100000,
+          'Enter valid marks.',
+        ),
       description: z.string().trim().max(1000, 'Maximum 1,000 characters.'),
     })
     .superRefine((values, context) => {
@@ -97,12 +147,52 @@ function schemaForResource(resource: AcademicsResource) {
         AcademicsResource,
         (keyof FormValues)[]
       > = {
-        'academic-years': ['name', 'startDate', 'endDate'],
+        'academic-years': ['name'],
         terms: ['name', 'academicYearId', 'startDate', 'endDate'],
         classes: ['name', 'code', 'campusId'],
         sections: ['name', 'classId'],
         subjects: ['name', 'totalMarks', 'passingPercentage'],
       };
+      if (resource === 'subjects') {
+        const components = [
+          {
+            key: 'theory',
+            enabled: values.theoryEnabled,
+            total: values.theoryTotalMarks,
+            passing: values.theoryPassingMarks,
+          },
+          {
+            key: 'practical',
+            enabled: values.practicalEnabled,
+            total: values.practicalTotalMarks,
+            passing: values.practicalPassingMarks,
+          },
+          {
+            key: 'viva',
+            enabled: values.vivaEnabled,
+            total: values.vivaTotalMarks,
+            passing: values.vivaPassingMarks,
+          },
+        ];
+        const enabled = components.filter((component) => component.enabled);
+        if (enabled.length === 0)
+          context.addIssue({
+            code: 'custom',
+            path: ['theoryEnabled'],
+            message: 'Enable at least one component.',
+          });
+        for (const component of components) {
+          if (
+            (component.enabled && Number(component.total) < 1) ||
+            Number(component.passing) > Number(component.total)
+          )
+            context.addIssue({
+              code: 'custom',
+              path: [`${component.key}PassingMarks`],
+              message: 'Passing marks cannot exceed total marks.',
+            });
+        }
+      }
       if (resource === 'subjects' && values.classIds.length === 0)
         context.addIssue({
           code: 'custom',
@@ -127,7 +217,7 @@ function schemaForResource(resource: AcademicsResource) {
             message: 'Required.',
           });
       }
-      if (resource === 'academic-years' || resource === 'terms') {
+      if (resource === 'terms') {
         for (const key of ['startDate', 'endDate'] as const) {
           const value = values[key];
           const parsed = value ? new Date(`${value}T00:00:00.000Z`) : undefined;
@@ -162,18 +252,8 @@ function schemaForResource(resource: AcademicsResource) {
 
 const fieldsByResource: Record<AcademicsResource, Field[]> = {
   'academic-years': [
-    { name: 'name', label: 'Session name' },
-    { name: 'startDate', label: 'Start date', type: 'date' },
-    { name: 'endDate', label: 'End date', type: 'date' },
-    {
-      name: 'status',
-      label: 'Status',
-      type: 'select',
-      choices: [
-        { value: 'active', label: 'Active' },
-        { value: 'archived', label: 'Archived' },
-      ],
-    },
+    { name: 'name', label: 'Session Name *' },
+    { name: 'description', label: 'Description', type: 'textarea' },
   ],
   terms: [
     { name: 'name', label: 'Term / semester name' },
@@ -206,8 +286,7 @@ const fieldsByResource: Record<AcademicsResource, Field[]> = {
   subjects: [
     { name: 'name', label: 'Subject Name' },
     { name: 'classIds', label: 'Select Classes', type: 'multiselect' },
-    { name: 'totalMarks', label: 'Total Marks', type: 'number' },
-    { name: 'passingPercentage', label: 'Passing Percentage', type: 'number' },
+    { name: 'theoryEnabled', label: 'Mark components', type: 'components' },
     { name: 'description', label: 'Description', type: 'textarea' },
   ],
 };
@@ -231,6 +310,15 @@ const emptyValues: FormValues = {
   classIds: [],
   totalMarks: '100',
   passingPercentage: '40',
+  theoryEnabled: true,
+  theoryTotalMarks: '100',
+  theoryPassingMarks: '40',
+  practicalEnabled: false,
+  practicalTotalMarks: '0',
+  practicalPassingMarks: '0',
+  vivaEnabled: false,
+  vivaTotalMarks: '0',
+  vivaPassingMarks: '0',
   description: '',
 };
 
@@ -242,6 +330,7 @@ export function AcademicsForm({
   saveError,
   onSubmit,
   onCancel,
+  submitLabel,
 }: {
   resource: AcademicsResource;
   record?: Record<string, unknown>;
@@ -250,8 +339,17 @@ export function AcademicsForm({
   saveError?: string;
   onSubmit: (input: AcademicsFormPayload) => void;
   onCancel?: () => void;
+  submitLabel?: string;
 }) {
   const initialValues = useMemo(() => {
+    const existingComponents = Array.isArray(record?.markComponents)
+      ? (record.markComponents as Array<{
+          key: string;
+          enabled: boolean;
+          totalMarks: number;
+          passingMarks: number;
+        }>)
+      : [];
     const value = (key: Exclude<keyof FormValues, 'classIds'>): string =>
       record?.[key] == null
         ? (emptyValues[key] as string)
@@ -287,6 +385,48 @@ export function AcademicsForm({
         : [],
       totalMarks: String(record?.totalMarks ?? 100),
       passingPercentage: String(record?.passingPercentage ?? 40),
+      theoryEnabled: existingComponents.length
+        ? Boolean(
+            existingComponents.find((item) => item.key === 'theory')?.enabled,
+          )
+        : true,
+      theoryTotalMarks: String(
+        existingComponents.find((item) => item.key === 'theory')?.totalMarks ??
+          record?.totalMarks ??
+          100,
+      ),
+      theoryPassingMarks: String(
+        existingComponents.find((item) => item.key === 'theory')
+          ?.passingMarks ??
+          Math.round(
+            (Number(record?.totalMarks ?? 100) *
+              Number(record?.passingPercentage ?? 40)) /
+              100,
+          ),
+      ),
+      practicalEnabled: Boolean(
+        existingComponents.find((item) => item.key === 'practical')?.enabled ??
+        false,
+      ),
+      practicalTotalMarks: String(
+        existingComponents.find((item) => item.key === 'practical')
+          ?.totalMarks ?? 0,
+      ),
+      practicalPassingMarks: String(
+        existingComponents.find((item) => item.key === 'practical')
+          ?.passingMarks ?? 0,
+      ),
+      vivaEnabled: Boolean(
+        existingComponents.find((item) => item.key === 'viva')?.enabled ??
+        false,
+      ),
+      vivaTotalMarks: String(
+        existingComponents.find((item) => item.key === 'viva')?.totalMarks ?? 0,
+      ),
+      vivaPassingMarks: String(
+        existingComponents.find((item) => item.key === 'viva')?.passingMarks ??
+          0,
+      ),
       description: String(record?.description ?? ''),
     };
   }, [
@@ -309,8 +449,44 @@ export function AcademicsForm({
   const submit = form.handleSubmit((values) => {
     const input: AcademicsFormPayload = { ...values };
     if (resource === 'subjects') {
-      input.totalMarks = Number(values.totalMarks);
-      input.passingPercentage = Number(values.passingPercentage);
+      const markComponents: SubjectMarkComponent[] = [
+        {
+          key: 'theory',
+          label: 'Theory',
+          enabled: values.theoryEnabled,
+          totalMarks: Number(values.theoryTotalMarks),
+          passingMarks: Number(values.theoryPassingMarks),
+        },
+        {
+          key: 'practical',
+          label: 'Practical',
+          enabled: values.practicalEnabled,
+          totalMarks: Number(values.practicalTotalMarks),
+          passingMarks: Number(values.practicalPassingMarks),
+        },
+        {
+          key: 'viva',
+          label: 'Viva',
+          enabled: values.vivaEnabled,
+          totalMarks: Number(values.vivaTotalMarks),
+          passingMarks: Number(values.vivaPassingMarks),
+        },
+      ];
+      const enabledComponents = markComponents.filter(
+        (component) => component.enabled,
+      );
+      const totalMarks = enabledComponents.reduce(
+        (sum, component) => sum + component.totalMarks,
+        0,
+      );
+      const passingMarks = enabledComponents.reduce(
+        (sum, component) => sum + component.passingMarks,
+        0,
+      );
+      input.totalMarks = totalMarks;
+      input.passingPercentage =
+        totalMarks > 0 ? Math.round((passingMarks / totalMarks) * 100) : 0;
+      input.markComponents = markComponents;
       delete input.code;
       delete input.department;
     }
@@ -340,7 +516,8 @@ export function AcademicsForm({
         delete input[key];
       }
     }
-    if (resource === 'academic-years') input.status = values.status;
+    if (resource === 'academic-years')
+      input.status = record ? values.status : 'archived';
     onSubmit(input);
   });
 
@@ -403,6 +580,110 @@ export function AcademicsForm({
               </FormField>
             );
           }
+          if (field.type === 'components') {
+            const components = [
+              {
+                key: 'theory',
+                label: 'Theory',
+                enabled: 'theoryEnabled' as const,
+                total: 'theoryTotalMarks' as const,
+                passing: 'theoryPassingMarks' as const,
+              },
+              {
+                key: 'practical',
+                label: 'Practical',
+                enabled: 'practicalEnabled' as const,
+                total: 'practicalTotalMarks' as const,
+                passing: 'practicalPassingMarks' as const,
+              },
+              {
+                key: 'viva',
+                label: 'Viva',
+                enabled: 'vivaEnabled' as const,
+                total: 'vivaTotalMarks' as const,
+                passing: 'vivaPassingMarks' as const,
+              },
+            ];
+            const enabledTotal = components.reduce(
+              (sum, component) =>
+                sum +
+                (form.watch(component.enabled)
+                  ? Number(form.watch(component.total) || 0)
+                  : 0),
+              0,
+            );
+            return (
+              <FormField
+                error={error}
+                key={field.name}
+                label="Subject mark components"
+                name={field.name}
+              >
+                <div
+                  className="academics-subject-components"
+                  style={{ display: 'grid', gap: 12 }}
+                >
+                  {components.map((component) => {
+                    const enabled = form.watch(component.enabled);
+                    return (
+                      <div
+                        className="academics-subject-component"
+                        key={component.key}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'minmax(120px, 1fr) 1fr 1fr',
+                          gap: 12,
+                          alignItems: 'end',
+                          padding: 12,
+                          border: '1px solid var(--border-subtle, #d1d5db)',
+                          borderRadius: 8,
+                        }}
+                      >
+                        <label className="academics-class-choice">
+                          <input
+                            type="checkbox"
+                            checked={enabled}
+                            onChange={(event) =>
+                              form.setValue(
+                                component.enabled,
+                                event.target.checked,
+                                { shouldDirty: true, shouldValidate: true },
+                              )
+                            }
+                          />
+                          <span>{component.label}</span>
+                        </label>
+                        <label>
+                          Total marks
+                          <input
+                            type="number"
+                            min="0"
+                            max="100000"
+                            readOnly={!enabled}
+                            {...form.register(component.total)}
+                          />
+                        </label>
+                        <label>
+                          Passing marks
+                          <input
+                            type="number"
+                            min="0"
+                            max="100000"
+                            readOnly={!enabled}
+                            {...form.register(component.passing)}
+                          />
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="form-help-text">
+                  Enabled components total: {enabledTotal} marks. Disabled
+                  components are not included.
+                </p>
+              </FormField>
+            );
+          }
           if (field.type === 'select') {
             return (
               <FormField
@@ -452,6 +733,11 @@ export function AcademicsForm({
                   id={field.name}
                   rows={4}
                   maxLength={1000}
+                  placeholder={
+                    resource === 'academic-years'
+                      ? 'Optional description of the session'
+                      : undefined
+                  }
                   {...form.register(field.name)}
                 />
               </FormField>
@@ -463,6 +749,11 @@ export function AcademicsForm({
               key={field.name}
               label={field.label}
               maxLength={field.name === 'name' ? 120 : 100}
+              placeholder={
+                resource === 'academic-years' && field.name === 'name'
+                  ? 'e.g., 2026-2027, Fall 2026'
+                  : undefined
+              }
               type={field.type}
               {...form.register(field.name)}
             />
@@ -481,16 +772,17 @@ export function AcademicsForm({
             : 'button-row'
         }
       >
-        {resource === 'subjects' && onCancel && (
-          <Button
-            disabled={isSaving}
-            onClick={onCancel}
-            type="button"
-            variant="secondary"
-          >
-            Back to Subjects
-          </Button>
-        )}
+        {(resource === 'subjects' || resource === 'academic-years') &&
+          onCancel && (
+            <Button
+              disabled={isSaving}
+              onClick={onCancel}
+              type="button"
+              variant="secondary"
+            >
+              {resource === 'subjects' ? 'Back to Subjects' : 'Cancel'}
+            </Button>
+          )}
         <Button disabled={isSaving} type="submit" variant="primary">
           {isSaving
             ? 'Saving…'
@@ -498,9 +790,7 @@ export function AcademicsForm({
               ? record
                 ? 'Update Subject'
                 : 'Add Subject'
-              : record
-                ? 'Save changes'
-                : 'Create record'}
+              : (submitLabel ?? (record ? 'Save changes' : 'Create record'))}
         </Button>
       </div>
     </form>

@@ -30,6 +30,7 @@ import type {
   StudentRecord,
 } from './people.types.js';
 import { CampusModel } from '../tenancy/tenancy.model.js';
+import { StudentSectionPlacementModel } from '../attendance/attendance.model.js';
 
 function idObject(id: string): Types.ObjectId {
   return new Types.ObjectId(id);
@@ -68,6 +69,16 @@ function studentDocumentInput(
     firstName: input.firstName,
     lastName: input.lastName,
     preferredName: input.preferredName,
+    registrationNumber: input.registrationNumber,
+    fatherName: input.fatherName,
+    motherName: input.motherName,
+    parentMobile: input.parentMobile,
+    nationality: input.nationality,
+    religion: input.religion,
+    birthPlace: input.birthPlace,
+    nationalId: input.nationalId,
+    specialNeeds: input.specialNeeds,
+    photoUrl: input.photoUrl,
     dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
     gender: input.gender,
     status: input.status ?? 'active',
@@ -102,11 +113,24 @@ export class MongoPeopleRepository {
     if (campusIds.length > 1)
       filters.campusId = { $in: campusIds.map((id) => idObject(id)) };
     if (query.status) filters.status = query.status;
+    if (query.classId || query.sectionId) {
+      const placementFilter: Record<string, unknown> = { organizationId: idObject(query.organizationId), status: 'active' };
+      if (query.classId) placementFilter.classId = idObject(query.classId);
+      if (query.sectionId) placementFilter.sectionId = idObject(query.sectionId);
+      const placedStudentIds = await StudentSectionPlacementModel.distinct('studentId', placementFilter);
+      filters._id = { $in: placedStudentIds };
+    }
     if (search) {
       filters.$or = [
         { firstName: { $regex: search, $options: 'i' } },
         { lastName: { $regex: search, $options: 'i' } },
+        { preferredName: { $regex: search, $options: 'i' } },
         { contactEmail: { $regex: search, $options: 'i' } },
+        { registrationNumber: { $regex: search, $options: 'i' } },
+        { fatherName: { $regex: search, $options: 'i' } },
+        { motherName: { $regex: search, $options: 'i' } },
+        { parentMobile: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
       ];
     }
 
@@ -129,6 +153,16 @@ export class MongoPeopleRepository {
         preferredName: record.preferredName
           ? String(record.preferredName)
           : undefined,
+        registrationNumber: record.registrationNumber ? String(record.registrationNumber) : undefined,
+        photoUrl: record.photoUrl ? String(record.photoUrl) : undefined,
+        fatherName: record.fatherName ? String(record.fatherName) : undefined,
+        motherName: record.motherName ? String(record.motherName) : undefined,
+        parentMobile: record.parentMobile ? String(record.parentMobile) : undefined,
+        nationality: record.nationality ? String(record.nationality) : undefined,
+        religion: record.religion ? String(record.religion) : undefined,
+        birthPlace: record.birthPlace ? String(record.birthPlace) : undefined,
+        nationalId: record.nationalId ? String(record.nationalId) : undefined,
+        specialNeeds: record.specialNeeds ? String(record.specialNeeds) : undefined,
         dateOfBirth: record.dateOfBirth
           ? new Date(record.dateOfBirth).toISOString()
           : undefined,
@@ -175,6 +209,16 @@ export class MongoPeopleRepository {
       preferredName: record.preferredName
         ? String(record.preferredName)
         : undefined,
+      registrationNumber: record.registrationNumber ? String(record.registrationNumber) : undefined,
+      photoUrl: record.photoUrl ? String(record.photoUrl) : undefined,
+      fatherName: record.fatherName ? String(record.fatherName) : undefined,
+      motherName: record.motherName ? String(record.motherName) : undefined,
+      parentMobile: record.parentMobile ? String(record.parentMobile) : undefined,
+      nationality: record.nationality ? String(record.nationality) : undefined,
+      religion: record.religion ? String(record.religion) : undefined,
+      birthPlace: record.birthPlace ? String(record.birthPlace) : undefined,
+      nationalId: record.nationalId ? String(record.nationalId) : undefined,
+      specialNeeds: record.specialNeeds ? String(record.specialNeeds) : undefined,
       dateOfBirth: record.dateOfBirth
         ? new Date(record.dateOfBirth).toISOString()
         : undefined,
@@ -907,6 +951,7 @@ export class MongoPeopleRepository {
     query?: {
       status?: string;
       department?: string;
+      staffType?: 'teacher' | 'other_staff';
       campusId?: string;
       search?: string;
       campusIds?: string[];
@@ -922,6 +967,7 @@ export class MongoPeopleRepository {
       organizationId: idObject(organizationId),
     };
     if (query?.status) filters.status = query.status;
+    if (query?.staffType) filters.staffType = query.staffType;
     if (query?.department)
       filters.department = {
         $regex: escapeRegex(query.department),
@@ -969,6 +1015,7 @@ export class MongoPeopleRepository {
         employeeCode: record.employeeCode
           ? String(record.employeeCode)
           : undefined,
+        staffType: (record.staffType as StaffRecord['staffType']) ?? 'other_staff',
         department: record.department ? String(record.department) : undefined,
         designation: record.designation
           ? String(record.designation)
@@ -1019,6 +1066,7 @@ export class MongoPeopleRepository {
       employeeCode: record.employeeCode
         ? String(record.employeeCode)
         : undefined,
+      staffType: (record.staffType as StaffRecord['staffType']) ?? 'other_staff',
       department: record.department ? String(record.department) : undefined,
       designation: record.designation
         ? String(record.designation)
@@ -1123,6 +1171,7 @@ export class MongoPeopleRepository {
       employeeCode: record.employeeCode
         ? String(record.employeeCode)
         : undefined,
+      staffType: (record.staffType as StaffRecord['staffType']) ?? 'other_staff',
       department: record.department ? String(record.department) : undefined,
       designation: record.designation
         ? String(record.designation)

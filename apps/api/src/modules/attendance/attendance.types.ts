@@ -81,6 +81,7 @@ export interface StudentAttendanceQuery {
   classId?: string;
   sectionId?: string;
   campusId?: string;
+  academicYearId?: string;
   /** Internal repository restriction derived from the signed-in teacher's assignments. */
   academicYearIds?: string[];
 }
@@ -122,6 +123,12 @@ export interface StudentPlacementRecord extends StudentPlacementInput {
 }
 
 export interface AttendanceRepository {
+  getAttendanceSettings(organizationId: string): Promise<{
+    timezone: string;
+    markingCutoffTime: string;
+    autoMarkUnmarkedAbsent: boolean;
+    allowAdminOverride: boolean;
+  } | null>;
   listTeacherAssignmentsForUser(
     organizationId: string,
     userId: string,

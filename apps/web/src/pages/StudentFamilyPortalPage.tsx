@@ -25,7 +25,8 @@ import {
 import { getOrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import { getPortalMe, type StudentPortalRecord } from './portal-api.js';
 
-type PortalSection = 'home' | 'fees' | 'attendance' | 'results' | 'messages';
+type PortalSection =
+  'home' | 'fees' | 'attendance' | 'results' | 'homework' | 'messages';
 type PortalMode = 'parent_guardian' | 'student';
 
 const sections: Array<{
@@ -36,6 +37,7 @@ const sections: Array<{
   { key: 'fees', label: 'Fees & receipts', icon: WalletCards },
   { key: 'attendance', label: 'Attendance', icon: CalendarCheck },
   { key: 'results', label: 'Results', icon: GraduationCap },
+  { key: 'homework', label: 'Homework & tests', icon: BookOpenText },
   { key: 'messages', label: 'Messages', icon: MessageCircle },
 ];
 
@@ -66,6 +68,7 @@ function StudentFamilyPortalPage({ mode }: { mode: PortalMode }) {
     'fees',
     'attendance',
     'results',
+    'homework',
     'messages',
   ].includes(section)
     ? (section as PortalSection)
@@ -310,6 +313,13 @@ function StudentFamilyPortalPage({ mode }: { mode: PortalMode }) {
                 </Link>
                 <Link className="reference-quick-action" to={`${root}/results`}>
                   <GraduationCap size={13} aria-hidden="true" /> Results
+                </Link>
+                <Link
+                  className="reference-quick-action"
+                  to={`${root}/homework`}
+                >
+                  <BookOpenText size={13} aria-hidden="true" /> Homework &amp;
+                  tests
                 </Link>
                 <Link
                   className="reference-quick-action"
@@ -719,6 +729,52 @@ function StudentFamilyPortalPage({ mode }: { mode: PortalMode }) {
                   </div>
                 )}
               </section>
+            </section>
+          )}
+
+          {selectedStudent && activeSection === 'homework' && (
+            <section className="panel parent-content-panel">
+              <div className="parent-section-heading">
+                <div>
+                  <h2>Published homework & tests</h2>
+                  <p>
+                    Only work published by the college or teacher is shown here.
+                  </p>
+                </div>
+              </div>
+              {selectedStudent.homework.length ? (
+                <div className="parent-fee-list">
+                  {selectedStudent.homework.map((item) => (
+                    <article className="parent-fee-row" key={item.id}>
+                      <span className="parent-fee-icon">
+                        <BookOpenText size={18} aria-hidden="true" />
+                      </span>
+                      <div className="parent-fee-copy">
+                        <strong>{item.title}</strong>
+                        <span>
+                          {item.type === 'test' ? 'Test' : 'Homework'} ·{' '}
+                          {item.subjectName} · Due {dateLabel(item.dueDate)}
+                        </span>
+                        <span>Assigned by {item.teacherName ?? 'Teacher'}</span>
+                        <span>
+                          {item.instructions ||
+                            'No additional instructions provided.'}
+                        </span>
+                      </div>
+                      {item.type === 'test' && item.totalMarks !== null && (
+                        <span className="parent-status">
+                          {item.totalMarks} marks
+                        </span>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No published homework or tests"
+                  description="New work will appear here after your child's teacher or college publishes it."
+                />
+              )}
             </section>
           )}
 

@@ -1,12 +1,14 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
+import { useAuth } from '../auth/AuthProvider.js';
 import {
   BookOpenText,
   CalendarCheck,
   ClipboardCheck,
   Plus,
   Trash2,
+  Pencil,
 } from 'lucide-react';
 import { Button } from '../components/ui/Button.js';
 import {
@@ -22,7 +24,7 @@ import {
   createHomeworkTest,
   deleteHomeworkTest,
   listHomeworkTests,
-  updateHomeworkTestStatus,
+  updateHomeworkTest,
 } from './homework-api.js';
 import type {
   HomeworkTestInput,
@@ -41,6 +43,7 @@ function localDate() {
 export function HomeworkTestsPage() {
   const { organizationId = '' } = useParams();
   const access = useOrganizationAccess(organizationId);
+  const { user } = useAuth();
   const role = access.data?.role ?? '';
   const canRead =
     access.data?.permissions.includes('examination.read') ?? false;
@@ -50,6 +53,9 @@ export function HomeworkTestsPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<HomeworkTestType>('homework');
   const [formOpen, setFormOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<HomeworkTestRecord | null>(
+    null,
+  );
   const [title, setTitle] = useState('');
   const [instructions, setInstructions] = useState('');
   const [dueDate, setDueDate] = useState(localDate);
@@ -127,14 +133,17 @@ export function HomeworkTestsPage() {
       item.academicYearId === yearId,
   );
 
-  const createMutation = useMutation({
-    mutationFn: (input: HomeworkTestInput) =>
-      createHomeworkTest(organizationId, input),
+  const saveMutation = useMutation({
+    mutationFn: ({ id, input }: { id?: string; input: HomeworkTestInput }) =>
+      id
+        ? updateHomeworkTest(organizationId, id, input)
+        : createHomeworkTest(organizationId, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ['homework-tests', organizationId],
       });
       setFormOpen(false);
+      setEditingItem(null);
       setTitle('');
       setInstructions('');
       setTotalMarks('');
@@ -144,7 +153,7 @@ export function HomeworkTestsPage() {
   });
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: HomeworkTestStatus }) =>
-      updateHomeworkTestStatus(organizationId, id, status),
+      updateHomeworkTest(organizationId, id, { status }),
     onSuccess: () =>
       void queryClient.invalidateQueries({
         queryKey: ['homework-tests', organizationId],
@@ -177,10 +186,15 @@ export function HomeworkTestsPage() {
     'principal_director',
     'academic_coordinator',
   ].includes(role);
+  const canCreate = canWrite && (isTeacher || allowedManager);
+  const canModerate = allowedManager && canWrite;
   if (!canRead || (!isTeacher && !allowedManager))
     return <PermissionDeniedState />;
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const saveWithStatus = (
+    event: FormEvent<HTMLFormElement>,
+    status: HomeworkTestStatus,
+  ) => {
     event.preventDefault();
     setFormError('');
     if (
@@ -211,20 +225,38 @@ export function HomeworkTestsPage() {
       setFormError('Enter valid non-negative total marks.');
       return;
     }
-    createMutation.mutate({
-      campusId: selectedClass.campusId,
-      academicYearId: yearId,
-      classId,
-      sectionId,
-      subjectId,
-      title: title.trim(),
-      instructions: instructions.trim(),
-      type: tab,
-      dueDate,
-      ...(tab === 'test' && totalMarks.trim()
-        ? { totalMarks: Number(totalMarks) }
-        : {}),
+    saveMutation.mutate({
+      id: editingItem?.id,
+      input: {
+        campusId: selectedClass.campusId,
+        academicYearId: yearId,
+        classId,
+        sectionId,
+        subjectId,
+        title: title.trim(),
+        instructions: instructions.trim(),
+        type: tab,
+        dueDate,
+        ...(tab === 'test' && totalMarks.trim()
+          ? { totalMarks: Number(totalMarks) }
+          : {}),
+        status,
+      },
     });
+  };
+  const beginEdit = (item: HomeworkTestRecord) => {
+    setEditingItem(item);
+    setTab(item.type);
+    setTitle(item.title);
+    setInstructions(item.instructions);
+    setDueDate(item.dueDate);
+    setTotalMarks(item.totalMarks === undefined ? '' : String(item.totalMarks));
+    setClassId(item.classId);
+    setSectionId(item.sectionId);
+    setSubjectId(item.subjectId);
+    setYearId(item.academicYearId);
+    setFormError('');
+    setFormOpen(true);
   };
   const pageRecords = records.filter((item) => item.type === tab);
 
@@ -233,9 +265,13 @@ export function HomeworkTestsPage() {
       <WorkspacePageHeading
         eyebrow="Academic workspace"
         title="Homework & tests"
-        description="Create, publish and review class homework and tests. Teachers can only manage items for their assigned class sections and subjects."
+        description={
+          isTeacher
+            ? 'Create and manage homework and tests for your assigned classes, sections and subjects.'
+            : 'Manage homework and tests across your school, including teacher-created work.'
+        }
         aside={
-          canWrite && (
+          canCreate && (
             <Button onClick={() => setFormOpen((open) => !open)}>
               <Plus size={15} />{' '}
               {formOpen
@@ -275,12 +311,16 @@ export function HomeworkTestsPage() {
         </button>
       </nav>
 
-      {formOpen && canWrite && (
+      {formOpen && canCreate && (
         <section className="panel homework-form-panel">
           <div className="panel-heading">
             <div>
               <h2>
-                {tab === 'homework' ? 'Create homework' : 'Schedule a test'}
+                {editingItem
+                  ? 'Edit'
+                  : tab === 'homework'
+                    ? 'Create homework'
+                    : 'Schedule a test'}
               </h2>
               <p>
                 Saved to the selected college with server-side class and teacher
@@ -288,7 +328,10 @@ export function HomeworkTestsPage() {
               </p>
             </div>
           </div>
-          <form className="homework-form-grid" onSubmit={submit}>
+          <form
+            className="homework-form-grid"
+            onSubmit={(event) => saveWithStatus(event, 'draft')}
+          >
             <label className="homework-wide">
               Title
               <input
@@ -413,12 +456,25 @@ export function HomeworkTestsPage() {
               </p>
             )}
             <div className="homework-form-actions homework-wide">
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending
+              <Button type="submit" disabled={saveMutation.isPending}>
+                {saveMutation.isPending
                   ? 'Saving…'
-                  : tab === 'homework'
-                    ? 'Save homework'
-                    : 'Save test'}
+                  : editingItem
+                    ? 'Save as draft'
+                    : 'Save as draft'}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={saveMutation.isPending}
+                onClick={() =>
+                  saveWithStatus(
+                    { preventDefault() {} } as FormEvent<HTMLFormElement>,
+                    'published',
+                  )
+                }
+              >
+                {editingItem ? 'Save & publish' : 'Publish'}
               </Button>
             </div>
           </form>
@@ -448,8 +504,8 @@ export function HomeworkTestsPage() {
           <EmptyState
             title={tab === 'homework' ? 'No homework yet' : 'No tests yet'}
             description={
-              canWrite
-                ? 'Use the add action to create the first record.'
+              canCreate
+                ? 'Create the first homework or test for a class and section.'
                 : 'Published work for your assigned classes will appear here.'
             }
           />
@@ -483,56 +539,72 @@ export function HomeworkTestsPage() {
                     {item.subjectName} · {item.academicYearName}
                   </span>
                   <span>
+                    Assigned by {item.createdByName ?? 'School administration'}
+                  </span>
+                  <span>
                     <CalendarCheck size={13} /> Due {item.dueDate}
                   </span>
                   {item.type === 'test' && item.totalMarks !== undefined && (
                     <span>Total marks: {item.totalMarks}</span>
                   )}
                 </div>
-                {canWrite && (
+                {(isTeacher || canModerate) && (
                   <div className="homework-record-actions">
-                    {item.status !== 'published' && (
+                    {(canModerate || item.createdBy === user?.id) && (
                       <Button
                         variant="secondary"
                         disabled={statusMutation.isPending}
-                        onClick={() =>
-                          statusMutation.mutate({
-                            id: item.id,
-                            status: 'published',
-                          })
-                        }
+                        onClick={() => beginEdit(item)}
                       >
-                        Publish
+                        <Pencil size={13} /> Edit
                       </Button>
                     )}
-                    {item.status === 'published' && (
+                    {(canModerate || item.createdBy === user?.id) &&
+                      item.status === 'draft' && (
+                        <Button
+                          variant="secondary"
+                          disabled={statusMutation.isPending}
+                          onClick={() =>
+                            statusMutation.mutate({
+                              id: item.id,
+                              status: 'published',
+                            })
+                          }
+                        >
+                          Publish
+                        </Button>
+                      )}
+                    {(canModerate || item.createdBy === user?.id) &&
+                      item.status === 'published' && (
+                        <Button
+                          variant="quiet"
+                          disabled={statusMutation.isPending}
+                          onClick={() =>
+                            statusMutation.mutate({
+                              id: item.id,
+                              status: 'draft',
+                            })
+                          }
+                        >
+                          Move to draft
+                        </Button>
+                      )}
+                    {(canModerate || item.createdBy === user?.id) && (
                       <Button
-                        variant="secondary"
-                        disabled={statusMutation.isPending}
-                        onClick={() =>
-                          statusMutation.mutate({
-                            id: item.id,
-                            status: 'archived',
-                          })
-                        }
-                      >
-                        Archive
-                      </Button>
-                    )}
-                    <Button
-                      variant="quiet"
-                      disabled={deleteMutation.isPending}
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            'Delete this homework or test record? This action cannot be undone.',
+                        variant="quiet"
+                        disabled={deleteMutation.isPending}
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              'Delete this homework or test record? This action cannot be undone.',
+                            )
                           )
-                        )
-                          deleteMutation.mutate(item.id);
-                      }}
-                    >
-                      <Trash2 size={13} /> Delete
-                    </Button>
+                            deleteMutation.mutate(item.id);
+                        }}
+                      >
+                        <Trash2 size={13} /> Delete
+                      </Button>
+                    )}
                   </div>
                 )}
               </article>
@@ -541,7 +613,11 @@ export function HomeworkTestsPage() {
         )}
         {(statusMutation.isError || deleteMutation.isError) && (
           <p className="homework-form-error" role="alert">
-            {apiMessage(statusMutation.error ?? deleteMutation.error)}
+            {apiMessage(
+              saveMutation.error ??
+                statusMutation.error ??
+                deleteMutation.error,
+            )}
           </p>
         )}
       </section>

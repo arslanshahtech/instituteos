@@ -6,7 +6,11 @@ import {
   StudentGuardianLinkModel,
   StudentModel,
 } from '../people/people.model.js';
-import { activeStudentIdsForAccount } from './portal.routes.js';
+import {
+  activeStudentIdsForAccount,
+  publishedHomeworkForPlacement,
+} from './portal.routes.js';
+import { HomeworkTestModel } from '../homework/homework.model.js';
 
 const organizationId = '650000000000000000000001';
 const userId = '650000000000000000000002';
@@ -154,5 +158,41 @@ describe('parent portal child-link resolution', () => {
       emailVerifiedAt: 1,
     });
     expect(findGuardians).not.toHaveBeenCalled();
+  });
+});
+
+describe('published homework in the family portal', () => {
+  it('queries only published work for the selected student placement', async () => {
+    const organizationObjectId = new Types.ObjectId(organizationId);
+    const campusId = new Types.ObjectId('650000000000000000000006');
+    const academicYearId = new Types.ObjectId('650000000000000000000007');
+    const classId = new Types.ObjectId('650000000000000000000008');
+    const sectionId = new Types.ObjectId('650000000000000000000009');
+    const query = {
+      sort: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue([]),
+    };
+    const find = vi
+      .spyOn(HomeworkTestModel, 'find')
+      .mockReturnValue(query as never);
+
+    await publishedHomeworkForPlacement(organizationId, {
+      campusId,
+      academicYearId,
+      classId,
+      sectionId,
+    });
+
+    expect(find).toHaveBeenCalledWith({
+      organizationId: organizationObjectId,
+      campusId,
+      academicYearId,
+      classId,
+      sectionId,
+      status: 'published',
+    });
+    expect(query.sort).toHaveBeenCalledWith({ dueDate: 1, createdAt: -1 });
+    expect(query.limit).toHaveBeenCalledWith(100);
   });
 });

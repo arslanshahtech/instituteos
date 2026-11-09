@@ -345,6 +345,28 @@ describe('staff HTTP routes', () => {
     expect(unsupportedField.body.error.code).toBe('VALIDATION_ERROR');
   });
 
+  it('requires a parent or guardian before beginning student enrollment', async () => {
+    const response = await request(testApp('organization_admin'))
+      .post(`/api/v1/${organizationId}/students/enroll`)
+      .set('Cookie', `instituteos_csrf=${csrfToken}`)
+      .set('X-CSRF-Token', csrfToken)
+      .send({ student: {}, enrollment: {}, parents: [] });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('denies enrollment creation to members without student.create', async () => {
+    const response = await request(testApp('student'))
+      .post(`/api/v1/${organizationId}/students/enroll`)
+      .set('Cookie', `instituteos_csrf=${csrfToken}`)
+      .set('X-CSRF-Token', csrfToken)
+      .send({ student: {}, enrollment: {}, parents: [] });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe('PERMISSION_DENIED');
+  });
+
   it('denies staff routes to members without staff.read', async () => {
     const find = vi.spyOn(StaffMemberModel, 'find');
     const response = await request(testApp('student')).get(

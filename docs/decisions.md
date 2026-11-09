@@ -91,3 +91,11 @@ Finance structures, invoices, and payment receipts are organization-owned and ev
 **Status:** Adopted; first hosted GitHub Actions run pending
 
 Every push and pull request runs locked dependency installation, ESLint, TypeScript typecheck, both workspace test suites, and production build on Node.js 22. Formatting is intentionally not a blocking CI check yet because the current repository has broad pre-existing Prettier drift; run a separately reviewed formatting-only change before enabling format:check. CI is a code-quality gate, not a replacement for staging smoke tests, a backup-restore rehearsal, security review, or school-owner acceptance. The release sequence is documented in docs/PRODUCTION_READINESS_PLAN.md.
+
+## 2026-11-07 ? PDF-aligned student enrollment and directory
+
+**Status:** Accepted for the current implementation phase
+
+The InstituteOS enrollment workflow now creates the student, guardian relationships, People enrollment record, and canonical `StudentSectionPlacement` in one tenant-scoped MongoDB transaction. Academic class, section, session, and campus are validated against the organization; section capacity is checked under the same section revision lock used by normal placement operations. The canonical attendance placement record remains the source of truth for class/section roster membership; People enrollment stores the enrollment-specific registration and fee snapshot fields. The Students directory reads canonical placements and applies class/section filters server-side. This decision supersedes the earlier deferral of automated enrollment-to-class placement for the specific PDF-requested Enrollment workflow only; it does not authorize promotion or other admission pipeline features.
+
+The initial enrollment form captures fee amounts as Decimal128 enrollment snapshots. It does not generate a Finance invoice or payment receipt; those remain Finance-owned workflows. Student photo selection is currently a UI placeholder because the repository has no secure media-upload/storage service. Existing bulk import and export flows remain separate and unchanged.

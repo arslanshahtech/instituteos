@@ -133,8 +133,8 @@ describe('Admissions list page', () => {
     await user.type(screen.getByLabelText('Date of birth'), '2012-05-15');
     await user.clear(screen.getByLabelText('Class / grade'));
     await user.type(screen.getByLabelText('Class / grade'), 'Year 5');
-    await user.type(screen.getByLabelText('Guardian name'), 'Raj Patel');
-    await user.type(screen.getByLabelText('Guardian phone'), '03001234567');
+    await user.type(screen.getByLabelText('Family contact name'), 'Raj Patel');
+    await user.type(screen.getByLabelText('Family contact phone'), '03001234567');
     await user.click(
       screen.getByRole('button', { name: 'Submit for approval' }),
     );

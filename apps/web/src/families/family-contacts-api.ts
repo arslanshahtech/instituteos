@@ -1,14 +1,15 @@
 import { apiRequest } from '../api/client.js';
 import type { StudentRecord } from '../students/students-api.js';
 
-export type GuardianRelationship = 'father' | 'mother' | 'guardian' | 'other';
+export type FamilyContactRelationship =
+  'father' | 'mother' | 'guardian' | 'other';
 export type CommunicationPreference = 'sms' | 'email' | 'both';
 
-export interface GuardianRecord {
+export interface FamilyContactRecord {
   id: string;
   firstName: string;
   lastName: string;
-  relationship?: GuardianRelationship;
+  relationship?: FamilyContactRelationship;
   phone?: string;
   email?: string;
   communicationPreference?: CommunicationPreference;
@@ -25,100 +26,103 @@ export interface GuardianRecord {
   updatedAt: string;
 }
 
-export interface GuardianInput {
+export interface FamilyContactInput {
   firstName: string;
   lastName: string;
-  relationship?: GuardianRelationship;
+  relationship?: FamilyContactRelationship;
   phone?: string;
   email?: string;
   communicationPreference?: CommunicationPreference;
 }
 
-export interface GuardianListResponse {
-  items: GuardianRecord[];
+export interface FamilyContactListResponse {
+  items: FamilyContactRecord[];
   total: number;
   page: number;
   pageSize: number;
 }
 
-export interface GuardianStudentRelation {
+export interface FamilyContactStudentRelation {
   id: string;
-  relationship: GuardianRelationship;
+  relationship: FamilyContactRelationship;
   isPrimary: boolean;
   student: Pick<StudentRecord, 'id' | 'firstName' | 'lastName' | 'campusId'>;
 }
 
-export interface StudentGuardianRelation {
+export interface StudentFamilyContactRelation {
   id: string;
-  relationship: GuardianRelationship;
+  relationship: FamilyContactRelationship;
   isPrimary: boolean;
-  guardian: GuardianRecord;
+  guardian: FamilyContactRecord;
 }
 
-const guardiansPath = (organizationId: string) =>
+const familyContactsPath = (organizationId: string) =>
   `/organizations/${encodeURIComponent(organizationId)}/guardians`;
 
-export function listGuardians(
+export function listFamilyContacts(
   organizationId: string,
   input: { search?: string; page: number; pageSize: number },
-): Promise<GuardianListResponse> {
+): Promise<FamilyContactListResponse> {
   const query = new URLSearchParams({
     page: String(input.page),
     pageSize: String(input.pageSize),
   });
   if (input.search) query.set('search', input.search);
-  return apiRequest<GuardianListResponse>(
-    `${guardiansPath(organizationId)}?${query.toString()}`,
+  return apiRequest<FamilyContactListResponse>(
+    `${familyContactsPath(organizationId)}?${query.toString()}`,
   );
 }
 
-export function getGuardian(
+export function getFamilyContact(
   organizationId: string,
   guardianId: string,
-): Promise<{ guardian: GuardianRecord; students: GuardianStudentRelation[] }> {
+): Promise<{
+  guardian: FamilyContactRecord;
+  students: FamilyContactStudentRelation[];
+}> {
   return apiRequest(
-    `${guardiansPath(organizationId)}/${encodeURIComponent(guardianId)}`,
+    `${familyContactsPath(organizationId)}/${encodeURIComponent(guardianId)}`,
   );
 }
 
-export function createGuardian(
+export function createFamilyContact(
   organizationId: string,
-  input: GuardianInput & { studentId?: string },
-): Promise<{ guardian: GuardianRecord }> {
-  return apiRequest(guardiansPath(organizationId), {
+  input: FamilyContactInput & { studentId?: string },
+): Promise<{ guardian: FamilyContactRecord }> {
+  return apiRequest(familyContactsPath(organizationId), {
     method: 'POST',
     body: JSON.stringify(input),
   });
 }
 
-export function updateGuardian(
+export function updateFamilyContact(
   organizationId: string,
   guardianId: string,
-  input: GuardianInput,
-): Promise<{ guardian: GuardianRecord }> {
+  input: FamilyContactInput,
+): Promise<{ guardian: FamilyContactRecord }> {
   return apiRequest(
-    `${guardiansPath(organizationId)}/${encodeURIComponent(guardianId)}`,
+    `${familyContactsPath(organizationId)}/${encodeURIComponent(guardianId)}`,
     { method: 'PATCH', body: JSON.stringify(input) },
   );
 }
 
-export function listStudentGuardians(
+export function listStudentFamilyContacts(
   organizationId: string,
   studentId: string,
-): Promise<{ relations: StudentGuardianRelation[] }> {
+): Promise<{ relations: StudentFamilyContactRelation[] }> {
   return apiRequest(
     `/organizations/${encodeURIComponent(organizationId)}/students/${encodeURIComponent(studentId)}/guardians`,
   );
 }
 
-export function linkGuardian(
+export function linkFamilyContact(
   organizationId: string,
   studentId: string,
   guardianId: string,
-  input: { relationship: GuardianRelationship; isPrimary: boolean },
+  input: { relationship: FamilyContactRelationship; isPrimary: boolean },
 ): Promise<{ link: unknown }> {
   return apiRequest(
-    `${guardiansPath(organizationId)}/${encodeURIComponent(guardianId)}/links`,
+    `${familyContactsPath(organizationId)}/${encodeURIComponent(guardianId)}/links`,
     {
       method: 'POST',
       body: JSON.stringify({ studentId, ...input }),
@@ -126,13 +130,13 @@ export function linkGuardian(
   );
 }
 
-export function unlinkGuardian(
+export function unlinkFamilyContact(
   organizationId: string,
   studentId: string,
   guardianId: string,
 ): Promise<void> {
   return apiRequest(
-    `/organizations/${encodeURIComponent(organizationId)}/students/${encodeURIComponent(studentId)}/guardians/${encodeURIComponent(guardianId)}`,
+    `/organizations/${encodeURIComponent(organizationId)}/students/${encodeURIComponent(studentId)}/families/${encodeURIComponent(guardianId)}`,
     { method: 'DELETE' },
   );
 }

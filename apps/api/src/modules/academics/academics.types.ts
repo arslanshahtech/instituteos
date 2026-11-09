@@ -13,9 +13,15 @@ export interface AcademicCampusChoice {
 
 export interface AcademicYearInput {
   name: string;
+  description?: string;
   startDate: string;
   endDate: string;
   status?: AcademicYearStatus;
+}
+
+export interface AcademicYearCreateInput extends Omit<AcademicYearInput, 'startDate' | 'endDate'> {
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface AcademicYearSessionStats {
@@ -34,6 +40,7 @@ export interface AcademicYearSummary {
   bySession: AcademicYearSessionStats[];
 }
 export interface AcademicYearRecord extends AcademicYearInput {
+  description?: string;
   id: string;
   organizationId: string;
   status: AcademicYearStatus;
@@ -88,12 +95,23 @@ export interface SectionRecord extends Omit<SectionInput, 'capacity'> {
   updatedAt: string;
 }
 
+export type SubjectMarkComponentKey = 'theory' | 'practical' | 'viva';
+
+export interface SubjectMarkComponent {
+  key: SubjectMarkComponentKey;
+  label: string;
+  totalMarks: number;
+  passingMarks: number;
+  enabled: boolean;
+}
+
 export interface SubjectInput {
   name: string;
   code?: string;
   classIds?: string[];
   totalMarks: number;
   passingPercentage: number;
+  markComponents?: SubjectMarkComponent[];
   description?: string;
 }
 

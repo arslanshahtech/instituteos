@@ -1,0 +1,64 @@
+﻿.events-holidays-page{display:grid;gap:16px;width:100%;min-width:0;color:var(--color-ink)}
+.events-holidays-heading{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:0 0 2px}
+.events-holidays-heading h1{margin:0;color:var(--color-ink);font-size:clamp(22px,2vw,27px);font-weight:650;letter-spacing:-.04em;line-height:1.2}
+.events-holidays-heading p{margin:6px 0 0;color:var(--color-muted);font-size:13px;line-height:1.5}
+.events-holidays-heading-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.events-holidays-heading-actions .button{min-height:38px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:8px;padding-inline:13px;font-size:12px;font-weight:600;white-space:nowrap}
+.events-holidays-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.events-holidays-stat{position:relative;display:grid;min-width:0;min-height:112px;align-content:start;gap:8px;border:1px solid var(--color-border);border-radius:12px;background:var(--color-surface);padding:14px 15px;box-shadow:var(--shadow-panel);transition:border-color 160ms ease,box-shadow 160ms ease,transform 160ms ease}
+.events-holidays-stat:hover{transform:translateY(-1px);border-color:var(--color-border-strong);box-shadow:0 5px 16px rgb(0 0 0 / 4%)}
+.events-holidays-stat-top{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.events-holidays-stat .reference-metric-label{color:var(--color-muted);font-size:10px;font-weight:650;letter-spacing:.07em;text-transform:uppercase}
+.events-holidays-stat-icon{display:grid;width:30px;height:30px;flex:0 0 30px;place-items:center;border:1px solid var(--color-border);border-radius:8px;background:#f6f5f2;color:#55514a}
+.events-holidays-stat>strong{display:block;overflow-wrap:anywhere;color:var(--color-ink);font-size:27px;font-weight:650;letter-spacing:-.045em;line-height:1.1}
+.events-holidays-stat>small{color:var(--color-muted);font-size:11px;line-height:1.4}
+.events-holidays-list-panel{min-width:0;overflow:hidden;border:1px solid var(--color-border);border-radius:13px;background:var(--color-surface);box-shadow:var(--shadow-panel)}
+.events-holidays-tabs{display:flex;align-items:center;gap:7px;padding:12px 15px;border-bottom:1px solid var(--color-border);background:#fdfcfb}
+.events-holidays-tabs button{display:inline-flex;align-items:center;gap:7px;min-height:34px;border:1px solid transparent;border-radius:7px;padding:7px 11px;background:transparent;color:var(--color-muted);font-size:12px;font-weight:550;cursor:pointer;transition:background 140ms ease,color 140ms ease,border-color 140ms ease}
+.events-holidays-tabs button:hover{background:#f3f2ef;color:var(--color-ink)}
+.events-holidays-tabs button.active{border-color:var(--color-border);background:#fff;color:var(--color-ink);box-shadow:0 1px 2px rgb(0 0 0 / 3%);font-weight:650}
+.events-holidays-records{display:grid;gap:20px;padding:17px}
+.events-holidays-group{min-width:0}
+.events-holidays-group+.events-holidays-group{padding-top:17px;border-top:1px solid #efede9}
+.events-holidays-group h2{display:flex;align-items:center;gap:8px;margin:0 0 10px;color:#77736d;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.events-holidays-group h2 i{width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:#0f766e}
+.events-holidays-group h2 i.event{background:#8b79b8}
+.events-holidays-record{display:flex;align-items:center;gap:13px;min-width:0;margin-top:8px;padding:11px 12px;border:1px solid #eeece8;border-radius:10px;background:#fff;transition:border-color 140ms ease,background 140ms ease}
+.events-holidays-record:hover{border-color:#dcd8d1;background:#fdfcfb}
+.events-holidays-date{display:flex;width:45px;min-height:48px;flex:0 0 45px;flex-direction:column;align-items:center;justify-content:center;gap:1px;border:1px solid #dce9e6;border-radius:8px;background:#f0f7f5;color:#245b53}
+.events-holidays-date strong{font-size:9px;font-weight:700;letter-spacing:.05em}
+.events-holidays-date b{font-size:19px;font-weight:650;letter-spacing:-.04em;line-height:1.05}
+.events-holidays-record-content{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}
+.events-holidays-record-content>strong{overflow-wrap:anywhere;color:var(--color-ink);font-size:13px;font-weight:650;line-height:1.35}
+.events-holidays-record-content>span{color:#77736d;font-size:11px;line-height:1.4}
+.events-holidays-record-content>small{color:#77736d;font-size:10px;line-height:1.4}
+.events-holidays-record-content>small:first-of-type{color:#47746d}
+.events-holidays-type{flex:0 0 auto;border:1px solid #e8e6e1;border-radius:6px;background:#f8f7f5;padding:4px 8px;color:#69655e;font-size:10px;font-weight:600}
+.events-holidays-record-actions{display:flex;flex:0 0 auto;gap:3px}
+.events-holidays-record-actions button,.events-holidays-modal>header button{display:grid;width:30px;height:30px;place-items:center;border:1px solid transparent;border-radius:7px;background:transparent;color:#77736d;padding:0;cursor:pointer;transition:background 140ms ease,color 140ms ease,border-color 140ms ease}
+.events-holidays-record-actions button:hover{border-color:#e9e6e1;background:#f5f4f1;color:var(--color-ink)}
+.events-holidays-record-actions button:last-child:hover{border-color:#f1d7d4;background:#fff5f4;color:#b42318}
+.events-holidays-record-actions button:disabled{opacity:.45;cursor:not-allowed}
+.events-holidays-empty{display:flex;align-items:center;flex-direction:column;gap:8px;padding:48px 20px;color:#8a867f}
+.events-holidays-empty>svg{margin-bottom:3px;color:#aaa69e}
+.events-holidays-empty strong{color:var(--color-ink);font-size:13px;font-weight:650}
+.events-holidays-empty span{color:var(--color-muted);font-size:11px}
+.events-holidays-modal-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;background:rgb(22 22 22 / 42%);backdrop-filter:blur(2px)}
+.events-holidays-modal{width:min(100%,460px);max-height:calc(100vh - 40px);overflow:auto;border:1px solid #e9e6e1;border-radius:13px;background:var(--color-surface);box-shadow:0 20px 60px rgb(0 0 0 / 18%)}
+.events-holidays-modal>header{display:flex;align-items:center;justify-content:space-between;padding:19px 21px 12px}
+.events-holidays-modal>header h2{margin:0;color:var(--color-ink);font-size:16px;font-weight:650;letter-spacing:-.02em}
+.events-holidays-modal form{display:grid;gap:13px;padding:9px 21px 21px}
+.events-holidays-modal form>label:not(.events-holidays-checkbox){display:grid;gap:6px;color:#5f5b55;font-size:11px;font-weight:650}
+.events-holidays-modal input:not([type=checkbox]),.events-holidays-modal select{width:100%;min-height:39px;border:1px solid #e3e0da;border-radius:7px;background:#fff;padding:8px 10px;color:var(--color-ink);font-size:12px;outline:none;transition:border-color 140ms ease,box-shadow 140ms ease}
+.events-holidays-modal input:focus,.events-holidays-modal select:focus{border-color:#8eaaa3;box-shadow:0 0 0 3px rgb(15 118 110 / 9%)}
+.events-holidays-checkbox{display:flex;align-items:flex-start;gap:10px;border:1px solid #eeece8;border-radius:8px;background:#fdfcfb;padding:10px;color:var(--color-ink);font-size:11px}
+.events-holidays-checkbox input{width:15px;height:15px;flex:0 0 15px;margin:1px 0 0;accent-color:#0f766e}
+.events-holidays-checkbox span{display:grid;gap:4px}
+.events-holidays-checkbox strong{font-size:11px;font-weight:650}
+.events-holidays-checkbox small{color:var(--color-muted);font-size:10px;line-height:1.45}
+.events-holidays-modal footer{display:flex;justify-content:flex-end;gap:8px;margin-top:3px}
+.events-holidays-modal footer .button{min-height:36px;border-radius:7px;padding-inline:13px;font-size:11px}
+.events-holidays-alert{margin:0;border:1px solid #f1d7d4;border-radius:7px;background:#fff5f4;padding:9px 11px;color:#a12b22;font-size:11px;line-height:1.45}
+@media(max-width:900px){.events-holidays-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.events-holidays-heading{align-items:flex-start;flex-direction:column}.events-holidays-heading-actions{width:100%}.events-holidays-heading-actions .button{flex:1}.events-holidays-record{gap:9px;padding:10px}.events-holidays-type{display:none}.events-holidays-record-actions{gap:1px}}
+@media(max-width:420px){.events-holidays-stats{gap:8px}.events-holidays-stat{min-height:100px;padding:12px}.events-holidays-stat>strong{font-size:23px}.events-holidays-records{padding:12px}.events-holidays-record-content>span{font-size:10px}}

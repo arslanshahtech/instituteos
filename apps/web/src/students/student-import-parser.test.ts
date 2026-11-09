@@ -66,7 +66,7 @@ describe('student import spreadsheet parser', () => {
         'Class',
         'Student Name',
         'Father Name',
-        'Guardian Phone',
+        'Family contact Phone',
         'Parent Email',
         'Relationship',
       ]),

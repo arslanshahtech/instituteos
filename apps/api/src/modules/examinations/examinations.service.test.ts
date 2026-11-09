@@ -46,6 +46,9 @@ const schedule: ExamScheduleRecord = {
   durationMinutes: 60,
   totalMarks: 100,
   passingMarks: 40,
+  marksReviewStatus: 'submitted',
+  marksSubmittedAt: '2026-10-11T00:00:00.000Z',
+  marksSubmittedBy: userId,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
@@ -63,6 +66,7 @@ function makeRepository(assigned: boolean) {
     getSchedule: vi.fn().mockResolvedValue(schedule),
     getExam: vi.fn().mockResolvedValue(exam),
     listSchedules: vi.fn().mockResolvedValue([schedule]),
+    setMarksReviewStatus: vi.fn().mockImplementation(async (_organizationId: string, _scheduleId: string, status: 'draft' | 'submitted' | 'changes_requested', submittedBy: string | null) => ({ ...schedule, marksReviewStatus: status, marksSubmittedAt: status === 'submitted' ? '2026-11-07T00:00:00.000Z' : null, marksSubmittedBy: submittedBy })),
     setResultsPublication: vi
       .fn()
       .mockImplementation(
@@ -78,6 +82,11 @@ function makeRepository(assigned: boolean) {
         }),
       ),
     listRoster: vi.fn().mockResolvedValue([]),
+    validateAcademicYear: vi.fn().mockResolvedValue(true),
+    validateCampus: vi.fn().mockResolvedValue(true),
+    validateTerm: vi.fn().mockResolvedValue(true),
+    createExam: vi.fn().mockResolvedValue(exam),
+    updateExam: vi.fn().mockResolvedValue(exam),
     validateSubject: vi.fn().mockResolvedValue(true),
     getClassCampus: vi.fn().mockResolvedValue(campusId),
     validateSection: vi.fn().mockResolvedValue(true),
@@ -108,6 +117,76 @@ const markedStudent: ExamRosterStudent = {
     updatedAt: '2026-01-01T00:00:00.000Z',
   },
 };
+
+describe('ExaminationsService annual and term-based exams', () => {
+  const examInput = {
+    name: 'Annual Examination',
+    type: 'final' as const,
+    academicYearId,
+    campusId,
+    startDate: '2026-10-01',
+    endDate: '2026-10-31',
+  };
+
+  it.each(['monthly_test', 'class_test', 'mid_year', 'send_up', 'annual', 'practical', 'viva', 'supplementary', 'improvement'] as const)('accepts the %s internal exam category', async (type) => {
+    const repo = makeRepository(true);
+    const service = new ExaminationsService(repo);
+
+    await service.createExam(managerContext, { ...examInput, type });
+
+    expect(repo.createExam).toHaveBeenCalledWith(organizationId, expect.objectContaining({ type }));
+  });
+
+  it('creates an annual exam without requiring a term', async () => {
+    const repo = makeRepository(true);
+    const service = new ExaminationsService(repo);
+
+    await service.createExam(managerContext, examInput);
+
+    expect(repo.validateAcademicYear).toHaveBeenCalledWith(organizationId, academicYearId);
+    expect(repo.validateTerm).not.toHaveBeenCalled();
+    expect(repo.createExam).toHaveBeenCalledWith(
+      organizationId,
+      expect.objectContaining({ ...examInput, termId: null }),
+    );
+  });
+
+  it('validates a selected term against the same academic year and exam dates', async () => {
+    const repo = makeRepository(true);
+    const service = new ExaminationsService(repo);
+    const termId = '650000000000000000000010';
+
+    await service.createExam(managerContext, { ...examInput, termId });
+
+    expect(repo.validateTerm).toHaveBeenCalledWith(
+      organizationId, academicYearId, termId, examInput.startDate, examInput.endDate,
+    );
+  });
+
+  it('rejects a term that does not belong to the selected academic year or dates', async () => {
+    const repo = makeRepository(true);
+    vi.mocked(repo.validateTerm).mockResolvedValue(false);
+    const service = new ExaminationsService(repo);
+
+    await expect(service.createExam(managerContext, {
+      ...examInput, termId: '650000000000000000000010',
+    })).rejects.toMatchObject({ code: 'VALIDATION_ERROR', statusCode: 400 });
+    expect(repo.createExam).not.toHaveBeenCalled();
+  });
+
+  it('allows an existing term-based exam to be converted to annual by clearing its term', async () => {
+    const repo = makeRepository(true);
+    vi.mocked(repo.getExam).mockResolvedValue(exam);
+    const service = new ExaminationsService(repo);
+
+    await service.updateExam(managerContext, examId, { termId: null });
+
+    expect(repo.validateTerm).not.toHaveBeenCalled();
+    expect(repo.updateExam).toHaveBeenCalledWith(
+      organizationId, examId, expect.objectContaining({ termId: null }),
+    );
+  });
+});
 
 describe('ExaminationsService class-specific subjects', () => {
   it('rejects scheduling a subject outside its assigned class/group', async () => {
@@ -147,6 +226,37 @@ describe('ExaminationsService result publication', () => {
       service.setResultsPublication(managerContext, examId, true),
     ).rejects.toMatchObject({ code: 'RESULTS_NOT_READY', statusCode: 409 });
     expect(repo.setResultsPublication).not.toHaveBeenCalled();
+  });
+
+  it('requires marks review before publishing even when marks exist', async () => {
+    const repo = makeRepository(true);
+    vi.mocked(repo.listSchedules).mockResolvedValue([{ ...schedule, marksReviewStatus: 'draft' }]);
+    vi.mocked(repo.listRoster).mockResolvedValue([markedStudent]);
+    const service = new ExaminationsService(repo);
+    await expect(service.setResultsPublication(managerContext, examId, true)).rejects.toMatchObject({ code: 'REVIEW_PENDING', statusCode: 409 });
+    expect(repo.setResultsPublication).not.toHaveBeenCalled();
+  });
+
+  it('locks teacher edits after submission until admin requests changes', async () => {
+    const repo = makeRepository(true);
+    const service = new ExaminationsService(repo);
+    await expect(service.saveMarks(teacherContext, scheduleId, [])).rejects.toMatchObject({ code: 'MARKS_ALREADY_SUBMITTED', statusCode: 409 });
+  });
+
+  it('submits completed marks for admin review', async () => {
+    const repo = makeRepository(true);
+    vi.mocked(repo.getSchedule).mockResolvedValue({ ...schedule, marksReviewStatus: 'draft' });
+    vi.mocked(repo.listRoster).mockResolvedValue([markedStudent]);
+    const service = new ExaminationsService(repo);
+    await expect(service.submitMarksForReview(teacherContext, scheduleId)).resolves.toMatchObject({ marksReviewStatus: 'submitted', marksSubmittedBy: userId });
+    expect(repo.setMarksReviewStatus).toHaveBeenCalledWith(organizationId, scheduleId, 'submitted', userId);
+  });
+
+  it('returns submitted marks to the teacher for correction', async () => {
+    const repo = makeRepository(true);
+    const service = new ExaminationsService(repo);
+    await expect(service.requestMarksChanges(managerContext, scheduleId)).resolves.toMatchObject({ marksReviewStatus: 'changes_requested' });
+    expect(repo.setMarksReviewStatus).toHaveBeenCalledWith(organizationId, scheduleId, 'changes_requested', null);
   });
 
   it('publishes only after every scheduled roster has marks', async () => {

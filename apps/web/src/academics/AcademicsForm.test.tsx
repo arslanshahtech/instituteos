@@ -73,7 +73,7 @@ describe('AcademicsForm curriculum validation', () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it('rejects an academic session whose end date is not after its start date', async () => {
+  it('creates an academic session with only a name and optional description', async () => {
     const onSubmit = vi.fn();
     render(
       <AcademicsForm
@@ -84,19 +84,24 @@ describe('AcademicsForm curriculum validation', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('Session name'), {
-      target: { value: '2026-2027' },
+    fireEvent.change(screen.getByLabelText('Session Name *'), {
+      target: { value: '2027-2028' },
     });
-    fireEvent.change(screen.getByLabelText('Start date'), {
-      target: { value: '2026-04-01' },
-    });
-    fireEvent.change(screen.getByLabelText('End date'), {
-      target: { value: '2026-04-01' },
+    fireEvent.change(screen.getByLabelText('Description'), {
+      target: { value: 'Next academic session' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Create record' }));
 
-    expect(await screen.findByText('End date must be later.')).toBeTruthy();
-    expect(onSubmit).not.toHaveBeenCalled();
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: '2027-2028',
+        description: 'Next academic session',
+        status: 'archived',
+      }),
+    );
+    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty('startDate');
+    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty('endDate');
   });
 
   it('preserves multiple class associations when editing a subject', async () => {

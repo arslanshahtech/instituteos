@@ -434,6 +434,24 @@ export class MongoFinanceRepository implements FinanceRepository {
       .lean();
     const existingIds = new Set(existing.map((item) => String(item.studentId)));
     const targetStudentIds = studentIds.filter((id) => !existingIds.has(id));
+    const placements = targetStudentIds.length
+      ? await StudentSectionPlacementModel.find({
+          organizationId: oid(organizationId),
+          academicYearId: oid(input.academicYearId),
+          studentId: { $in: targetStudentIds.map(oid) },
+          status: 'active',
+        })
+          .select({ studentId: 1, feeOverrideAmount: 1 })
+          .lean()
+      : [];
+    const feeOverrideByStudent = new Map<string, number>(
+      placements
+        .filter((placement) => placement.feeOverrideAmount)
+        .map((placement) => [
+          String(placement.studentId),
+          decimalNumber(placement.feeOverrideAmount),
+        ]),
+    );
 
     // Active student concessions تلاش کریں اور جمع کریں
     const concessions = targetStudentIds.length
@@ -457,9 +475,10 @@ export class MongoFinanceRepository implements FinanceRepository {
     for (const conc of concessions) {
       const sid = String(conc.studentId);
       const val = decimalNumber(conc.discountValue);
+      const studentBaseFee = feeOverrideByStudent.get(sid) ?? totalAmount;
       let calculatedDiscount = 0;
       if (conc.discountType === 'percentage') {
-        calculatedDiscount = (totalAmount * val) / 100;
+        calculatedDiscount = (studentBaseFee * val) / 100;
       } else {
         calculatedDiscount = val;
       }
@@ -469,7 +488,7 @@ export class MongoFinanceRepository implements FinanceRepository {
 
       const prev = concessionMap.get(sid);
       const combinedDiscount = Math.min(
-        totalAmount,
+        studentBaseFee,
         Math.max(0, (prev?.discountAmount ?? 0) + calculatedDiscount),
       );
       const combinedReason = prev ? `${prev.reason} + ${label}` : label;
@@ -497,9 +516,10 @@ export class MongoFinanceRepository implements FinanceRepository {
 
     const documents = targetStudentIds.map((studentId, index) => {
       const conc = concessionMap.get(studentId);
+      const baseFee = feeOverrideByStudent.get(studentId) ?? totalAmount;
       const discount = conc ? conc.discountAmount : 0;
       const arrears = Math.max(0, arrearsByStudent[studentId] ?? 0);
-      const netTotal = Math.max(0, totalAmount + arrears - discount);
+      const netTotal = Math.max(0, baseFee + arrears - discount);
 
       return {
         organizationId: oid(organizationId),
@@ -511,7 +531,7 @@ export class MongoFinanceRepository implements FinanceRepository {
         campusId: oid(feeStructure.campusId),
         billingCycle: input.billingCycle,
         dueDate: due,
-        currentAmount: money(totalAmount),
+        currentAmount: money(baseFee),
         discountAmount: money(discount),
         discountReason: conc ? conc.reason : undefined,
         arrearsAmount: money(arrears),

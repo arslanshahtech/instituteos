@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { app } from './app.js';
 import { env } from './config/env.js';
 import { connectDatabase, disconnectDatabase } from './database/connection.js';
+import { startStudentAutoAbsentScheduler } from './modules/attendance/student-auto-absent.scheduler.js';
 
 const server = createServer(app);
 let shuttingDown = false;
@@ -95,12 +96,16 @@ mongoose.connection.on('error', (error: unknown) => {
   );
 });
 
-void maintainDatabaseConnection(databaseRetryController.signal);
+let stopAttendanceScheduler: (() => void) | undefined;
+void maintainDatabaseConnection(databaseRetryController.signal).then(() => {
+  if (!shuttingDown) stopAttendanceScheduler = startStudentAutoAbsentScheduler();
+});
 
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   databaseRetryController.abort();
+  stopAttendanceScheduler?.();
 
   console.info(
     JSON.stringify({ level: 'info', event: 'shutdown.started', signal }),

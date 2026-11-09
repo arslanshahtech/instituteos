@@ -34,6 +34,7 @@ function defaultSettings(
       smsAlerts: false,
       autoAttendanceAlerts: false,
     },
+    staffSetup: { departments: [], designations: [], employmentTypes: [], workShifts: [], qualifications: [], documentTypes: [] },
     teacherSelfAttendance: {
       viewOwnAttendance: true,
       selfMarkingEnabled: false,
@@ -51,6 +52,7 @@ function validateInput(input: OrganizationSettingsInput): void {
     'localization',
     'notifications',
     'teacherSelfAttendance',
+    'staffSetup',
   ] as const;
   let hasValue = false;
   for (const section of sections) {
@@ -66,6 +68,7 @@ function validateInput(input: OrganizationSettingsInput): void {
         'selfMarkingEnabled',
         'allowedStatuses',
       ],
+      staffSetup: ['departments', 'designations', 'employmentTypes', 'workShifts', 'qualifications', 'documentTypes'],
     }[section];
     const optionalTextFields = [
       'logoUrl',
@@ -84,7 +87,11 @@ function validateInput(input: OrganizationSettingsInput): void {
           'Settings contain an unsupported field.',
         );
       }
-      if (section === 'notifications' || section === 'teacherSelfAttendance') {
+      if (section === 'staffSetup') {
+        if (!Array.isArray(value) || value.length > 100 || value.some((item) => !item || typeof item !== 'object' || typeof (item as { id?: unknown }).id !== 'string' || typeof (item as { name?: unknown }).name !== 'string' || !(item as { name: string }).name.trim() || (item as { name: string }).name.length > 120 || typeof (item as { isActive?: unknown }).isActive !== 'boolean')) {
+          throw new AppError(400, 'VALIDATION_ERROR', `Enter valid ${key} entries.`);
+        }
+      } else if (section === 'notifications' || section === 'teacherSelfAttendance') {
         if (key === 'allowedStatuses') {
           if (
             !Array.isArray(value) ||
@@ -133,6 +140,7 @@ function changedSettings(
     'localization',
     'notifications',
     'teacherSelfAttendance',
+    'staffSetup',
   ] as const) {
     const values = input[section];
     if (!values) continue;

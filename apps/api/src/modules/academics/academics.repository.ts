@@ -35,6 +35,7 @@ import type {
   SectionInput,
   SectionRecord,
   SubjectInput,
+  SubjectMarkComponentKey,
   SubjectRecord,
   TeacherAssignmentInput,
   TeacherAssignmentRecord,
@@ -56,6 +57,7 @@ function yearRecord(record: Record<string, unknown>): AcademicYearRecord {
     id: String(record._id),
     organizationId: String(record.organizationId),
     name: String(record.name),
+    description: String(record.description ?? ''),
     startDate: new Date(record.startDate as Date).toISOString().slice(0, 10),
     endDate: new Date(record.endDate as Date).toISOString().slice(0, 10),
     status: record.status === 'archived' ? 'archived' : 'active',
@@ -116,6 +118,20 @@ function subjectRecord(record: Record<string, unknown>): SubjectRecord {
     code: String(record.code),
     totalMarks: Number(record.totalMarks ?? 100),
     passingPercentage: Number(record.passingPercentage ?? 40),
+    ...(Array.isArray(record.markComponents)
+      ? {
+          markComponents: record.markComponents.map((component) => {
+            const item = component as Record<string, unknown>;
+            return {
+              key: String(item.key) as SubjectMarkComponentKey,
+              label: String(item.label ?? item.key),
+              totalMarks: Number(item.totalMarks ?? 0),
+              passingMarks: Number(item.passingMarks ?? 0),
+              enabled: item.enabled !== false,
+            };
+          }),
+        }
+      : {}),
     description: String(record.description ?? ''),
     classIds: Array.isArray(record.classIds) ? record.classIds.map(String) : [],
     createdAt: timestamp(record.createdAt as Date),
@@ -176,6 +192,7 @@ export class MongoAcademicsRepository implements AcademicsRepository {
         _id: 1,
         organizationId: 1,
         name: 1,
+        description: 1,
         startDate: 1,
         endDate: 1,
         status: 1,
@@ -303,9 +320,13 @@ export class MongoAcademicsRepository implements AcademicsRepository {
     input: AcademicYearInput,
   ): Promise<AcademicYearRecord> {
     try {
+      if (!input.startDate || !input.endDate)
+        throw new AppError(400, 'VALIDATION_ERROR', 'Academic session dates must be generated before saving.');
       const record = await AcademicYearModel.create({
         organizationId: oid(organizationId),
-        ...dates(input),
+        ...input,
+        startDate: new Date(input.startDate),
+        endDate: new Date(input.endDate),
       });
       return this.created(
         this.getAcademicYear(organizationId, String(record._id)),

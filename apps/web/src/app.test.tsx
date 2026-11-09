@@ -33,7 +33,7 @@ const tenancyMocks = vi.hoisted(() => ({
 const dashboardDataMocks = vi.hoisted(() => ({
   listApplications: vi.fn(),
   listStudentAttendance: vi.fn(),
-  listGuardians: vi.fn(),
+  listFamilyContacts: vi.fn(),
   listDailyCollections: vi.fn(),
 }));
 
@@ -137,10 +137,13 @@ vi.mock('./attendance/attendance-api.js', async (importOriginal) => {
     listStudentAttendance: dashboardDataMocks.listStudentAttendance,
   };
 });
-vi.mock('./guardians/guardians-api.js', async (importOriginal) => {
+vi.mock('./families/family-contacts-api.js', async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import('./guardians/guardians-api.js')>();
-  return { ...actual, listGuardians: dashboardDataMocks.listGuardians };
+    await importOriginal<typeof import('./families/family-contacts-api.js')>();
+  return {
+    ...actual,
+    listFamilyContacts: dashboardDataMocks.listFamilyContacts,
+  };
 });
 vi.mock('./finance/finance-api.js', async (importOriginal) => {
   const actual =
@@ -199,7 +202,7 @@ describe('frontend application foundation', () => {
       pageSize: 3,
     });
     dashboardDataMocks.listStudentAttendance.mockResolvedValue({ items: [] });
-    dashboardDataMocks.listGuardians.mockResolvedValue({
+    dashboardDataMocks.listFamilyContacts.mockResolvedValue({
       items: [],
       total: 0,
       page: 1,
@@ -869,8 +872,8 @@ describe('frontend application foundation', () => {
     for (const [label, path] of [
       ['Curriculum', '/academics'],
       ['Students', '/students'],
-      ['Guardians', '/guardians'],
-      ['Teachers / Staff', '/staff'],
+      ['Families', '/families'],
+      ['Staff', '/staff'],
       ['Attendance', '/attendance'],
       ['Examinations', '/examinations'],
       ['Finance', '/finance'],
@@ -881,6 +884,20 @@ describe('frontend application foundation', () => {
         within(navigation).getByRole('link', { name: label }),
       ).toHaveAttribute('href', base + path);
     }
+
+    const staffLink = within(navigation).getByRole('link', { name: 'Staff' });
+    expect(staffLink).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(staffLink);
+    expect(staffLink).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      within(navigation).getByRole('link', { name: 'Add Staff' }),
+    ).toHaveAttribute('href', base + '/staff/new');
+    expect(
+      within(navigation).getByRole('link', { name: 'All Staff' }),
+    ).toHaveAttribute('href', base + '/staff');
+    expect(
+      within(navigation).getByRole('link', { name: 'Staff Setup' }),
+    ).toHaveAttribute('href', base + '/staff/setup');
 
     const curriculumLink = within(navigation).getByRole('link', {
       name: 'Curriculum',

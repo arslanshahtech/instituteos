@@ -64,6 +64,70 @@ function dateRange(input: { dateFrom?: string; dateTo?: string }): void {
   }
 }
 
+function enforceStudentAttendanceCutoff(
+  context: AttendanceContext,
+  attendanceDate: string,
+  settings: {
+    timezone: string;
+    markingCutoffTime: string;
+    allowAdminOverride: boolean;
+  },
+): void {
+  let parts: Record<string, string>;
+  try {
+    parts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: settings.timezone || 'Asia/Karachi',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      })
+        .formatToParts(new Date())
+        .map((part) => [part.type, part.value]),
+    );
+  } catch {
+    throw new AppError(
+      500,
+      'ATTENDANCE_TIMEZONE_INVALID',
+      'The institute attendance timezone is invalid. Ask an administrator to correct Attendance Settings.',
+    );
+  }
+  const today =
+    String(parts.year) + '-' + String(parts.month) + '-' + String(parts.day);
+  const isOrganizationAdmin = [
+    'organization_owner',
+    'organization_admin',
+  ].includes(context.role);
+  if (attendanceDate > today) {
+    throw new AppError(
+      403,
+      'FUTURE_ATTENDANCE_NOT_ALLOWED',
+      'Attendance cannot be recorded for a future date.',
+    );
+  }
+  if (attendanceDate < today) {
+    if (isOrganizationAdmin && settings.allowAdminOverride) return;
+    throw new AppError(
+      403,
+      'ATTENDANCE_CUTOFF_PASSED',
+      'Past attendance can only be corrected by an authorized organization administrator.',
+    );
+  }
+  const currentTime = String(parts.hour) + ':' + String(parts.minute);
+  if (currentTime < settings.markingCutoffTime) return;
+  if (isOrganizationAdmin && settings.allowAdminOverride) return;
+  throw new AppError(
+    403,
+    'ATTENDANCE_CUTOFF_PASSED',
+    isOrganizationAdmin
+      ? 'The attendance cutoff has passed and administrator override is disabled.'
+      : 'The attendance cutoff has passed. Contact an organization administrator if a correction is required.',
+  );
+}
+
 function campusScope(context: AttendanceContext): string[] | undefined {
   if (context.role === 'campus_admin' && context.campusIds.length === 0) {
     return [];
@@ -248,6 +312,15 @@ export class AttendanceService {
       );
     }
     await this.validateSectionContext(context, normalized);
+    const attendancePolicy = await this.repository.getAttendanceSettings(
+      context.organizationId,
+    );
+    if (attendancePolicy)
+      enforceStudentAttendanceCutoff(
+        context,
+        normalized.date,
+        attendancePolicy,
+      );
     const roster = await this.repository.listStudentRoster(
       context.organizationId,
       normalized,
@@ -327,6 +400,9 @@ export class AttendanceService {
       ...(input.campusId
         ? { campusId: objectId(input.campusId, 'campus') }
         : {}),
+      ...(input.academicYearId
+        ? { academicYearId: objectId(input.academicYearId, 'academic year') }
+        : {}),
     };
     if (normalized.campusId) assertCampus(context, normalized.campusId);
     if (context.role === 'teacher') {
@@ -347,6 +423,8 @@ export class AttendanceService {
           (!normalized.classId || assignment.classId === normalized.classId) &&
           (!normalized.campusId ||
             assignment.campusId === normalized.campusId) &&
+          (!normalized.academicYearId ||
+            assignment.academicYearId === normalized.academicYearId) &&
           (context.campusIds.length === 0 ||
             context.campusIds.includes(assignment.campusId)),
       );

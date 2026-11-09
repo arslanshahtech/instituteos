@@ -103,9 +103,10 @@ function queryId(value: unknown, field: string, optional = false) {
 }
 
 function examType(value: string | undefined): ExamType {
-  if (value !== 'midterm' && value !== 'final' && value !== 'quiz')
+  const allowedTypes: readonly ExamType[] = ['midterm', 'final', 'quiz', 'monthly_test', 'class_test', 'mid_year', 'send_up', 'annual', 'practical', 'viva', 'supplementary', 'improvement'];
+  if (!value || !allowedTypes.includes(value as ExamType))
     throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid exam type.');
-  return value;
+  return value as ExamType;
 }
 
 function examInput(body: Record<string, unknown>): ExamInput {
@@ -113,7 +114,9 @@ function examInput(body: Record<string, unknown>): ExamInput {
     name: stringField(body, 'name', 120)!,
     type: examType(stringField(body, 'type', 20)),
     academicYearId: objectId(body.academicYearId, 'academic year'),
-    termId: objectId(body.termId, 'term'),
+    ...(body.termId === undefined || body.termId === null || body.termId === ''
+      ? {}
+      : { termId: objectId(body.termId, 'term') }),
     campusId: objectId(body.campusId, 'campus'),
     startDate: stringField(body, 'startDate', 10)!,
     endDate: stringField(body, 'endDate', 10)!,
@@ -127,7 +130,11 @@ function partialExamInput(body: Record<string, unknown>): Partial<ExamInput> {
     input.type = examType(stringField(body, 'type', 20));
   if (body.academicYearId !== undefined)
     input.academicYearId = objectId(body.academicYearId, 'academic year');
-  if (body.termId !== undefined) input.termId = objectId(body.termId, 'term');
+  if (body.termId !== undefined)
+    input.termId =
+      body.termId === null || body.termId === ''
+        ? null
+        : objectId(body.termId, 'term');
   if (body.campusId !== undefined)
     input.campusId = objectId(body.campusId, 'campus');
   if (body.startDate !== undefined)
@@ -301,9 +308,18 @@ export function createExaminationsRouter(
     authenticate,
     resolveOrganization,
     requireOrganizationPermission('examination.write'),
+    requireOrganizationRole([...examManagementRoles, 'teacher']),
   ] as const;
 
   const base = '/:organizationId/examinations';
+
+  router.get(
+    `${base}/pending-reviews`,
+    ...manageExams,
+    asyncHandler(async (_request, response) => {
+      response.status(200).json({ items: await service.listPendingMarksReviews(organizationContext(response)) });
+    }),
+  );
 
   router.get(
     base,
@@ -510,6 +526,26 @@ export function createExaminationsRouter(
   );
 
   // Teachers and authorized staff can record/update marks
+  router.post(
+    `${base}/schedules/:scheduleId/marks/submission`,
+    ...enterMarks,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      response.status(200).json({ schedule: await service.submitMarksForReview(organizationContext(response), routeId(request.params.scheduleId, 'Exam schedule')) });
+    }),
+  );
+
+  router.patch(
+    `${base}/schedules/:scheduleId/marks-review`,
+    ...manageExams,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const body = bodyObject(request.body);
+      if (body.action !== 'request_changes') throw new AppError(400, 'VALIDATION_ERROR', 'Choose a valid review action.');
+      response.status(200).json({ schedule: await service.requestMarksChanges(organizationContext(response), routeId(request.params.scheduleId, 'Exam schedule')) });
+    }),
+  );
+
   router.put(
     `${base}/schedules/:scheduleId/marks`,
     ...enterMarks,

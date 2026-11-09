@@ -21,6 +21,7 @@ function settingsRecord(
       record.localization as OrganizationSettingsRecord['localization'],
     notifications:
       record.notifications as OrganizationSettingsRecord['notifications'],
+    staffSetup: (record.staffSetup ?? { departments: [], designations: [], employmentTypes: [], workShifts: [], qualifications: [], documentTypes: [] }) as OrganizationSettingsRecord['staffSetup'],
     teacherSelfAttendance: (record.teacherSelfAttendance ?? {
       viewOwnAttendance: true,
       selfMarkingEnabled: false,
@@ -39,6 +40,7 @@ function updateFields(input: OrganizationSettingsInput) {
     'localization',
     'notifications',
     'teacherSelfAttendance',
+    'staffSetup',
   ] as const) {
     const values = input[section];
     if (!values) continue;

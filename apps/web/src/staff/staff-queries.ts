@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createStaff, getStaff, listStaff, updateStaff } from './staff-api.js';
-import type { StaffInput, StaffStatus } from './staff-api.js';
+import type { StaffInput, StaffStatus, StaffType } from './staff-api.js';
 
 export const staffQueryKey = (organizationId: string) =>
   ['staff', organizationId] as const;
@@ -10,6 +10,7 @@ export function useStaffList(
   input: {
     search: string;
     department: string;
+    staffType?: StaffType;
     status?: StaffStatus;
     campusId?: string;
     page: number;
@@ -44,6 +45,27 @@ export function useCreateStaff(organizationId: string) {
       queryClient.invalidateQueries({
         queryKey: staffQueryKey(organizationId),
       }),
+  });
+}
+
+export function useSetStaffStatus(organizationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      staffId,
+      status,
+    }: {
+      staffId: string;
+      status: StaffStatus;
+    }) => updateStaff(organizationId, staffId, { status }),
+    onSuccess: async (_result, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: staffQueryKey(organizationId),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: [...staffQueryKey(organizationId), variables.staffId],
+      });
+    },
   });
 }
 

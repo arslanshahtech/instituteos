@@ -9,6 +9,7 @@ const academicYearSchema = new Schema(
       required: true,
     },
     name: { type: String, required: true, trim: true, maxlength: 100 },
+    description: { type: String, trim: true, maxlength: 500, default: '' },
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
     status: {
@@ -113,6 +114,17 @@ sectionSchema.index(
   { unique: true, name: 'uniq_section_name_per_class' },
 );
 
+const subjectMarkComponentSchema = new Schema(
+  {
+    key: { type: String, enum: ['theory', 'practical', 'viva'], required: true },
+    label: { type: String, required: true, trim: true, maxlength: 40 },
+    totalMarks: { type: Number, required: true, min: 0, max: 100000 },
+    passingMarks: { type: Number, required: true, min: 0, max: 100000 },
+    enabled: { type: Boolean, required: true, default: true },
+  },
+  { _id: false },
+);
+
 const subjectSchema = new Schema(
   {
     organizationId: {
@@ -142,6 +154,8 @@ const subjectSchema = new Schema(
       max: 100,
       default: 40,
     },
+    // Optional for legacy subjects; new subject setup stores component defaults.
+    markComponents: { type: [subjectMarkComponentSchema], default: undefined },
     description: { type: String, trim: true, maxlength: 1000, default: '' },
     // Empty/missing classIds keeps legacy organization-wide subject behavior.
     classIds: [

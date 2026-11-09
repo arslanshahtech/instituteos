@@ -67,6 +67,9 @@ const schedules: ExamSchedule[] = [
     durationMinutes: 90,
     totalMarks: 100,
     passingMarks: 40,
+    marksReviewStatus: 'draft',
+    marksSubmittedAt: null,
+    marksSubmittedBy: null,
   },
   {
     id: 'exam-2',
@@ -79,6 +82,9 @@ const schedules: ExamSchedule[] = [
     durationMinutes: 90,
     totalMarks: 50,
     passingMarks: 20,
+    marksReviewStatus: 'draft',
+    marksSubmittedAt: null,
+    marksSubmittedBy: null,
   },
 ];
 

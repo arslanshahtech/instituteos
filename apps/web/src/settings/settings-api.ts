@@ -2,6 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../api/client.js';
 import { useToast } from '../components/ui/ToastProvider.js';
 
+export interface StaffSetupItem { id: string; name: string; isActive: boolean }
+export interface StaffSetup { departments: StaffSetupItem[]; designations: StaffSetupItem[]; employmentTypes: StaffSetupItem[]; workShifts: StaffSetupItem[]; qualifications: StaffSetupItem[]; documentTypes: StaffSetupItem[] }
+
 export interface OrganizationSettings {
   organizationId: string;
   branding: {
@@ -30,6 +33,7 @@ export interface OrganizationSettings {
     selfMarkingEnabled: boolean;
     allowedStatuses: Array<'present' | 'absent' | 'half-day' | 'on-leave'>;
   };
+  staffSetup: StaffSetup;
   createdAt: string;
   updatedAt: string;
 }
@@ -42,6 +46,7 @@ export type OrganizationSettingsInput = Partial<
     | 'localization'
     | 'notifications'
     | 'teacherSelfAttendance'
+    | 'staffSetup'
   >
 >;
 

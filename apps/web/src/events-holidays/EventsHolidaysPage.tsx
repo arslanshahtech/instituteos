@@ -1,0 +1,49 @@
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CalendarDays, CalendarCheck, Clock3, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { Button } from '../components/ui/Button.js';
+import { ErrorState, LoadingState } from '../components/ui/States.js';
+import { deleteSchoolEvent, listSchoolEvents, saveSchoolEvent, type EventInput, type SchoolEvent } from './events-holidays-api.js';
+import './events-holidays.css';
+
+const blankForm = (type: 'holiday' | 'event' = 'event'): EventInput => ({ title: '', type, noClasses: type === 'holiday', startDate: new Date().toISOString().slice(0, 10), endDate: new Date().toISOString().slice(0, 10), remarks: '' });
+const displayDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('en-PK', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+export function EventsHolidaysPage() {
+  const { organizationId } = useParams();
+  const queryClient = useQueryClient();
+  const [view, setView] = useState<'upcoming' | 'past'>('upcoming');
+  const [form, setForm] = useState<EventInput>(blankForm());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [rangeEnabled, setRangeEnabled] = useState(false);
+  const [error, setError] = useState('');
+  const eventsQuery = useQuery({ queryKey: ['events-holidays', organizationId], queryFn: () => listSchoolEvents(organizationId!), enabled: Boolean(organizationId) });
+  const saveMutation = useMutation({ mutationFn: () => saveSchoolEvent(organizationId!, form, editingId ?? undefined), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['events-holidays', organizationId] }); closeModal(); }, onError: (cause: unknown) => setError(cause instanceof Error ? cause.message : 'Event could not be saved.') });
+  const deleteMutation = useMutation({ mutationFn: (id: string) => deleteSchoolEvent(organizationId!, id), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['events-holidays', organizationId] }), onError: (cause: unknown) => setError(cause instanceof Error ? cause.message : 'Event could not be deleted.') });
+  const items = eventsQuery.data?.items ?? [];
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const visibleItems = useMemo(() => items.filter((item) => (new Date(`${item.endDate}T00:00:00`) >= today) === (view === 'upcoming')).sort((a, b) => a.startDate.localeCompare(b.startDate)), [items, view]);
+  function openModal(type: 'holiday' | 'event', item?: SchoolEvent) { setError(''); setEditingId(item?.id ?? null); setForm(item ? { title: item.title, type: item.type, noClasses: item.noClasses, startDate: item.startDate, endDate: item.endDate, remarks: item.remarks } : blankForm(type)); setRangeEnabled(Boolean(item && item.endDate !== item.startDate)); setModalOpen(true); }
+  function closeModal() { setModalOpen(false); setEditingId(null); setForm(blankForm()); setRangeEnabled(false); setError(''); }
+  function update<K extends keyof EventInput>(key: K, value: EventInput[K]) { setForm((current) => ({ ...current, [key]: value })); }
+  if (eventsQuery.isPending) return <LoadingState message="Loading events & holidays?" />;
+  if (eventsQuery.isError) return <ErrorState title="Events & holidays unavailable" description="Try again." onRetry={() => void eventsQuery.refetch()} />;
+
+  return <main className="events-holidays-page">
+    <header className="events-holidays-heading"><div><h1>Events &amp; Holidays</h1><p>School-wide calendar entries</p></div><div className="events-holidays-heading-actions"><Button type="button" onClick={() => openModal('holiday')}><Plus size={16} /> Add holiday</Button><Button type="button" variant="secondary" onClick={() => openModal('event')}><Plus size={16} /> Add event</Button></div></header>
+    {error && <p className="events-holidays-alert" role="alert">{error}</p>}
+    <section className="events-holidays-stats" aria-label="Calendar summary">
+      <article className="events-holidays-stat"><div className="events-holidays-stat-top"><span className="reference-metric-label">Holidays</span><span className="events-holidays-stat-icon"><CalendarDays size={16} /></span></div><strong>{eventsQuery.data.summary.holidays}</strong><small>upcoming</small></article>
+      <article className="events-holidays-stat"><div className="events-holidays-stat-top"><span className="reference-metric-label">Events</span><span className="events-holidays-stat-icon"><Sparkles size={16} /></span></div><strong>{eventsQuery.data.summary.events}</strong><small>scheduled ahead</small></article>
+      <article className="events-holidays-stat"><div className="events-holidays-stat-top"><span className="reference-metric-label">Total</span><span className="events-holidays-stat-icon"><CalendarCheck size={16} /></span></div><strong>{eventsQuery.data.summary.total}</strong><small>holidays + events</small></article>
+      <article className="events-holidays-stat"><div className="events-holidays-stat-top"><span className="reference-metric-label">Past</span><span className="events-holidays-stat-icon"><Clock3 size={16} /></span></div><strong>{eventsQuery.data.summary.past}</strong><small>before today</small></article>
+    </section>
+    <section className="events-holidays-list-panel">
+      <div className="events-holidays-tabs"><button type="button" className={view === 'upcoming' ? 'active' : ''} onClick={() => setView('upcoming')}><Sparkles size={15} /> Upcoming</button><button type="button" className={view === 'past' ? 'active' : ''} onClick={() => setView('past')}><Clock3 size={15} /> Past</button></div>
+      {visibleItems.length === 0 ? <div className="events-holidays-empty"><CalendarDays size={28} /><strong>No {view} entries</strong><span>School calendar entries will appear here.</span></div> : <div className="events-holidays-records">{(['holiday', 'event'] as const).map((type) => { const group = visibleItems.filter((item) => item.type === type); return group.length ? <section className="events-holidays-group" key={type}><h2><i className={type} />{type === 'holiday' ? 'Holidays' : 'Events'}</h2>{group.map((item) => <article className="events-holidays-record" key={item.id}><div className="events-holidays-date"><strong>{new Date(`${item.startDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</strong><b>{new Date(`${item.startDate}T00:00:00`).getDate()}</b></div><div className="events-holidays-record-content"><strong>{item.title}</strong><span>{displayDate(item.startDate)}{item.endDate !== item.startDate ? ` – ${displayDate(item.endDate)}` : ''}</span>{item.noClasses && <small>No classes scheduled</small>}{item.remarks && <small>{item.remarks}</small>}</div><span className="events-holidays-type">{type === 'holiday' ? 'Holiday' : 'Event'}</span><div className="events-holidays-record-actions"><button type="button" aria-label={`Edit ${item.title}`} onClick={() => openModal(type, item)}><Pencil size={16} /></button><button type="button" aria-label={`Delete ${item.title}`} onClick={() => { if (window.confirm(`Delete ${item.title}?`)) deleteMutation.mutate(item.id); }} disabled={deleteMutation.isPending}><Trash2 size={16} /></button></div></article>)}</section> : null; })}</div>}
+    </section>
+    {modalOpen && <div className="events-holidays-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeModal(); }}><section className="events-holidays-modal" role="dialog" aria-modal="true" aria-labelledby="events-holidays-modal-title"><header><h2 id="events-holidays-modal-title">{editingId ? 'Edit entry' : form.type === 'holiday' ? 'Add holiday' : 'Add event'}</h2><button type="button" aria-label="Close" onClick={closeModal}><X size={18} /></button></header><form onSubmit={(event) => { event.preventDefault(); setError(''); saveMutation.mutate(); }}><label>Title<input autoFocus maxLength={120} placeholder="e.g. Winter break" value={form.title} onChange={(event) => update('title', event.target.value)} required /></label><label>Type<select value={form.type} onChange={(event) => update('type', event.target.value as EventInput['type'])}><option value="event">Event</option><option value="holiday">Holiday</option></select></label><label className="events-holidays-checkbox"><input type="checkbox" checked={form.noClasses} onChange={(event) => update('noClasses', event.target.checked)} /><span><strong>No classes on this day</strong><small>Cancels lessons on the selected date. The school stays open — staff still sign in and are still marked.</small></span></label><label>Date<input type="date" value={form.startDate} onChange={(event) => { update('startDate', event.target.value); if (form.endDate < event.target.value) update('endDate', event.target.value); }} required /></label><label className="events-holidays-checkbox"><input type="checkbox" checked={rangeEnabled} onChange={(event) => { setRangeEnabled(event.target.checked); if (!event.target.checked) update('endDate', form.startDate); }} /><span><strong>Add for a date range</strong></span></label>{rangeEnabled && <label>End date<input type="date" min={form.startDate} value={form.endDate} onChange={(event) => update('endDate', event.target.value)} required /></label>}<label>Remarks (optional)<input maxLength={500} placeholder="Optional notes" value={form.remarks} onChange={(event) => update('remarks', event.target.value)} /></label>{error && <p className="events-holidays-alert" role="alert">{error}</p>}<footer><Button type="button" variant="secondary" onClick={closeModal}>Cancel</Button><Button type="submit" disabled={saveMutation.isPending}>{saveMutation.isPending ? 'Saving…' : 'Save'}</Button></footer></form></section></div>}
+  </main>;
+}

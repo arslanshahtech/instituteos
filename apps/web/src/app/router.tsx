@@ -83,6 +83,16 @@ const OrganizationAdminPage = lazy(() =>
     default: module.OrganizationAdminPage,
   })),
 );
+const EnrollmentWizardPage = lazy(() =>
+  import('../students/EnrollmentWizardPage.js').then((module) => ({
+    default: module.EnrollmentWizardPage,
+  })),
+);
+const StudentPromotionPage = lazy(() =>
+  import('../admissions/StudentPromotionPage.js').then((module) => ({
+    default: module.StudentPromotionPage,
+  })),
+);
 const StudentCreatePage = lazy(() =>
   import('../students/StudentPages.js').then((module) => ({
     default: module.StudentCreatePage,
@@ -108,36 +118,37 @@ const StudentImportPage = lazy(() =>
     default: module.StudentImportPage,
   })),
 );
-const GuardianCreatePage = lazy(() =>
-  import('../guardians/GuardianPages.js').then((module) => ({
-    default: module.GuardianCreatePage,
+const FamiliesListPage = lazy(() =>
+  import('../families/FamiliesPages.js').then((module) => ({
+    default: module.FamiliesListPage,
   })),
 );
-const GuardianDetailPage = lazy(() =>
-  import('../guardians/GuardianPages.js').then((module) => ({
-    default: module.GuardianDetailPage,
+const FamilyDetailPage = lazy(() =>
+  import('../families/FamiliesPages.js').then((module) => ({
+    default: module.FamilyDetailPage,
   })),
 );
-const GuardianEditPage = lazy(() =>
-  import('../guardians/GuardianPages.js').then((module) => ({
-    default: module.GuardianEditPage,
+const FamilyContactCreatePage = lazy(() =>
+  import('../families/FamilyContactsPages.js').then((module) => ({
+    default: module.FamilyContactCreatePage,
   })),
 );
-const GuardiansListPage = lazy(() =>
-  import('../guardians/GuardianPages.js').then((module) => ({
-    default: module.GuardiansListPage,
+const FamilyContactDetailPage = lazy(() =>
+  import('../families/FamilyContactsPages.js').then((module) => ({
+    default: module.FamilyContactDetailPage,
   })),
 );
-const AdmissionsListPage = lazy(() =>
-  import('../admissions/AdmissionsListPage.js').then((module) => ({
-    default: module.AdmissionsListPage,
+const FamilyContactEditPage = lazy(() =>
+  import('../families/FamilyContactsPages.js').then((module) => ({
+    default: module.FamilyContactEditPage,
   })),
 );
-const ApplicationReviewPage = lazy(() =>
-  import('../admissions/ApplicationReviewPage.js').then((module) => ({
-    default: module.ApplicationReviewPage,
+const FamilyContactsListPage = lazy(() =>
+  import('../families/FamilyContactsPages.js').then((module) => ({
+    default: module.FamilyContactsListPage,
   })),
 );
+
 const AcademicsDashboard = lazy(() =>
   import('../academics/AcademicsDashboard.js').then((module) => ({
     default: module.AcademicsDashboard,
@@ -156,6 +167,11 @@ const TeacherStudentsPage = lazy(() =>
 const ExaminationDashboard = lazy(() =>
   import('../examinations/ExaminationDashboard.js').then((module) => ({
     default: module.ExaminationDashboard,
+  })),
+);
+const EventsHolidaysPage = lazy(() =>
+  import('../events-holidays/EventsHolidaysPage.js').then((module) => ({
+    default: module.EventsHolidaysPage,
   })),
 );
 const HomeworkTestsPage = lazy(() =>
@@ -211,6 +227,11 @@ const StaffEditPage = lazy(() =>
 const StaffListPage = lazy(() =>
   import('../staff/StaffPages.js').then((module) => ({
     default: module.StaffListPage,
+  })),
+);
+const StaffSetupPage = lazy(() =>
+  import('../staff/StaffSetupPage.js').then((module) => ({
+    default: module.StaffSetupPage,
   })),
 );
 const TeacherTimetablePage = lazy(() =>
@@ -291,7 +312,15 @@ const roleRoutes: RouteObject[] = [
       },
       {
         path: 'organizations/:organizationId/admissions',
-        element: <AdmissionsListPage />,
+        element: <Navigate to="../admissions/enroll" replace />,
+      },
+      {
+        path: 'organizations/:organizationId/admissions/enroll',
+        element: <EnrollmentWizardPage />,
+      },
+      {
+        path: 'organizations/:organizationId/admissions/promote',
+        element: <StudentPromotionPage />,
       },
       {
         path: 'organizations/:organizationId/academics',
@@ -304,6 +333,10 @@ const roleRoutes: RouteObject[] = [
       {
         path: 'organizations/:organizationId/examinations',
         element: <ExaminationDashboard />,
+      },
+      {
+        path: 'organizations/:organizationId/events-holidays',
+        element: <EventsHolidaysPage />,
       },
       {
         path: 'organizations/:organizationId/homework-tests',
@@ -334,24 +367,32 @@ const roleRoutes: RouteObject[] = [
         element: <ProfileSettingsPage />,
       },
       {
-        path: 'organizations/:organizationId/admissions/applications/:applicationId',
-        element: <ApplicationReviewPage />,
+        path: 'organizations/:organizationId/families',
+        element: <FamiliesListPage />,
+      },
+      {
+        path: 'organizations/:organizationId/families/:familyId',
+        element: <FamilyDetailPage />,
       },
       {
         path: 'organizations/:organizationId/guardians',
-        element: <GuardiansListPage />,
+        element: <FamilyContactsListPage />,
       },
       {
-        path: 'organizations/:organizationId/guardians/new',
-        element: <GuardianCreatePage />,
+        path: 'organizations/:organizationId/family-contacts',
+        element: <FamilyContactsListPage />,
       },
       {
-        path: 'organizations/:organizationId/guardians/:guardianId/edit',
-        element: <GuardianEditPage />,
+        path: 'organizations/:organizationId/family-contacts/new',
+        element: <FamilyContactCreatePage />,
       },
       {
-        path: 'organizations/:organizationId/guardians/:guardianId',
-        element: <GuardianDetailPage />,
+        path: 'organizations/:organizationId/family-contacts/:guardianId/edit',
+        element: <FamilyContactEditPage />,
+      },
+      {
+        path: 'organizations/:organizationId/family-contacts/:guardianId',
+        element: <FamilyContactDetailPage />,
       },
       {
         path: 'organizations/:organizationId/students',
@@ -376,6 +417,10 @@ const roleRoutes: RouteObject[] = [
       {
         path: 'organizations/:organizationId/staff',
         element: <StaffListPage />,
+      },
+      {
+        path: 'organizations/:organizationId/staff/setup',
+        element: <StaffSetupPage />,
       },
       {
         path: 'organizations/:organizationId/staff/new',

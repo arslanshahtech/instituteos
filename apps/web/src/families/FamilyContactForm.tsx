@@ -4,7 +4,10 @@ import { z } from 'zod';
 import { Button } from '../components/ui/Button.js';
 import { FormField } from '../components/ui/FormField.js';
 import type { StudentRecord } from '../students/students-api.js';
-import type { GuardianInput, GuardianRecord } from './guardians-api.js';
+import type {
+  FamilyContactInput,
+  FamilyContactRecord,
+} from './family-contacts-api.js';
 
 const schema = z.object({
   firstName: z.string().trim().min(2, 'Enter at least two characters.').max(80),
@@ -24,7 +27,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema> & { studentId: string };
 
-export function GuardianForm({
+export function FamilyContactForm({
   guardian,
   students,
   studentSearch,
@@ -38,7 +41,7 @@ export function GuardianForm({
   saveError,
   onSubmit,
 }: {
-  guardian?: GuardianRecord;
+  guardian?: FamilyContactRecord;
   students: StudentRecord[];
   studentSearch: string;
   onStudentSearchChange: (search: string) => void;
@@ -49,7 +52,7 @@ export function GuardianForm({
   studentError?: string;
   isSaving: boolean;
   saveError?: string;
-  onSubmit: (input: GuardianInput, studentId?: string) => void;
+  onSubmit: (input: FamilyContactInput, studentId?: string) => void;
 }) {
   const form = useForm<FormValues>({
     resolver: zodResolver(
@@ -72,7 +75,7 @@ export function GuardianForm({
   });
 
   const submit = form.handleSubmit((values) => {
-    const input: GuardianInput = {
+    const input: FamilyContactInput = {
       firstName: values.firstName,
       lastName: values.lastName,
       relationship: values.relationship,
@@ -186,7 +189,11 @@ export function GuardianForm({
       )}
       <div className="button-row">
         <Button disabled={isSaving} type="submit" variant="primary">
-          {isSaving ? 'Saving…' : guardian ? 'Save changes' : 'Create guardian'}
+          {isSaving
+            ? 'Saving…'
+            : guardian
+              ? 'Save changes'
+              : 'Create family contact'}
         </Button>
       </div>
     </form>

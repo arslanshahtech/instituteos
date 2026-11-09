@@ -52,7 +52,7 @@ const audienceLabels: Record<AnnouncementAudience, string> = {
   all: 'Everyone',
   staff: 'Staff',
   students: 'Students',
-  guardians: 'Guardians',
+  guardians: 'Family contacts',
 };
 
 const statusLabels: Record<AnnouncementStatus, string> = {

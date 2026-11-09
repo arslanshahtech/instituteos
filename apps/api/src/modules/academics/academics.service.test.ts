@@ -91,8 +91,44 @@ describe('AcademicsService', () => {
       context.organizationId,
       {
         name: '2027–2028',
+        description: '',
         startDate: '2027-09-01',
         endDate: '2028-06-30',
+        status: 'archived',
+      },
+    );
+  });
+
+  it('derives next-session dates from the active session without activating it', async () => {
+    const repo = repository({
+      listAcademicYears: vi.fn().mockResolvedValue([
+        {
+          id: 'active-year',
+          organizationId: context.organizationId,
+          name: '2026-2027',
+          startDate: '2026-04-01',
+          endDate: '2027-03-31',
+          status: 'active',
+          createdAt: '',
+          updatedAt: '',
+        },
+      ]),
+      createAcademicYear: vi.fn().mockResolvedValue({ id: 'next-year', status: 'archived' }),
+    });
+    const service = new AcademicsService(repo);
+
+    await service.createAcademicYear(context, {
+      name: '2027-2028',
+      description: 'Next session',
+    });
+
+    expect(repo.createAcademicYear).toHaveBeenCalledWith(
+      context.organizationId,
+      {
+        name: '2027-2028',
+        description: 'Next session',
+        startDate: '2027-04-01',
+        endDate: '2028-03-31',
         status: 'archived',
       },
     );
@@ -250,6 +286,47 @@ describe('AcademicsService', () => {
       context.organizationId,
       expect.objectContaining({ classIds: [classRecord.id] }),
     );
+  });
+
+  it('stores subject-default theory, practical and viva mark components', async () => {
+    const repo = repository();
+    const service = new AcademicsService(repo);
+    await service.createSubject(context, {
+      name: 'Physics',
+      code: 'PHY',
+      classIds: [classRecord.id],
+      totalMarks: 150,
+      passingPercentage: 40,
+      markComponents: [
+        { key: 'theory', label: 'Theory', totalMarks: 100, passingMarks: 40, enabled: true },
+        { key: 'practical', label: 'Practical', totalMarks: 50, passingMarks: 20, enabled: true },
+        { key: 'viva', label: 'Viva', totalMarks: 0, passingMarks: 0, enabled: false },
+      ],
+    });
+    expect(repo.createSubject).toHaveBeenCalledWith(
+      context.organizationId,
+      expect.objectContaining({ totalMarks: 150, markComponents: expect.arrayContaining([
+        expect.objectContaining({ key: 'theory', totalMarks: 100, passingMarks: 40 }),
+        expect.objectContaining({ key: 'practical', totalMarks: 50, passingMarks: 20 }),
+      ]) }),
+    );
+  });
+
+  it('rejects subject components when their enabled total differs from the subject total', async () => {
+    const repo = repository();
+    const service = new AcademicsService(repo);
+    await expect(service.createSubject(context, {
+      name: 'Chemistry',
+      code: 'CHEM',
+      classIds: [classRecord.id],
+      totalMarks: 100,
+      passingPercentage: 40,
+      markComponents: [
+        { key: 'theory', label: 'Theory', totalMarks: 80, passingMarks: 32, enabled: true },
+        { key: 'practical', label: 'Practical', totalMarks: 50, passingMarks: 20, enabled: true },
+      ],
+    })).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    expect(repo.createSubject).not.toHaveBeenCalled();
   });
 
   it('requires a program/group name when a college study level is selected', async () => {

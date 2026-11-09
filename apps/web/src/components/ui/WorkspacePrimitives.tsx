@@ -71,15 +71,18 @@ export function WorkspaceFilterSelect({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: string;
   options: Array<{ value: string; label: string }>;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <select
       aria-label={label}
+      disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
       value={value}
     >
@@ -183,7 +186,7 @@ export function WorkspaceStudentCard({
   );
 }
 
-export function WorkspaceGuardianCard({
+export function WorkspaceFamilyContactCard({
   initials,
   name,
   phone,
@@ -205,23 +208,23 @@ export function WorkspaceGuardianCard({
   to: string;
 }) {
   return (
-    <Link aria-label={name} className="reference-guardian-card" to={to}>
-      <span className="reference-guardian-card-top">
+    <Link aria-label={name} className="reference-family-contact-card" to={to}>
+      <span className="reference-family-contact-card-top">
         <span className="reference-staff-avatar" aria-hidden="true">
           {initials}
         </span>
-        <span className="reference-guardian-count">
+        <span className="reference-family-contact-count">
           {childCount} {childCount === 1 ? 'child' : 'children'}
         </span>
       </span>
       <strong>{name}</strong>
-      <span className="reference-guardian-phone">
+      <span className="reference-family-contact-phone">
         {phone || 'Phone not provided'}
       </span>
-      <span className="reference-guardian-relation">
+      <span className="reference-family-contact-relation">
         {relationship || 'Relationship not set'}
       </span>
-      <span className="reference-guardian-children">
+      <span className="reference-family-contact-children">
         <small>Linked children</small>
         {childrenNames.length > 0
           ? childrenNames.join(', ')

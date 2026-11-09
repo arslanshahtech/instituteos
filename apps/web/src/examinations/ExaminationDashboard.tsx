@@ -32,9 +32,12 @@ import {
   useDeleteGradingScale,
   useExamMarkSheet,
   useExamSchedules,
+  usePendingExamMarksReviews,
   useExaminationWorkspace,
   useSaveExam,
   useSaveExamMarks,
+  useSubmitExamMarksForReview,
+  useRequestExamMarksChanges,
   useSetExamResultsPublication,
   useSaveExamSchedule,
   useSaveGradingScale,
@@ -43,14 +46,25 @@ import {
 
 const examSchema = z.object({
   name: z.string().trim().min(1, 'Enter an exam name.').max(120),
-  type: z.enum(['midterm', 'final', 'quiz']),
+  type: z.enum(['midterm', 'final', 'quiz', 'monthly_test', 'class_test', 'mid_year', 'send_up', 'annual', 'practical', 'viva', 'supplementary', 'improvement']),
   academicYearId: z.string().min(1, 'Select an academic year.'),
-  termId: z.string().min(1, 'Select a term.'),
+  termId: z.string(),
   campusId: z.string().min(1, 'Select a campus.'),
   startDate: z.string().min(1, 'Select a start date.'),
   endDate: z.string().min(1, 'Select an end date.'),
 });
 type ExamFormValues = z.infer<typeof examSchema>;
+
+const examTypeLabels: Record<import('./examinations-api.js').ExamType, string> = {
+  midterm: 'Midterm', final: 'Final', quiz: 'Quiz (legacy)',
+  monthly_test: 'Monthly Test', class_test: 'Class Test', mid_year: 'Mid-Year / Half-Yearly',
+  send_up: 'Send-up / Pre-Board', annual: 'Annual Examination', practical: 'Practical Examination',
+  viva: 'Viva / Oral', supplementary: 'Supplementary', improvement: 'Improvement',
+};
+
+function examTypeLabel(type: import('./examinations-api.js').ExamType): string {
+  return examTypeLabels[type] ?? type;
+}
 
 const scheduleSchema = z.object({
   subjectId: z.string().min(1, 'Select a subject.'),
@@ -80,6 +94,10 @@ const tabs = [
   'Student report',
 ] as const;
 type Tab = (typeof tabs)[number];
+
+// MVP navigation: advanced grading and report tools stay in the codebase but are not exposed in the first launch.
+const managerTabs: readonly Tab[] = ['Exams & schedules', 'Marks entry sheet'];
+const teacherTabs: readonly Tab[] = ['Marks entry sheet'];
 
 function SelectField({
   label,
@@ -139,6 +157,7 @@ export function ExaminationDashboard() {
       'principal_director',
       'academic_coordinator',
     ].includes(access.data?.role ?? '');
+  const visibleTabs = canManageExams ? managerTabs : teacherTabs;
   const workspace = useExaminationWorkspace(
     organizationId,
     Boolean(access.data && canRead),
@@ -155,6 +174,12 @@ export function ExaminationDashboard() {
   const sections = academics.sections.data?.items ?? [];
   const subjects = academics.subjects.data?.items ?? [];
   const [tab, setTab] = useState<Tab>('Exams & schedules');
+
+  useEffect(() => {
+    if (access.data && !canManageExams && tab !== 'Marks entry sheet') {
+      setTab('Marks entry sheet');
+    }
+  }, [access.data, canManageExams, tab]);
   const [campusFilter, setCampusFilter] = useState('');
   const [termFilter, setTermFilter] = useState('');
   const [examId, setExamId] = useState('');
@@ -178,6 +203,7 @@ export function ExaminationDashboard() {
     examId,
     Boolean(access.data && canRead),
   );
+  const pendingReviews = usePendingExamMarksReviews(organizationId, Boolean(access.data && canManageExams));
   const schedules = examSchedules.data?.items ?? [];
   const selectedExam = exams.find((item) => item.id === examId);
   const examClasses = classes.filter(
@@ -226,6 +252,8 @@ export function ExaminationDashboard() {
   const saveSchedule = useSaveExamSchedule(organizationId);
   const removeSchedule = useDeleteExamSchedule(organizationId);
   const saveMarks = useSaveExamMarks(organizationId);
+  const submitMarksForReview = useSubmitExamMarksForReview(organizationId);
+  const requestMarksChanges = useRequestExamMarksChanges(organizationId);
   const saveScale = useSaveGradingScale(organizationId);
   const removeScale = useDeleteGradingScale(organizationId);
   const examForm = useForm<ExamFormValues>({
@@ -262,11 +290,12 @@ export function ExaminationDashboard() {
     (exam) =>
       (!campusFilter || exam.campusId === campusFilter) &&
       (!termFilter || exam.termId === termFilter),
-  );
-  const scales = workspace.scales.data?.items ?? [];
+  );  // Grading scales are outside the first-launch MVP; do not fetch or depend on them.
+  const scales: Array<{ id: string; name: string; gradeBreakdowns: GradeBreakdown[]; isActive: boolean }> = [];
 
   useEffect(() => {
-    if (examId && !exams.some((item) => item.id === examId)) setExamId('');
+    if (!examId && exams[0]) setExamId(exams[0].id);
+    else if (examId && !exams.some((item) => item.id === examId)) setExamId('');
   }, [examId, exams]);
 
   useEffect(() => {
@@ -331,7 +360,7 @@ export function ExaminationDashboard() {
       name: exam.name,
       type: exam.type,
       academicYearId: exam.academicYearId,
-      termId: exam.termId,
+      termId: exam.termId ?? '',
       campusId: exam.campusId,
       startDate: exam.startDate,
       endDate: exam.endDate,
@@ -344,7 +373,7 @@ export function ExaminationDashboard() {
     try {
       await saveExam.mutateAsync({
         id: examEditId || undefined,
-        data: values,
+        data: { ...values, termId: values.termId || null },
       });
       setExamEditId('');
       examForm.reset();
@@ -412,6 +441,7 @@ export function ExaminationDashboard() {
         scheduleId: selectedSchedule.id,
         records,
       });
+      if (!canManageExams) await submitMarksForReview.mutateAsync(selectedSchedule.id);
     } catch (error) {
       setFormError(apiMessage(error));
     }
@@ -480,24 +510,19 @@ export function ExaminationDashboard() {
     );
   if (!canRead) return <PermissionDeniedState />;
 
+  // Only data needed by the active role should block the first-launch screen.
   const loading =
     workspace.exams.isLoading ||
-    workspace.scales.isLoading ||
-    academics.years.isLoading ||
-    academics.terms.isLoading ||
     academics.classes.isLoading ||
     academics.sections.isLoading ||
     academics.subjects.isLoading ||
-    academics.campuses.isLoading;
+    (canManageExams && (academics.years.isLoading || academics.campuses.isLoading));
   const queryError =
     workspace.exams.error ||
-    workspace.scales.error ||
-    academics.years.error ||
-    academics.terms.error ||
     academics.classes.error ||
     academics.sections.error ||
     academics.subjects.error ||
-    academics.campuses.error;
+    (canManageExams ? academics.years.error || academics.campuses.error : null);
   if (loading) return <LoadingState message="Loading examinations..." />;
   if (queryError)
     return (
@@ -505,11 +530,7 @@ export function ExaminationDashboard() {
         title="Examinations could not be loaded"
         description={apiMessage(queryError)}
         onRetry={() => {
-          void workspace.exams.refetch();
-          void workspace.scales.refetch();
-          void academics.years.refetch();
-          void academics.terms.refetch();
-          void academics.classes.refetch();
+          void workspace.exams.refetch();          void academics.years.refetch();          void academics.classes.refetch();
           void academics.sections.refetch();
           void academics.subjects.refetch();
           void academics.campuses.refetch();
@@ -523,7 +544,7 @@ export function ExaminationDashboard() {
         className="examinations-page-heading"
         eyebrow="Academic workspace"
         title="Examinations & assessment"
-        description="Manage exam schedules, enter marks, configure grading, and review student results."
+        description={canManageExams ? 'Create exams, set teacher access through class and subject assignments, review marks, and publish results.' : 'View your assigned exams and enter or update marks for your assigned students.'}
       />
       <label className="examinations-mobile-tab-switcher">
         <span className="visually-hidden">Examination view</span>
@@ -540,7 +561,7 @@ export function ExaminationDashboard() {
             }
           }}
         >
-          {tabs.map((item) => (
+          {visibleTabs.map((item) => (
             <option key={item} value={item}>
               {item}
             </option>
@@ -551,7 +572,7 @@ export function ExaminationDashboard() {
         className="academics-tabs attendance-tabs"
         aria-label="Examination sections"
       >
-        {tabs.map((item) => (
+        {visibleTabs.map((item) => (
           <button
             aria-current={tab === item ? 'page' : undefined}
             className={`academics-tab${tab === item ? ' academics-tab-active' : ''}`}
@@ -579,6 +600,28 @@ export function ExaminationDashboard() {
 
       {tab === 'Exams & schedules' && (
         <section className="examinations-panel">
+          {canManageExams && pendingReviews.data?.items.length ? (
+            <div className="examinations-card" role="status">
+              <div className="examinations-panel-heading">
+                <h2>Review pending</h2>
+                <strong>{pendingReviews.data.items.length}</strong>
+              </div>
+              <ul className="examinations-record-list">
+                {pendingReviews.data.items.map((schedule) => (
+                  <li key={schedule.id}>
+                    <div>
+                      <strong>{exams.find((exam) => exam.id === schedule.examId)?.name ?? 'Examination'}</strong>
+                      <span>{subjects.find((subject) => subject.id === schedule.subjectId)?.name ?? 'Subject'} - {classes.find((item) => item.id === schedule.classId)?.name ?? 'Class'} - {sections.find((item) => item.id === schedule.sectionId)?.name ?? 'Section'}</span>
+                    </div>
+                    <Button type="button" variant="secondary" onClick={() => { setExamId(schedule.examId); setClassId(schedule.classId); setSectionId(schedule.sectionId); setSubjectId(schedule.subjectId); setScheduleId(schedule.id); setTab('Marks entry sheet'); }}>Review</Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {canManageExams && pendingReviews.isError && (
+            <ErrorState title="Review queue unavailable" description="Try again." onRetry={() => void pendingReviews.refetch()} />
+          )}
           <div className="examinations-grid">
             <section className="examinations-card">
               <h2>{examEditId ? 'Update exam' : 'Create exam'}</h2>
@@ -588,24 +631,33 @@ export function ExaminationDashboard() {
               >
                 <label>
                   Exam name
-                  <input {...examForm.register('name')} disabled={!canWrite} />
+                  <input {...examForm.register('name')} disabled={!canManageExams} />
                   {examForm.formState.errors.name && (
                     <small>{examForm.formState.errors.name.message}</small>
                   )}
                 </label>
                 <label>
                   Exam type
-                  <select {...examForm.register('type')} disabled={!canWrite}>
+                  <select {...examForm.register('type')} disabled={!canManageExams}>
                     <option value="midterm">Midterm</option>
                     <option value="final">Final</option>
-                    <option value="quiz">Quiz</option>
+                    <option value="quiz">Quiz (legacy)</option>
+                    <option value="monthly_test">Monthly Test</option>
+                    <option value="class_test">Class Test</option>
+                    <option value="mid_year">Mid-Year / Half-Yearly</option>
+                    <option value="send_up">Send-up / Pre-Board</option>
+                    <option value="annual">Annual Examination</option>
+                    <option value="practical">Practical Examination</option>
+                    <option value="viva">Viva / Oral</option>
+                    <option value="supplementary">Supplementary</option>
+                    <option value="improvement">Improvement</option>
                   </select>
                 </label>
                 <label>
                   Campus
                   <select
                     {...examForm.register('campusId')}
-                    disabled={!canWrite}
+                    disabled={!canManageExams}
                   >
                     <option value="">Select campus</option>
                     {campuses.map((campus) => (
@@ -621,8 +673,16 @@ export function ExaminationDashboard() {
                 <label>
                   Academic year
                   <select
-                    {...examForm.register('academicYearId')}
-                    disabled={!canWrite}
+                    {...examForm.register('academicYearId', {
+                      onChange: (event) => {
+                        const nextYearId = event.target.value as string;
+                        const currentTermId = examForm.getValues('termId');
+                        if (currentTermId && !terms.some(
+                          (term) => term.id === currentTermId && term.academicYearId === nextYearId,
+                        )) examForm.setValue('termId', '', { shouldValidate: true });
+                      },
+                    })}
+                    disabled={!canManageExams}
                   >
                     <option value="">Select academic year</option>
                     {years.map((year: AcademicYear) => (
@@ -638,18 +698,15 @@ export function ExaminationDashboard() {
                   )}
                 </label>
                 <label>
-                  Term
-                  <select {...examForm.register('termId')} disabled={!canWrite}>
-                    <option value="">Select term</option>
+                  Term (optional)
+                  <select {...examForm.register('termId')} disabled={!canManageExams}>
+                    <option value="">Annual exam (no term)</option>
                     {availableTerms.map((term: AcademicTerm) => (
                       <option key={term.id} value={term.id}>
                         {term.name}
                       </option>
                     ))}
                   </select>
-                  {examForm.formState.errors.termId && (
-                    <small>{examForm.formState.errors.termId.message}</small>
-                  )}
                 </label>
                 <div className="examinations-form-row">
                   <label>
@@ -657,7 +714,7 @@ export function ExaminationDashboard() {
                     <input
                       type="date"
                       {...examForm.register('startDate')}
-                      disabled={!canWrite}
+                      disabled={!canManageExams}
                     />
                   </label>
                   <label>
@@ -665,12 +722,12 @@ export function ExaminationDashboard() {
                     <input
                       type="date"
                       {...examForm.register('endDate')}
-                      disabled={!canWrite}
+                      disabled={!canManageExams}
                     />
                   </label>
                 </div>
                 <div className="examinations-actions">
-                  {canWrite && (
+                  {canManageExams && (
                     <Button type="submit" disabled={saveExam.isPending}>
                       {saveExam.isPending
                         ? 'Saving…'
@@ -694,6 +751,7 @@ export function ExaminationDashboard() {
                 </div>
               </form>
               <h3 className="examinations-subheading">Add a schedule</h3>
+              <p className="examinations-form-hint">Set the class, section, subject and exam timing.</p>
               <SelectField label="Exam" value={examId} onChange={setExamId}>
                 <option value="">Select an exam</option>
                 {exams.map((exam) => (
@@ -710,7 +768,7 @@ export function ExaminationDashboard() {
                   Class
                   <select
                     {...scheduleForm.register('classId')}
-                    disabled={!canWrite || !examId}
+                    disabled={!canManageExams || !examId}
                     onChange={(event) => {
                       scheduleForm.setValue('classId', event.target.value);
                       scheduleForm.setValue('sectionId', '');
@@ -728,7 +786,7 @@ export function ExaminationDashboard() {
                   Section
                   <select
                     {...scheduleForm.register('sectionId')}
-                    disabled={!canWrite || !examId}
+                    disabled={!canManageExams || !examId}
                   >
                     <option value="">Select section</option>
                     {sections
@@ -747,7 +805,7 @@ export function ExaminationDashboard() {
                   Subject
                   <select
                     {...scheduleForm.register('subjectId')}
-                    disabled={!canWrite || !examId}
+                    disabled={!canManageExams || !examId}
                   >
                     <option value="">Select subject</option>
                     {subjects.map((item: AcademicSubject) => (
@@ -763,7 +821,7 @@ export function ExaminationDashboard() {
                     <input
                       type="date"
                       {...scheduleForm.register('date')}
-                      disabled={!canWrite || !examId}
+                      disabled={!canManageExams || !examId}
                     />
                   </label>
                   <label>
@@ -771,7 +829,7 @@ export function ExaminationDashboard() {
                     <input
                       type="time"
                       {...scheduleForm.register('startTime')}
-                      disabled={!canWrite || !examId}
+                      disabled={!canManageExams || !examId}
                     />
                   </label>
                 </div>
@@ -782,7 +840,7 @@ export function ExaminationDashboard() {
                       type="number"
                       min="1"
                       {...scheduleForm.register('durationMinutes')}
-                      disabled={!canWrite || !examId}
+                      disabled={!canManageExams || !examId}
                     />
                   </label>
                   <label>
@@ -792,7 +850,7 @@ export function ExaminationDashboard() {
                       min="0.01"
                       step="0.01"
                       {...scheduleForm.register('totalMarks')}
-                      disabled={!canWrite || !examId}
+                      disabled={!canManageExams || !examId}
                     />
                   </label>
                   <label>
@@ -802,7 +860,7 @@ export function ExaminationDashboard() {
                       min="0"
                       step="0.01"
                       {...scheduleForm.register('passingMarks')}
-                      disabled={!canWrite || !examId}
+                      disabled={!canManageExams || !examId}
                     />
                   </label>
                 </div>
@@ -810,7 +868,7 @@ export function ExaminationDashboard() {
                   <small>{scheduleForm.formState.errors.root.message}</small>
                 )}
                 <div className="examinations-actions">
-                  {canWrite && (
+                  {canManageExams && (
                     <Button
                       type="submit"
                       disabled={!examId || saveSchedule.isPending}
@@ -873,10 +931,10 @@ export function ExaminationDashboard() {
                       <div>
                         <strong>{examName(exam, years)}</strong>
                         <span>
-                          {exam.type} · {exam.startDate} to {exam.endDate}
+                          {examTypeLabel(exam.type)} · {exam.termId ? (terms.find((term) => term.id === exam.termId)?.name ?? 'Term-based') : 'Annual (no term)'} · {exam.startDate} to {exam.endDate}
                         </span>
                       </div>
-                      {canWrite && (
+                      {canManageExams && (
                         <div className="examinations-actions">
                           <Button
                             type="button"
@@ -929,13 +987,13 @@ export function ExaminationDashboard() {
                         disabled={
                           setResultsPublication.isPending ||
                           (!selectedExam.resultsPublishedAt &&
-                            (examSchedules.isLoading || schedules.length === 0))
+                            (examSchedules.isLoading || schedules.length === 0 || schedules.some((item) => item.marksReviewStatus !== 'submitted')))
                         }
                         onClick={() => {
                           const published = !selectedExam.resultsPublishedAt;
                           const message = published
-                            ? 'Publish these exam results to linked parent and student portals? This requires marks for every student in every scheduled class.'
-                            : 'Unpublish these results? Parents and students will no longer see them.';
+                            ? 'Publish results to parent and student portals?'
+                            : 'Hide results from parent and student portals?';
                           if (!window.confirm(message)) return;
                           setFormError('');
                           void setResultsPublication
@@ -980,14 +1038,21 @@ export function ExaminationDashboard() {
                               )?.name ?? 'Section'}{' '}
                               · {schedule.date} {schedule.startTime}
                             </span>
+                            <span>{schedule.marksReviewStatus === 'submitted' ? 'Review pending' : schedule.marksReviewStatus === 'changes_requested' ? 'Changes requested' : 'Marks pending'}</span>
                             <span>
                               {schedule.totalMarks} marks · pass{' '}
                               {schedule.passingMarks}
                             </span>
                           </div>
-                          {canWrite && (
+                          {canManageExams && (
                             <div className="examinations-actions">
-                              <Button
+                              {schedule.marksReviewStatus === 'submitted' && !selectedExam.resultsPublishedAt && (
+                                <>
+                                  <Button type="button" variant="secondary" onClick={() => { setClassId(schedule.classId); setSectionId(schedule.sectionId); setSubjectId(schedule.subjectId); setScheduleId(schedule.id); setTab('Marks entry sheet'); }}>Review</Button>
+                                  <Button type="button" variant="quiet" disabled={requestMarksChanges.isPending} onClick={() => { void requestMarksChanges.mutateAsync(schedule.id).catch((error: unknown) => setFormError(apiMessage(error))); }}>Request changes</Button>
+                                </>
+                              )}
+<Button
                                 type="button"
                                 variant="secondary"
                                 onClick={() => setScheduleForEdit(schedule)}
@@ -1125,16 +1190,21 @@ export function ExaminationDashboard() {
                 <div>
                   <h2>Marks entry</h2>
                   <p>
-                    Enter values out of {selectedSchedule.totalMarks}. Mark
-                    absent students separately.
+                    Enter marks out of {selectedSchedule.totalMarks}.
                   </p>
+                  {selectedSchedule.marksReviewStatus === 'submitted' && (
+                    <p role="status">Submitted � awaiting review</p>
+                  )}
+                  {selectedSchedule.marksReviewStatus === 'changes_requested' && (
+                    <p role="status">Changes requested � update and resubmit</p>
+                  )}
                 </div>
                 {canWrite && (
                   <Button
                     type="button"
                     onClick={() => void submitMarkSheet()}
                     disabled={
-                      saveMarks.isPending ||
+                      saveMarks.isPending || submitMarksForReview.isPending || (access.data?.role === 'teacher' && selectedSchedule.marksReviewStatus === 'submitted') ||
                       markSheet.data.items.some(
                         (student) =>
                           !marksByStudent[student.id]?.absent &&
@@ -1173,7 +1243,7 @@ export function ExaminationDashboard() {
                           max={selectedSchedule.totalMarks}
                           step="0.01"
                           value={current.marks}
-                          disabled={!canWrite || current.absent}
+                          disabled={!canWrite || current.absent || (access.data?.role === 'teacher' && selectedSchedule.marksReviewStatus === 'submitted')}
                           onChange={(event) =>
                             setMarksByStudent((previous) => ({
                               ...previous,
@@ -1189,7 +1259,7 @@ export function ExaminationDashboard() {
                         <input
                           type="checkbox"
                           checked={current.absent}
-                          disabled={!canWrite}
+                          disabled={!canWrite || (access.data?.role === 'teacher' && selectedSchedule.marksReviewStatus === 'submitted')}
                           onChange={(event) =>
                             setMarksByStudent((previous) => ({
                               ...previous,
@@ -1209,7 +1279,7 @@ export function ExaminationDashboard() {
                           aria-label={`Remarks for ${studentName(student)}`}
                           maxLength={500}
                           value={current.remarks}
-                          disabled={!canWrite}
+                          disabled={!canWrite || (access.data?.role === 'teacher' && selectedSchedule.marksReviewStatus === 'submitted')}
                           onChange={(event) =>
                             setMarksByStudent((previous) => ({
                               ...previous,

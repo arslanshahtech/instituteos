@@ -19,6 +19,7 @@ import {
   StudentSectionPlacementModel,
 } from '../attendance/attendance.model.js';
 import { StudentInvoiceModel } from '../finance/finance.model.js';
+import { HomeworkTestModel } from '../homework/homework.model.js';
 import {
   ExamMarkModel,
   ExamModel,
@@ -26,6 +27,7 @@ import {
 } from '../examinations/examinations.model.js';
 import {
   GuardianModel,
+  StaffMemberModel,
   StudentGuardianLinkModel,
   StudentModel,
 } from '../people/people.model.js';
@@ -250,6 +252,28 @@ async function publishedExamResultsForStudent(
   });
 }
 
+export async function publishedHomeworkForPlacement(
+  organizationId: string,
+  placement: {
+    campusId: unknown;
+    academicYearId: unknown;
+    classId: unknown;
+    sectionId: unknown;
+  },
+) {
+  return HomeworkTestModel.find({
+    organizationId: oid(organizationId),
+    campusId: placement.campusId,
+    academicYearId: placement.academicYearId,
+    classId: placement.classId,
+    sectionId: placement.sectionId,
+    status: 'published',
+  })
+    .sort({ dueDate: 1, createdAt: -1 })
+    .limit(100)
+    .lean();
+}
+
 async function studentPortalRecord(organizationId: string, studentId: string) {
   const organizationObjectId = oid(organizationId);
   const studentObjectId = oid(studentId);
@@ -288,6 +312,35 @@ async function studentPortalRecord(organizationId: string, studentId: string) {
   })
     .sort({ createdAt: -1 })
     .lean();
+
+  const homeworkRecords = placement
+    ? await publishedHomeworkForPlacement(organizationId, placement)
+    : [];
+  const homeworkSubjects = await SubjectModel.find({
+    organizationId: organizationObjectId,
+    _id: { $in: homeworkRecords.map((record) => record.subjectId) },
+  })
+    .select({ name: 1 })
+    .lean();
+  const homeworkSubjectNames = new Map(
+    homeworkSubjects.map((subject) => [
+      String(subject._id),
+      String(subject.name),
+    ]),
+  );
+  const homeworkTeachers = await StaffMemberModel.find({
+    organizationId: organizationObjectId,
+    userId: { $in: homeworkRecords.map((record) => record.createdBy) },
+  })
+    .select({ userId: 1, firstName: 1, lastName: 1 })
+    .lean();
+  const homeworkTeacherNames = new Map(
+    homeworkTeachers.map((teacher) => [
+      String(teacher.userId),
+      [teacher.firstName, teacher.lastName].filter(Boolean).join(' ') ||
+        'Teacher',
+    ]),
+  );
 
   const [campus, academicClass, section] = placement
     ? await Promise.all([
@@ -382,6 +435,20 @@ async function studentPortalRecord(organizationId: string, studentId: string) {
     },
     results: publishedResults,
     resultsAvailable: publishedResults.length > 0,
+    homework: homeworkRecords.map((record) => ({
+      id: String(record._id),
+      title: String(record.title),
+      instructions: String(record.instructions ?? ''),
+      type: String(record.type),
+      dueDate: dateOnly(record.dueDate),
+      totalMarks:
+        record.totalMarks === undefined ? null : numeric(record.totalMarks),
+      subjectName:
+        homeworkSubjectNames.get(String(record.subjectId)) ?? 'Subject',
+      teacherName:
+        homeworkTeacherNames.get(String(record.createdBy)) ??
+        'School administration',
+    })),
   };
 }
 

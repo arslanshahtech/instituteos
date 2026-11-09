@@ -172,3 +172,9 @@
     transition: none;
   }
 }
+
+.academic-sections-metric-capacity .reference-metric-icon {
+  border-color: #a5f3fc;
+  background: #ecfeff;
+  color: #0891b2;
+}

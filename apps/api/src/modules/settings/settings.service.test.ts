@@ -27,6 +27,7 @@ function settingsRecord(
       smsAlerts: false,
       autoAttendanceAlerts: false,
     },
+    staffSetup: { departments: [], designations: [], employmentTypes: [], workShifts: [], qualifications: [], documentTypes: [] },
     teacherSelfAttendance: {
       viewOwnAttendance: true,
       selfMarkingEnabled: false,
@@ -62,6 +63,7 @@ function repository(overrides: Partial<SettingsRepository> = {}) {
               ...current.teacherSelfAttendance,
               ...input.teacherSelfAttendance,
             },
+            staffSetup: { ...current.staffSetup, ...input.staffSetup },
           };
         },
       ),
@@ -141,6 +143,19 @@ describe('SettingsService', () => {
       organizationId,
       userId,
     );
+  });
+
+
+  it('persists organization-specific staff setup lists', async () => {
+    const repo = repository();
+    const service = new SettingsService(repo, () => new Date('2026-01-01T00:00:00.000Z'));
+    const staffSetup = {
+      departments: [{ id: 'dept-1', name: 'Academics', isActive: true }],
+      designations: [], employmentTypes: [], workShifts: [], qualifications: [], documentTypes: [],
+    };
+    await service.updateSettings(organizationId, { staffSetup }, { userId, role: 'organization_owner' });
+    expect(repo.updateSettings).toHaveBeenCalledWith(organizationId, { staffSetup });
+    expect(repo.createSettingsAuditLog).toHaveBeenCalledWith(organizationId, userId);
   });
 
   it('rejects an empty or unsupported self-attendance status list', async () => {

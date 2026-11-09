@@ -356,3 +356,45 @@
     margin-left: 0;
   }
 }
+
+.academic-session-create-page {
+  gap: 20px;
+}
+.academic-session-create-page .page-heading {
+  margin-bottom: 0;
+}
+.academic-session-create-card {
+  width: 100%;
+  border: 1px solid #e5e2dc;
+  border-radius: 9px;
+  background: #fff;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 8%);
+}
+.academic-session-create-card > header {
+  margin-bottom: 22px;
+}
+.academic-session-create-card > header h2 {
+  margin: 0;
+  color: #25231f;
+  font-size: 16px;
+  font-weight: 650;
+}
+.academic-session-create-card > header p {
+  margin: 6px 0 0;
+  color: #77736d;
+  font-size: 12px;
+}
+.academic-session-create-card .student-form-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.academic-session-create-card .button-row {
+  justify-content: flex-end;
+  margin-top: 22px;
+}
+@media (max-width: 620px) {
+  .academic-session-create-card {
+    padding: 16px;
+  }
+}

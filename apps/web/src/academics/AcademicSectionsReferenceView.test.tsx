@@ -108,6 +108,9 @@ describe('AcademicSectionsReferenceView', () => {
     expect(screen.getByText('0 / 25')).toBeTruthy();
     expect(screen.queryByText('AVG / SECTION')).toBeNull();
     expect(screen.queryByText('10.0')).toBeNull();
+    expect(screen.getByText('Seat Capacity')).toBeTruthy();
+    expect(screen.getByText('45')).toBeTruthy();
+    expect(screen.getByText('Configured across all sections')).toBeTruthy();
   });
 
   it('filters by class and search, and wires create/edit/delete actions', () => {

@@ -104,7 +104,7 @@ const demoStudents = [
   },
 ];
 
-const demoGuardians = [
+const demoFamilyContacts = [
   {
     name: 'Rajesh Sharma',
     phone: '+92 98101 22334',
@@ -227,7 +227,7 @@ const initialConcessions = [
 
 const moduleTitles: Record<string, string> = {
   students: 'Students',
-  guardians: 'Guardians',
+  guardians: 'Family contacts',
   staff: 'Teachers / Staff',
   attendance: 'Attendance',
   homework: 'Homework & Tests',
@@ -409,7 +409,7 @@ export function RoleDemoModulePage() {
                   <dd>{selectedDemoStudent.roll}</dd>
                 </div>
                 <div>
-                  <dt>Guardian</dt>
+                  <dt>Family contact</dt>
                   <dd>{selectedDemoStudent.guardian}</dd>
                 </div>
                 <div>
@@ -472,7 +472,7 @@ export function RoleDemoModulePage() {
       {module === 'guardians' && (
         <WorkspaceModuleSection>
           <WorkspaceModuleToolbar>
-            <p>Guardians · 298</p>
+            <p>Family contacts · 298</p>
             <span className="reference-scope-note">
               Visible to authorized college staff
             </span>
@@ -501,7 +501,7 @@ export function RoleDemoModulePage() {
               },
             ]}
             rowKey={(guardian) => guardian.name}
-            rows={demoGuardians}
+            rows={demoFamilyContacts}
           />
         </WorkspaceModuleSection>
       )}
@@ -735,8 +735,8 @@ export function RoleDemoModulePage() {
               </select>
             </div>
             <input
-              aria-label="Guardian name and phone"
-              placeholder="Guardian Name & Phone"
+              aria-label="Family contact name and phone"
+              placeholder="Family contact Name & Phone"
               required
             />
             <select aria-label="Fee plan" defaultValue="Standard">

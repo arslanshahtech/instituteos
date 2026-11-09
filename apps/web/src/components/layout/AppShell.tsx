@@ -10,6 +10,7 @@ import {
   BookOpenText,
   ClipboardCheck,
   ClipboardList,
+  CalendarDays,
   GraduationCap,
   LayoutDashboard,
   Menu,
@@ -117,9 +118,19 @@ function getNavigationItems(
     if (role.key === 'admin') {
       items.push(
         { label: 'Students', to: base + '/students', icon: Users },
-        { label: 'Guardians', to: base + '/guardians', icon: UserCheck },
-        { label: 'Teachers / Staff', to: base + '/staff', icon: GraduationCap },
-        { label: 'Attendance', to: base + '/attendance', icon: ClipboardCheck },
+        { label: 'Families', to: base + '/families', icon: UserCheck },
+        { label: 'Staff', to: base + '/staff', icon: GraduationCap },
+        {
+        label: 'Attendance',
+        to: base + '/attendance',
+        icon: ClipboardCheck,
+        children: [
+          { label: 'Classes', to: base + '/attendance', icon: GraduationCap, end: true },
+          { label: 'Students', to: base + '/attendance?tab=students', icon: Users },
+          { label: 'Staff', to: base + '/attendance?tab=staff', icon: UserCheck },
+          { label: 'Attendance Settings', to: base + '/attendance?tab=settings', icon: Settings2 },
+        ],
+      },
         {
           label: 'Homework & Tests',
           to: base + '/homework',
@@ -135,7 +146,17 @@ function getNavigationItems(
     } else if (role.key === 'teacher') {
       items.push(
         { label: 'Students', to: base + '/students', icon: Users },
-        { label: 'Attendance', to: base + '/attendance', icon: ClipboardCheck },
+        {
+        label: 'Attendance',
+        to: base + '/attendance',
+        icon: ClipboardCheck,
+        children: [
+          { label: 'Classes', to: base + '/attendance', icon: GraduationCap, end: true },
+          { label: 'Students', to: base + '/attendance?tab=students', icon: Users },
+          { label: 'Staff', to: base + '/attendance?tab=staff', icon: UserCheck },
+          { label: 'Attendance Settings', to: base + '/attendance?tab=settings', icon: Settings2 },
+        ],
+      },
         {
           label: 'Homework & Tests',
           to: base + '/homework',
@@ -186,7 +207,25 @@ function getNavigationItems(
   // Similar-looking demo routes are deliberately confined to referencePreview.
   if (role.key === 'admin') {
     items.push(
+      {
+        label: 'Admission',
+        to: base + '/admissions',
+        icon: UserPlus,
+        children: [
+          {
+            label: 'Enroll Student',
+            to: base + '/admissions/enroll',
+            icon: UserPlus,
+          },
+          {
+            label: 'Promote Students',
+            to: base + '/admissions/promote',
+            icon: GraduationCap,
+          },
+        ],
+      },
       { label: 'Students', to: base + '/students', icon: Users },
+      { label: 'Families', to: base + '/families', icon: UserCheck },
       {
         label: 'Curriculum',
         to: base + '/academics',
@@ -224,9 +263,27 @@ function getNavigationItems(
         icon: ClipboardCheck,
         queryTab: 'timetable',
       },
-      { label: 'Guardians', to: base + '/guardians', icon: UserCheck },
-      { label: 'Teachers / Staff', to: base + '/staff', icon: GraduationCap },
-      { label: 'Attendance', to: base + '/attendance', icon: ClipboardCheck },
+      {
+        label: 'Staff',
+        to: base + '/staff',
+        icon: GraduationCap,
+        children: [
+          { label: 'Add Staff', to: base + '/staff/new', icon: UserPlus },
+          { label: 'All Staff', to: base + '/staff', icon: Users, end: true },
+          { label: 'Staff Setup', to: base + '/staff/setup', icon: Settings2 },
+        ],
+      },
+      {
+        label: 'Attendance',
+        to: base + '/attendance',
+        icon: ClipboardCheck,
+        children: [
+          { label: 'Classes', to: base + '/attendance', icon: GraduationCap, end: true },
+          { label: 'Students', to: base + '/attendance?tab=students', icon: Users },
+          { label: 'Staff', to: base + '/attendance?tab=staff', icon: UserCheck },
+          { label: 'Attendance Settings', to: base + '/attendance?tab=settings', icon: Settings2 },
+        ],
+      },
       {
         label: 'Homework & Tests',
         to: base + '/homework-tests',
@@ -237,7 +294,11 @@ function getNavigationItems(
         to: base + '/examinations',
         icon: ClipboardList,
       },
-      { label: 'Admissions', to: base + '/admissions', icon: UserPlus },
+      {
+        label: 'Events & Holidays',
+        to: base + '/events-holidays',
+        icon: CalendarDays,
+      },
       { label: 'Finance', to: base + '/finance', icon: WalletCards },
       { label: 'Concessions', to: base + '/concessions', icon: ReceiptText },
       { label: 'Messages', to: base + '/communications', icon: Megaphone },
@@ -270,6 +331,7 @@ function getNavigationItems(
     );
   } else if (role.key === 'parent') {
     items.push(
+      { label: 'Homework & Tests', to: base + '/homework', icon: BookOpenText },
       { label: 'Attendance', to: base + '/attendance', icon: ClipboardCheck },
       { label: 'Fees & receipts', to: base + '/fees', icon: WalletCards },
       { label: 'Results', to: base + '/results', icon: ClipboardList },
@@ -304,11 +366,23 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
         .get('tab')
         ?.startsWith('curriculum-') ?? false,
   );
+  const [admissionExpanded, setAdmissionExpanded] = useState(() =>
+    window.location.pathname.includes('/admissions'),
+  );
+  const [staffExpanded, setStaffExpanded] = useState(() =>
+    /\/staff(?:\/|$)/.test(window.location.pathname),
+  );
+  const [attendanceExpanded, setAttendanceExpanded] = useState(() =>
+    /\/attendance(?:\/|$)/.test(window.location.pathname),
+  );
   const navigate = useNavigate();
   const location = useLocation();
   useEffect(() => {
     const activeTab = new URLSearchParams(location.search).get('tab');
     setCurriculumExpanded(activeTab?.startsWith('curriculum-') ?? false);
+    setAdmissionExpanded(location.pathname.includes('/admissions'));
+    setStaffExpanded(/\/staff(?:\/|$)/.test(location.pathname));
+    setAttendanceExpanded(/\/attendance(?:\/|$)/.test(location.pathname));
   }, [location.pathname, location.search]);
   const { organizationId } = useParams();
   const auth = useAuth();
@@ -379,6 +453,7 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
           'Timetable',
           'Homework & Tests',
           'Examinations',
+          'Events & Holidays',
           'Examinations & Marks',
         ].includes(label)
       )
@@ -386,10 +461,11 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
       if (
         [
           'Students',
+          'Families',
           'My classes & students',
-          'Guardians',
-          'Teachers / Staff',
-          'Admissions',
+          'Family contacts',
+          'Staff',
+          'Admission',
           'Your colleges',
         ].includes(label)
       )
@@ -668,7 +744,15 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                       <NavLink
                         key={item.label}
                         aria-expanded={
-                          item.children ? curriculumExpanded : undefined
+                          item.children
+                            ? item.label === 'Admission'
+                              ? admissionExpanded
+                              : item.label === 'Staff'
+                                ? staffExpanded
+                                : item.label === 'Attendance'
+                                  ? attendanceExpanded
+                                  : curriculumExpanded
+                            : undefined
                         }
                         className={({ isActive }) => {
                           const activeTab = new URLSearchParams(
@@ -680,8 +764,10 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                               ? activeTab === item.queryTab
                               : !activeTab;
                           const pathMatches = item.children
-                            ? location.pathname ===
-                              new URL(item.to, window.location.origin).pathname
+                            ? location.pathname.startsWith(
+                                new URL(item.to, window.location.origin)
+                                  .pathname,
+                              )
                             : item.queryTab
                               ? true
                               : isActive;
@@ -692,7 +778,17 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                           item.children
                             ? (event) => {
                                 event.preventDefault();
-                                setCurriculumExpanded((expanded) => !expanded);
+                                if (item.label === 'Admission') {
+                                  setAdmissionExpanded((expanded) => !expanded);
+                                } else if (item.label === 'Staff') {
+                                  setStaffExpanded((expanded) => !expanded);
+                                } else if (item.label === 'Attendance') {
+                                  setAttendanceExpanded((expanded) => !expanded);
+                                } else {
+                                  setCurriculumExpanded(
+                                    (expanded) => !expanded,
+                                  );
+                                }
                               }
                             : closeMobileNav
                         }
@@ -711,7 +807,13 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                       </NavLink>
                     </div>
                     {item.children &&
-                      curriculumExpanded &&
+                      (item.label === 'Admission'
+                        ? admissionExpanded
+                        : item.label === 'Staff'
+                          ? staffExpanded
+                          : item.label === 'Attendance'
+                            ? attendanceExpanded
+                            : curriculumExpanded) &&
                       item.children.map((child) => {
                         const ChildIcon = child.icon;
                         return (
@@ -721,10 +823,16 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                               const activeTab = new URLSearchParams(
                                 location.search,
                               ).get('tab');
-                              return `navigation-link navigation-sublink${isActive && activeTab === child.queryTab ? ' navigation-sublink-active' : ''}`;
+                              return `navigation-link navigation-sublink${isActive && (!child.queryTab || activeTab === child.queryTab) ? ' navigation-sublink-active' : ''}`;
                             }}
                             onClick={() => {
-                              setCurriculumExpanded(true);
+                              if (item.label === 'Admission')
+                                setAdmissionExpanded(true);
+                              else if (item.label === 'Staff')
+                                setStaffExpanded(true);
+                              else if (item.label === 'Attendance')
+                                setAttendanceExpanded(true);
+                              else setCurriculumExpanded(true);
                               closeMobileNav();
                             }}
                             title={sidebarCollapsed ? child.label : undefined}

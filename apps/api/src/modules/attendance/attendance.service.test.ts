@@ -23,6 +23,7 @@ const context: AttendanceContext = {
 function repository(overrides: Partial<AttendanceRepository> = {}) {
   return {
     listTeacherAssignmentsForUser: vi.fn().mockResolvedValue([]),
+    getAttendanceSettings: vi.fn().mockResolvedValue(null),
     getTeacherSelfAttendanceConfig: vi.fn().mockResolvedValue({
       viewOwnAttendance: true,
       selfMarkingEnabled: false,
@@ -99,6 +100,72 @@ describe('AttendanceService', () => {
         campusId,
       },
     );
+  });
+
+  it('blocks non-admin attendance submissions after the configured cutoff', async () => {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Karachi',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
+        .formatToParts(new Date())
+        .map((part) => [part.type, part.value]),
+    );
+    const today =
+      String(parts.year) + '-' + String(parts.month) + '-' + String(parts.day);
+    const repo = repository({
+      getAttendanceSettings: vi.fn().mockResolvedValue({
+        timezone: 'Asia/Karachi',
+        markingCutoffTime: '00:00',
+        autoMarkUnmarkedAbsent: false,
+        allowAdminOverride: false,
+      }),
+    });
+    const service = new AttendanceService(repo);
+
+    await expect(
+      service.saveStudentAttendance(context, {
+        ...baseBulkInput,
+        date: today,
+      }),
+    ).rejects.toMatchObject({ code: 'ATTENDANCE_CUTOFF_PASSED' });
+    expect(repo.listStudentRoster).not.toHaveBeenCalled();
+    expect(repo.saveStudentAttendance).not.toHaveBeenCalled();
+  });
+
+  it('allows an organization admin to correct attendance after cutoff when override is enabled', async () => {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Karachi',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
+        .formatToParts(new Date())
+        .map((part) => [part.type, part.value]),
+    );
+    const today =
+      String(parts.year) + '-' + String(parts.month) + '-' + String(parts.day);
+    const repo = repository({
+      getAttendanceSettings: vi.fn().mockResolvedValue({
+        timezone: 'Asia/Karachi',
+        markingCutoffTime: '00:00',
+        autoMarkUnmarkedAbsent: false,
+        allowAdminOverride: true,
+      }),
+    });
+    const service = new AttendanceService(repo);
+
+    await service.saveStudentAttendance(
+      { ...context, role: 'organization_admin' },
+      {
+        ...baseBulkInput,
+        date: today,
+      },
+    );
+    expect(repo.saveStudentAttendance).toHaveBeenCalledOnce();
   });
 
   it('accepts Leave as a valid student attendance status', async () => {

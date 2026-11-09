@@ -1,11 +1,7 @@
 import mongoose, { Schema } from 'mongoose';
 
 export const HOMEWORK_TEST_TYPES = ['homework', 'test'] as const;
-export const HOMEWORK_TEST_STATUSES = [
-  'draft',
-  'published',
-  'archived',
-] as const;
+export const HOMEWORK_TEST_STATUSES = ['draft', 'published'] as const;
 
 const homeworkTestSchema = new Schema(
   {
@@ -39,7 +35,7 @@ const homeworkTestSchema = new Schema(
     status: {
       type: String,
       enum: HOMEWORK_TEST_STATUSES,
-      default: 'published',
+      default: 'draft',
       required: true,
     },
     createdBy: { type: Schema.Types.ObjectId, ref: 'AuthUser', required: true },

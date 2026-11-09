@@ -411,6 +411,8 @@ export class PeopleService {
       search?: string;
       status?: StudentStatus;
       campusIds?: string[];
+      classId?: string;
+      sectionId?: string;
       page?: number;
       pageSize?: number;
     },
@@ -431,6 +433,8 @@ export class PeopleService {
       campusIds,
       search: input.search,
       status: input.status,
+      classId: input.classId,
+      sectionId: input.sectionId,
       page: input.page,
       pageSize: input.pageSize,
     });
@@ -968,6 +972,7 @@ export class PeopleService {
     input?: {
       status?: string;
       department?: string;
+      staffType?: 'teacher' | 'other_staff';
       campusId?: string;
       search?: string;
       campusIds?: string[];

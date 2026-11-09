@@ -4362,12 +4362,12 @@
   padding: 12px;
 }
 
-.reference-guardian-grid {
+.reference-family-contact-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 245px), 1fr));
   gap: 12px;
 }
-.reference-guardian-card {
+.reference-family-contact-card {
   display: grid;
   min-width: 0;
   align-content: start;
@@ -4382,17 +4382,17 @@
     border-color 120ms ease,
     background-color 120ms ease;
 }
-.reference-guardian-card:hover {
+.reference-family-contact-card:hover {
   border-color: #c9c6bf;
   background: #fcfbf9;
 }
-.reference-guardian-card-top {
+.reference-family-contact-card-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
-.reference-guardian-count {
+.reference-family-contact-count {
   border: 1px solid #e9e7e3;
   border-radius: 999px;
   background: #faf9f7;
@@ -4400,21 +4400,21 @@
   color: #5f5b54;
   font-size: 10px;
 }
-.reference-guardian-card > strong {
+.reference-family-contact-card > strong {
   overflow-wrap: anywhere;
   font-size: 14px;
   font-weight: 650;
 }
-.reference-guardian-phone {
+.reference-family-contact-phone {
   color: #3e3b36;
   font-size: 12px;
 }
-.reference-guardian-relation {
+.reference-family-contact-relation {
   color: #85817b;
   font-size: 11px;
   text-transform: capitalize;
 }
-.reference-guardian-children {
+.reference-family-contact-children {
   display: grid;
   gap: 5px;
   border-top: 1px solid #efede9;
@@ -4424,7 +4424,7 @@
   font-size: 11px;
   line-height: 1.5;
 }
-.reference-guardian-children small {
+.reference-family-contact-children small {
   color: #85817b;
   font-size: 9px;
   font-weight: 650;
@@ -5034,6 +5034,14 @@
   flex-wrap: wrap;
   gap: 5px;
   border: 0;
+}
+
+.examinations-page .academics-tab::after,
+.examinations-page .academics-tab:hover::after,
+.examinations-page .academics-tab-active::after {
+  display: none;
+  content: none;
+  transform: none;
 }
 
 .examinations-page .academics-tab {

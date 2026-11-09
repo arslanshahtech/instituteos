@@ -1,0 +1,216 @@
+.attendance-settings-page {
+  display: grid;
+  gap: 22px;
+  padding: 4px 0 28px;
+}
+
+.attendance-settings-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.attendance-settings-eyebrow {
+  color: var(--text-muted, #64748b);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.attendance-settings-heading h2 {
+  margin: 6px 0;
+  color: var(--text-primary, #172033);
+  font-size: 24px;
+}
+
+.attendance-settings-heading p,
+.attendance-settings-card-title p,
+.attendance-settings-days p {
+  margin: 5px 0 0;
+  color: var(--text-muted, #64748b);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.attendance-settings-scope {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 999px;
+  color: var(--text-muted, #64748b);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.attendance-settings-page form {
+  display: grid;
+  gap: 20px;
+}
+
+.attendance-settings-card {
+  display: grid;
+  gap: 20px;
+  padding: 24px;
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 16px;
+  background: var(--surface, #fff);
+}
+
+.attendance-settings-card-title h3 {
+  margin: 0;
+  color: var(--text-primary, #172033);
+  font-size: 16px;
+}
+
+.attendance-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 22px;
+}
+
+.attendance-settings-field {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  color: var(--text-primary, #172033);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.attendance-settings-field input,
+.attendance-settings-field select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle, #cbd5e1);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  color: inherit;
+  font: inherit;
+}
+
+.attendance-settings-field input:focus,
+.attendance-settings-field select:focus {
+  outline: 2px solid var(--color-primary, #0f766e);
+  outline-offset: 2px;
+}
+
+.attendance-settings-field small,
+.attendance-settings-toggle small {
+  color: var(--text-muted, #64748b);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.attendance-settings-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border-subtle, #e2e8f0);
+}
+
+.attendance-settings-toggle span {
+  display: grid;
+  gap: 6px;
+}
+
+.attendance-settings-toggle strong,
+.attendance-settings-days strong {
+  color: var(--text-primary, #172033);
+  font-size: 13px;
+}
+
+.attendance-settings-toggle input,
+.attendance-settings-day-options input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primary, #0f766e);
+  cursor: pointer;
+}
+
+.attendance-settings-days {
+  display: grid;
+  gap: 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-subtle, #e2e8f0);
+}
+
+.attendance-settings-day-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.attendance-settings-day-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle, #e2e8f0);
+  border-radius: 10px;
+  color: var(--text-primary, #172033);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.attendance-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.attendance-settings-state {
+  padding: 24px;
+  color: var(--text-muted, #64748b);
+}
+
+.attendance-settings-error {
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 700px) {
+  .attendance-settings-page {
+    gap: 18px;
+  }
+
+  .attendance-settings-heading {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .attendance-settings-card {
+    gap: 18px;
+    padding: 18px;
+  }
+
+  .attendance-settings-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .attendance-settings-toggle {
+    gap: 16px;
+  }
+
+  .attendance-settings-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .attendance-settings-actions button {
+    width: 100%;
+  }
+}

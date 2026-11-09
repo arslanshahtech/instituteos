@@ -37,6 +37,16 @@ const notificationsSchema = new Schema(
   { _id: false },
 );
 
+const staffSetupItemSchema = new Schema(
+  { id: { type: String, required: true, trim: true, maxlength: 80 }, name: { type: String, required: true, trim: true, maxlength: 120 }, isActive: { type: Boolean, default: true } },
+  { _id: false },
+);
+
+const staffSetupSchema = new Schema(
+  { departments: { type: [staffSetupItemSchema], default: [] }, designations: { type: [staffSetupItemSchema], default: [] }, employmentTypes: { type: [staffSetupItemSchema], default: [] }, workShifts: { type: [staffSetupItemSchema], default: [] }, qualifications: { type: [staffSetupItemSchema], default: [] }, documentTypes: { type: [staffSetupItemSchema], default: [] } },
+  { _id: false },
+);
+
 const teacherSelfAttendanceSchema = new Schema(
   {
     viewOwnAttendance: { type: Boolean, default: true },
@@ -67,6 +77,7 @@ export const organizationSettingsSchema = new Schema(
       type: teacherSelfAttendanceSchema,
       default: () => ({}),
     },
+    staffSetup: { type: staffSetupSchema, default: () => ({}) },
   },
   { timestamps: true, versionKey: false },
 );

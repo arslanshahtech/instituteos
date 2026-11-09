@@ -15,6 +15,8 @@ export function useStudents(
   input: {
     search: string;
     status?: StudentStatus;
+    classId?: string;
+    sectionId?: string;
     page: number;
     pageSize: number;
   },

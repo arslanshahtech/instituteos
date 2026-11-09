@@ -329,14 +329,14 @@ export function ApplicationForm({
         />
         <FormField
           error={form.formState.errors.guardianName?.message}
-          label="Guardian name"
+          label="Family contact name"
           maxLength={160}
           {...form.register('guardianName')}
         />
         <FormField
           autoComplete="tel"
           error={form.formState.errors.guardianPhone?.message}
-          label="Guardian phone"
+          label="Family contact phone"
           maxLength={40}
           type="tel"
           {...form.register('guardianPhone')}

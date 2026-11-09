@@ -1,7 +1,7 @@
 import { apiRequest } from '../api/client.js';
 
 export type HomeworkTestType = 'homework' | 'test';
-export type HomeworkTestStatus = 'draft' | 'published' | 'archived';
+export type HomeworkTestStatus = 'draft' | 'published';
 
 export interface HomeworkTestRecord {
   id: string;
@@ -18,6 +18,7 @@ export interface HomeworkTestRecord {
   totalMarks?: number;
   status: HomeworkTestStatus;
   createdBy: string;
+  createdByName?: string;
   createdAt: string;
   updatedAt: string;
   campusName: string;
@@ -55,14 +56,14 @@ export function createHomeworkTest(orgId: string, input: HomeworkTestInput) {
   });
 }
 
-export function updateHomeworkTestStatus(
+export function updateHomeworkTest(
   orgId: string,
   id: string,
-  status: HomeworkTestStatus,
+  input: Partial<HomeworkTestInput>,
 ) {
-  return apiRequest<{ id: string; status: HomeworkTestStatus }>(
-    `${path(orgId)}/${encodeURIComponent(id)}/status`,
-    { method: 'PATCH', body: JSON.stringify({ status }) },
+  return apiRequest<{ item: HomeworkTestRecord }>(
+    path(orgId) + '/' + encodeURIComponent(id),
+    { method: 'PATCH', body: JSON.stringify(input) },
   );
 }
 
