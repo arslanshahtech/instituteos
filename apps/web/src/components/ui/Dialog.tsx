@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { Button } from './Button.js';
 
@@ -7,6 +8,8 @@ interface DialogProps {
   open: boolean;
   title: string;
   description?: string;
+  className?: string;
+  portal?: boolean;
   onOpenChange: (open: boolean) => void;
   children: ReactNode;
 }
@@ -15,6 +18,8 @@ export function Dialog({
   open,
   title,
   description,
+  className,
+  portal = false,
   onOpenChange,
   children,
 }: DialogProps) {
@@ -30,10 +35,10 @@ export function Dialog({
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
-  return (
+  const dialogElement = (
     <dialog
       ref={dialogRef}
-      className="dialog"
+      className={['dialog', className].filter(Boolean).join(' ')}
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
       onCancel={(event) => {
@@ -59,4 +64,6 @@ export function Dialog({
       <div className="dialog-body">{children}</div>
     </dialog>
   );
+
+  return portal ? createPortal(dialogElement, document.body) : dialogElement;
 }

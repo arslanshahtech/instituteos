@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { ReactNode } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowUpRight,
@@ -56,6 +56,10 @@ import {
 import { getOrganizationDashboard } from '../organizations/organizations-api.js';
 import { StudentFeeLedgerModal } from './StudentFeeLedgerModal.js';
 import { StudentConcessionModal } from './StudentConcessionModal.js';
+import {
+  printFeeChallan,
+  printMinimalPaymentReceipt,
+} from './finance-documents.js';
 
 const tabs = [
   'All',
@@ -67,7 +71,33 @@ const tabs = [
   'Concessions',
 ] as const;
 type WorkspaceTab = (typeof tabs)[number];
-type Tab = WorkspaceTab | 'Create invoices' | 'Fee setup';
+type Tab = WorkspaceTab | 'Create invoices' | 'Fee setup' | 'Payroll';
+
+function financeTabFromSearch(search: string): Tab {
+  const routeTab = new URLSearchParams(search).get('tab');
+  switch (routeTab) {
+    case 'fees':
+      return 'Fee Structures';
+    case 'fee-setup':
+      return 'Fee setup';
+    case 'create-invoices':
+      return 'Create invoices';
+    case 'concessions':
+      return 'Concessions';
+    case 'receivables':
+      return 'Invoices';
+    case 'payments':
+      return 'Payments';
+    case 'expenses':
+    case 'payroll':
+      return 'Expenses';
+    case 'accounts':
+      return 'Ledger';
+    case 'overview':
+    default:
+      return 'All';
+  }
+}
 
 const expenseCategories: { value: ExpenseCategory; label: string }[] = [
   { value: 'salaries', label: 'Salaries' },
@@ -304,140 +334,39 @@ function initialFeeHeads(): FeeHeadDraft[] {
 function handlePrintReceipt(
   invoice: StudentInvoice,
   classNameText: string,
-  payment?: {
+  payment: {
     receiptNumber: string;
     amountPaid: number;
     paymentMethod: PaymentMethod;
     paymentDate: string;
+    transactionReference?: string;
   },
   orgName?: string,
+  campusLabelText = '—',
 ) {
-  const remaining = Math.max(0, invoice.totalAmount - invoice.paidAmount);
-
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <title>${payment ? 'Payment Receipt' : 'Fee Statement'} - ${invoice.invoiceNumber}</title>
-      <style>
-        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { padding: 30px; margin: 0; background: #ffffff; color: #0f172a; }
-        .receipt-card { border: 1px solid #cbd5e1; border-radius: 12px; padding: 28px; max-width: 520px; margin: 0 auto; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12); }
-        @media print {
-          body { padding: 0; }
-          .receipt-card { max-width: 100%; border: 1px solid #0f172a; border-radius: 0; box-shadow: none; }
-        }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px; }
-        .header h2 { margin: 0; font-size: 20px; color: #0f172a; }
-        .badge { padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
-        .badge.paid { background: #dcfce7; color: #166534; }
-        .badge.partial { background: #fef3c7; color: #854d0e; }
-        .badge.unpaid { background: #fee2e2; color: #991b1b; }
-        .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; margin-bottom: 20px; }
-        .meta-grid div strong { color: #64748b; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
-        td { padding: 10px 0; }
-        .row-total { border-top: 1px solid #e2e8f0; }
-        .row-paid { color: #15803d; }
-        .row-balance { border-top: 2px dashed #94a3b8; font-size: 16px; font-weight: bold; color: #b91c1c; }
-        .text-right { text-align: right; }
-        .footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #64748b; }
-      </style>
-    </head>
-    <body>
-      <div class="receipt-card">
-        <div class="header">
-          <h2>${orgName ?? 'InstituteOS'} ${payment ? 'Payment Receipt' : 'Fee Statement'}</h2>
-          <span class="badge ${invoice.status}">${invoice.status}</span>
-        </div>
-        <div class="meta-grid">
-          <div><strong>Invoice:</strong> ${invoice.invoiceNumber}</div>
-          ${payment ? `<div><strong>Receipt:</strong> ${payment.receiptNumber}</div><div><strong>Payment date:</strong> ${new Date(payment.paymentDate).toLocaleDateString()}</div><div><strong>Method:</strong> ${payment.paymentMethod.replace('_', ' ')}</div>` : ''}
-          <div><strong>Student:</strong> ${invoice.studentName}</div>
-          <div><strong>Class:</strong> ${classNameText}</div>
-          <div><strong>Billing Cycle:</strong> ${invoice.billingCycle}</div>
-          <div><strong>Due Date:</strong> ${new Date(invoice.dueDate).toLocaleDateString()}</div>
-        </div>
-        <table>
-          ${
-            invoice.discountAmount && invoice.discountAmount > 0
-              ? `
-          <tr class="row-total">
-            <td>Current Fee:</td>
-            <td class="text-right">Rs. ${Number(invoice.currentAmount ?? invoice.totalAmount).toFixed(2)}</td>
-          </tr>
-          <tr style="color: #16a34a;">
-            <td>Concession (${invoice.discountReason || 'Discount'}):</td>
-            <td class="text-right"><strong>- Rs. ${Number(invoice.discountAmount).toFixed(2)}</strong></td>
-          </tr>`
-              : ''
-          }
-          ${
-            invoice.arrearsAmount && invoice.arrearsAmount > 0
-              ? `
-          <tr style="color: #d97706;">
-            <td>Previous Arrears:</td>
-            <td class="text-right">+ Rs. ${Number(invoice.arrearsAmount).toFixed(2)}</td>
-          </tr>`
-              : ''
-          }
-          <tr class="row-total">
-            <td>Net Total Payable:</td>
-            <td class="text-right"><strong>Rs. ${Number(invoice.totalAmount).toFixed(2)}</strong></td>
-          </tr>
-          ${payment ? `<tr class="row-paid"><td>This payment (${payment.receiptNumber}):</td><td class="text-right"><strong>Rs. ${payment.amountPaid.toFixed(2)}</strong></td></tr>` : ''}
-          <tr class="row-paid">
-            <td>Total Paid Amount:</td>
-            <td class="text-right"><strong>Rs. ${Number(invoice.paidAmount).toFixed(2)}</strong></td>
-          </tr>
-          <tr class="row-balance">
-            <td>Remaining Balance (Baqaya):</td>
-            <td class="text-right">Rs. ${remaining.toFixed(2)}</td>
-          </tr>
-        </table>
-        <div class="footer">
-          Computer generated official fee receipt. Valid without signature.
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
-
-  const iframe = document.createElement('iframe');
-  iframe.style.position = 'fixed';
-  iframe.style.right = '0';
-  iframe.style.bottom = '0';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
-  iframe.style.border = '0';
-  document.body.appendChild(iframe);
-
-  const doc = iframe.contentWindow?.document;
-  if (!doc) {
-    document.body.removeChild(iframe);
-    return;
-  }
-
-  doc.open();
-  doc.write(htmlContent);
-  doc.close();
-
-  iframe.contentWindow?.focus();
-  setTimeout(() => {
-    iframe.contentWindow?.print();
-    setTimeout(() => {
-      document.body.removeChild(iframe);
-    }, 1000);
-  }, 250);
+  printMinimalPaymentReceipt(
+    invoice,
+    classNameText,
+    campusLabelText,
+    orgName ?? 'InstituteOS',
+    payment,
+  );
 }
 
 export function FinanceDashboard() {
   const { organizationId = '' } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const roleBase = location.pathname.startsWith('/accountant')
     ? '/accountant'
     : '/admin';
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('tab') === 'payroll') {
+      navigate(location.pathname.replace('/finance', '/payroll'), {
+        replace: true,
+      });
+    }
+  }, [location.pathname, location.search, navigate]);
   const access = useOrganizationAccess(organizationId);
   const canRead = access.data?.permissions.includes('finance.read') ?? false;
   const canWrite = access.data?.permissions.includes('finance.write') ?? false;
@@ -454,12 +383,49 @@ export function FinanceDashboard() {
     enabled: Boolean(organizationId),
     retry: false,
   });
-  const organizationName =
-    organizationProfile.data?.organization.name ?? null;
-  const [tab, setTab] = useState<Tab>('All');
+  const organizationName = organizationProfile.data?.organization.name ?? null;
+  const [tab, setTabState] = useState<Tab>(() =>
+    financeTabFromSearch(location.search),
+  );
+  const setTab = (nextTab: Tab) => {
+    setTabState(nextTab);
+    const params = new URLSearchParams(location.search);
+    const routeTab =
+      nextTab === 'Fee Structures'
+        ? 'fees'
+        : nextTab === 'Fee setup'
+          ? 'fee-setup'
+          : nextTab === 'Create invoices'
+            ? 'create-invoices'
+            : nextTab === 'Concessions'
+              ? 'concessions'
+              : nextTab === 'Invoices'
+                ? 'receivables'
+                : nextTab === 'Payments'
+                  ? 'payments'
+                  : nextTab === 'Expenses'
+                    ? 'expenses'
+                    : nextTab === 'Ledger'
+                      ? 'accounts'
+                      : 'overview';
+    if (routeTab === 'overview') params.delete('tab');
+    else params.set('tab', routeTab);
+    navigate(
+      {
+        pathname: location.pathname,
+        search: params.toString() ? `?${params.toString()}` : '',
+      },
+      { replace: true },
+    );
+  };
+  useEffect(() => {
+    setTabState(financeTabFromSearch(location.search));
+  }, [location.search]);
   const [campusFilter, setCampusFilter] = useState('');
   const [classFilter, setClassFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | ''>('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [studentFilter, setStudentFilter] = useState('');
   const [datePreset, setDatePreset] = useState('month');
   const [dateFrom, setDateFrom] = useState(monthStart());
   const [dateTo, setDateTo] = useState(monthEnd());
@@ -471,6 +437,13 @@ export function FinanceDashboard() {
   const [expenseCategoryFilter, setExpenseCategoryFilter] = useState<
     ExpenseCategory | ''
   >('');
+  useEffect(() => {
+    setExpenseCategoryFilter(
+      new URLSearchParams(location.search).get('tab') === 'payroll'
+        ? 'salaries'
+        : '',
+    );
+  }, [location.search]);
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [budgetCategory, setBudgetCategory] =
     useState<ExpenseCategory>('utilities');
@@ -479,7 +452,7 @@ export function FinanceDashboard() {
   const [budgetCampusId, setBudgetCampusId] = useState('');
   const [budgetError, setBudgetError] = useState('');
   const [ledgerAccountFilter, setLedgerAccountFilter] = useState<
-    'All Accounts' | 'Fee Income' | 'Expense' | 'Cash in Hand' | 'Bank'
+    'All Accounts' | 'Fee Collections' | 'Expense' | 'Cash in Hand' | 'Bank'
   >('All Accounts');
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [expenseDescription, setExpenseDescription] = useState('');
@@ -648,10 +621,12 @@ export function FinanceDashboard() {
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const filteredTransactions = allTransactions.filter(
     (row) =>
-      !statusFilter ||
-      (statusFilter === 'unpaid'
-        ? row.status === 'Unpaid' || row.status === 'Pending'
-        : row.status.toLowerCase() === statusFilter),
+      (!statusFilter ||
+        (statusFilter === 'unpaid'
+          ? row.status === 'Unpaid' || row.status === 'Pending'
+          : row.status.toLowerCase() === statusFilter)) &&
+      (!categoryFilter || row.category === categoryFilter) &&
+      (!studentFilter || row.description === studentFilter),
   );
   const ledgerEntries = [
     ...visiblePayments.map((payment) => ({
@@ -672,21 +647,10 @@ export function FinanceDashboard() {
       credit: expense.amount,
       account: expense.paymentMethod === 'cash' ? 'Cash in Hand' : 'Bank',
     })),
-    ...visibleInvoices
-      .filter((invoice) => invoice.totalAmount > invoice.paidAmount)
-      .map((invoice) => ({
-        id: `invoice-${invoice.id}`,
-        date: invoice.issueDate,
-        description: `Invoice ${invoice.invoiceNumber} — ${invoice.studentName} (outstanding)`,
-        reference: invoice.invoiceNumber,
-        debit: Math.max(0, invoice.totalAmount - invoice.paidAmount),
-        credit: 0,
-        account: 'Fee Income',
-      })),
   ]
     .filter((entry) => {
       if (ledgerAccountFilter === 'All Accounts') return true;
-      if (ledgerAccountFilter === 'Fee Income') return entry.debit > 0;
+      if (ledgerAccountFilter === 'Fee Collections') return entry.debit > 0;
       if (ledgerAccountFilter === 'Expense') return entry.credit > 0;
       return entry.account === ledgerAccountFilter;
     })
@@ -809,7 +773,14 @@ export function FinanceDashboard() {
     amountPaid: number;
     paymentMethod: PaymentMethod;
     paymentDate: string;
+    transactionReference?: string;
   } | null>(null);
+  const [challanInvoice, setChallanInvoice] = useState<StudentInvoice | null>(
+    null,
+  );
+  const [challanCopies, setChallanCopies] = useState<'single' | 'three'>(
+    'single',
+  );
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [paymentDate, setPaymentDate] = useState(today());
@@ -824,17 +795,32 @@ export function FinanceDashboard() {
       item.classId === bulkClassId && item.academicYearId === academicYearId,
   );
 
-  function openInvoiceReceipt(invoice: StudentInvoice) {
-    setReceiptPayment(null);
-    setReceiptInvoice(invoice);
-  }
-
   function openPayment(invoice: StudentInvoice) {
     setGlobalPaymentOpen(false);
     setPaymentInvoice(invoice);
     setPaymentAmount(amountText(invoice.totalAmount - invoice.paidAmount));
     setPaymentDate(today());
     setFormError('');
+  }
+
+  function openPaymentReceipt(payment: FinancePayment) {
+    const invoice = allInvoices.find((item) => item.id === payment.invoiceId);
+    if (!invoice) {
+      toast.showToast(
+        `Receipt ${payment.receiptNumber} is recorded, but its invoice details are unavailable.`,
+        'info',
+      );
+      return;
+    }
+
+    setReceiptInvoice(invoice);
+    setReceiptPayment({
+      receiptNumber: payment.receiptNumber,
+      amountPaid: payment.amountPaid,
+      paymentMethod: payment.paymentMethod,
+      paymentDate: payment.paymentDate,
+      transactionReference: payment.transactionReference,
+    });
   }
 
   function openGlobalPayment() {
@@ -1129,6 +1115,7 @@ export function FinanceDashboard() {
         amountPaid: result.receipt.amountPaid,
         paymentMethod: result.receipt.paymentMethod,
         paymentDate: result.receipt.paymentDate,
+        transactionReference: transactionReference.trim() || undefined,
       });
       toast.showToast(
         `Payment recorded · receipt ${result.receipt.receiptNumber}.`,
@@ -1211,44 +1198,8 @@ export function FinanceDashboard() {
 
   return (
     <main className="finance-page reference-live-module">
-      <div className="finance-top-toolbar">
-        <label className="finance-global-search">
-          <Search size={16} aria-hidden="true" />
-          <input
-            ref={searchInputRef}
-            aria-label="Search finance transactions"
-            placeholder="Search transactions, students, receipts..."
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-          />
-          <kbd>⌘ K</kbd>
-        </label>
-        <div className="finance-date-range" aria-label="Finance date range">
-          <label>
-            <span className="visually-hidden">From date</span>
-            <input
-              type="date"
-              max={dateTo || undefined}
-              value={dateFrom}
-              onChange={(event) => setDateFrom(event.target.value)}
-            />
-          </label>
-          <span aria-hidden="true">—</span>
-          <label>
-            <span className="visually-hidden">To date</span>
-            <input
-              type="date"
-              min={dateFrom || undefined}
-              value={dateTo}
-              onChange={(event) => setDateTo(event.target.value)}
-            />
-          </label>
-        </div>
-      </div>
-
       <header className="page-heading finance-page-heading reference-dashboard-heading">
         <div>
-          <p className="eyebrow">Organization workspace</p>
           <h1>Finance</h1>
           <p className="page-description">
             Track fees, expenses and ledger activity across your institute.
@@ -1371,6 +1322,44 @@ export function FinanceDashboard() {
         </article>
       </section>
 
+      <section
+        className="finance-overview-controls"
+        aria-label="Finance search and date range"
+      >
+        <label className="finance-global-search">
+          <Search size={16} aria-hidden="true" />
+          <input
+            ref={searchInputRef}
+            aria-label="Search finance transactions"
+            placeholder="Search student, invoice or receipt..."
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+          />
+          <kbd>Ctrl K</kbd>
+        </label>
+        <div className="finance-date-range" aria-label="Finance date range">
+          <label>
+            <span className="visually-hidden">From date</span>
+            <input
+              type="date"
+              max={dateTo || undefined}
+              value={dateFrom}
+              onChange={(event) => setDateFrom(event.target.value)}
+            />
+          </label>
+          <span aria-hidden="true">—</span>
+          <label>
+            <span className="visually-hidden">To date</span>
+            <input
+              type="date"
+              min={dateFrom || undefined}
+              value={dateTo}
+              onChange={(event) => setDateTo(event.target.value)}
+            />
+          </label>
+        </div>
+      </section>
+
       <label className="finance-mobile-tab-switcher">
         <span className="visually-hidden">Finance view</span>
         <select
@@ -1429,20 +1418,20 @@ export function FinanceDashboard() {
           className="finance-section finance-transactions-section"
           aria-label="All finance transactions"
         >
-          <div className="finance-section-heading">
-            <div>
+          <div className="finance-section-heading finance-transactions-heading">
+            <div className="finance-transactions-heading-copy">
               <h2>All transactions</h2>
               <p>
                 Collections and expenses in one searchable financial register.
               </p>
+              <span className="finance-result-count">
+                {filteredTransactions.length} records
+              </span>
             </div>
             <div className="finance-section-heading-actions">
-              <span className="finance-result-count">
-                {allTransactions.length} records
-              </span>
               <Button
-                disabled={!allTransactions.length}
-                onClick={() => exportFinanceTransactions(allTransactions)}
+                disabled={!filteredTransactions.length}
+                onClick={() => exportFinanceTransactions(filteredTransactions)}
                 type="button"
                 variant="quiet"
               >
@@ -1450,8 +1439,10 @@ export function FinanceDashboard() {
               </Button>
             </div>
           </div>
-          <div className="finance-reference-filters">
-            <span className="finance-filter-label">FILTERS</span>
+          <div
+            className="finance-reference-filters"
+            aria-label="Transaction filters"
+          >
             <label>
               <span className="visually-hidden">Date range</span>
               <select
@@ -1489,6 +1480,28 @@ export function FinanceDashboard() {
               </select>
             </label>
             <label>
+              <span className="visually-hidden">Category filter</span>
+              <select
+                className="finance-select"
+                value={categoryFilter}
+                onChange={(event) => setCategoryFilter(event.target.value)}
+              >
+                <option value="">All categories</option>
+                {[
+                  'Admission fee',
+                  'Concession',
+                  'Monthly fee',
+                  ...expenseCategories.map((item) => item.label),
+                ]
+                  .sort()
+                  .map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
               <span className="visually-hidden">Campus filter</span>
               <select
                 className="finance-select"
@@ -1523,6 +1536,28 @@ export function FinanceDashboard() {
               </select>
             </label>
             <label>
+              <span className="visually-hidden">Student filter</span>
+              <select
+                className="finance-select"
+                value={studentFilter}
+                onChange={(event) => setStudentFilter(event.target.value)}
+              >
+                <option value="">All students</option>
+                {Array.from(
+                  new Set([
+                    ...payments.map((payment) => payment.studentName),
+                    ...invoices.map((invoice) => invoice.studentName),
+                  ]),
+                )
+                  .sort()
+                  .map((student) => (
+                    <option key={student} value={student}>
+                      {student}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
               <span className="visually-hidden">Payment method filter</span>
               <select
                 className="finance-select"
@@ -1532,26 +1567,11 @@ export function FinanceDashboard() {
                 }
               >
                 <option value="">All methods</option>
-                {Object.entries(paymentMethodLabels)
-                  .filter(
-                    ([value, label]) =>
-                      /cash/i.test(value + ' ' + label) ||
-                      /bank/i.test(value + ' ' + label) ||
-                      /online|easypaisa|jazzcash|card|digital/i.test(
-                        value + ' ' + label,
-                      ),
-                  )
-                  .map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {/online|easypaisa|jazzcash|card|digital/i.test(
-                        value + ' ' + label,
-                      )
-                        ? 'Online'
-                        : /bank/i.test(value + ' ' + label)
-                          ? 'Bank'
-                          : 'Cash'}
-                    </option>
-                  ))}
+                {Object.entries(paymentMethodLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </select>
             </label>
             <label>
@@ -1563,64 +1583,78 @@ export function FinanceDashboard() {
                   setStatusFilter(event.target.value as InvoiceStatus | '')
                 }
               >
-                <option value="">All status</option>
+                <option value="">All statuses</option>
                 <option value="paid">Paid</option>
-                <option value="unpaid">Pending</option>
+                <option value="unpaid">Unpaid</option>
                 <option value="overdue">Overdue</option>
                 <option value="partial">Partial</option>
               </select>
             </label>
           </div>
-          <div
-            className="finance-selection-toolbar"
-            role="toolbar"
-            aria-label="Selected transaction actions"
-          >
-            <span>{selectedTransactionIds.length} selected</span>
-            <Button
-              disabled={!selectedTransactionIds.length || !canWrite}
-              onClick={() => {
-                const row = allTransactions.find(
-                  (item) =>
-                    selectedTransactionIds.includes(item.id) &&
-                    item.kind === 'invoice' &&
-                    item.invoice,
-                );
-                if (row?.invoice) openPayment(row.invoice);
-                else
-                  toast.showToast(
-                    'Select an unpaid invoice to record payment.',
-                    'info',
-                  );
-              }}
-              type="button"
+          {selectedTransactionIds.length > 0 && (
+            <div
+              className="finance-selection-toolbar"
+              role="toolbar"
+              aria-label="Selected transaction actions"
             >
-              Mark paid
-            </Button>
-            <Button
-              disabled={!selectedTransactionIds.length}
-              onClick={() => {
-                const rows = allTransactions.filter(
-                  (item) =>
-                    selectedTransactionIds.includes(item.id) &&
-                    item.kind === 'invoice' &&
-                    item.invoice,
-                );
-                if (!rows.length) {
-                  toast.showToast(
-                    'Select invoices with outstanding dues to send reminders.',
-                    'info',
+              <span>
+                {selectedTransactionIds.length}{' '}
+                {selectedTransactionIds.length === 1
+                  ? 'transaction selected'
+                  : 'transactions selected'}
+              </span>
+              <Button
+                disabled={!selectedTransactionIds.length || !canWrite}
+                onClick={() => {
+                  const row = allTransactions.find(
+                    (item) =>
+                      selectedTransactionIds.includes(item.id) &&
+                      item.kind === 'invoice' &&
+                      item.invoice,
                   );
-                  return;
-                }
-                rows.forEach((row) => handleInvoiceReminder(row.invoice!));
-              }}
-              type="button"
-              variant="quiet"
-            >
-              Send reminder
-            </Button>
-          </div>
+                  if (row?.invoice) openPayment(row.invoice);
+                  else
+                    toast.showToast(
+                      'Select an unpaid invoice to record payment.',
+                      'info',
+                    );
+                }}
+                type="button"
+              >
+                Record payment
+              </Button>
+              <Button
+                disabled={!selectedTransactionIds.length}
+                onClick={() => {
+                  const rows = allTransactions.filter(
+                    (item) =>
+                      selectedTransactionIds.includes(item.id) &&
+                      item.kind === 'invoice' &&
+                      item.invoice,
+                  );
+                  if (!rows.length) {
+                    toast.showToast(
+                      'Select invoices with outstanding dues to send reminders.',
+                      'info',
+                    );
+                    return;
+                  }
+                  rows.forEach((row) => handleInvoiceReminder(row.invoice!));
+                }}
+                type="button"
+                variant="quiet"
+              >
+                Send reminder
+              </Button>
+              <Button
+                onClick={() => setSelectedTransactionIds([])}
+                type="button"
+                variant="quiet"
+              >
+                Clear selection
+              </Button>
+            </div>
+          )}
           <div className="finance-premium-table-wrap">
             <table className="finance-premium-table">
               <thead>
@@ -1733,25 +1767,7 @@ export function FinanceDashboard() {
                       {row.kind === 'payment' && row.payment ? (
                         <Button
                           className="finance-receipt-button"
-                          onClick={() => {
-                            const invoice = allInvoices.find(
-                              (item) => item.id === row.payment!.invoiceId,
-                            );
-                            if (invoice) {
-                              setReceiptInvoice(invoice);
-                              setReceiptPayment({
-                                receiptNumber: row.payment!.receiptNumber,
-                                amountPaid: row.payment!.amountPaid,
-                                paymentMethod: row.payment!.paymentMethod,
-                                paymentDate: row.payment!.paymentDate,
-                              });
-                            } else {
-                              toast.showToast(
-                                `Receipt ${row.payment!.receiptNumber} is recorded, but its invoice details are unavailable.`,
-                                'info',
-                              );
-                            }
-                          }}
+                          onClick={() => openPaymentReceipt(row.payment!)}
                           type="button"
                           variant="quiet"
                         >
@@ -1772,6 +1788,77 @@ export function FinanceDashboard() {
               />
             )}
           </div>
+          <div className="finance-mobile-transactions">
+            {filteredTransactions.map((row) => (
+              <article className="finance-mobile-transaction" key={row.id}>
+                <div className="finance-mobile-transaction-top">
+                  <input
+                    aria-label={'Select ' + row.description}
+                    type="checkbox"
+                    checked={selectedTransactionIds.includes(row.id)}
+                    onChange={(event) =>
+                      setSelectedTransactionIds((current) =>
+                        event.target.checked
+                          ? [...current, row.id]
+                          : current.filter((id) => id !== row.id),
+                      )
+                    }
+                  />
+                  <div>
+                    <span className="finance-mobile-transaction-date">
+                      {shortDate(row.date)}
+                    </span>
+                    <strong>{row.description}</strong>
+                    <small>{row.detail || row.category}</small>
+                  </div>
+                  <strong
+                    className={
+                      row.kind === 'expense'
+                        ? 'finance-negative-amount'
+                        : row.kind === 'invoice'
+                          ? 'finance-due-amount'
+                          : 'finance-positive-amount'
+                    }
+                  >
+                    {row.kind === 'expense'
+                      ? '− '
+                      : row.kind === 'payment'
+                        ? '+ '
+                        : ''}
+                    {currency(Math.abs(row.amount))}
+                  </strong>
+                </div>
+                <div className="finance-mobile-transaction-bottom">
+                  <span
+                    className={`finance-reference-status ${row.kind === 'payment' ? 'finance-status-paid' : row.kind === 'expense' ? 'finance-status-recorded' : row.status === 'Overdue' ? 'finance-status-overdue' : row.status === 'Partial' ? 'finance-status-partial' : 'finance-status-pending'}`}
+                  >
+                    <i />
+                    {row.status}
+                  </span>
+                  {row.kind === 'payment' && row.payment ? (
+                    <Button
+                      className="finance-receipt-button"
+                      onClick={() => openPaymentReceipt(row.payment!)}
+                      type="button"
+                      variant="quiet"
+                    >
+                      Receipt
+                    </Button>
+                  ) : (
+                    <span className="finance-mobile-reference">
+                      {row.reference}
+                    </span>
+                  )}
+                </div>
+              </article>
+            ))}
+            {!filteredTransactions.length && (
+              <EmptyState
+                title="No transactions found"
+                description="Try changing your search, date range or filters."
+              />
+            )}
+          </div>
         </section>
       )}
 
@@ -1782,9 +1869,25 @@ export function FinanceDashboard() {
               <h2>Fee structures</h2>
               <p>Review fee plans currently configured for your classes.</p>
             </div>
-            <Button onClick={() => setTab('Fee setup')} type="button">
-              <Plus size={14} aria-hidden="true" /> Fee setup
-            </Button>
+            <div className="finance-section-heading-actions">
+              <Button
+                onClick={() => setTab('Concessions')}
+                type="button"
+                variant="quiet"
+              >
+                Concessions
+              </Button>
+              <Button
+                onClick={() => setTab('Create invoices')}
+                type="button"
+                variant="quiet"
+              >
+                Generate invoices
+              </Button>
+              <Button onClick={() => setTab('Fee setup')} type="button">
+                <Plus size={14} aria-hidden="true" /> Fee setup
+              </Button>
+            </div>
           </div>
           {feeStructures.length ? (
             <div className="finance-collection-grid">
@@ -1859,9 +1962,18 @@ export function FinanceDashboard() {
                 Verified payment receipts recorded against student invoices.
               </p>
             </div>
-            <span className="finance-result-count">
-              {visiblePayments.length} payments
-            </span>
+            <div className="finance-section-heading-actions">
+              <Button
+                onClick={() => setTab('Invoices')}
+                type="button"
+                variant="quiet"
+              >
+                Invoices & receivables
+              </Button>
+              <span className="finance-result-count">
+                {visiblePayments.length} payments
+              </span>
+            </div>
           </div>
           <div className="finance-reference-filters">
             <span className="finance-filter-label">FILTERS</span>
@@ -1932,20 +2044,7 @@ export function FinanceDashboard() {
                       <Button
                         type="button"
                         variant="quiet"
-                        onClick={() => {
-                          const invoice = invoices.find(
-                            (item) => item.id === payment.invoiceId,
-                          );
-                          if (invoice) {
-                            setReceiptInvoice(invoice);
-                            setReceiptPayment({
-                              receiptNumber: payment.receiptNumber,
-                              amountPaid: payment.amountPaid,
-                              paymentMethod: payment.paymentMethod,
-                              paymentDate: payment.paymentDate,
-                            });
-                          }
-                        }}
+                        onClick={() => openPaymentReceipt(payment)}
                       >
                         View receipt
                       </Button>
@@ -1968,7 +2067,11 @@ export function FinanceDashboard() {
         <section className="finance-section" aria-label="Expense records">
           <div className="finance-section-heading">
             <div>
-              <h2>Expenses</h2>
+              <h2>
+                {new URLSearchParams(location.search).get('tab') === 'payroll'
+                  ? 'Payroll & salaries'
+                  : 'Expenses'}
+              </h2>
               <p>
                 Track operating costs with date, category, method and supporting
                 reference.
@@ -1982,6 +2085,12 @@ export function FinanceDashboard() {
                 disabled={!canWrite}
                 onClick={() => {
                   setExpenseError('');
+                  setExpenseCategory(
+                    new URLSearchParams(location.search).get('tab') ===
+                      'payroll'
+                      ? 'salaries'
+                      : 'utilities',
+                  );
                   setExpenseCampusId(
                     campusFilter ||
                       (campuses.length === 1 ? campuses[0].id : ''),
@@ -1990,7 +2099,10 @@ export function FinanceDashboard() {
                 }}
                 type="button"
               >
-                <Plus size={14} aria-hidden="true" /> Add expense
+                <Plus size={14} aria-hidden="true" />{' '}
+                {new URLSearchParams(location.search).get('tab') === 'payroll'
+                  ? 'Record salary payment'
+                  : 'Add expense'}
               </Button>
             </div>
           </div>
@@ -2155,10 +2267,11 @@ export function FinanceDashboard() {
         <section className="finance-section" aria-label="Financial ledger">
           <div className="finance-section-heading">
             <div>
-              <h2>General ledger</h2>
+              <h2>Cash &amp; bank ledger</h2>
               <p>
-                Chronological movement from fee payments, outstanding invoices
-                and expenses.
+                Actual cash and bank movement from received fee payments and
+                paid expenses. Unpaid invoices remain pending receivables until
+                payment is received.
               </p>
             </div>
             <div className="finance-section-heading-actions">
@@ -2177,7 +2290,7 @@ export function FinanceDashboard() {
           </div>
           <div className="finance-ledger-summary">
             <div>
-              <span>Fee income</span>
+              <span>Fee collected</span>
               <strong>{currency(collectedTotal)}</strong>
             </div>
             <div>
@@ -2197,7 +2310,7 @@ export function FinanceDashboard() {
             {(
               [
                 'All Accounts',
-                'Fee Income',
+                'Fee Collections',
                 'Expense',
                 'Cash in Hand',
                 'Bank',
@@ -2220,9 +2333,9 @@ export function FinanceDashboard() {
                   <th>Date</th>
                   <th>Particulars</th>
                   <th>Voucher</th>
-                  <th className="is-number">Debit / income</th>
-                  <th className="is-number">Credit / expense</th>
-                  <th className="is-number">Balance</th>
+                  <th className="is-number">Cash received</th>
+                  <th className="is-number">Cash paid</th>
+                  <th className="is-number">Net movement</th>
                 </tr>
               </thead>
               <tbody>
@@ -2249,7 +2362,7 @@ export function FinanceDashboard() {
             {!ledgerRows.length && (
               <EmptyState
                 title="Ledger is empty"
-                description="Record a fee payment, invoice or expense to begin the general ledger."
+                description="Record a fee payment or paid expense to begin tracking cash and bank movement. Unpaid invoices are tracked separately as pending dues."
               />
             )}
           </div>
@@ -2342,6 +2455,13 @@ export function FinanceDashboard() {
               </p>
             </div>
             <div className="finance-section-heading-actions">
+              <Button
+                onClick={() => setTab('Payments')}
+                type="button"
+                variant="quiet"
+              >
+                Payment history
+              </Button>
               <Button onClick={() => setTab('Create invoices')} type="button">
                 <Plus size={14} aria-hidden="true" /> New invoice
               </Button>
@@ -2539,9 +2659,9 @@ export function FinanceDashboard() {
                       </Button>
                       <Button
                         variant="quiet"
-                        onClick={() => openInvoiceReceipt(row)}
+                        onClick={() => setChallanInvoice(row)}
                       >
-                        Receipt
+                        Print challan
                       </Button>
                       <Button
                         disabled={!row.guardianPhone || row.status === 'paid'}
@@ -2630,9 +2750,9 @@ export function FinanceDashboard() {
                     </Button>
                     <Button
                       variant="quiet"
-                      onClick={() => openInvoiceReceipt(invoice)}
+                      onClick={() => setChallanInvoice(invoice)}
                     >
-                      Receipt
+                      Print challan
                     </Button>
                     <Button
                       disabled={
@@ -3278,6 +3398,8 @@ export function FinanceDashboard() {
 
       {/* Record Payment Dialog */}
       <Dialog
+        className="finance-payment-modal"
+        portal
         open={Boolean(paymentInvoice) || globalPaymentOpen}
         title={globalPaymentOpen ? 'Record payment' : 'Record invoice payment'}
         description={
@@ -3400,10 +3522,112 @@ export function FinanceDashboard() {
         )}
       </Dialog>
 
+      {/* Optional single-copy or triplicate challan */}
+      <Dialog
+        open={Boolean(challanInvoice)}
+        title="Print fee challan"
+        description="Choose the challan layout required by this institute. The challan does not record a payment."
+        onOpenChange={(open) => {
+          if (!open) setChallanInvoice(null);
+        }}
+      >
+        {challanInvoice && (
+          <div className="finance-challan-dialog">
+            <div className="finance-challan-options">
+              <label>
+                <span>Challan copies</span>
+                <select
+                  className="finance-select"
+                  value={challanCopies}
+                  onChange={(event) =>
+                    setChallanCopies(event.target.value as 'single' | 'three')
+                  }
+                >
+                  <option value="single">Single copy — standard</option>
+                  <option value="three">
+                    Three copies — Bank / Institute / Student
+                  </option>
+                </select>
+              </label>
+              <p>
+                Three-copy printing is optional. Select it only when the school
+                or college uses physical bank deposit challans.
+              </p>
+            </div>
+            <div className="finance-challan-preview">
+              <div className="finance-challan-preview-head">
+                <span>{organizationName ?? 'InstituteOS'}</span>
+                <strong>FEE CHALLAN</strong>
+              </div>
+              <div className="finance-challan-preview-details">
+                <span>
+                  <small>Student</small>
+                  <b>{challanInvoice.studentName}</b>
+                </span>
+                <span>
+                  <small>Challan / Invoice</small>
+                  <b>{challanInvoice.invoiceNumber}</b>
+                </span>
+                <span>
+                  <small>Class</small>
+                  <b>{className(challanInvoice.classId, classes)}</b>
+                </span>
+                <span>
+                  <small>Due date</small>
+                  <b>{shortDate(challanInvoice.dueDate)}</b>
+                </span>
+              </div>
+              <div className="finance-challan-preview-total">
+                <span>Outstanding amount</span>
+                <strong>
+                  {currency(
+                    Math.max(
+                      0,
+                      challanInvoice.totalAmount - challanInvoice.paidAmount,
+                    ),
+                  )}
+                </strong>
+              </div>
+              {challanCopies === 'three' && (
+                <div className="finance-challan-copy-labels">
+                  <span>01 · BANK COPY</span>
+                  <span>02 · INSTITUTE COPY</span>
+                  <span>03 · STUDENT COPY</span>
+                </div>
+              )}
+            </div>
+            <div className="finance-form-actions">
+              <Button
+                variant="primary"
+                onClick={() => {
+                  printFeeChallan(
+                    challanInvoice,
+                    className(challanInvoice.classId, classes),
+                    campusName(challanInvoice.campusId, campuses),
+                    organizationName ?? 'InstituteOS',
+                    feeStructures.find(
+                      (item) => item.id === challanInvoice.feeStructureId,
+                    )?.feeHeads ?? [],
+                    challanCopies,
+                  );
+                }}
+              >
+                Print / Save as PDF
+              </Button>
+              <Button variant="quiet" onClick={() => setChallanInvoice(null)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
       {/* Printable Receipt & Proof Dialog */}
       <Dialog
+        className="finance-receipt-modal"
+        portal
         open={Boolean(receiptInvoice)}
-        title={receiptPayment ? 'Payment receipt' : 'Fee statement'}
+        title="Payment receipt"
         description={
           receiptInvoice
             ? receiptPayment
@@ -3430,6 +3654,12 @@ export function FinanceDashboard() {
                   {statusLabels[receiptInvoice.status]}
                 </span>
               </div>
+              {receiptPayment && (
+                <div className="finance-receipt-amount">
+                  <span>Received this payment</span>
+                  <strong>{currency(receiptPayment.amountPaid)}</strong>
+                </div>
+              )}
               <hr style={{ margin: '1rem 0', opacity: 0.2 }} />
               <div className="finance-receipt-meta">
                 <div>
@@ -3450,6 +3680,12 @@ export function FinanceDashboard() {
                       <strong>Method:</strong>{' '}
                       {receiptPayment.paymentMethod.replace('_', ' ')}
                     </div>
+                    {receiptPayment.transactionReference && (
+                      <div>
+                        <strong>Transaction ref:</strong>{' '}
+                        {receiptPayment.transactionReference}
+                      </div>
+                    )}
                   </>
                 )}
                 <div>
@@ -3532,7 +3768,7 @@ export function FinanceDashboard() {
                   )}
                   <tr>
                     <td style={{ padding: '0.5rem 0', color: '#10b981' }}>
-                      Total paid:
+                      Total paid to date:
                     </td>
                     <td
                       style={{
@@ -3552,7 +3788,7 @@ export function FinanceDashboard() {
                         color: '#dc2626',
                       }}
                     >
-                      Remaining Balance (Baqaya):
+                      Current Outstanding Balance (Baqaya):
                     </td>
                     <td
                       style={{
@@ -3578,7 +3814,8 @@ export function FinanceDashboard() {
                   textAlign: 'center',
                 }}
               >
-                Computer generated fee slip. Valid without manual signature.
+                Computer-generated official payment receipt. Please retain for
+                your records.
               </div>
             </div>
 
@@ -3586,19 +3823,22 @@ export function FinanceDashboard() {
               className="finance-form-actions"
               style={{ marginTop: '1.25rem' }}
             >
-              <Button
-                variant="primary"
-                onClick={() =>
-                  handlePrintReceipt(
-                    receiptInvoice,
-                    className(receiptInvoice.classId, classes),
-                    receiptPayment ?? undefined,
-                    organizationName ?? undefined,
-                  )
-                }
-              >
-                Print / Save as PDF
-              </Button>
+              {receiptPayment && (
+                <Button
+                  variant="primary"
+                  onClick={() =>
+                    handlePrintReceipt(
+                      receiptInvoice,
+                      className(receiptInvoice.classId, classes),
+                      receiptPayment,
+                      organizationName ?? undefined,
+                      campusName(receiptInvoice.campusId, campuses),
+                    )
+                  }
+                >
+                  Print / Save as PDF
+                </Button>
+              )}
               <Button
                 onClick={() => {
                   setReceiptInvoice(null);
