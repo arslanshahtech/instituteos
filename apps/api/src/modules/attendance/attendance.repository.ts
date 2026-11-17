@@ -119,6 +119,7 @@ export class MongoAttendanceRepository implements AttendanceRepository {
       .select({
         timezone: 1,
         markingCutoffTime: 1,
+        teacherMarkingCutoffEnabled: 1,
         autoMarkUnmarkedAbsent: 1,
         allowAdminOverride: 1,
       })
@@ -127,6 +128,8 @@ export class MongoAttendanceRepository implements AttendanceRepository {
       ? {
           timezone: settings.timezone || 'Asia/Karachi',
           markingCutoffTime: settings.markingCutoffTime || '09:00',
+          teacherMarkingCutoffEnabled:
+            settings.teacherMarkingCutoffEnabled === true,
           autoMarkUnmarkedAbsent: settings.autoMarkUnmarkedAbsent === true,
           allowAdminOverride: settings.allowAdminOverride !== false,
         }

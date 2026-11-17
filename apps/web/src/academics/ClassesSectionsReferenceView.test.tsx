@@ -74,6 +74,15 @@ describe('ClassesSectionsReferenceView', () => {
       },
     ] as AcademicSubject[],
     studentsCount: 20,
+    summary: {
+      totals: { classes: 2, sections: 1, students: 18 },
+      bySession: [
+        { academicYearId: 'year-1', classes: 2, sections: 1, students: 18 },
+      ],
+      bySection: [
+        { academicYearId: 'year-1', sectionId: 'section-1', students: 18 },
+      ],
+    },
     onCreate: vi.fn(),
     onEdit: vi.fn(),
     onDelete: vi.fn(),
@@ -89,10 +98,16 @@ describe('ClassesSectionsReferenceView', () => {
     expect(
       screen.getByText('Manage All Classes in Your Institute.'),
     ).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Study Level/ })).toBeTruthy();
+    const addClassButton = screen.getByRole('button', { name: 'Add Class' });
     expect(
-      screen.getByRole('button', { name: /Education Levels/ }),
-    ).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Add Class' })).toBeTruthy();
+      addClassButton
+        .closest('header')
+        ?.classList.contains('classes-page-heading'),
+    ).toBe(true);
+    expect(screen.getAllByRole('button', { name: 'Add Class' })).toHaveLength(
+      1,
+    );
     expect(screen.getByText('20')).toBeTruthy();
     expect(screen.getAllByText('Sections').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Subjects').length).toBeGreaterThan(0);
@@ -121,8 +136,8 @@ describe('ClassesSectionsReferenceView', () => {
     ]) {
       expect(screen.getByRole('columnheader', { name: heading })).toBeTruthy();
     }
-    expect(screen.getByText('Class Five')).toBeTruthy();
-    expect(screen.getAllByText('2026-2027').length).toBe(2);
+    expect(screen.getAllByText('Class Five').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('2026-2027').length).toBeGreaterThanOrEqual(2);
     expect(
       screen.getByRole('button', { name: 'Edit Class Five' }),
     ).toBeTruthy();
@@ -130,11 +145,54 @@ describe('ClassesSectionsReferenceView', () => {
       screen.getByRole('button', { name: 'Delete Class Five' }),
     ).toBeTruthy();
     expect(
-      screen.queryByRole('button', { name: /View Class Five details/ }),
-    ).toBeNull();
+      screen.getByRole('button', { name: 'View details for Class Five' }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole('button', { name: 'Delete Class Five' })
+        .classList.contains('danger'),
+    ).toBe(true);
   });
 
-  it('filters classes by search and education level', () => {
+  it('keeps the mobile class list simple with class name, student total and view details', () => {
+    const { container } = render(
+      <ClassesSectionsReferenceView {...baseProps()} />,
+    );
+    const cards = container.querySelectorAll(
+      '.cr-class-mobile-list .cr-class-mobile-card',
+    );
+
+    expect(cards).toHaveLength(2);
+    expect(cards[0]?.textContent).toContain('Class Five');
+    expect(cards[0]?.textContent).toContain('18 students');
+    expect(cards[0]?.querySelectorAll('button')).toHaveLength(1);
+    expect(cards[0]?.querySelector('.cr-class-mobile-copy')).toBeTruthy();
+    expect(cards[0]?.textContent).toContain('View Details');
+    expect(cards[0]?.textContent).not.toContain('sections');
+    expect(cards[0]?.textContent).not.toContain('subjects');
+  });
+
+  it('opens class details with campus, current session, sections and assigned subjects', () => {
+    render(<ClassesSectionsReferenceView {...baseProps()} />);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'View details for Class Five' }),
+    );
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeTruthy();
+    expect(dialog.textContent).toContain('Main Campus');
+    expect(dialog.textContent).toContain('2026-2027');
+    expect(dialog.textContent).toContain('Section A');
+    expect(dialog.textContent).toContain('Mathematics');
+    expect(dialog.textContent).toContain('18');
+    expect(dialog.textContent).toContain('1 Apr 2026');
+    expect(dialog.textContent).not.toContain('?');
+    expect(screen.getByRole('button', { name: 'Edit Class' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Delete Class' })).toBeTruthy();
+  });
+
+  it('filters classes by search and study level', () => {
     render(<ClassesSectionsReferenceView {...baseProps()} />);
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Search classes' }), {
@@ -146,16 +204,16 @@ describe('ClassesSectionsReferenceView', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Search classes' }), {
       target: { value: '' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /Education Levels/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Study Level/ }));
     fireEvent.click(screen.getByRole('menuitem', { name: /Other 1/ }));
-    expect(screen.getByText('Class Five')).toBeTruthy();
+    expect(screen.getAllByText('Class Five').length).toBeGreaterThan(0);
     expect(screen.queryByRole('row', { name: /First Year/ })).toBeNull();
   });
 
-  it('uses the Education Levels action to choose an available level', () => {
+  it('uses the Study Level action to choose an available level', () => {
     render(<ClassesSectionsReferenceView {...baseProps()} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Education Levels/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Study Level/ }));
     expect(screen.getByRole('menu')).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: /All Levels 2/ })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: /First Year 1/ })).toBeTruthy();

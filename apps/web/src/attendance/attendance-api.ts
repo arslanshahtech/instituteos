@@ -1,6 +1,7 @@
 import { apiRequest } from '../api/client.js';
 
 export interface TeacherProfile {
+  staffId: string;
   firstName: string;
   lastName: string;
   displayName: string;
@@ -35,6 +36,7 @@ export type StaffAttendanceStatus =
 export interface StudentAttendancePolicy {
   timezone: string;
   markingCutoffTime: string;
+  teacherMarkingCutoffEnabled: boolean;
   autoMarkUnmarkedAbsent: boolean;
   allowAdminOverride: boolean;
   workingDays: string[];

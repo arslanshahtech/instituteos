@@ -25,6 +25,29 @@ export function apiMessage(error: unknown): string {
   return 'The request could not be completed. Try again.';
 }
 
+export function staffFormErrorMessage(
+  error: unknown,
+  context: 'save' | 'campus' = 'save',
+): string {
+  if (error instanceof ApiError) {
+    switch (error.code) {
+      case 'STAFF_DUPLICATE':
+        return 'Email or employee ID already exists.';
+      case 'VALIDATION_ERROR':
+        return 'Please check the entered details.';
+      case 'CAMPUS_NOT_FOUND':
+        return 'Selected campus is unavailable.';
+      case 'CAMPUS_FORBIDDEN':
+        return 'You do not have access to this campus.';
+      case 'NETWORK_ERROR':
+        return 'Connection issue. Please try again.';
+    }
+  }
+  return context === 'campus'
+    ? 'Campus list could not be loaded. Try again.'
+    : 'Could not save staff. Please try again.';
+}
+
 export function useOrganizationAccess(organizationId: string) {
   return useQuery({
     queryKey: ['organization-context', organizationId],
@@ -108,23 +131,23 @@ export function StaffHeading({
         </Link>
       )}
       <WorkspacePageHeading
-      className="student-page-heading"
-      eyebrow={eyebrow}
-      title={title}
-      description={description}
-      aside={
-        <div className="student-page-actions">
-          {showDirectoryLink && (
-            <Link
-              className="button button-secondary"
-              to={`/admin/organizations/${encodeURIComponent(organizationId)}/staff`}
-            >
-              Staff directory
-            </Link>
-          )}
-          {action}
-        </div>
-      }
+        className="student-page-heading"
+        eyebrow={eyebrow}
+        title={title}
+        description={description}
+        aside={
+          <div className="student-page-actions">
+            {showDirectoryLink && (
+              <Link
+                className="button button-secondary"
+                to={`/admin/organizations/${encodeURIComponent(organizationId)}/staff`}
+              >
+                Staff directory
+              </Link>
+            )}
+            {action}
+          </div>
+        }
       />
     </>
   );

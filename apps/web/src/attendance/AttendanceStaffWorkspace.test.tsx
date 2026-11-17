@@ -84,11 +84,11 @@ const records: StaffAttendanceRecord[] = [
 function renderWorkspace(onSave = vi.fn().mockResolvedValue(undefined)) {
   render(
     <AttendanceStaffWorkspace
-      date="2026-11-09"
-      onDateChange={vi.fn()}
       staff={staff}
       records={records}
       canWrite
+      date="2026-11-12"
+      onDateChange={vi.fn()}
       isSaving={false}
       onSave={onSave}
     />,
@@ -103,14 +103,25 @@ describe('AttendanceStaffWorkspace', () => {
     expect(
       screen.getByRole('heading', { name: 'Staff Attendance' }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText('Attendance date')).toHaveValue('2026-11-09');
+    expect(screen.getByLabelText('Attendance date')).toHaveValue('2026-11-12');
     expect(
-      document.querySelector('.attendance-staff-filter-panel'),
+      document.querySelector('.attendance-staff-table-toolbar'),
     ).toBeInTheDocument();
+    const listCard = document.querySelector('.attendance-staff-table-card');
+    expect(
+      listCard?.contains(
+        screen.getByRole('searchbox', { name: 'Search staff' }),
+      ),
+    ).toBe(true);
+    expect(
+      listCard?.contains(
+        screen.getByRole('button', { name: 'Mark All Present' }),
+      ),
+    ).toBe(true);
     expect(
       document.querySelectorAll('.attendance-staff-metric-icon'),
     ).toHaveLength(4);
-    expect(screen.getByText('Checked In')).toBeInTheDocument();
+    expect(screen.getByText('Total Staff')).toBeInTheDocument();
     expect(
       screen.getByText('Present', {
         selector: '.attendance-staff-metric-label',
@@ -122,18 +133,19 @@ describe('AttendanceStaffWorkspace', () => {
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('On Leave', {
+      screen.getByText('Leave / Half day', {
         selector: '.attendance-staff-metric-label',
       }),
     ).toBeInTheDocument();
     expect(
       document.querySelector('.attendance-staff-metric-checked strong')
         ?.textContent,
-    ).toBe('1');
+    ).toBe('4');
     expect(screen.getByText('Sadia Khan')).toBeInTheDocument();
     expect(screen.getByText('EMP-001')).toBeInTheDocument();
+    expect(screen.queryByText('Employee ID not set')).not.toBeInTheDocument();
     expect(
-      screen.getByText('Not checked in', {
+      screen.getByText('Not marked', {
         selector: '.attendance-staff-status-not-marked',
       }),
     ).toBeInTheDocument();
@@ -164,17 +176,20 @@ describe('AttendanceStaffWorkspace', () => {
   it('checks a staff member in immediately and supports manual attendance marking', () => {
     const onSave = renderWorkspace();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Check-in' })[2]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Mark Present' })[3]);
     expect(onSave).toHaveBeenCalledWith('staff-4', 'present');
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Manual Mark' })[0]);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    fireEvent.change(
-      screen.getByRole('combobox', { name: 'Attendance status' }),
-      {
-        target: { value: 'half-day' },
-      },
-    );
+    const statusSelect = screen.getByRole('combobox', {
+      name: 'Attendance status',
+    }) as HTMLSelectElement;
+    expect(
+      Array.from(statusSelect.options).map((option) => option.value),
+    ).toEqual(['present', 'absent', 'on-leave', 'half-day']);
+    fireEvent.change(statusSelect, {
+      target: { value: 'half-day' },
+    });
     fireEvent.change(screen.getByPlaceholderText('Add a note if needed...'), {
       target: { value: 'Arrived after lunch' },
     });
@@ -186,10 +201,10 @@ describe('AttendanceStaffWorkspace', () => {
     );
   });
 
-  it('opens the header Manual Mark dialog so an admin can choose any staff member', () => {
+  it('opens Manual Mark so an admin can choose any staff member', () => {
     const onSave = renderWorkspace();
 
-    fireEvent.click(screen.getByRole('button', { name: '+ Manual Mark' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Manual Mark' })[0]);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     fireEvent.change(screen.getByRole('combobox', { name: 'Staff member' }), {
       target: { value: 'staff-2' },
@@ -202,5 +217,16 @@ describe('AttendanceStaffWorkspace', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Save Attendance' }));
     expect(onSave).toHaveBeenCalledWith('staff-2', 'absent', undefined);
+  });
+
+  it('marks all staff present from the bulk action', () => {
+    const onSave = renderWorkspace();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Mark All Present' }));
+    expect(onSave).toHaveBeenCalledTimes(staff.length);
+    for (const person of staff) {
+      expect(onSave).toHaveBeenCalledWith(person.id, 'present');
+    }
+    vi.restoreAllMocks();
   });
 });

@@ -149,6 +149,11 @@ const FamilyContactsListPage = lazy(() =>
   })),
 );
 
+const AcademicImportPage = lazy(() =>
+  import('../academics/AcademicImportPage.js').then((module) => ({
+    default: module.AcademicImportPage,
+  })),
+);
 const AcademicsDashboard = lazy(() =>
   import('../academics/AcademicsDashboard.js').then((module) => ({
     default: module.AcademicsDashboard,
@@ -184,9 +189,9 @@ const FinanceDashboard = lazy(() =>
     default: module.FinanceDashboard,
   })),
 );
-const FeeConcessionsPage = lazy(() =>
-  import('../finance/FeeConcessionsPage.js').then((module) => ({
-    default: module.FeeConcessionsPage,
+const PayrollDashboard = lazy(() =>
+  import('../finance/PayrollDashboard.js').then((module) => ({
+    default: module.PayrollDashboard,
   })),
 );
 const CommunicationsDashboard = lazy(() =>
@@ -204,9 +209,9 @@ const SettingsPage = lazy(() =>
     default: module.SettingsPage,
   })),
 );
-const ProfileSettingsPage = lazy(() =>
-  import('../settings/ProfileSettingsPage.js').then((module) => ({
-    default: module.ProfileSettingsPage,
+const StaffImportPage = lazy(() =>
+  import('../staff/StaffImportPage.js').then((module) => ({
+    default: module.StaffImportPage,
   })),
 );
 const StaffCreatePage = lazy(() =>
@@ -327,6 +332,10 @@ const roleRoutes: RouteObject[] = [
         element: <AcademicsDashboard />,
       },
       {
+        path: 'organizations/:organizationId/academics/import',
+        element: <AcademicImportPage />,
+      },
+      {
         path: 'organizations/:organizationId/attendance',
         element: <AttendanceDashboard />,
       },
@@ -347,11 +356,23 @@ const roleRoutes: RouteObject[] = [
         element: <FinanceDashboard />,
       },
       {
+        path: 'organizations/:organizationId/payroll',
+        element: <PayrollDashboard />,
+      },
+      {
         path: 'organizations/:organizationId/concessions',
-        element: <FeeConcessionsPage />,
+        element: <Navigate to="../finance?tab=concessions" replace />,
       },
       {
         path: 'organizations/:organizationId/communications',
+        element: <Navigate to="messages" replace />,
+      },
+      {
+        path: 'organizations/:organizationId/communications/messages',
+        element: <CommunicationsDashboard />,
+      },
+      {
+        path: 'organizations/:organizationId/communications/announcements',
         element: <CommunicationsDashboard />,
       },
       {
@@ -364,7 +385,7 @@ const roleRoutes: RouteObject[] = [
       },
       {
         path: 'organizations/:organizationId/profile',
-        element: <ProfileSettingsPage />,
+        element: <Navigate to="../settings" replace />,
       },
       {
         path: 'organizations/:organizationId/families',
@@ -423,6 +444,10 @@ const roleRoutes: RouteObject[] = [
         element: <StaffSetupPage />,
       },
       {
+        path: 'organizations/:organizationId/staff/import',
+        element: <StaffImportPage />,
+      },
+      {
         path: 'organizations/:organizationId/staff/new',
         element: <StaffCreatePage />,
       },
@@ -467,6 +492,10 @@ const roleRoutes: RouteObject[] = [
         element: <TeacherStudentsPage />,
       },
       {
+        path: 'organizations/:organizationId/students/:studentId',
+        element: <StudentDetailPage />,
+      },
+      {
         path: 'organizations/:organizationId/attendance',
         element: <AttendanceDashboard />,
       },
@@ -480,11 +509,19 @@ const roleRoutes: RouteObject[] = [
       },
       {
         path: 'organizations/:organizationId/communications',
+        element: <Navigate to="messages" replace />,
+      },
+      {
+        path: 'organizations/:organizationId/communications/messages',
+        element: <CommunicationsDashboard />,
+      },
+      {
+        path: 'organizations/:organizationId/communications/announcements',
         element: <CommunicationsDashboard />,
       },
       {
         path: 'organizations/:organizationId/settings',
-        element: <ProfileSettingsPage />,
+        element: <SettingsPage />,
       },
       { path: '*', element: <NotFoundPage /> },
     ],
@@ -511,8 +548,12 @@ const roleRoutes: RouteObject[] = [
         element: <FinanceDashboard />,
       },
       {
+        path: 'organizations/:organizationId/payroll',
+        element: <PayrollDashboard />,
+      },
+      {
         path: 'organizations/:organizationId/concessions',
-        element: <FeeConcessionsPage />,
+        element: <Navigate to="../finance?tab=concessions" replace />,
       },
       {
         path: 'organizations/:organizationId/reports',
@@ -568,7 +609,7 @@ const roleRoutes: RouteObject[] = [
       { path: 'organizations/:organizationId', element: <ParentPortalPage /> },
       {
         path: 'organizations/:organizationId/settings',
-        element: <ProfileSettingsPage />,
+        element: <SettingsPage />,
       },
       {
         path: 'organizations/:organizationId/:section',

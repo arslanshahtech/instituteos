@@ -34,6 +34,11 @@ const attendanceSettingsSchema = new Schema(
       default: '09:00',
       match: /^([01]\d|2[0-3]):[0-5]\d$/,
     },
+    teacherMarkingCutoffEnabled: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
     autoMarkUnmarkedAbsent: { type: Boolean, required: true, default: false },
     allowAdminOverride: { type: Boolean, required: true, default: true },
     workingDays: {

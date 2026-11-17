@@ -54,7 +54,9 @@ async function main() {
         }).lean()
       : null;
     if (!organization)
-      throw new Error('Admin workspace membership or organization is missing/inactive.');
+      throw new Error(
+        'Admin workspace membership or organization is missing/inactive.',
+      );
 
     let failures = 0;
     for (const account of expected) {

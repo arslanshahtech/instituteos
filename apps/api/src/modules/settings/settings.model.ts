@@ -38,12 +38,23 @@ const notificationsSchema = new Schema(
 );
 
 const staffSetupItemSchema = new Schema(
-  { id: { type: String, required: true, trim: true, maxlength: 80 }, name: { type: String, required: true, trim: true, maxlength: 120 }, isActive: { type: Boolean, default: true } },
+  {
+    id: { type: String, required: true, trim: true, maxlength: 80 },
+    name: { type: String, required: true, trim: true, maxlength: 120 },
+    isActive: { type: Boolean, default: true },
+  },
   { _id: false },
 );
 
 const staffSetupSchema = new Schema(
-  { departments: { type: [staffSetupItemSchema], default: [] }, designations: { type: [staffSetupItemSchema], default: [] }, employmentTypes: { type: [staffSetupItemSchema], default: [] }, workShifts: { type: [staffSetupItemSchema], default: [] }, qualifications: { type: [staffSetupItemSchema], default: [] }, documentTypes: { type: [staffSetupItemSchema], default: [] } },
+  {
+    departments: { type: [staffSetupItemSchema], default: [] },
+    designations: { type: [staffSetupItemSchema], default: [] },
+    employmentTypes: { type: [staffSetupItemSchema], default: [] },
+    workShifts: { type: [staffSetupItemSchema], default: [] },
+    qualifications: { type: [staffSetupItemSchema], default: [] },
+    documentTypes: { type: [staffSetupItemSchema], default: [] },
+  },
   { _id: false },
 );
 

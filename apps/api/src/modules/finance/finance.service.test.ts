@@ -335,28 +335,28 @@ describe('FinanceService', () => {
   it('carries a student previous dues into the next generated invoice and consumes it once', async () => {
     const repo = repository({
       listActiveClassStudents: vi.fn().mockResolvedValue([studentId]),
-      getStudentsPreviousDues: vi
+      getStudentsPreviousDues: vi.fn().mockResolvedValue({ [studentId]: 5000 }),
+      createInvoices: vi
         .fn()
-        .mockResolvedValue({ [studentId]: 5000 }),
-      createInvoices: vi.fn().mockImplementation(
-        async (
-          _org: string,
-          _input: unknown,
-          structure: FeeStructureRecord,
-          ids: string[],
-          _issueDate: string,
-          totalAmount: number,
-          arrearsByStudent: Record<string, number>,
-        ) =>
-          ids.map((id) =>
-            invoice({
-              studentId: id,
-              feeStructureId: structure.id,
-              totalAmount: totalAmount + (arrearsByStudent[id] ?? 0),
-              arrearsAmount: arrearsByStudent[id] ?? 0,
-            }),
-          ),
-      ),
+        .mockImplementation(
+          async (
+            _org: string,
+            _input: unknown,
+            structure: FeeStructureRecord,
+            ids: string[],
+            _issueDate: string,
+            totalAmount: number,
+            arrearsByStudent: Record<string, number>,
+          ) =>
+            ids.map((id) =>
+              invoice({
+                studentId: id,
+                feeStructureId: structure.id,
+                totalAmount: totalAmount + (arrearsByStudent[id] ?? 0),
+                arrearsAmount: arrearsByStudent[id] ?? 0,
+              }),
+            ),
+        ),
     });
     const result = await new FinanceService(repo).generateInvoices(context, {
       classId,

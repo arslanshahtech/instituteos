@@ -58,7 +58,10 @@ export function WorkspaceRedirectPage({
   useEffect(() => {
     let active = true;
     async function resolve() {
-      if (!expectedWorkspace) {
+      // Platform access is independent of organization membership. Check it
+      // before the general/admin workspace redirect, so a platform admin who
+      // signs in from /admin/login is not sent to an organization workspace.
+      if (!expectedWorkspace || expectedWorkspace === 'admin') {
         try {
           await getPlatformOrganizations();
           if (active) setState({ destination: '/super-admin' });

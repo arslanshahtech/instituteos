@@ -202,8 +202,8 @@ export function StudentFeeLedgerModal({
                   {formatMoney(ledger.previousDues ?? 0)}
                 </div>
                 <p style={{ color: '#64748b', margin: '0.25rem 0 0.75rem' }}>
-                  Ye raqam agli nayi invoice me arrears ke tor par shamil
-                  hogi. Invoice banne par ye khatam ho jayegi.
+                  Ye raqam agli nayi invoice me arrears ke tor par shamil hogi.
+                  Invoice banne par ye khatam ho jayegi.
                 </p>
                 {canWrite && (
                   <form

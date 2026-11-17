@@ -86,12 +86,12 @@ function normalizeMatrix(
     });
     if (rows.length > MAX_STUDENT_IMPORT_ROWS) {
       throw new Error(
-        `This import supports up to ${MAX_STUDENT_IMPORT_ROWS} non-empty student rows per batch.`,
+        `This import supports up to ${MAX_STUDENT_IMPORT_ROWS} non-empty records per batch.`,
       );
     }
   }
   if (rows.length === 0)
-    throw new Error('No student rows were found below the headings.');
+    throw new Error('No data rows were found below the headings.');
   return { sheetName, headers, rows };
 }
 
@@ -224,7 +224,7 @@ export function guessStudentImportField(header: string): StudentImportField {
   )
     return 'guardianName';
   if (
-    /^(guardianphone|parentphone|fatherphone|motherphone|guardianmobile|parentmobile)$/.test(
+    /^(guardianphone|parentphone|fatherphone|motherphone|guardianmobile|parentmobile|familycontactphone)$/.test(
       normalized,
     )
   )

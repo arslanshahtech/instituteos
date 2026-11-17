@@ -3,6 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../api/client.js';
 import { Button } from '../components/ui/Button.js';
 import { useToast } from '../components/ui/ToastProvider.js';
+import {
+  useOrganizationSettings,
+  useUpdateOrganizationSettings,
+} from '../settings/settings-api.js';
+import type { OrganizationSettings } from '../settings/settings-api.js';
 import './attendance-settings.css';
 
 type AttendanceSettings = {
@@ -11,6 +16,7 @@ type AttendanceSettings = {
   schoolStartTime: string;
   gracePeriodMinutes: number;
   markingCutoffTime: string;
+  teacherMarkingCutoffEnabled: boolean;
   autoMarkUnmarkedAbsent: boolean;
   allowAdminOverride: boolean;
   workingDays: string[];
@@ -22,6 +28,7 @@ const defaults: AttendanceSettings = {
   schoolStartTime: '08:00',
   gracePeriodMinutes: 15,
   markingCutoffTime: '09:00',
+  teacherMarkingCutoffEnabled: false,
   autoMarkUnmarkedAbsent: false,
   allowAdminOverride: true,
   workingDays: [
@@ -52,6 +59,16 @@ export function AttendanceSettingsPanel({
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [form, setForm] = useState<AttendanceSettings>(defaults);
+  const organizationPolicy = useOrganizationSettings(organizationId);
+  const updateOrganizationPolicy =
+    useUpdateOrganizationSettings(organizationId);
+  const [teacherPolicy, setTeacherPolicy] = useState<
+    OrganizationSettings['teacherSelfAttendance']
+  >({
+    viewOwnAttendance: true,
+    selfMarkingEnabled: false,
+    allowedStatuses: ['present'],
+  });
   const queryKey = ['attendance', organizationId, 'settings'] as const;
   const settings = useQuery({
     queryKey,
@@ -82,6 +99,12 @@ export function AttendanceSettingsPanel({
   useEffect(() => {
     if (settings.data?.settings) setForm(settings.data.settings);
   }, [settings.data?.settings]);
+
+  useEffect(() => {
+    if (organizationPolicy.data?.settings.teacherSelfAttendance) {
+      setTeacherPolicy(organizationPolicy.data.settings.teacherSelfAttendance);
+    }
+  }, [organizationPolicy.data?.settings.teacherSelfAttendance]);
 
   const savedSettings = settings.data?.settings;
   const hasUnsavedChanges =
@@ -115,6 +138,25 @@ export function AttendanceSettingsPanel({
     setForm((current) => ({ ...current, [key]: value }));
   };
 
+  const updateTeacherPolicy = (
+    next: OrganizationSettings['teacherSelfAttendance'],
+  ) => {
+    setTeacherPolicy(next);
+    updateOrganizationPolicy.mutate(
+      { teacherSelfAttendance: next },
+      {
+        onError: () =>
+          setTeacherPolicy(
+            organizationPolicy.data?.settings.teacherSelfAttendance ?? {
+              viewOwnAttendance: true,
+              selfMarkingEnabled: false,
+              allowedStatuses: ['present'],
+            },
+          ),
+      },
+    );
+  };
+
   return (
     <section className="attendance-settings-page">
       <header className="attendance-settings-heading">
@@ -123,10 +165,7 @@ export function AttendanceSettingsPanel({
             Attendance configuration
           </span>
           <h2>Attendance Settings</h2>
-          <p>
-            Set the school day, teacher marking deadline, and automatic absence
-            rules for this organization.
-          </p>
+          <p>Configure attendance timings, rules and teacher access.</p>
         </div>
         <span className="attendance-settings-scope">Organization-wide</span>
       </header>
@@ -139,6 +178,7 @@ export function AttendanceSettingsPanel({
             schoolStartTime: form.schoolStartTime,
             gracePeriodMinutes: form.gracePeriodMinutes,
             markingCutoffTime: form.markingCutoffTime,
+            teacherMarkingCutoffEnabled: form.teacherMarkingCutoffEnabled,
             autoMarkUnmarkedAbsent: form.autoMarkUnmarkedAbsent,
             allowAdminOverride: form.allowAdminOverride,
             workingDays: form.workingDays,
@@ -149,10 +189,7 @@ export function AttendanceSettingsPanel({
           <div className="attendance-settings-card-title">
             <div>
               <h3>Attendance schedule</h3>
-              <p>
-                Set the school start, late-arrival grace period, and final
-                attendance cutoff. All times use the institute timezone.
-              </p>
+              <p>Set the start time, late grace period and daily cutoff.</p>
             </div>
           </div>
           <div className="attendance-settings-grid">
@@ -167,9 +204,7 @@ export function AttendanceSettingsPanel({
                 <option value="Asia/Dubai">UAE — Asia/Dubai</option>
                 <option value="Europe/London">UK — Europe/London</option>
               </select>
-              <small>
-                Used to calculate the attendance cutoff in local school time.
-              </small>
+              <small>Used for attendance dates and cutoff times.</small>
             </label>
             <label className="attendance-settings-field">
               <span>School start time</span>
@@ -181,9 +216,7 @@ export function AttendanceSettingsPanel({
                   update('schoolStartTime', event.target.value)
                 }
               />
-              <small>
-                Used as the reference time when staff review late arrivals.
-              </small>
+              <small>Reference time for late arrivals.</small>
             </label>
             <label className="attendance-settings-field">
               <span>Grace period (minutes)</span>
@@ -199,24 +232,29 @@ export function AttendanceSettingsPanel({
                 }
               />
               <small>
-                Helps staff decide when to manually mark a student Late. The
-                system does not automatically change attendance to Late.
+                Guides manual Late marking; status is not changed automatically.
               </small>
             </label>
             <label className="attendance-settings-field">
-              <span>Attendance marking cutoff</span>
+              <span>Daily attendance cutoff time</span>
               <input
                 type="time"
-                required
+                disabled={
+                  !form.teacherMarkingCutoffEnabled &&
+                  !form.autoMarkUnmarkedAbsent
+                }
+                required={
+                  form.teacherMarkingCutoffEnabled ||
+                  form.autoMarkUnmarkedAbsent
+                }
                 value={form.markingCutoffTime}
                 onChange={(event) =>
                   update('markingCutoffTime', event.target.value)
                 }
               />
               <small>
-                At this time, any students still unmarked are automatically
-                saved as Absent when automatic absence is enabled. Teachers
-                cannot submit normal roll-call changes after the cutoff.
+                Applies to teacher lock time and, separately, the automatic
+                absence schedule when that option is enabled.
               </small>
             </label>
           </div>
@@ -225,19 +263,146 @@ export function AttendanceSettingsPanel({
         <section className="attendance-settings-card">
           <div className="attendance-settings-card-title">
             <div>
-              <h3>Automatic student absence</h3>
+              <h3>Teacher attendance marking</h3>
+              <p>Set a cutoff for teacher-submitted student attendance.</p>
+            </div>
+          </div>
+          <label className="attendance-settings-toggle">
+            <span>
+              <strong>Restrict teachers after a daily cutoff</strong>
+              <small>
+                Off means teachers can record today's class attendance at any
+                time. Past dates remain restricted.
+              </small>
+            </span>
+            <input
+              type="checkbox"
+              checked={form.teacherMarkingCutoffEnabled}
+              onChange={(event) =>
+                update('teacherMarkingCutoffEnabled', event.target.checked)
+              }
+            />
+          </label>
+        </section>
+
+        <section className="attendance-settings-card">
+          <div className="attendance-settings-card-title">
+            <div>
+              <h3>Teacher self-attendance</h3>
               <p>
-                Unmarked active students are saved as Absent after the cutoff.
+                Choose whether teachers can view or submit their own attendance.
               </p>
+            </div>
+          </div>
+          {organizationPolicy.isPending ? (
+            <p>Loading teacher attendance policy...</p>
+          ) : organizationPolicy.isError ? (
+            <p className="attendance-settings-error" role="alert">
+              Teacher attendance policy could not be loaded.
+            </p>
+          ) : (
+            <>
+              <label className="attendance-settings-toggle">
+                <span>
+                  <strong>Allow teachers to view attendance history</strong>
+                  <small>
+                    Teachers can view only their own attendance records.
+                  </small>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={teacherPolicy.viewOwnAttendance}
+                  disabled={updateOrganizationPolicy.isPending}
+                  onChange={(event) => {
+                    const next = {
+                      ...teacherPolicy,
+                      viewOwnAttendance: event.target.checked,
+                    };
+                    updateTeacherPolicy(next);
+                  }}
+                />
+              </label>
+              <label className="attendance-settings-toggle">
+                <span>
+                  <strong>Allow teachers to mark their own attendance</strong>
+                  <small>
+                    Teachers can mark today only; existing records stay
+                    unchanged.
+                  </small>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={teacherPolicy.selfMarkingEnabled}
+                  disabled={updateOrganizationPolicy.isPending}
+                  onChange={(event) => {
+                    const next = {
+                      ...teacherPolicy,
+                      selfMarkingEnabled: event.target.checked,
+                    };
+                    updateTeacherPolicy(next);
+                  }}
+                />
+              </label>
+              <div className="attendance-settings-days">
+                <strong>Allowed self-attendance statuses</strong>
+                <div className="attendance-settings-day-options">
+                  {(['present', 'absent', 'half-day', 'on-leave'] as const).map(
+                    (status) => (
+                      <label key={status}>
+                        <input
+                          type="checkbox"
+                          checked={teacherPolicy.allowedStatuses.includes(
+                            status,
+                          )}
+                          disabled={
+                            !teacherPolicy.selfMarkingEnabled ||
+                            updateOrganizationPolicy.isPending ||
+                            (teacherPolicy.allowedStatuses.length === 1 &&
+                              teacherPolicy.allowedStatuses.includes(status))
+                          }
+                          onChange={(event) => {
+                            const next = {
+                              ...teacherPolicy,
+                              allowedStatuses: event.target.checked
+                                ? [...teacherPolicy.allowedStatuses, status]
+                                : teacherPolicy.allowedStatuses.filter(
+                                    (item) => item !== status,
+                                  ),
+                            };
+                            updateTeacherPolicy(next);
+                          }}
+                        />
+                        {status
+                          .replace('-', ' ')
+                          .replace(/^\w/, (letter) => letter.toUpperCase())}
+                      </label>
+                    ),
+                  )}
+                </div>
+              </div>
+              {updateOrganizationPolicy.isError && (
+                <p className="attendance-settings-error" role="alert">
+                  Teacher attendance policy could not be saved. Please try
+                  again.
+                </p>
+              )}
+            </>
+          )}
+        </section>
+
+        <section className="attendance-settings-card">
+          <div className="attendance-settings-card-title">
+            <div>
+              <h3>Automatic student absence</h3>
+              <p>Automatically mark unrecorded students absent.</p>
             </div>
           </div>
           <label className="attendance-settings-toggle">
             <span>
               <strong>Automatically mark unmarked students Absent</strong>
               <small>
-                The system checks the active academic year and class placements.
-                Existing Present, Late, Leave, or manually entered Absent
-                records are preserved.
+                Applies to active class placements. Existing attendance marks
+                are preserved.
               </small>
             </span>
             <input
@@ -252,9 +417,7 @@ export function AttendanceSettingsPanel({
             <span>
               <strong>Allow administrator override after cutoff</strong>
               <small>
-                Organization Owner and Admin can correct attendance after the
-                deadline. All changes remain subject to attendance.write
-                permission.
+                Owners and Admins can correct records after the cutoff.
               </small>
             </span>
             <input
@@ -268,8 +431,8 @@ export function AttendanceSettingsPanel({
           <div className="attendance-settings-days">
             <strong>Working days</strong>
             <p>
-              Automatic absence is skipped on non-working days and institute
-              holidays with “No classes” enabled.
+              Automatic absence skips non-working days and “No classes”
+              holidays.
             </p>
             <div className="attendance-settings-day-options">
               {dayOptions.map(([value, label]) => (

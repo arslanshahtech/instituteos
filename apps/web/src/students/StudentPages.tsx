@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   BookOpen,
   CalendarDays,
+  CheckSquare,
   Download,
   Eye,
   FileText,
@@ -45,10 +46,6 @@ import { getOrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import type { OrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import { listInvoices } from '../finance/finance-api.js';
 import type { StudentInvoice } from '../finance/finance-api.js';
-import {
-  useSetStudentPreviousDues,
-  useStudentFeeLedger,
-} from '../finance/finance-queries.js';
 import { StudentForm } from './StudentForm.js';
 import { ChildPickupPanel } from './ChildPickupPanel.js';
 import { StudentFamilyContactsSection } from '../families/FamilyContactsPages.js';
@@ -113,6 +110,45 @@ function studentCsv(students: StudentRecord[]): string {
 function apiMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   return 'The request could not be completed. Try again.';
+}
+
+function compactAttendanceRemark(value?: string): string {
+  if (!value?.trim()) return '—';
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized.includes('absent') &&
+    (normalized.includes('automatic') ||
+      normalized.includes('cutoff') ||
+      normalized.includes('cut-off'))
+  ) {
+    return 'Auto absent';
+  }
+  return (
+    value.trim().replace(/\s+/g, ' ').split(/[.!?]/)[0].slice(0, 42) || '—'
+  );
+}
+
+function studentWithdrawalInput(student: StudentRecord): StudentInput {
+  return {
+    firstName: student.firstName,
+    lastName: student.lastName,
+    preferredName: student.preferredName,
+    registrationNumber: student.registrationNumber,
+    fatherName: student.fatherName,
+    motherName: student.motherName,
+    parentMobile: student.parentMobile,
+    dateOfBirth: student.dateOfBirth,
+    gender: student.gender,
+    contactEmail: student.contactEmail,
+    phone: student.phone,
+    campusId: student.campusId,
+    nationality: student.nationality,
+    religion: student.religion,
+    birthPlace: student.birthPlace,
+    nationalId: student.nationalId,
+    specialNeeds: student.specialNeeds,
+    status: 'withdrawn',
+  };
 }
 
 function useOrganizationAccess(organizationId: string) {
@@ -244,6 +280,10 @@ export function StudentsListPage() {
     useState({ top: 0, left: 0 });
   const [registrationPrefix, setRegistrationPrefix] = useState('REG');
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [isBulkWithdrawDialogOpen, setIsBulkWithdrawDialogOpen] =
+    useState(false);
+  const [bulkWithdrawConfirmation, setBulkWithdrawConfirmation] = useState('');
+  const [isBulkWithdrawing, setIsBulkWithdrawing] = useState(false);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -383,32 +423,59 @@ export function StudentsListPage() {
     )
       return;
     try {
-      await updateStudent(organizationId, student.id, {
-        firstName: student.firstName,
-        lastName: student.lastName,
-        preferredName: student.preferredName,
-        registrationNumber: student.registrationNumber,
-        fatherName: student.fatherName,
-        motherName: student.motherName,
-        parentMobile: student.parentMobile,
-        dateOfBirth: student.dateOfBirth,
-        gender: student.gender,
-        contactEmail: student.contactEmail,
-        phone: student.phone,
-        campusId: student.campusId,
-        nationality: student.nationality,
-        religion: student.religion,
-        birthPlace: student.birthPlace,
-        nationalId: student.nationalId,
-        specialNeeds: student.specialNeeds,
-        status: 'withdrawn',
-      });
+      await updateStudent(
+        organizationId,
+        student.id,
+        studentWithdrawalInput(student),
+      );
       await students.refetch();
       showToast(`${fullName} marked as withdrawn.`);
     } catch (error) {
       showToast(apiMessage(error), 'info');
     }
   };
+
+  const visibleStudents = students.data?.items ?? [];
+  const selectedVisibleStudents = visibleStudents.filter((student) =>
+    selectedStudentIds.includes(student.id),
+  );
+  const allVisibleSelected =
+    visibleStudents.length > 0 &&
+    selectedVisibleStudents.length === visibleStudents.length;
+
+  const withdrawSelectedStudents = async () => {
+    if (!canUpdate || !selectedVisibleStudents.length || isBulkWithdrawing)
+      return;
+    setIsBulkWithdrawing(true);
+    try {
+      const results = await Promise.allSettled(
+        selectedVisibleStudents.map((student) =>
+          updateStudent(
+            organizationId,
+            student.id,
+            studentWithdrawalInput(student),
+          ),
+        ),
+      );
+      const withdrawn = results.filter(
+        (result) => result.status === 'fulfilled',
+      ).length;
+      const failed = results.length - withdrawn;
+      setSelectedStudentIds([]);
+      setIsBulkWithdrawDialogOpen(false);
+      setBulkWithdrawConfirmation('');
+      await students.refetch();
+      showToast(
+        failed
+          ? `Withdrawn ${withdrawn} of ${results.length}; ${failed} could not be updated.`
+          : `${withdrawn} student(s) withdrawn. Records and history are preserved.`,
+        failed ? 'info' : 'success',
+      );
+    } finally {
+      setIsBulkWithdrawing(false);
+    }
+  };
+
   const canReadFinance =
     access.data?.permissions.includes('finance.read') ?? false;
   const invoices = useQuery({
@@ -701,7 +768,11 @@ export function StudentsListPage() {
           <WorkspaceModuleToolbar className="student-filters">
             <WorkspaceSearchField
               label="Search students"
-              onChange={setSearchInput}
+              onChange={(value) => {
+                setSelectedStudentIds([]);
+                setIsBulkWithdrawDialogOpen(false);
+                setSearchInput(value);
+              }}
               placeholder="Search by name or ID..."
               value={searchInput}
             />
@@ -709,6 +780,7 @@ export function StudentsListPage() {
               label="Class"
               value={classId}
               onChange={(value) => {
+                setSelectedStudentIds([]);
                 setClassId(value);
                 setSectionId('');
                 setPage(1);
@@ -726,6 +798,7 @@ export function StudentsListPage() {
               value={sectionId}
               disabled={!classId}
               onChange={(value) => {
+                setSelectedStudentIds([]);
                 setSectionId(value);
                 setPage(1);
               }}
@@ -739,6 +812,7 @@ export function StudentsListPage() {
             <WorkspaceFilterSelect
               label="Student status"
               onChange={(value) => {
+                setSelectedStudentIds([]);
                 setStatus(value as StudentStatus | '');
                 setPage(1);
               }}
@@ -787,6 +861,45 @@ export function StudentsListPage() {
             />
           ) : (
             <>
+              {students.data.items.length > 0 && (
+                <div className="student-selection-toolbar">
+                  <div className="student-selection-start">
+                    <button
+                      className="student-select-shown"
+                      type="button"
+                      aria-pressed={allVisibleSelected}
+                      onClick={() =>
+                        setSelectedStudentIds((current) =>
+                          allVisibleSelected
+                            ? current.filter(
+                                (id) => !visibleStudentIds.includes(id),
+                              )
+                            : visibleStudentIds,
+                        )
+                      }
+                    >
+                      <CheckSquare size={14} aria-hidden="true" />
+                      {allVisibleSelected ? 'Deselect shown' : 'Select shown'}
+                    </button>
+                    {selectedVisibleStudents.length > 0 && (
+                      <small>{selectedVisibleStudents.length} selected</small>
+                    )}
+                  </div>
+                  {selectedVisibleStudents.length > 0 && canUpdate && (
+                    <button
+                      className="student-bulk-withdraw"
+                      type="button"
+                      onClick={() => {
+                        setBulkWithdrawConfirmation('');
+                        setIsBulkWithdrawDialogOpen(true);
+                      }}
+                    >
+                      <Trash2 size={14} aria-hidden="true" />
+                      Withdraw selected
+                    </button>
+                  )}
+                </div>
+              )}
               {students.data.items.length === 0 ? (
                 <DataTable
                   caption="Students"
@@ -822,31 +935,7 @@ export function StudentsListPage() {
                   wrapperClassName="student-reference-table"
                   columns={[
                     {
-                      header: 'Select',
-                      headerRender: () => (
-                        <input
-                          aria-label="Select all students on this page"
-                          checked={
-                            students.data.items.length > 0 &&
-                            students.data.items.every((student) =>
-                              selectedStudentIds.includes(student.id),
-                            )
-                          }
-                          onChange={(event) => {
-                            const visibleIds = students.data.items.map(
-                              (student) => student.id,
-                            );
-                            setSelectedStudentIds((current) =>
-                              event.target.checked
-                                ? [...new Set([...current, ...visibleIds])]
-                                : current.filter(
-                                    (id) => !visibleIds.includes(id),
-                                  ),
-                            );
-                          }}
-                          type="checkbox"
-                        />
-                      ),
+                      header: '',
                       render: (student) => (
                         <input
                           aria-label={`Select ${student.firstName} ${student.lastName}`}
@@ -854,7 +943,7 @@ export function StudentsListPage() {
                           onChange={(event) =>
                             setSelectedStudentIds((current) =>
                               event.target.checked
-                                ? [...current, student.id]
+                                ? [...new Set([...current, student.id])]
                                 : current.filter((id) => id !== student.id),
                             )
                           }
@@ -954,6 +1043,9 @@ export function StudentsListPage() {
                             to={`/admin/organizations/${encodeURIComponent(organizationId)}/students/${encodeURIComponent(student.id)}`}
                           >
                             <Eye size={16} />
+                            <span className="student-view-details-label">
+                              View details
+                            </span>
                           </Link>
                           <Link
                             aria-label={`Edit ${student.firstName} ${student.lastName}`}
@@ -983,7 +1075,10 @@ export function StudentsListPage() {
               )}
               <Pagination
                 currentPage={students.data.page}
-                onPageChange={setPage}
+                onPageChange={(nextPage) => {
+                  setSelectedStudentIds([]);
+                  setPage(nextPage);
+                }}
                 pageSize={students.data.pageSize}
                 totalItems={students.data.total}
               />
@@ -991,6 +1086,68 @@ export function StudentsListPage() {
           )}
         </WorkspaceModuleSection>
       </main>
+      {isBulkWithdrawDialogOpen &&
+        createPortal(
+          <div className="student-bulk-dialog-backdrop">
+            <section
+              aria-labelledby="student-bulk-dialog-title"
+              aria-modal="true"
+              className="student-bulk-dialog"
+              role="dialog"
+            >
+              <div className="student-bulk-dialog-icon">
+                <Trash2 size={19} aria-hidden="true" />
+              </div>
+              <h2 id="student-bulk-dialog-title">
+                Withdraw selected students?
+              </h2>
+              <p>
+                {selectedVisibleStudents.length} selected student(s) will be
+                marked as withdrawn. Academic, attendance and fee history will
+                be kept. This does not permanently delete student records.
+              </p>
+              <label>
+                Type <strong>WITHDRAW</strong> to confirm
+                <input
+                  autoComplete="off"
+                  autoFocus
+                  value={bulkWithdrawConfirmation}
+                  onChange={(event) =>
+                    setBulkWithdrawConfirmation(event.target.value)
+                  }
+                  placeholder="WITHDRAW"
+                />
+              </label>
+              <div className="student-bulk-dialog-actions">
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  disabled={isBulkWithdrawing}
+                  onClick={() => {
+                    setIsBulkWithdrawDialogOpen(false);
+                    setBulkWithdrawConfirmation('');
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="button button-primary"
+                  type="button"
+                  disabled={
+                    isBulkWithdrawing ||
+                    bulkWithdrawConfirmation.trim().toUpperCase() !==
+                      'WITHDRAW' ||
+                    selectedVisibleStudents.length === 0
+                  }
+                  onClick={() => void withdrawSelectedStudents()}
+                >
+                  {isBulkWithdrawing ? 'Withdrawing…' : 'Confirm withdrawal'}
+                </button>
+              </div>
+            </section>
+          </div>,
+          document.body,
+        )}
     </AccessState>
   );
 }
@@ -1050,119 +1207,19 @@ export function StudentCreatePage() {
   );
 }
 
-function StudentPreviousDuesSection({
-  organizationId,
-  studentId,
-  canWrite,
-}: {
-  organizationId: string;
-  studentId: string;
-  canWrite: boolean;
-}) {
-  const [duesInput, setDuesInput] = useState('');
-  const [duesMessage, setDuesMessage] = useState<string | null>(null);
-  const ledger = useStudentFeeLedger(organizationId, studentId);
-  const setPreviousDues = useSetStudentPreviousDues(organizationId);
-
-  useEffect(() => {
-    if (ledger.data) {
-      setDuesInput(String(ledger.data.previousDues ?? 0));
-    }
-  }, [ledger.data]);
-
-  const formatMoney = (val: number) =>
-    `Rs. ${Number(val || 0).toLocaleString('en-PK', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-
-  return (
-    <section className="student-detail-panel panel">
-      <div className="student-detail-heading">
-        <h2>Fee dues</h2>
-      </div>
-      {ledger.isPending ? (
-        <LoadingState message="Loading fee duesâ€¦" />
-      ) : ledger.isError || !ledger.data ? (
-        <p role="alert" style={{ color: '#b91c1c' }}>
-          Fee dues could not be loaded for this student.
-        </p>
-      ) : (
-        <>
-          <dl className="student-details">
-            <div>
-              <dt>Previous dues (pehla baqaya)</dt>
-              <dd>{formatMoney(ledger.data.previousDues ?? 0)}</dd>
-            </div>
-            <div>
-              <dt>Total outstanding (kul baqaya)</dt>
-              <dd>{formatMoney(ledger.data.outstandingBalance)}</dd>
-            </div>
-          </dl>
-          <p>
-            Previous dues agli nayi invoice me shamil honge. Invoice banne ke
-            baad baqaya us invoice me rehta hai jab tak poori payment na ho
-            jaye. Invoice delete hone par bacha hua baqaya wapas previous dues
-            me aa jata hai.
-          </p>
-          {canWrite && (
-            <form
-              onSubmit={async (event) => {
-                event.preventDefault();
-                const amount = Number(duesInput);
-                if (!Number.isFinite(amount) || amount < 0) {
-                  setDuesMessage('Enter a valid amount of zero or more.');
-                  return;
-                }
-                try {
-                  await setPreviousDues.mutateAsync({ studentId, amount });
-                  setDuesMessage('Previous dues saved.');
-                } catch {
-                  setDuesMessage('Could not save previous dues.');
-                }
-              }}
-              style={{
-                display: 'flex',
-                gap: '0.5rem',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                marginTop: '1rem',
-              }}
-            >
-              <label>
-                Previous dues (Rs.){' '}
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={duesInput}
-                  onChange={(event) => setDuesInput(event.target.value)}
-                  style={{
-                    padding: '0.4rem',
-                    border: '1px solid #cbd5e1',
-                    borderRadius: '0.375rem',
-                  }}
-                />
-              </label>
-              <button
-                className="button button-primary"
-                type="submit"
-                disabled={setPreviousDues.isPending}
-              >
-                Save previous dues
-              </button>
-              {duesMessage && <span role="status">{duesMessage}</span>}
-            </form>
-          )}
-        </>
-      )}
-    </section>
-  );
-}
-
 export function StudentDetailPage() {
   const { organizationId = '', studentId = '' } = useParams();
+  const location = useLocation();
   const access = useOrganizationAccess(organizationId);
+  const requestedTeacherReturn = (location.state as { from?: unknown } | null)
+    ?.from;
+  const teacherStudentsPath = `/teacher/organizations/${encodeURIComponent(organizationId)}/students`;
+  const backHref =
+    access.data?.role === 'teacher' &&
+    typeof requestedTeacherReturn === 'string' &&
+    requestedTeacherReturn.startsWith(`${teacherStudentsPath}?`)
+      ? requestedTeacherReturn
+      : `${access.data?.role === 'teacher' ? '/teacher' : '/admin'}/organizations/${encodeURIComponent(organizationId)}/students`;
   const student = useStudent(
     organizationId,
     studentId,
@@ -1457,7 +1514,7 @@ export function StudentDetailPage() {
       <div className="student-profile-top">
         <Link
           className="student-profile-back"
-          to={`/admin/organizations/${encodeURIComponent(organizationId)}/students`}
+          to={backHref}
           aria-label="Back to students"
         >
           ←
@@ -1779,18 +1836,16 @@ export function StudentDetailPage() {
               </div>
             </dl>
           </section>
+          <ChildPickupPanel
+            organizationId={organizationId}
+            studentId={studentId}
+            userRole={access.data.role}
+          />
         </>
       )}
 
       {activeTab === 'fees' && (
         <>
-          {canReadFinance && (
-            <StudentPreviousDuesSection
-              organizationId={organizationId}
-              studentId={studentId}
-              canWrite={access.data.permissions.includes('finance.write')}
-            />
-          )}
           <section className="student-detail-panel panel">
             <div className="student-detail-heading">
               <div>
@@ -1923,8 +1978,16 @@ export function StudentDetailPage() {
                       .map((item) => (
                         <tr key={item.id}>
                           <td>{item.date}</td>
-                          <td>{item.status}</td>
-                          <td>{item.remarks || '—'}</td>
+                          <td>
+                            <span
+                              className={`student-attendance-status status-${item.status}`}
+                            >
+                              {item.status.replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td title={item.remarks || undefined}>
+                            {compactAttendanceRemark(item.remarks)}
+                          </td>
                         </tr>
                       ))}
                   </tbody>
@@ -2028,17 +2091,47 @@ export function StudentDetailPage() {
       {activeTab === 'history' && (
         <section className="student-detail-panel panel">
           <h2>Student history</h2>
-          <p className="page-description">
-            Current status: {record.status}. Current placement:{' '}
-            {placement
-              ? `${placement.className} - ${placement.sectionName} (${placement.academicYearName})`
-              : 'No active placement'}
-            .
-          </p>
-          <p className="page-description">
-            Class movement history is not yet stored by the placement service;
-            this screen will not fabricate previous movements.
-          </p>
+          <dl className="student-details">
+            <div>
+              <dt>Current status</dt>
+              <dd>{record.status}</dd>
+            </div>
+            <div>
+              <dt>Admission date</dt>
+              <dd>{record.createdAt?.slice(0, 10) || '—'}</dd>
+            </div>
+            <div>
+              <dt>Registration number</dt>
+              <dd>
+                {record.registrationNumber ||
+                  placement?.registrationNumber ||
+                  '—'}
+              </dd>
+            </div>
+            <div>
+              <dt>Current class</dt>
+              <dd>{placement?.className || 'No active placement'}</dd>
+            </div>
+            <div>
+              <dt>Section</dt>
+              <dd>{placement?.sectionName || '—'}</dd>
+            </div>
+            <div>
+              <dt>Campus</dt>
+              <dd>
+                <StudentCampusName
+                  campusId={record.campusId}
+                  campuses={campuses.data?.campuses ?? []}
+                />
+              </dd>
+            </div>
+          </dl>
+          <div className="student-history-note">
+            <h3>Class movement</h3>
+            <p className="page-description">
+              Previous class movements are not available in the current records.
+            </p>
+          </div>
         </section>
       )}
       {changeClassOpen && (
@@ -2178,11 +2271,6 @@ export function StudentDetailPage() {
           </section>
         </div>
       )}
-      <ChildPickupPanel
-        organizationId={organizationId}
-        studentId={studentId}
-        userRole={access.data.role}
-      />
     </main>
   );
 }

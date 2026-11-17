@@ -727,13 +727,144 @@
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.025);
 }
 @media (max-width: 720px) {
+  .organization-settings-stack {
+    gap: 16px;
+  }
   .organization-settings-stack > .organization-form {
     grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
     padding: 16px;
+  }
+  .organization-settings-stack > .organization-form > button {
+    width: 100%;
+    min-height: 46px;
+  }
+  .organization-logo-control {
+    align-items: flex-start;
+  }
+  .organization-logo-actions {
+    flex: 1 1 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+  .organization-logo-upload {
+    width: 100%;
+    min-height: 44px;
+  }
+  .organization-settings-stack .organization-danger-zone {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    padding: 16px;
+  }
+  .organization-archive-action {
+    width: 100% !important;
+    min-height: 44px;
+    justify-self: stretch;
+    justify-content: center;
   }
   .organization-admin-page .campus-list-row {
     grid-template-columns: 36px minmax(0, 1fr);
     padding: 13px;
+  }
+}
+
+/* Membership invitation card and concise campus page hierarchy. */
+.organization-admin-page .campus-panel-heading {
+  justify-content: flex-end;
+  margin: 0;
+}
+.organization-admin-page .organization-section > .member-invite-form {
+  grid-template-columns: minmax(0, 1.25fr) minmax(220px, 0.75fr);
+  align-items: end;
+  gap: 16px;
+  padding: 22px;
+  border-color: #e2e8f0;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.045);
+}
+.organization-admin-page .member-invite-card-heading {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 13px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.organization-admin-page .member-invite-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #0f172a;
+}
+.organization-admin-page .member-invite-card-heading h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 650;
+}
+.organization-admin-page .member-invite-card-heading p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.organization-admin-page .member-invite-form > .field-hint {
+  grid-column: 1 / -1;
+  margin-top: -8px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.organization-admin-page .member-invite-form > .campus-scope-dropdown,
+.organization-admin-page .member-invite-form > .admin-permission-editor {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+.organization-admin-page .member-invite-form > .admin-permission-editor {
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  background: #fff;
+}
+.organization-admin-page .member-invite-form > button[type='submit'] {
+  justify-self: end;
+  min-width: 168px;
+  min-height: 44px;
+  border-radius: 10px;
+  background: #0a0a0a;
+  color: #fff;
+}
+.organization-admin-page .member-invite-form > button[type='submit']:hover {
+  background: #262626;
+}
+.organization-admin-page .member-invite-form > button[type='submit']:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+@media (max-width: 760px) {
+  .organization-admin-page .organization-section > .member-invite-form {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 13px;
+    padding: 16px;
+  }
+  .organization-admin-page .member-invite-card-heading {
+    align-items: flex-start;
+  }
+  .organization-admin-page .member-invite-form > .field-hint,
+  .organization-admin-page .member-invite-form > .campus-scope-dropdown,
+  .organization-admin-page .member-invite-form > .admin-permission-editor {
+    grid-column: auto;
+  }
+  .organization-admin-page .member-invite-form > button[type='submit'] {
+    justify-self: stretch;
+    width: 100%;
   }
 }
 
@@ -780,4 +911,139 @@
   .button-primary:hover {
   background: #252525;
   border-color: #252525;
+}
+/* Organization Profile: focused lifecycle panel and mobile-first controls. */
+.organization-settings-stack .organization-danger-zone {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px 24px;
+}
+
+.organization-settings-stack .organization-danger-zone > div {
+  min-width: 0;
+}
+
+.organization-settings-stack .organization-danger-zone > div > p:not(.eyebrow) {
+  max-width: 48ch;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.organization-logo-upload:focus-within {
+  outline: 2px solid #0f172a;
+  outline-offset: 3px;
+}
+
+/* Membership final polish: quiet role labels and compact, task-focused mobile controls. */
+.organization-admin-page .member-tags .member-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.organization-admin-page .member-tags .member-role-tag {
+  background: #f1f5f9;
+  color: #475569;
+  text-transform: capitalize;
+}
+.organization-admin-page .member-tags .member-active-tag {
+  border: 0;
+  background: #f0fdf4;
+  color: #166534;
+}
+.organization-admin-page .member-tags .member-inactive-tag {
+  border: 0;
+  background: #f8fafc;
+  color: #64748b;
+}
+.organization-admin-page .member-tags .member-active-tag::before,
+.organization-admin-page .member-tags .member-inactive-tag::before {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
+}
+@media (max-width: 760px) {
+  .organization-admin-page
+    .organization-section
+    > .organization-list
+    .organization-row:has(.member-identity) {
+    gap: 14px;
+    padding: 15px;
+  }
+  .organization-admin-page
+    .organization-section
+    > .organization-list
+    .organization-row:has(.member-identity)
+    .member-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 9px;
+    padding-top: 12px;
+    border-top: 1px solid #eef2f6;
+  }
+  .organization-admin-page
+    .organization-section
+    > .organization-list
+    .organization-row:has(.member-identity)
+    .member-controls
+    > select {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    min-height: 40px;
+    border-radius: 8px;
+    background: #f8fafc;
+  }
+  .organization-admin-page
+    .organization-section
+    > .organization-list
+    .organization-row:has(.member-identity)
+    .member-controls
+    > .campus-scope-dropdown,
+  .organization-admin-page
+    .organization-section
+    > .organization-list
+    .organization-row:has(.member-identity)
+    .member-controls
+    > .admin-permission-editor {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+  }
+  .organization-admin-page
+    .organization-section
+    > .organization-list
+    .organization-row:has(.member-identity)
+    .member-controls
+    > button:not([aria-label^='Remove']) {
+    grid-column: 1;
+    width: 100%;
+    min-height: 40px;
+    justify-content: center;
+    border-radius: 8px;
+  }
+  .organization-admin-page
+    .organization-section
+    > .organization-list
+    .organization-row:has(.member-identity)
+    .member-controls
+    > button[aria-label^='Remove'] {
+    grid-column: 2;
+    justify-self: end;
+    width: 40px;
+    min-height: 40px;
+    border-radius: 8px;
+  }
+  .organization-admin-page .member-invite-form > button[type='submit'] {
+    min-height: 44px;
+  }
 }

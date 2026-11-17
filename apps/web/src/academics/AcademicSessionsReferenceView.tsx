@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   CalendarDays,
   Download,
+  Eye,
   Layers3,
   Pencil,
   Plus,
@@ -10,8 +11,14 @@ import {
   Users,
   BookOpen,
 } from 'lucide-react';
-import type { AcademicYear, AcademicYearSummary } from './academics-api.js';
+import type {
+  AcademicClass,
+  AcademicSection,
+  AcademicYear,
+  AcademicYearSummary,
+} from './academics-api.js';
 import { Button } from '../components/ui/Button.js';
+import { Dialog } from '../components/ui/Dialog.js';
 import {
   WorkspaceMetricCard,
   WorkspacePageHeading,
@@ -76,6 +83,8 @@ function downloadSessionsCsv(
 
 export function AcademicSessionsReferenceView({
   sessions,
+  classes = [],
+  sections = [],
   summary,
   canWrite,
   onCreate,
@@ -83,6 +92,8 @@ export function AcademicSessionsReferenceView({
   onDelete,
 }: {
   sessions: AcademicYear[];
+  classes?: AcademicClass[];
+  sections?: AcademicSection[];
   summary: AcademicYearSummary;
   canWrite: boolean;
   onCreate: () => void;
@@ -92,6 +103,9 @@ export function AcademicSessionsReferenceView({
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [detailsSession, setDetailsSession] = useState<AcademicYear | null>(
+    null,
+  );
   const activeSession = sessions.find((session) => session.status === 'active');
   const counts = useMemo(
     () => new Map(summary.bySession.map((item) => [item.academicYearId, item])),
@@ -106,6 +120,34 @@ export function AcademicSessionsReferenceView({
         .includes(query),
     );
   }, [search, sessions]);
+  const sessionClassGroups = useMemo(() => {
+    if (!detailsSession) return [];
+    const classMap = new Map(classes.map((item) => [item.id, item]));
+    const sectionMap = new Map(sections.map((item) => [item.id, item]));
+    const groups = new Map<
+      string,
+      { name: string; sections: Array<{ name: string; students: number }> }
+    >();
+    summary.bySection
+      .filter((placement) => placement.academicYearId === detailsSession.id)
+      .forEach((placement) => {
+        const section = sectionMap.get(placement.sectionId);
+        const academicClass = section
+          ? classMap.get(section.classId)
+          : undefined;
+        if (!section || !academicClass) return;
+        const group = groups.get(academicClass.id) ?? {
+          name: academicClass.name,
+          sections: [],
+        };
+        group.sections.push({
+          name: section.name,
+          students: placement.students,
+        });
+        groups.set(academicClass.id, group);
+      });
+    return [...groups.values()];
+  }, [classes, detailsSession, sections, summary.bySection]);
   const pageCount = Math.max(1, Math.ceil(filteredSessions.length / pageSize));
   const visibleSessions = filteredSessions.slice(
     (page - 1) * pageSize,
@@ -144,8 +186,8 @@ export function AcademicSessionsReferenceView({
   return (
     <main className="page-stack academic-sessions-page">
       <WorkspacePageHeading
-        eyebrow="Curriculum"
-        title="Academic Sessions"
+        eyebrow=""
+        title="Academy Session"
         description="Manage your institute's academic sessions."
         aside={
           canWrite ? (
@@ -191,10 +233,9 @@ export function AcademicSessionsReferenceView({
         <header className="academic-sessions-table-heading">
           <div>
             <h2>All Sessions ({filteredSessions.length})</h2>
-            <p>Sessions created for this organization</p>
           </div>
         </header>
-        <div className="table-scroll">
+        <div className="table-scroll academic-sessions-desktop-list">
           <table className="data-table academic-sessions-table">
             <thead>
               <tr>
@@ -262,6 +303,7 @@ export function AcademicSessionsReferenceView({
                             </Button>
                             <Button
                               aria-label={'Delete ' + session.name}
+                              className="academic-session-delete-button"
                               onClick={() => onDelete(session)}
                               type="button"
                               variant="quiet"
@@ -305,6 +347,57 @@ export function AcademicSessionsReferenceView({
               )}
             </tbody>
           </table>
+        </div>
+        <div className="academic-sessions-mobile-list">
+          {visibleSessions.length ? (
+            visibleSessions.map((session) => (
+              <article
+                className="academic-session-mobile-card"
+                key={session.id}
+              >
+                <div className="academic-session-mobile-card-main">
+                  <span className="academic-session-mobile-label">SESSION</span>
+                  <strong>{session.name}</strong>
+                  <small
+                    className={session.status === 'active' ? 'is-current' : ''}
+                  >
+                    {session.status === 'active'
+                      ? 'Current session'
+                      : activeSession &&
+                          session.startDate > activeSession.startDate
+                        ? 'Upcoming'
+                        : 'Archived'}
+                  </small>
+                </div>
+                <Button
+                  aria-label={'View details for ' + session.name}
+                  onClick={() => setDetailsSession(session)}
+                  type="button"
+                  variant="secondary"
+                >
+                  <Eye size={15} aria-hidden="true" />
+                  View Details
+                </Button>
+              </article>
+            ))
+          ) : (
+            <div className="academic-sessions-empty">
+              <strong>
+                {search.trim() ? 'No matching sessions' : 'No sessions yet'}
+              </strong>
+              <p>
+                {search.trim()
+                  ? 'Try another session name.'
+                  : 'Create your first session to get started.'}
+              </p>
+              {!search.trim() && canWrite && (
+                <Button onClick={onCreate} type="button" variant="secondary">
+                  <Plus size={15} aria-hidden="true" />
+                  Add Session
+                </Button>
+              )}
+            </div>
+          )}
         </div>
         <footer className="academic-sessions-pagination">
           <span>
@@ -352,6 +445,98 @@ export function AcademicSessionsReferenceView({
           </div>
         </footer>
       </section>
+      <Dialog
+        open={detailsSession !== null}
+        onOpenChange={(open) => {
+          if (!open) setDetailsSession(null);
+        }}
+        title={detailsSession?.name ?? 'Session details'}
+        description={
+          detailsSession ? sessionDescription(detailsSession) : undefined
+        }
+      >
+        {detailsSession && (
+          <div className="academic-session-details">
+            <div className="academic-session-details-status">
+              <span
+                className={
+                  detailsSession.status === 'active' ? 'is-active' : ''
+                }
+              >
+                {detailsSession.status === 'active'
+                  ? 'Current session'
+                  : 'Archived session'}
+              </span>
+              <span>
+                {formatDate(detailsSession.startDate)} –{' '}
+                {formatDate(detailsSession.endDate)}
+              </span>
+            </div>
+            <div className="academic-session-details-metrics">
+              <div>
+                <strong>{counts.get(detailsSession.id)?.classes ?? 0}</strong>
+                <span>Classes</span>
+              </div>
+              <div>
+                <strong>{counts.get(detailsSession.id)?.sections ?? 0}</strong>
+                <span>Sections</span>
+              </div>
+              <div>
+                <strong>{counts.get(detailsSession.id)?.students ?? 0}</strong>
+                <span>Students</span>
+              </div>
+            </div>
+            <div className="academic-session-class-list">
+              <h3>Classes &amp; Sections</h3>
+              {sessionClassGroups.length ? (
+                <ul>
+                  {sessionClassGroups.map((group) => (
+                    <li key={group.name}>
+                      <strong>{group.name}</strong>
+                      <span>
+                        {group.sections
+                          .map(
+                            (section) =>
+                              `${section.name} · ${section.students} students`,
+                          )
+                          .join(' / ')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>No enrolled class or section records for this session.</p>
+              )}
+            </div>
+            {canWrite && (
+              <div className="academic-session-details-actions">
+                <Button
+                  onClick={() => {
+                    onEdit(detailsSession);
+                    setDetailsSession(null);
+                  }}
+                  type="button"
+                  variant="secondary"
+                >
+                  <Pencil size={15} aria-hidden="true" />
+                  Edit Session
+                </Button>
+                <Button
+                  onClick={() => {
+                    onDelete(detailsSession);
+                    setDetailsSession(null);
+                  }}
+                  type="button"
+                  variant="danger"
+                >
+                  <Trash2 size={15} aria-hidden="true" />
+                  Delete
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </Dialog>
     </main>
   );
 }

@@ -1,6 +1,10 @@
 import { useState } from 'react';
-import { ArrowLeft, FileSpreadsheet, UploadCloud } from 'lucide-react';
-import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
+import {
+  ArrowLeft,
+  Download,
+  FileSpreadsheet,
+  UploadCloud,
+} from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client.js';
@@ -9,6 +13,8 @@ import { getOrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import type { Campus } from '../organizations/organizations-api.js';
 import type { OrganizationAccessContext } from '../tenancy/tenancy-api.js';
 import { importStudents, previewStudentImport } from './students-api.js';
+import { recordTransferHistory } from '../reporting/reporting-api.js';
+import { downloadImportCsv } from '../import-file-utils.js';
 import type {
   StudentImportData,
   StudentImportPreviewResponse,
@@ -37,6 +43,54 @@ const statusLabels: Record<string, string> = {
   duplicate: 'Duplicate',
   error: 'Error',
 };
+
+function downloadStudentTemplate() {
+  const headers = [
+    'firstName',
+    'lastName',
+    'dateOfBirth',
+    'gender',
+    'contactEmail',
+    'phone',
+    'status',
+    'guardianName',
+    'guardianPhone',
+    'guardianEmail',
+    'guardianRelationship',
+  ];
+  const example = [
+    'Ayesha',
+    'Khan',
+    '2014-05-12',
+    'female',
+    'ayesha.khan@example.com',
+    '+923001234567',
+    'active',
+    'Ahmed Khan',
+    '+923009876543',
+    'ahmed.khan@example.com',
+    'father',
+  ];
+  downloadImportCsv(
+    'instituteos-student-import-template.csv',
+    [headers, example],
+    false,
+  );
+}
+
+function downloadStudentImportIssues(
+  fileName: string,
+  rows: StudentImportResult['rows'],
+) {
+  const issues = rows.filter((row) => row.outcome !== 'created');
+  downloadImportCsv(
+    fileName.replace(/\.(xlsx|csv)$/i, '') + '-import-issues.csv',
+    [
+      ['Source row', 'Outcome', 'Details'],
+      ...issues.map((row) => [String(row.rowNumber), row.outcome, row.message]),
+    ],
+  );
+}
 
 export function StudentImportPage() {
   const { organizationId = '' } = useParams();
@@ -74,9 +128,7 @@ export function StudentImportPage() {
   );
   const selectedCampusId =
     campusId ||
-    (isCampusAdmin && allowedCampuses.length === 1
-      ? (allowedCampuses[0]?.id ?? '')
-      : '');
+    (allowedCampuses.length === 1 ? (allowedCampuses[0]?.id ?? '') : '');
 
   const mappedRows = (): StudentImportRowInput[] => {
     if (!sheet) return [];
@@ -171,6 +223,23 @@ export function StudentImportPage() {
       await queryClient.invalidateQueries({
         queryKey: ['students', organizationId],
       });
+      try {
+        await recordTransferHistory(organizationId, {
+          direction: 'import',
+          dataType: 'students',
+          format: fileName.toLowerCase().endsWith('.xlsx') ? 'xlsx' : 'csv',
+          fileName,
+          totalRows: response.summary.total,
+          createdRows: response.summary.created,
+          skippedRows: response.summary.skipped,
+          failedRows: response.summary.failed,
+          ...(selectedCampusId ? { campusId: selectedCampusId } : {}),
+        });
+      } catch {
+        setError(
+          'Students were imported, but the transfer history record could not be saved.',
+        );
+      }
     } catch (importError) {
       setError(errorMessage(importError));
     } finally {
@@ -213,52 +282,53 @@ export function StudentImportPage() {
 
   return (
     <main className="page-stack student-import-page">
-      <WorkspacePageHeading
-        className="student-import-heading"
-        eyebrow="Students & families"
-        title="Import students"
-        description="Apne school register ko review karein aur student profiles ko safely import karein."
-        aside={
-          <Link
-            className="button button-secondary"
-            to={`/admin/organizations/${encodeURIComponent(organizationId)}/students`}
-          >
-            <ArrowLeft size={15} aria-hidden="true" />
-            Back to students
-          </Link>
-        }
-      />
+      <header className="student-import-page-header">
+        <Link
+          className="student-import-back"
+          to={`/admin/organizations/${encodeURIComponent(organizationId)}/students`}
+          aria-label="Back to students"
+          title="Back to students"
+        >
+          <ArrowLeft size={18} aria-hidden="true" />
+        </Link>
+        <div className="student-import-heading-copy">
+          <h1>Import students</h1>
+          <p>Upload a spreadsheet to add student records.</p>
+        </div>
+      </header>
 
       <section
         className="panel page-stack student-import-panel"
         aria-labelledby="import-file-heading"
       >
-        <div>
-          <h2 id="import-file-heading">
-            <FileSpreadsheet size={18} aria-hidden="true" /> 1. Select school
-            register
-          </h2>
-          <p>
-            Modern Excel (.xlsx) ya CSV file; maximum 5 MB aur 1,000 non-empty
-            student rows. Older .xls file ko pehle .xlsx mein save karein.
-          </p>
+        <div className="student-import-file-heading">
+          <div>
+            <h2 id="import-file-heading">
+              <FileSpreadsheet size={18} aria-hidden="true" /> Select
+              spreadsheet
+            </h2>
+            <p>Excel or CSV · Up to 1,000 student rows · 5 MB max</p>
+          </div>
+          <button
+            className="button button-secondary"
+            type="button"
+            onClick={downloadStudentTemplate}
+          >
+            <Download size={15} aria-hidden="true" /> Download template
+          </button>
         </div>
         <label className="form-field student-import-file-field">
-          <span className="student-import-field-label">
-            Student register file
-          </span>
+          <span className="student-import-field-label">Student file</span>
           <span className="student-import-file-picker">
             <span className="student-import-file-icon" aria-hidden="true">
               <UploadCloud size={22} />
             </span>
             <span className="student-import-file-copy">
-              <strong>Choose an Excel or CSV file</strong>
-              <small>
-                Click to browse your device · .xlsx or .csv · up to 5 MB
-              </small>
+              <strong>Choose a file</strong>
+              <small>Excel or CSV spreadsheet</small>
             </span>
             <span className="button button-secondary student-import-choose-button">
-              Browse files
+              Choose file
             </span>
             <input
               className="student-import-file-input"
@@ -281,8 +351,14 @@ export function StudentImportPage() {
             Campus list load nahi hui: {errorMessage(campusQuery.error)}
           </p>
         )}
-        {(context.permissions.includes('campus.read') || isCampusAdmin) && (
-          <label className="form-field">
+        {allowedCampuses.length === 1 && (
+          <p className="student-import-campus-summary">
+            Campus <strong>{allowedCampuses[0].name}</strong>
+          </p>
+        )}
+        {(allowedCampuses.length > 1 ||
+          (isCampusAdmin && allowedCampuses.length !== 1)) && (
+          <label className="form-field student-import-campus-field">
             <span>Campus {isCampusAdmin ? '(required)' : '(optional)'}</span>
             <select
               value={selectedCampusId}
@@ -295,9 +371,7 @@ export function StudentImportPage() {
               required={isCampusAdmin}
             >
               <option value="">
-                {isCampusAdmin
-                  ? 'Select assigned campus'
-                  : 'Organization-wide / no campus'}
+                {isCampusAdmin ? 'Select campus' : 'All campuses'}
               </option>
               {allowedCampuses.map((campus) => (
                 <option key={campus.id} value={campus.id}>
@@ -535,6 +609,17 @@ export function StudentImportPage() {
             </table>
           </div>
           <div className="button-row">
+            {(result.summary.skipped > 0 || result.summary.failed > 0) && (
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() =>
+                  downloadStudentImportIssues(fileName, result.rows)
+                }
+              >
+                <Download size={15} aria-hidden="true" /> Download issue report
+              </button>
+            )}
             <button
               className="button button-primary"
               onClick={() =>

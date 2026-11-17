@@ -18,6 +18,7 @@ import { eventsHolidaysRouter } from '../../modules/events-holidays/events-holid
 import { homeworkRouter } from '../../modules/homework/homework.routes.js';
 import { financeRouter } from '../../modules/finance/finance.routes.js';
 import { financeOperationsRouter } from '../../modules/finance/finance-operations.routes.js';
+import { payrollRouter } from '../../modules/finance/payroll.routes.js';
 import { communicationsRouter } from '../../modules/communications/communications.routes.js';
 import { reportingRouter } from '../../modules/reporting/reporting.routes.js';
 import { settingsRouter } from '../../modules/settings/settings.routes.js';
@@ -44,6 +45,7 @@ v1Router.use('/organizations', eventsHolidaysRouter);
 v1Router.use('/organizations', homeworkRouter);
 v1Router.use('/organizations', financeRouter);
 v1Router.use('/organizations', financeOperationsRouter);
+v1Router.use('/organizations', payrollRouter);
 v1Router.use('/organizations', communicationsRouter);
 v1Router.use('/organizations', reportingRouter);
 v1Router.use('/organizations', settingsRouter);

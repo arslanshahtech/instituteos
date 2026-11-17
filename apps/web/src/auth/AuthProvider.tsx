@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   type PropsWithChildren,
 } from 'react';
@@ -18,6 +19,10 @@ import {
   verifyEmailRequest,
 } from './auth-api.js';
 import type { AuthUser, RegistrationResponse } from './auth-api.js';
+import {
+  notifyAuthSessionChanged,
+  subscribeToAuthSessionChanges,
+} from './auth-session-sync.js';
 
 type AuthStatus = 'loading' | 'authenticated' | 'anonymous' | 'error';
 
@@ -65,10 +70,27 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return failureCount < 2;
     },
     retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 5_000),
+    // Session identity changes are broadcast across tabs. Avoid firing an
+    // auth/me request on every focus; reconnect still refreshes the session.
     refetchOnReconnect: true,
-    refetchOnWindowFocus: true,
-    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60_000,
   });
+
+  useEffect(
+    () =>
+      subscribeToAuthSessionChanges(() => {
+        void (async () => {
+          await queryClient.cancelQueries();
+          queryClient.removeQueries({
+            predicate: (query) => query.queryKey[0] !== 'auth',
+          });
+          queryClient.setQueryData(CURRENT_USER_KEY, null);
+          await queryClient.invalidateQueries({ queryKey: CURRENT_USER_KEY });
+        })();
+      }),
+    [queryClient],
+  );
 
   const value = useMemo<AuthContextValue>(() => {
     const user = currentUser.data ?? null;
@@ -92,6 +114,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
           predicate: (query) => query.queryKey[0] !== 'auth',
         });
         queryClient.setQueryData(CURRENT_USER_KEY, result.user);
+        notifyAuthSessionChanged();
       },
       async register(input) {
         return registerRequest(input);
@@ -110,10 +133,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
           predicate: (query) => query.queryKey[0] !== 'auth',
         });
         queryClient.setQueryData(CURRENT_USER_KEY, null);
+        notifyAuthSessionChanged();
       },
       forgotPassword: forgotPasswordRequest,
       resendVerification: resendVerificationRequest,
-      resetPassword: resetPasswordRequest,
+      async resetPassword(input) {
+        const result = await resetPasswordRequest(input);
+        await queryClient.cancelQueries();
+        queryClient.removeQueries({
+          predicate: (query) => query.queryKey[0] !== 'auth',
+        });
+        queryClient.setQueryData(CURRENT_USER_KEY, null);
+        notifyAuthSessionChanged();
+        return result;
+      },
       async verifyEmail(token) {
         await queryClient.cancelQueries();
         const result = await verifyEmailRequest(token);
@@ -123,6 +156,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
           predicate: (query) => query.queryKey[0] !== 'auth',
         });
         queryClient.setQueryData(CURRENT_USER_KEY, result.user);
+        notifyAuthSessionChanged();
       },
       async retryBootstrap() {
         await currentUser.refetch();

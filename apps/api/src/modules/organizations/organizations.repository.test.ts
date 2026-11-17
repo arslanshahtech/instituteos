@@ -9,7 +9,7 @@ import {
   PlatformRoleGrantModel,
 } from '../tenancy/tenancy.model.js';
 import { AuthUserModel } from '../auth/auth.model.js';
-import { StaffMemberModel } from '../people/people.model.js';
+import { GuardianModel, StaffMemberModel } from '../people/people.model.js';
 import { MongoOrganizationRepository } from './organizations.repository.js';
 
 const organizationId = '650000000000000000000001';
@@ -442,6 +442,29 @@ describe('organization repository transactions', () => {
   });
 });
 
+describe('organization invitation listing', () => {
+  it('does not show expired pending invitations as actionable', async () => {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      sort: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue([]),
+    };
+    const find = vi
+      .spyOn(OrganizationInvitationModel, 'find')
+      .mockReturnValue(query as never);
+
+    await new MongoOrganizationRepository().listInvitations(organizationId);
+
+    expect(find).toHaveBeenCalledWith({
+      organizationId: new Types.ObjectId(organizationId),
+      status: 'pending',
+      expiresAt: { $gt: expect.any(Date) },
+    });
+    expect(query.select).toHaveBeenCalledOnce();
+    expect(query.sort).toHaveBeenCalledWith({ createdAt: -1 });
+  });
+});
+
 describe('teacher invitation account linking', () => {
   const teacherUserId = '670000000000000000000099';
   const teacherStaffId = '680000000000000000000099';
@@ -558,6 +581,11 @@ describe('teacher invitation account linking', () => {
     });
 
     expect(result).toMatchObject({ role: 'teacher' });
+    expect(StaffMemberModel.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        $or: expect.arrayContaining([{ staffType: 'teacher' }]),
+      }),
+    );
     expect(linkProfile).toHaveBeenCalledWith(
       expect.objectContaining({
         _id: profile._id,
@@ -596,6 +624,110 @@ describe('teacher invitation account linking', () => {
         now: new Date('2026-11-01T00:00:00.000Z'),
       }),
     ).rejects.toMatchObject({ code: 'TEACHER_STAFF_PROFILE_REQUIRED' });
+
+    expect(createMembership).not.toHaveBeenCalled();
+    expect(session.endSession).toHaveBeenCalledOnce();
+  });
+});
+
+describe('parent invitation account linking', () => {
+  const parentUserId = '670000000000000000000088';
+  const parentEmail = 'parent@example.edu';
+  const firstGuardianId = '680000000000000000000088';
+  const secondGuardianId = '680000000000000000000089';
+
+  function mockParentInvitation(guardianIds: string[]) {
+    const session = makeSession();
+    const invite = {
+      _id: new Types.ObjectId('690000000000000000000088'),
+      organizationId: new Types.ObjectId(organizationId),
+      email: parentEmail,
+      role: 'parent_guardian',
+      campusIds: [],
+      status: 'pending',
+      expiresAt: new Date('2027-01-01T00:00:00.000Z'),
+    };
+    vi.spyOn(OrganizationInvitationModel, 'findOne').mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      session: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue(invite),
+    } as never);
+    vi.spyOn(OrganizationModel, 'findOne').mockReturnValue({
+      session: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue({
+        _id: new Types.ObjectId(organizationId),
+        status: 'active',
+      }),
+    } as never);
+    vi.spyOn(MembershipModel, 'findOne').mockReturnValue({
+      session: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue(null),
+    } as never);
+    vi.spyOn(GuardianModel, 'find').mockReturnValue({
+      session: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      lean: vi
+        .fn()
+        .mockResolvedValue(
+          guardianIds.map((_id) => ({ _id: new Types.ObjectId(_id) })),
+        ),
+    } as never);
+    return session;
+  }
+
+  it('accepts a parent invitation when the exact email matches one or more guardian records', async () => {
+    const session = mockParentInvitation([firstGuardianId, secondGuardianId]);
+    const membership = {
+      _id: new Types.ObjectId('670000000000000000000087'),
+      toObject: () => ({
+        _id: new Types.ObjectId('670000000000000000000087'),
+        role: 'parent_guardian',
+      }),
+    };
+    const createMembership = vi
+      .spyOn(MembershipModel, 'create')
+      .mockResolvedValue([membership] as never);
+    vi.spyOn(OrganizationInvitationModel, 'updateOne').mockResolvedValue({
+      modifiedCount: 1,
+    } as never);
+    const createAudit = vi
+      .spyOn(OrganizationAuditEventModel, 'create')
+      .mockResolvedValue([] as never);
+
+    const result = await new MongoOrganizationRepository().acceptInvitation({
+      tokenHash: 'hashed-parent-token',
+      userId: parentUserId,
+      email: parentEmail,
+      now: new Date('2026-11-14T00:00:00.000Z'),
+    });
+
+    expect(result).toMatchObject({ role: 'parent_guardian' });
+    expect(createMembership).toHaveBeenCalledOnce();
+    expect(createAudit).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          details: { role: 'parent_guardian' },
+        }),
+      ],
+      { session },
+    );
+  });
+
+  it('does not activate a parent membership without a matching guardian profile', async () => {
+    const session = mockParentInvitation([]);
+    const createMembership = vi.spyOn(MembershipModel, 'create');
+
+    await expect(
+      new MongoOrganizationRepository().acceptInvitation({
+        tokenHash: 'hashed-parent-token',
+        userId: parentUserId,
+        email: parentEmail,
+        now: new Date('2026-11-14T00:00:00.000Z'),
+      }),
+    ).rejects.toMatchObject({
+      code: 'PARENT_GUARDIAN_PROFILE_REQUIRED',
+    });
 
     expect(createMembership).not.toHaveBeenCalled();
     expect(session.endSession).toHaveBeenCalledOnce();

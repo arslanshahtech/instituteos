@@ -4,14 +4,29 @@ import type {
   AuditLogQuery,
   OrganizationSummary,
   ReportDataRow,
+  ReportFilters,
   ReportingRepository,
   ReportType,
 } from './reporting.types.js';
 
 const reportTypes: readonly ReportType[] = [
-  'finance',
-  'attendance',
   'students',
+  'staff',
+  'attendance',
+  'finance',
+  'payments',
+  'expenses',
+  'payroll',
+  'advances',
+  'classes',
+  'sections',
+  'subjects',
+  'exams',
+  'results',
+  'admissions',
+  'admission-inquiries',
+  'organization',
+  'audit',
 ];
 
 function validateOrganizationId(organizationId: string): void {
@@ -141,7 +156,7 @@ export class ReportingService {
     organizationId: string,
     reportType: ReportType,
     campusIds?: string[],
-    campusId?: string,
+    filters: ReportFilters = {},
   ): Promise<ReportDataRow[]> {
     validateOrganizationId(organizationId);
     if (!reportTypes.includes(reportType)) {
@@ -151,10 +166,29 @@ export class ReportingService {
         'Select a valid report type.',
       );
     }
+    const dateFrom = filters.dateFrom
+      ? validDate(filters.dateFrom, 'start date')
+      : undefined;
+    const dateTo = filters.dateTo
+      ? validDate(filters.dateTo, 'end date')
+      : undefined;
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Start date must not be after end date.',
+      );
+    }
+    const campusScope = authorizedCampuses(campusIds, filters.campusId);
     return this.repository.exportReportData(
       organizationId,
       reportType,
-      authorizedCampuses(campusIds, campusId),
+      campusScope,
+      {
+        ...filters,
+        dateFrom,
+        dateTo,
+      },
     );
   }
 }

@@ -24,6 +24,7 @@ export interface OrganizationMembershipContext {
   role: OrganizationRole;
   campusIds: string[];
   permissions?: readonly string[];
+  rolePermissions?: Record<string, readonly string[]>;
 }
 
 export interface OrganizationContext extends OrganizationMembershipContext {

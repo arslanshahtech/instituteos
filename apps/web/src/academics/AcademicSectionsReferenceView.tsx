@@ -8,7 +8,9 @@ import {
   Users,
   BookOpen,
   Armchair,
+  Eye,
 } from 'lucide-react';
+import { Dialog } from '../components/ui/Dialog.js';
 import type {
   AcademicClass,
   AcademicSection,
@@ -45,6 +47,9 @@ export function AcademicSectionsReferenceView({
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [detailsSection, setDetailsSection] = useState<AcademicSection | null>(
+    null,
+  );
   const selectedSession = sessions.find((item) => item.status === 'active');
   const sessionId = selectedSession?.id ?? '';
   const sessionStats = summary.bySession.find(
@@ -124,7 +129,7 @@ export function AcademicSectionsReferenceView({
   return (
     <main className="page-stack academic-sections-page">
       <WorkspacePageHeading
-        eyebrow="Curriculum"
+        eyebrow=""
         title="Sections"
         description="Manage all sections in your school."
         aside={
@@ -185,7 +190,59 @@ export function AcademicSectionsReferenceView({
             <h2>All Sections ({filteredRows.length})</h2>
           </div>
         </header>
-        <div className="table-scroll">
+        <div className="academic-sections-mobile-list">
+          {visibleRows.length ? (
+            visibleRows.map(({ section, className, enrolled }) => (
+              <article
+                className="academic-section-mobile-card"
+                key={section.id}
+              >
+                <div className="academic-section-mobile-copy">
+                  <span>SECTION</span>
+                  <strong>{section.name}</strong>
+                  <small>
+                    {className} · {selectedSession?.name ?? 'No active session'}
+                  </small>
+                  <small>
+                    {enrolled} students
+                    {section.capacity == null
+                      ? ''
+                      : ' · Capacity ' + section.capacity}
+                  </small>
+                </div>
+                <Button
+                  aria-label={'View details for ' + section.name}
+                  onClick={() => setDetailsSection(section)}
+                  type="button"
+                  variant="secondary"
+                >
+                  <Eye size={14} aria-hidden="true" />
+                  View Details
+                </Button>
+              </article>
+            ))
+          ) : (
+            <div className="academic-sections-empty">
+              <strong>
+                {search.trim() || classId !== 'all'
+                  ? 'No matching sections'
+                  : 'No sections yet'}
+              </strong>
+              <p>
+                {search.trim() || classId !== 'all'
+                  ? 'Change the search or class filter.'
+                  : 'Add a section to start organizing students.'}
+              </p>
+              {!search.trim() && classId === 'all' && canWrite && (
+                <Button onClick={onCreate} type="button" variant="secondary">
+                  <Plus size={15} aria-hidden="true" />
+                  Add Section
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="table-scroll academic-sections-desktop-list">
           <table className="data-table academic-sessions-table academic-sections-table">
             <thead>
               <tr>
@@ -323,6 +380,92 @@ export function AcademicSectionsReferenceView({
           </div>
         </footer>
       </section>
+      <Dialog
+        open={detailsSection !== null}
+        onOpenChange={(open) => {
+          if (!open) setDetailsSection(null);
+        }}
+        title={detailsSection?.name ?? 'Section details'}
+        description={
+          detailsSection
+            ? (classNames.get(detailsSection.classId) ?? 'Class unavailable') +
+              ' · ' +
+              (selectedSession?.name ?? 'No active session')
+            : undefined
+        }
+      >
+        {detailsSection && (
+          <div className="academic-section-details">
+            <div className="academic-section-details-grid">
+              <div>
+                <small>Section</small>
+                <strong>{detailsSection.name}</strong>
+              </div>
+              <div>
+                <small>Class</small>
+                <strong>
+                  {classNames.get(detailsSection.classId) ??
+                    'Class unavailable'}
+                </strong>
+              </div>
+              <div>
+                <small>Academic session</small>
+                <strong>{selectedSession?.name ?? 'No active session'}</strong>
+              </div>
+              <div>
+                <small>Enrolled students</small>
+                <strong>{enrolledBySection.get(detailsSection.id) ?? 0}</strong>
+              </div>
+              <div>
+                <small>Seat capacity</small>
+                <strong>{detailsSection.capacity ?? 'Not set'}</strong>
+              </div>
+              <div>
+                <small>Available seats</small>
+                <strong>
+                  {detailsSection.capacity == null
+                    ? 'Not set'
+                    : Math.max(
+                        0,
+                        detailsSection.capacity -
+                          (enrolledBySection.get(detailsSection.id) ?? 0),
+                      )}
+                </strong>
+              </div>
+            </div>
+            <div className="academic-section-details-note">
+              Student count is based on placements in the active academic
+              session.
+            </div>
+            {canWrite && (
+              <div className="academic-section-details-actions">
+                <Button
+                  onClick={() => {
+                    onEdit(detailsSection);
+                    setDetailsSection(null);
+                  }}
+                  type="button"
+                  variant="secondary"
+                >
+                  <Pencil size={15} aria-hidden="true" />
+                  Edit Section
+                </Button>
+                <Button
+                  onClick={() => {
+                    onDelete(detailsSection);
+                    setDetailsSection(null);
+                  }}
+                  type="button"
+                  variant="danger"
+                >
+                  <Trash2 size={15} aria-hidden="true" />
+                  Delete Section
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </Dialog>
     </main>
   );
 }

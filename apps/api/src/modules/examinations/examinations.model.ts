@@ -12,7 +12,20 @@ const examSchema = new Schema(
     name: { type: String, required: true, trim: true, maxlength: 120 },
     type: {
       type: String,
-      enum: ['midterm', 'final', 'quiz', 'monthly_test', 'class_test', 'mid_year', 'send_up', 'annual', 'practical', 'viva', 'supplementary', 'improvement'] satisfies ExamType[],
+      enum: [
+        'midterm',
+        'final',
+        'quiz',
+        'monthly_test',
+        'class_test',
+        'mid_year',
+        'send_up',
+        'annual',
+        'practical',
+        'viva',
+        'supplementary',
+        'improvement',
+      ] satisfies ExamType[],
       required: true,
     },
     academicYearId: {
@@ -67,9 +80,18 @@ const examScheduleSchema = new Schema(
     durationMinutes: { type: Number, required: true, min: 1, max: 1440 },
     totalMarks: { type: Number, required: true, min: 0.01, max: 100000 },
     passingMarks: { type: Number, required: true, min: 0, max: 100000 },
-    marksReviewStatus: { type: String, enum: ['draft', 'submitted', 'changes_requested'], default: 'draft', required: true },
+    marksReviewStatus: {
+      type: String,
+      enum: ['draft', 'submitted', 'changes_requested'],
+      default: 'draft',
+      required: true,
+    },
     marksSubmittedAt: { type: Date, default: null },
-    marksSubmittedBy: { type: Schema.Types.ObjectId, ref: 'AuthUser', default: null },
+    marksSubmittedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'AuthUser',
+      default: null,
+    },
   },
   { timestamps: true, versionKey: false },
 );

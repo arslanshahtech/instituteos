@@ -1,6 +1,6 @@
 import mongoose, { Types } from 'mongoose';
 import { AuthUserModel } from '../auth/auth.model.js';
-import { StaffMemberModel } from '../people/people.model.js';
+import { GuardianModel, StaffMemberModel } from '../people/people.model.js';
 import {
   CampusModel,
   MembershipModel,
@@ -723,6 +723,7 @@ export class MongoOrganizationRepository implements OrganizationRepository {
       (await OrganizationInvitationModel.find({
         organizationId: idObject(organizationId),
         status: 'pending',
+        expiresAt: { $gt: new Date() },
       })
         .select(
           '_id organizationId email role campusIds permissions invitedByUserId status expiresAt createdAt',
@@ -791,6 +792,7 @@ export class MongoOrganizationRepository implements OrganizationRepository {
                   $options: 'i',
                 },
               },
+              { staffType: 'teacher' },
               { 'subjects.0': { $exists: true } },
             ],
           })
@@ -849,6 +851,24 @@ export class MongoOrganizationRepository implements OrganizationRepository {
             );
           }
           linkedTeacherStaffId = teacherProfile._id as Types.ObjectId;
+        }
+
+        if (invite.role === 'parent_guardian') {
+          const guardianProfiles = await GuardianModel.find({
+            organizationId: invite.organizationId,
+            email: input.email.toLowerCase(),
+          })
+            .session(session)
+            .limit(100)
+            .select({ _id: 1 })
+            .lean();
+          if (guardianProfiles.length === 0) {
+            throw new AppError(
+              409,
+              'PARENT_GUARDIAN_PROFILE_REQUIRED',
+              'Create a guardian/family contact with this exact email and link it to the student before accepting the parent invitation.',
+            );
+          }
         }
 
         if (existing) {

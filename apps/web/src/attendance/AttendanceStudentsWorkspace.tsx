@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  CalendarDays,
+  CheckCircle2,
+  ClipboardCheck,
+  Download,
+  XCircle,
+} from 'lucide-react';
 import { Button } from '../components/ui/Button.js';
 import {
   EmptyState,
@@ -139,7 +146,6 @@ export function AttendanceStudentsWorkspace({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
-
   const scopedAssignments = useMemo(
     () =>
       teacherAssignments.filter(
@@ -161,19 +167,15 @@ export function AttendanceStudentsWorkspace({
       academicYearId,
       isTeacher ? classFilter : '',
       isTeacher ? sectionFilter : '',
-      studentStatusFilter,
-      search,
       isTeacher,
       scopedAssignments.map((item) => item.sectionId).join(','),
     ],
     queryFn: async () => {
+      // Keep the full campus roster loaded so local filters never hide dirty
+      // attendance changes before the user saves them.
       const common = {
         page: 1,
         pageSize: 100,
-        ...(studentStatusFilter !== 'all'
-          ? { status: studentStatusFilter }
-          : {}),
-        ...(search.trim() ? { search: search.trim() } : {}),
       };
       if (isTeacher) {
         const results = await Promise.all(
@@ -325,7 +327,13 @@ export function AttendanceStudentsWorkspace({
     setDirtyIds([]);
     setSaveMessage('');
     setSaveError('');
-  }, [date, campusId, academicYearId, classFilter, sectionFilter]);
+  }, [date, campusId, academicYearId]);
+
+  useEffect(() => {
+    if (!saveMessage) return;
+    const timeout = window.setTimeout(() => setSaveMessage(''), 3000);
+    return () => window.clearTimeout(timeout);
+  }, [saveMessage]);
 
   useEffect(() => {
     if (!attendanceQuery.data) return;
@@ -359,10 +367,25 @@ export function AttendanceStudentsWorkspace({
             !classFilter || placement?.classId === classFilter;
           const matchesSection =
             !sectionFilter || placement?.sectionId === sectionFilter;
-          return matchesSearch && matchesClass && matchesSection;
+          const matchesStudentStatus =
+            studentStatusFilter === 'all' ||
+            student.status === studentStatusFilter;
+          return (
+            matchesSearch &&
+            matchesClass &&
+            matchesSection &&
+            matchesStudentStatus
+          );
         })
         .sort((a, b) => displayName(a).localeCompare(displayName(b))),
-    [students, placements, search, classFilter, sectionFilter],
+    [
+      students,
+      placements,
+      search,
+      classFilter,
+      sectionFilter,
+      studentStatusFilter,
+    ],
   );
 
   const visibleRows = useMemo(
@@ -504,12 +527,8 @@ export function AttendanceStudentsWorkspace({
     <section className="attendance-students-workspace">
       <div className="attendance-students-heading">
         <div>
-          <p className="attendance-students-eyebrow">DAILY REGISTER</p>
-          <h2>Student attendance</h2>
-          <p>
-            Review the full student register, mark daily attendance, and track
-            each student’s status.
-          </p>
+          <h2>Student Attendance</h2>
+          <p>Mark and review student attendance for this date.</p>
         </div>
       </div>
 
@@ -520,28 +539,28 @@ export function AttendanceStudentsWorkspace({
             value: counts.total - counts.unmarked,
             detail: `${counts.total - counts.unmarked} of ${counts.total} students marked`,
             tone: 'marked',
-            icon: '✓',
+            icon: <ClipboardCheck size={16} strokeWidth={1.9} />,
           },
           {
             label: 'Present',
             value: counts.present,
-            detail: 'Students present today',
+            detail: 'Students present on selected date',
             tone: 'present',
-            icon: 'P',
+            icon: <CheckCircle2 size={16} strokeWidth={1.9} />,
           },
           {
             label: 'Absent',
             value: counts.absent,
-            detail: 'Students absent today',
+            detail: 'Students absent on selected date',
             tone: 'absent',
-            icon: 'A',
+            icon: <XCircle size={16} strokeWidth={1.9} />,
           },
           {
             label: 'On leave',
             value: counts.leave,
-            detail: 'Students on approved leave',
+            detail: 'Students on leave for selected date',
             tone: 'leave',
-            icon: 'L',
+            icon: <CalendarDays size={16} strokeWidth={1.9} />,
           },
         ].map((item) => (
           <div
@@ -564,102 +583,99 @@ export function AttendanceStudentsWorkspace({
       </div>
 
       <div className="attendance-students-filters">
-        <label>
-          Date
-          <input
-            aria-label="Date"
-            type="date"
-            value={date}
-            onChange={(event) => onDateChange(event.target.value)}
-          />
-        </label>
-        <label className="attendance-students-search">
-          Search
-          <input
-            aria-label="Search students"
-            type="search"
-            placeholder="Name, student ID, parent or mobile"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </label>
-        <label>
-          Class
-          <select
-            aria-label="Class"
-            value={classFilter}
-            onChange={(event) => {
-              setClassFilter(event.target.value);
-              setSectionFilter('');
-            }}
-          >
-            <option value="">All classes</option>
-            {classes.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Section
-          <select
-            aria-label="Section"
-            disabled={!classFilter}
-            value={sectionFilter}
-            onChange={(event) => setSectionFilter(event.target.value)}
-          >
-            <option value="">All sections</option>
-            {sectionsForClass.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Enrollment status
-          <select
-            aria-label="Enrollment status"
-            value={studentStatusFilter}
-            onChange={(event) =>
-              setStudentStatusFilter(event.target.value as StudentStatusFilter)
-            }
-          >
-            <option value="all">All students</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="withdrawn">Withdrawn</option>
-          </select>
-        </label>
-      </div>
-
-      <div className="attendance-students-toolbar">
-        <div
-          className="attendance-students-status-filters"
-          aria-label="Attendance status filter"
-        >
-          {(
-            [
-              ['all', 'All'],
-              ['unmarked', 'Not marked'],
-              ['present', 'Present'],
-              ['absent', 'Absent'],
-              ['late', 'Late'],
-              ['leave', 'Leave'],
-            ] as Array<[AttendanceFilter, string]>
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={attendanceFilter === value}
-              className={attendanceFilter === value ? 'is-active' : ''}
-              onClick={() => setAttendanceFilter(value)}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="attendance-students-filter-row attendance-students-filter-row-primary">
+          <label className="attendance-students-date-filter">
+            Date
+            <input
+              aria-label="Date"
+              type="date"
+              value={date}
+              onChange={(event) => onDateChange(event.target.value)}
+            />
+          </label>
+          <label className="attendance-students-search">
+            Search
+            <input
+              aria-label="Search students"
+              type="search"
+              placeholder="Name, student ID, parent or mobile"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
         </div>
+        <div className="attendance-students-filter-row attendance-students-filter-row-secondary">
+          <label>
+            Class
+            <select
+              aria-label="All Classes"
+              value={classFilter}
+              onChange={(event) => {
+                setClassFilter(event.target.value);
+                setSectionFilter('');
+              }}
+            >
+              <option value="">All classes</option>
+              {classes.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Section
+            <select
+              aria-label="Section"
+              disabled={!classFilter}
+              value={sectionFilter}
+              onChange={(event) => setSectionFilter(event.target.value)}
+            >
+              <option value="">All sections</option>
+              {sectionsForClass.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Student status
+            <select
+              aria-label="All Students"
+              value={studentStatusFilter}
+              onChange={(event) =>
+                setStudentStatusFilter(
+                  event.target.value as StudentStatusFilter,
+                )
+              }
+            >
+              <option value="all">All Students</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="withdrawn">Withdrawn</option>
+            </select>
+          </label>
+          <label>
+            Attendance status
+            <select
+              aria-label="Attendance status"
+              value={attendanceFilter}
+              onChange={(event) =>
+                setAttendanceFilter(event.target.value as AttendanceFilter)
+              }
+            >
+              <option value="all">All statuses</option>
+              <option value="unmarked">Not marked</option>
+              <option value="present">Present</option>
+              <option value="absent">Absent</option>
+              <option value="late">Late</option>
+              <option value="leave">Leave</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div className="attendance-students-toolbar">
         <div className="attendance-students-actions">
           <Button
             onClick={() =>
@@ -678,7 +694,7 @@ export function AttendanceStudentsWorkspace({
             variant="secondary"
             disabled={loading || !visibleRows.length}
           >
-            Download CSV
+            <Download size={14} aria-hidden="true" /> CSV
           </Button>
           {canWrite && (
             <Button
@@ -692,7 +708,7 @@ export function AttendanceStudentsWorkspace({
                 )
               }
             >
-              Mark visible present
+              Mark Visible
             </Button>
           )}
           {canWrite && (
@@ -703,7 +719,7 @@ export function AttendanceStudentsWorkspace({
             >
               {saving
                 ? 'Saving...'
-                : `Save changes${dirtyIds.length ? ` (${dirtyIds.length})` : ''}`}
+                : `Save${dirtyIds.length ? ` (${dirtyIds.length})` : ''}`}
             </Button>
           )}
         </div>
@@ -740,7 +756,7 @@ export function AttendanceStudentsWorkspace({
       ) : !visibleRows.length ? (
         <EmptyState
           title="No students found"
-          description="Try changing the filters or search term, or check student enrolments for this academic year."
+          description="Adjust the filters or check current-year student enrolments."
         />
       ) : (
         <div className="attendance-students-table-wrap">
@@ -779,6 +795,16 @@ export function AttendanceStudentsWorkspace({
                           <small>
                             {student.registrationNumber || student.id.slice(-7)}
                           </small>
+                          {placement && (
+                            <small className="attendance-student-class-meta">
+                              {placement.className} ·{' '}
+                              {placement.sectionName
+                                .toLowerCase()
+                                .startsWith('section')
+                                ? placement.sectionName
+                                : `Section ${placement.sectionName}`}
+                            </small>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -811,9 +837,13 @@ export function AttendanceStudentsWorkspace({
                             className={`attendance-students-choice attendance-students-choice-${status}${current === status ? ' is-active' : ''}`}
                             onClick={() => setStudentStatus(student.id, status)}
                           >
-                            {status === 'leave'
-                              ? 'LV'
-                              : status[0].toUpperCase()}
+                            {status === 'present'
+                              ? 'P'
+                              : status === 'absent'
+                                ? 'A'
+                                : status === 'late'
+                                  ? 'L'
+                                  : 'LB'}
                           </button>
                         ))}
                       </div>
@@ -838,7 +868,7 @@ export function AttendanceStudentsWorkspace({
         <span>
           Showing {visibleRows.length} of {students.length} students
         </span>
-        <span>P Present · A Absent · L Late · LV Leave</span>
+        <span>P Present · A Absent · L Late · LB Leave</span>
       </div>
     </section>
   );

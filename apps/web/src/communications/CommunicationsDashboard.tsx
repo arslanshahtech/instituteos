@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { MessageSquare, Pin, Plus, Trash2 } from 'lucide-react';
+import { Pin, Plus, Trash2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { listAcademicCampuses } from '../academics/academics-api.js';
 import { useAuth } from '../auth/AuthProvider.js';
 import { Button } from '../components/ui/Button.js';
@@ -43,7 +43,6 @@ const managerRoles = [
 const messagingRoles = [
   'organization_owner',
   'organization_admin',
-  'principal_director',
   'teacher',
   'parent_guardian',
 ];
@@ -106,6 +105,7 @@ function announcementDraft(item: Announcement): AnnouncementDraft {
 
 export function CommunicationsDashboard() {
   const { organizationId = '' } = useParams();
+  const location = useLocation();
   const { user } = useAuth();
   const access = useOrganizationAccess(organizationId);
 
@@ -115,9 +115,9 @@ export function CommunicationsDashboard() {
   const canManageAnnouncements = managerRoles.includes(currentRole);
   const canAccessMessaging = messagingRoles.includes(currentRole);
 
-  const [activeTab, setActiveTab] = useState<'announcements' | 'messaging'>(
-    'messaging',
-  );
+  const activeTab = location.pathname.endsWith('/announcements')
+    ? 'announcements'
+    : 'messaging';
 
   const [audienceFilter, setAudienceFilter] = useState<
     AnnouncementAudience | ''
@@ -271,7 +271,11 @@ export function CommunicationsDashboard() {
     );
   }
 
-  if (!canManageAnnouncements && !canAccessMessaging) {
+  if (
+    (!canManageAnnouncements && !canAccessMessaging) ||
+    (activeTab === 'announcements' && !canManageAnnouncements) ||
+    (activeTab === 'messaging' && !canAccessMessaging)
+  ) {
     return <PermissionDeniedState />;
   }
 
@@ -282,42 +286,56 @@ export function CommunicationsDashboard() {
   const saving = create.isPending || update.isPending;
 
   return (
-    <main className="communications-page reference-live-module">
-      <WorkspacePageHeading
-        className="communications-heading"
-        eyebrow="Organization workspace"
-        title="Communications"
-        description="Private, role-scoped conversations between parents, teachers and authorized staff."
-        aside={
-          activeTab === 'announcements' && canManageAnnouncements ? (
-            <Button onClick={openCreate} type="button" variant="primary">
-              <Plus size={17} aria-hidden="true" />
-              Create announcement
-            </Button>
-          ) : undefined
-        }
-      />
-
-      {/* Workspace Tabs */}
-      <div className="communications-workspace-tabs">
-        {canAccessMessaging && (
-          <button
-            type="button"
-            onClick={() => setActiveTab('messaging')}
-            className={`communications-workspace-tab${activeTab === 'messaging' ? ' is-active' : ''}`}
-          >
-            <MessageSquare size={15} />
-            Messages
-          </button>
-        )}
-      </div>
+    <main
+      className={`communications-page reference-live-module${activeTab === 'messaging' && currentRole === 'teacher' ? ' parent-portal teacher-messages-portal' : ''}`}
+    >
+      {activeTab === 'announcements' && (
+        <WorkspacePageHeading
+          className="communications-heading"
+          eyebrow=""
+          title={activeTab === 'announcements' ? 'Announcements' : 'Messages'}
+          description={
+            activeTab === 'announcements'
+              ? 'Publish updates for staff, students and families.'
+              : 'Private parent–teacher conversations with authorized admin access.'
+          }
+          aside={
+            activeTab === 'announcements' && canManageAnnouncements ? (
+              <Button onClick={openCreate} type="button" variant="primary">
+                <Plus size={17} aria-hidden="true" />
+                Create announcement
+              </Button>
+            ) : undefined
+          }
+        />
+      )}
 
       {activeTab === 'messaging' ? (
-        <ParentTeacherInbox
-          organizationId={organizationId}
-          currentUserId={currentUserId}
-          userRole={currentRole}
-        />
+        currentRole === 'teacher' ? (
+          <>
+            <section className="parent-portal-heading parent-portal-messages-heading">
+              <div>
+                <h1>Messages</h1>
+              </div>
+            </section>
+            <section
+              className="parent-content-panel parent-messages-workspace"
+              aria-label="Teacher messages"
+            >
+              <ParentTeacherInbox
+                organizationId={organizationId}
+                currentUserId={currentUserId}
+                userRole={currentRole}
+              />
+            </section>
+          </>
+        ) : (
+          <ParentTeacherInbox
+            organizationId={organizationId}
+            currentUserId={currentUserId}
+            userRole={currentRole}
+          />
+        )
       ) : (
         <>
           {queryError ? (
@@ -341,8 +359,8 @@ export function CommunicationsDashboard() {
             >
               <div className="communications-section-heading">
                 <div>
-                  <h2>Announcement feed</h2>
-                  <p>Published notices, drafts, and archived announcements.</p>
+                  <h2>All announcements</h2>
+                  <p>Filter notices by audience, status or campus.</p>
                 </div>
                 <span className="communications-count">
                   {items.length}{' '}
@@ -509,7 +527,7 @@ export function CommunicationsDashboard() {
       <Dialog
         open={formOpen}
         title={editing ? 'Edit announcement' : 'Create announcement'}
-        description="Share a message with your organization or a selected campus."
+        description="Send an update to your organization or a selected campus."
         onOpenChange={(open) => {
           if (!open) {
             setFormOpen(false);

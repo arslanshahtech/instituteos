@@ -26,6 +26,15 @@ function makeRepository() {
       createdAt: '2026-10-21T00:00:00.000Z',
       updatedAt: '2026-10-21T00:00:00.000Z',
     })),
+    updateExpense: vi.fn().mockImplementation(async (_context, _id, input) => ({
+      ...input,
+      source: 'manual',
+      id: '444444444444444444444444',
+      organizationId,
+      recordedBy: userId,
+      createdAt: '2026-10-21T00:00:00.000Z',
+      updatedAt: '2026-10-21T00:00:00.000Z',
+    })),
     deleteExpense: vi.fn().mockResolvedValue(true),
     listExpenseBudgets: vi.fn().mockResolvedValue([]),
     saveExpenseBudget: vi.fn().mockImplementation(async (_context, input) => ({
@@ -62,6 +71,46 @@ describe('FinanceOperationsService', () => {
       campusId,
     });
     expect(repository.createExpense).toHaveBeenCalledOnce();
+  });
+
+  it('updates a validated manual expense', async () => {
+    const repository = makeRepository();
+    const service = new FinanceOperationsService(repository);
+    const expense = await service.updateExpense(
+      context,
+      '444444444444444444444444',
+      {
+        description: 'Updated electricity bill',
+        category: 'utilities',
+        amount: 14500.25,
+        paymentMethod: 'bank_transfer',
+        expenseDate: '2026-10-22',
+        campusId,
+        reference: 'BILL-1021',
+      },
+    );
+    expect(expense).toMatchObject({
+      description: 'Updated electricity bill',
+      amount: 14500.25,
+      source: 'manual',
+    });
+    expect(repository.updateExpense).toHaveBeenCalledOnce();
+  });
+
+  it('rejects invalid expense updates before reaching the repository', async () => {
+    const repository = makeRepository();
+    const service = new FinanceOperationsService(repository);
+    await expect(
+      service.updateExpense(context, '444444444444444444444444', {
+        description: 'Updated bill',
+        category: 'utilities',
+        amount: 1.239,
+        paymentMethod: 'cash',
+        expenseDate: '2026-10-22',
+        campusId,
+      }),
+    ).rejects.toThrow('Expense amount can have at most two decimal places.');
+    expect(repository.updateExpense).not.toHaveBeenCalled();
   });
 
   it('rejects invalid calendar dates', async () => {

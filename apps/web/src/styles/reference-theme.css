@@ -554,3 +554,64 @@
   background: #111;
   content: '';
 }
+
+/* Organization Settings uses full responsive category navigation, not compact legacy pills. */
+.app-frame-live-organization .settings-page .settings-tabs {
+  display: grid;
+  width: 100%;
+  max-width: none;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.app-frame-live-organization .settings-page .settings-tab {
+  display: flex;
+  min-width: 0;
+  min-height: 58px;
+  align-items: center;
+  gap: 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: transparent;
+  padding: 0.7rem 0.8rem;
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.app-frame-live-organization .settings-page .settings-tab:hover {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.app-frame-live-organization .settings-page .settings-tab.is-active {
+  border-color: #0a0a0a;
+  background: #0a0a0a;
+  color: #fff;
+}
+
+@media (max-width: 900px) {
+  .app-frame-live-organization .settings-page .settings-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .app-frame-live-organization .settings-page .settings-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+
+  .app-frame-live-organization .settings-page .settings-tab {
+    min-height: 52px;
+    gap: 0.45rem;
+    border-radius: 9px;
+    padding: 0.55rem;
+    font-size: 0.74rem;
+  }
+}

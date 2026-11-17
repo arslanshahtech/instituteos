@@ -8,12 +8,14 @@ import {
   Trash2,
   Users,
 } from 'lucide-react';
+import { Dialog } from '../components/ui/Dialog.js';
 import type {
   AcademicClass,
   AcademicSection,
   AcademicYear,
   AcademicCampus,
   AcademicSubject,
+  AcademicYearSummary,
 } from './academics-api.js';
 
 interface Props {
@@ -23,6 +25,7 @@ interface Props {
   campuses: AcademicCampus[];
   subjects: AcademicSubject[];
   studentsCount?: number;
+  summary?: AcademicYearSummary;
   onCreate: (resource: 'classes') => void;
   onEdit: (resource: 'classes', record: AcademicClass) => void;
   onDelete: (resource: 'classes', id: string, title: string) => void;
@@ -38,6 +41,7 @@ export function ClassesSectionsReferenceView({
   campuses,
   subjects,
   studentsCount,
+  summary,
   onCreate,
   onEdit,
   onDelete,
@@ -49,7 +53,8 @@ export function ClassesSectionsReferenceView({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
-  const [showEducationLevels, setShowEducationLevels] = useState(false);
+  const [showStudyLevel, setShowEducationLevels] = useState(false);
+  const [detailsClass, setDetailsClass] = useState<AcademicClass | null>(null);
   const activeYear = years.find((year) => year.status === 'active') ?? years[0];
 
   const campusNames = useMemo(
@@ -112,6 +117,49 @@ export function ClassesSectionsReferenceView({
     if (page > pageCount) setPage(pageCount);
   }, [page, pageCount]);
 
+  const detailSections = detailsClass
+    ? sections.filter((section) => section.classId === detailsClass.id)
+    : [];
+  const detailSubjects = detailsClass
+    ? subjects.filter((subject) => subject.classIds?.includes(detailsClass.id))
+    : [];
+  const getClassStudentCount = (classId: string) => {
+    if (!summary || !activeYear) return undefined;
+    return sections
+      .filter((section) => section.classId === classId)
+      .reduce((total, section) => {
+        const placement = summary.bySection.find(
+          (item) =>
+            item.sectionId === section.id &&
+            item.academicYearId === activeYear.id,
+        );
+        return total + (placement?.students ?? 0);
+      }, 0);
+  };
+  const detailStudentCount = detailsClass
+    ? getClassStudentCount(detailsClass.id)
+    : undefined;
+  const formatDate = (value?: string) => {
+    if (!value) return 'Not set';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+      ? 'Not set'
+      : new Intl.DateTimeFormat('en-PK', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        }).format(date);
+  };
+  const detailLevel = detailsClass
+    ? detailsClass.studyLevel === 'first_year'
+      ? 'First Year'
+      : detailsClass.studyLevel === 'second_year'
+        ? 'Second Year'
+        : detailsClass.studyLevel === 'other'
+          ? 'Other'
+          : (detailsClass.programName ?? 'General')
+    : '';
+
   const openCreate = () => {
     if (!canWriteAcademics) return;
     if (campuses.length) onCreate('classes');
@@ -122,64 +170,11 @@ export function ClassesSectionsReferenceView({
     <main className="page-stack classes-reference-page">
       <header className="classes-page-heading">
         <div>
-          <span className="cr-eyebrow">ACADEMIC MANAGEMENT</span>
           <h1>Classes</h1>
           <p>Manage All Classes in Your Institute.</p>
         </div>
-        <div className="classes-page-actions">
-          <div className="cr-education-level-control">
-            <button
-              className="cr-secondary-button"
-              type="button"
-              aria-expanded={showEducationLevels}
-              aria-haspopup="menu"
-              onClick={() => setShowEducationLevels((current) => !current)}
-            >
-              Education Levels <ChevronDown size={15} />
-            </button>
-            {showEducationLevels && (
-              <div
-                className="cr-education-levels"
-                role="menu"
-                aria-label="Education levels"
-              >
-                <button
-                  className={levelFilter === 'all' ? 'is-active' : ''}
-                  type="button"
-                  role="menuitem"
-                  aria-current={levelFilter === 'all' ? 'true' : undefined}
-                  onClick={() => {
-                    setLevelFilter('all');
-                    setPage(1);
-                    setShowEducationLevels(false);
-                  }}
-                >
-                  <span>All Levels</span>
-                  <small>{classes.length}</small>
-                </button>
-                {levelOptions.map((option) => (
-                  <button
-                    className={levelFilter === option.value ? 'is-active' : ''}
-                    key={option.value}
-                    type="button"
-                    role="menuitem"
-                    aria-current={
-                      levelFilter === option.value ? 'true' : undefined
-                    }
-                    onClick={() => {
-                      setLevelFilter(option.value);
-                      setPage(1);
-                      setShowEducationLevels(false);
-                    }}
-                  >
-                    <span>{option.label}</span>
-                    <small>{option.count}</small>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          {canWriteAcademics && (
+        {canWriteAcademics && (
+          <div className="classes-page-heading-action">
             <button
               className="cr-primary-button"
               type="button"
@@ -187,8 +182,8 @@ export function ClassesSectionsReferenceView({
             >
               <Plus size={16} /> Add Class
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </header>
 
       {campuses.length === 0 && (
@@ -256,9 +251,65 @@ export function ClassesSectionsReferenceView({
                 setSearch(event.target.value);
                 setPage(1);
               }}
-              placeholder="Search by class name or class code..."
+              placeholder="Search classes..."
               aria-label="Search classes"
             />
+          </div>
+          <div className="classes-page-actions">
+            <div className="cr-education-level-control">
+              <button
+                className="cr-secondary-button"
+                type="button"
+                aria-expanded={showStudyLevel}
+                aria-haspopup="menu"
+                onClick={() => setShowEducationLevels((current) => !current)}
+              >
+                {levelFilter === 'all'
+                  ? 'Study Level'
+                  : (levelOptions.find((option) => option.value === levelFilter)
+                      ?.label ?? 'Study Level')}
+                <ChevronDown size={15} />
+              </button>
+              {showStudyLevel && (
+                <div
+                  className="cr-education-levels"
+                  role="menu"
+                  aria-label="Study level"
+                >
+                  <button
+                    className={levelFilter === 'all' ? 'is-active' : ''}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setLevelFilter('all');
+                      setPage(1);
+                      setShowEducationLevels(false);
+                    }}
+                  >
+                    <span>All Levels</span>
+                    <small>{classes.length}</small>
+                  </button>
+                  {levelOptions.map((option) => (
+                    <button
+                      className={
+                        levelFilter === option.value ? 'is-active' : ''
+                      }
+                      key={option.value}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setLevelFilter(option.value);
+                        setPage(1);
+                        setShowEducationLevels(false);
+                      }}
+                    >
+                      <span>{option.label}</span>
+                      <small>{option.count}</small>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -272,6 +323,28 @@ export function ClassesSectionsReferenceView({
 
         {filteredClasses.length ? (
           <>
+            <div className="cr-class-mobile-list" aria-label="All classes">
+              {visibleClasses.map((item) => (
+                <article className="cr-class-mobile-card" key={item.id}>
+                  <div className="cr-class-mobile-copy">
+                    <strong className="cr-class-mobile-name">
+                      {item.name}
+                    </strong>
+                    <small>
+                      {getClassStudentCount(item.id) ?? '—'} students
+                    </small>
+                  </div>
+                  <button
+                    className="cr-mobile-view-button"
+                    type="button"
+                    onClick={() => setDetailsClass(item)}
+                    aria-label={'View details for ' + item.name}
+                  >
+                    View Details
+                  </button>
+                </article>
+              ))}
+            </div>
             <div className="cr-class-table-wrap">
               <table className="cr-class-table">
                 <thead>
@@ -335,11 +408,8 @@ export function ClassesSectionsReferenceView({
                           </span>
                         </td>
                         <td className="cr-number-cell">
-                          <span
-                            className="cr-table-count"
-                            title="Per-class placement count is not provided by the current class list API"
-                          >
-                            —
+                          <span className="cr-table-count">
+                            {getClassStudentCount(item.id) ?? '?'}
                           </span>
                         </td>
                         <td>
@@ -431,22 +501,148 @@ export function ClassesSectionsReferenceView({
             <h3>No classes found</h3>
             <p>
               {search || levelFilter !== 'all'
-                ? 'Try a different search or education level.'
+                ? 'Try a different search or study level.'
                 : 'Add the first class for your institute.'}
             </p>
-            {!search && levelFilter === 'all' && canWriteAcademics && (
-              <button
-                className="cr-primary-button"
-                type="button"
-                onClick={openCreate}
-              >
-                <Plus size={16} /> Add Class
-              </button>
-            )}
           </div>
         )}
       </section>
 
+      <Dialog
+        open={detailsClass !== null}
+        onOpenChange={(open) => {
+          if (!open) setDetailsClass(null);
+        }}
+        title={detailsClass?.name ?? 'Class details'}
+        description={
+          detailsClass
+            ? 'Class code ' +
+              detailsClass.code +
+              ' - ' +
+              (campusNames.get(detailsClass.campusId) ?? 'Campus not assigned')
+            : undefined
+        }
+      >
+        {detailsClass && (
+          <div className="cr-class-details">
+            <div className="cr-class-details-summary">
+              <span className="cr-class-details-code">{detailsClass.code}</span>
+              <span>{detailLevel}</span>
+            </div>
+            <div className="cr-class-details-grid">
+              <div>
+                <small>Campus</small>
+                <strong>
+                  {campusNames.get(detailsClass.campusId) ?? 'Not assigned'}
+                </strong>
+              </div>
+              <div>
+                <small>Active session</small>
+                <strong>{activeYear?.name ?? 'No active session'}</strong>
+              </div>
+              <div>
+                <small>Session dates</small>
+                <strong>
+                  {activeYear
+                    ? formatDate(activeYear.startDate) +
+                      ' - ' +
+                      formatDate(activeYear.endDate)
+                    : 'Not available'}
+                </strong>
+              </div>
+              <div>
+                <small>Sections</small>
+                <strong>{detailSections.length}</strong>
+              </div>
+              <div>
+                <small>Subjects</small>
+                <strong>{detailSubjects.length}</strong>
+              </div>
+              <div>
+                <small>Enrolled students</small>
+                <strong>{detailStudentCount ?? 'Not available'}</strong>
+              </div>
+              <div>
+                <small>Education level</small>
+                <strong>{detailLevel}</strong>
+              </div>
+              <div>
+                <small>Program / Stream</small>
+                <strong>{detailsClass.programName ?? 'Not specified'}</strong>
+              </div>
+            </div>
+            <section className="cr-class-details-section">
+              <header>
+                <h3>Sections</h3>
+                <span>{detailSections.length} total</span>
+              </header>
+              {detailSections.length ? (
+                <ul>
+                  {detailSections.map((section) => (
+                    <li key={section.id}>
+                      <strong>{section.name}</strong>
+                      <span>
+                        {section.capacity
+                          ? 'Capacity ' + section.capacity
+                          : 'Capacity not set'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>No sections have been added to this class yet.</p>
+              )}
+            </section>
+            <section className="cr-class-details-section">
+              <header>
+                <h3>Subjects</h3>
+                <span>{detailSubjects.length} assigned</span>
+              </header>
+              {detailSubjects.length ? (
+                <ul>
+                  {detailSubjects.map((subject) => (
+                    <li key={subject.id}>
+                      <strong>{subject.name}</strong>
+                      <span>{subject.code}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>No subjects are currently assigned to this class.</p>
+              )}
+            </section>
+            <p className="cr-class-details-note">
+              Student total is calculated from actual section placements in the
+              active session. If the placement summary is unavailable, the count
+              is not displayed as zero.
+            </p>
+            {canWriteAcademics && (
+              <div className="cr-class-details-actions">
+                <button
+                  className="cr-secondary-button"
+                  type="button"
+                  onClick={() => {
+                    onEdit('classes', detailsClass);
+                    setDetailsClass(null);
+                  }}
+                >
+                  <Pencil size={15} /> Edit Class
+                </button>
+                <button
+                  className="cr-danger-button"
+                  type="button"
+                  onClick={() => {
+                    onDelete('classes', detailsClass.id, detailsClass.name);
+                    setDetailsClass(null);
+                  }}
+                >
+                  <Trash2 size={15} /> Delete Class
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </Dialog>
       <footer className="cr-footer">
         <span>InstituteOS · Classes</span>
         <span>

@@ -1,0 +1,25 @@
+.staff-import-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.staff-import-topline h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+}
+.staff-import-topline p {
+  margin: 0.4rem 0 0;
+  color: var(--color-muted);
+  font-size: 0.84rem;
+}
+.staff-import-topline .button {
+  flex: 0 0 auto;
+}
+@media (max-width: 560px) {
+  .staff-import-topline {
+    flex-direction: column;
+  }
+}

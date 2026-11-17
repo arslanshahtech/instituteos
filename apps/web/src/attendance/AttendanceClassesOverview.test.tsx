@@ -83,8 +83,9 @@ describe('AttendanceClassesOverview', () => {
     const dateInput = await screen.findByLabelText('Attendance date');
     expect(dateInput).toHaveValue('2026-11-09');
     expect(
-      screen.getByText('Registers Marked').compareDocumentPosition(dateInput) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      document
+        .querySelectorAll('.attendance-classes-stat')[3]!
+        .compareDocumentPosition(dateInput) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     fireEvent.change(dateInput, { target: { value: '2026-11-10' } });
     expect(onDateChange).toHaveBeenCalledWith('2026-11-10');
@@ -112,10 +113,68 @@ describe('AttendanceClassesOverview', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows exactly four separate status summary cards for the selected period', async () => {
+    renderOverview();
+    expect(
+      await screen.findByRole('heading', { name: 'Attendance summary' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('This month · 1 recorded entries'),
+    ).toBeInTheDocument();
+    const cards = document.querySelectorAll('.attendance-classes-stat');
+    expect(cards).toHaveLength(4);
+    expect(cards[0]).toHaveClass('attendance-classes-stat--present');
+    expect(cards[1]).toHaveClass('attendance-classes-stat--absent');
+    expect(cards[2]).toHaveClass('attendance-classes-stat--late');
+    expect(cards[3]).toHaveClass('attendance-classes-stat--leave');
+    expect(screen.getByText('Present', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('Absent', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('Late', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('Leave', { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText('Attended')).not.toBeInTheDocument();
+    expect(screen.queryByText('Absent / Leave')).not.toBeInTheDocument();
+  });
+  it('requests the selected week or month range with campus and academic year filters', async () => {
+    renderOverview();
+    await screen.findByRole('heading', { name: 'Attendance summary' });
+
+    expect(mocks.listStudentAttendance).toHaveBeenCalledWith(
+      'org-1',
+      expect.objectContaining({
+        dateFrom: '2026-11-01',
+        dateTo: '2026-11-30',
+        campusId: 'campus-1',
+        academicYearId: 'year-1',
+      }),
+    );
+
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Attendance summary period' }),
+      { target: { value: 'week' } },
+    );
+
+    await waitFor(() => {
+      expect(mocks.listStudentAttendance).toHaveBeenCalledWith(
+        'org-1',
+        expect.objectContaining({
+          dateFrom: '2026-11-09',
+          dateTo: '2026-11-15',
+          campusId: 'campus-1',
+          academicYearId: 'year-1',
+        }),
+      );
+    });
+  });
   it('filters class registers by attendance completion status', async () => {
     renderOverview();
     await screen.findByText('Showing 1 to 2 of 2 class sections');
-    fireEvent.click(screen.getByRole('button', { name: /Not marked/ }));
+    expect(
+      document.querySelector('.attendance-classes-summary-heading > span'),
+    ).toHaveTextContent(/1\s+class.*2\s+sections.*3\s+students/);
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Attendance status' }),
+      { target: { value: 'Not marked' } },
+    );
     expect(
       screen.getByText('Showing 1 to 1 of 1 class sections'),
     ).toBeInTheDocument();

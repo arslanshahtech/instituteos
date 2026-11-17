@@ -114,12 +114,9 @@ describe('ReportingService', () => {
       }),
     ).rejects.toMatchObject({ statusCode: 403, code: 'CAMPUS_FORBIDDEN' });
     await expect(
-      service.exportReportData(
-        organizationId,
-        'students',
-        [campusOne],
-        campusTwo,
-      ),
+      service.exportReportData(organizationId, 'students', [campusOne], {
+        campusId: campusTwo,
+      }),
     ).rejects.toMatchObject({ statusCode: 403, code: 'CAMPUS_FORBIDDEN' });
     expect(repository.listAuditLogs).not.toHaveBeenCalled();
     expect(repository.exportReportData).not.toHaveBeenCalled();
@@ -140,6 +137,81 @@ describe('ReportingService', () => {
       organizationId,
       expect.any(Object),
       [],
+    );
+  });
+
+  it('forwards validated report date and campus filters to the repository', async () => {
+    const repository = makeRepository();
+    const service = new ReportingService(repository);
+    await service.exportReportData(
+      organizationId,
+      'staff',
+      [campusOne, campusTwo],
+      {
+        campusId: campusOne,
+        dateFrom: '2026-10-01',
+        dateTo: '2026-10-31',
+      },
+    );
+    expect(repository.exportReportData).toHaveBeenCalledWith(
+      organizationId,
+      'staff',
+      [campusOne],
+      { campusId: campusOne, dateFrom: '2026-10-01', dateTo: '2026-10-31' },
+    );
+  });
+
+  it('rejects invalid report dates and reversed date ranges', async () => {
+    const repository = makeRepository();
+    const service = new ReportingService(repository);
+    await expect(
+      service.exportReportData(organizationId, 'students', undefined, {
+        dateFrom: '2026-02-30',
+      }),
+    ).rejects.toMatchObject({ statusCode: 400, code: 'VALIDATION_ERROR' });
+    await expect(
+      service.exportReportData(organizationId, 'students', undefined, {
+        dateFrom: '2026-11-02',
+        dateTo: '2026-11-01',
+      }),
+    ).rejects.toMatchObject({ statusCode: 400, code: 'VALIDATION_ERROR' });
+    expect(repository.exportReportData).not.toHaveBeenCalled();
+  });
+
+  it('accepts admissions, admission inquiries, and organization summary reports', async () => {
+    const repository = makeRepository();
+    const service = new ReportingService(repository);
+
+    for (const reportType of [
+      'admissions',
+      'admission-inquiries',
+      'organization',
+    ] as const) {
+      await expect(
+        service.exportReportData(organizationId, reportType, [campusOne]),
+      ).resolves.toEqual([]);
+    }
+
+    expect(repository.exportReportData).toHaveBeenNthCalledWith(
+      1,
+      organizationId,
+      'admissions',
+      [campusOne],
+      expect.any(Object),
+    );
+    expect(repository.exportReportData).toHaveBeenNthCalledWith(
+      2,
+      organizationId,
+      'admission-inquiries',
+      [campusOne],
+      expect.any(Object),
+    );
+    expect(repository.exportReportData).toHaveBeenNthCalledWith(
+      3,
+      organizationId,
+      'organization',
+      [campusOne],
+      expect.any(Object),
     );
   });
 });

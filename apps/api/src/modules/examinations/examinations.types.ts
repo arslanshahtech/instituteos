@@ -1,4 +1,16 @@
-export type ExamType = 'midterm' | 'final' | 'quiz' | 'monthly_test' | 'class_test' | 'mid_year' | 'send_up' | 'annual' | 'practical' | 'viva' | 'supplementary' | 'improvement';
+export type ExamType =
+  | 'midterm'
+  | 'final'
+  | 'quiz'
+  | 'monthly_test'
+  | 'class_test'
+  | 'mid_year'
+  | 'send_up'
+  | 'annual'
+  | 'practical'
+  | 'viva'
+  | 'supplementary'
+  | 'improvement';
 
 export interface ExaminationsContext {
   organizationId: string;
@@ -93,6 +105,7 @@ export interface ExamRosterStudent {
   id: string;
   firstName: string;
   lastName: string;
+  registrationNumber?: string;
   preferredName?: string;
   mark?: ExamMarkRecord;
 }
@@ -170,12 +183,20 @@ export interface ExaminationsRepository {
     examId: string,
     campusIds?: string[],
   ): Promise<ExamScheduleRecord[]>;
-  listPendingMarksReviews(organizationId: string, campusIds?: string[]): Promise<ExamScheduleRecord[]>;
+  listPendingMarksReviews(
+    organizationId: string,
+    campusIds?: string[],
+  ): Promise<ExamScheduleRecord[]>;
   getSchedule(
     organizationId: string,
     id: string,
   ): Promise<ExamScheduleRecord | null>;
-  setMarksReviewStatus(organizationId: string, scheduleId: string, status: MarksReviewStatus, submittedByUserId: string | null): Promise<ExamScheduleRecord | null>;
+  setMarksReviewStatus(
+    organizationId: string,
+    scheduleId: string,
+    status: MarksReviewStatus,
+    submittedByUserId: string | null,
+  ): Promise<ExamScheduleRecord | null>;
   createSchedule(
     organizationId: string,
     examId: string,

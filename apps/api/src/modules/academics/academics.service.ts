@@ -108,10 +108,18 @@ export class AcademicsService {
       startDate = validDate(input.startDate, 'start date');
       endDate = validDate(input.endDate, 'end date');
     } else {
-      const existingYears = await this.repository.listAcademicYears(context.organizationId);
-      const currentYear = existingYears.find((year) => year.status === 'active');
+      const existingYears = await this.repository.listAcademicYears(
+        context.organizationId,
+      );
+      const currentYear = existingYears.find(
+        (year) => year.status === 'active',
+      );
       if (!currentYear)
-        throw new AppError(400, 'ACADEMIC_CALENDAR_REQUIRED', 'Create the first academic session with its date range before adding another session.');
+        throw new AppError(
+          400,
+          'ACADEMIC_CALENDAR_REQUIRED',
+          'Create the first academic session with its date range before adding another session.',
+        );
       const shiftOneYear = (value: string) => {
         const [year, month, day] = value.split('-').map(Number);
         const next = new Date(Date.UTC(year! + 1, month! - 1, day!));
@@ -124,7 +132,9 @@ export class AcademicsService {
     assertDateRange(startDate, endDate);
     return this.repository.createAcademicYear(context.organizationId, {
       name,
-      description: String(input.description ?? '').trim().slice(0, 500),
+      description: String(input.description ?? '')
+        .trim()
+        .slice(0, 500),
       startDate,
       endDate,
       status: input.status ?? 'archived',
@@ -639,22 +649,42 @@ export class AcademicsService {
       ...(input.markComponents !== undefined
         ? (() => {
             const components = input.markComponents!;
-            if (components.length < 1 || components.length > 3 ||
-                new Set(components.map((component) => component.key)).size !== components.length ||
-                !components.some((component) => component.enabled))
-              throw new AppError(400, 'VALIDATION_ERROR', 'Configure at least one unique enabled mark component.');
+            if (
+              components.length < 1 ||
+              components.length > 3 ||
+              new Set(components.map((component) => component.key)).size !==
+                components.length ||
+              !components.some((component) => component.enabled)
+            )
+              throw new AppError(
+                400,
+                'VALIDATION_ERROR',
+                'Configure at least one unique enabled mark component.',
+              );
             for (const component of components) {
-              if (!Number.isSafeInteger(component.totalMarks) ||
-                  !Number.isSafeInteger(component.passingMarks) ||
-                  component.totalMarks < 0 || component.passingMarks < 0 ||
-                  component.passingMarks > component.totalMarks ||
-                  (component.enabled && component.totalMarks < 1))
-                throw new AppError(400, 'VALIDATION_ERROR', 'Enter valid component total and passing marks.');
+              if (
+                !Number.isSafeInteger(component.totalMarks) ||
+                !Number.isSafeInteger(component.passingMarks) ||
+                component.totalMarks < 0 ||
+                component.passingMarks < 0 ||
+                component.passingMarks > component.totalMarks ||
+                (component.enabled && component.totalMarks < 1)
+              )
+                throw new AppError(
+                  400,
+                  'VALIDATION_ERROR',
+                  'Enter valid component total and passing marks.',
+                );
             }
-            const enabledTotal = components.filter((component) => component.enabled)
+            const enabledTotal = components
+              .filter((component) => component.enabled)
               .reduce((sum, component) => sum + component.totalMarks, 0);
             if (enabledTotal !== input.totalMarks)
-              throw new AppError(400, 'VALIDATION_ERROR', 'Subject total marks must equal the enabled component totals.');
+              throw new AppError(
+                400,
+                'VALIDATION_ERROR',
+                'Subject total marks must equal the enabled component totals.',
+              );
             return { markComponents: components };
           })()
         : {}),

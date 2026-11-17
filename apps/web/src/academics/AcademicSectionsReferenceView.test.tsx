@@ -133,13 +133,15 @@ describe('AcademicSectionsReferenceView', () => {
       screen.getByRole('combobox', { name: 'Filter by class' }),
       { target: { value: 'class-2' } },
     );
-    expect(screen.getByText('Section B')).toBeTruthy();
+    expect(screen.getAllByText('Section B').length).toBeGreaterThan(0);
     expect(screen.queryByText('Section A')).toBeNull();
     fireEvent.change(
       screen.getByRole('searchbox', { name: 'Search sections' }),
       { target: { value: 'does-not-exist' } },
     );
-    expect(screen.getByText('No matching sections')).toBeTruthy();
+    expect(screen.getAllByText('No matching sections').length).toBeGreaterThan(
+      0,
+    );
     fireEvent.change(
       screen.getByRole('combobox', { name: 'Filter by class' }),
       { target: { value: 'all' } },
@@ -183,6 +185,42 @@ describe('AcademicSectionsReferenceView', () => {
     expect(
       pagination?.querySelector('select[aria-label="Rows per page"]'),
     ).toBeTruthy();
+  });
+
+  it('renders compact mobile section cards and opens responsive section details', () => {
+    const { container } = render(
+      <AcademicSectionsReferenceView
+        sections={sections}
+        classes={classes}
+        sessions={sessions}
+        summary={summary}
+        canWrite
+        onCreate={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    const cards = container.querySelectorAll(
+      '.academic-sections-mobile-list .academic-section-mobile-card',
+    );
+    expect(cards).toHaveLength(2);
+    expect(cards[0]?.textContent).toContain('Section A');
+    expect(cards[0]?.textContent).toContain('Prep');
+    expect(cards[0]?.textContent).toContain('2026-27');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'View details for Section A' }),
+    );
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.textContent).toContain('Section A');
+    expect(dialog.textContent).toContain('Prep');
+    expect(dialog.textContent).toContain('2026-27');
+    expect(dialog.textContent).toContain('10');
+    expect(dialog.textContent).toContain('20');
+    expect(dialog.textContent).toContain('Available seats');
+    expect(screen.getByRole('button', { name: 'Edit Section' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Delete Section' })).toBeTruthy();
   });
 
   it('does not present archived session counts as current when no active session exists', () => {

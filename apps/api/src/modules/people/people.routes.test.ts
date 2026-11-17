@@ -165,6 +165,7 @@ describe('staff HTTP routes', () => {
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
       updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     };
+    vi.spyOn(StaffMemberModel, 'exists').mockResolvedValue(null);
     const created = vi
       .spyOn(StaffMemberModel, 'create')
       .mockResolvedValue({ _id: staffId } as never);

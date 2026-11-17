@@ -182,7 +182,7 @@ describe('Homework & Tests teacher authorization routes', () => {
       subjectId,
       title: 'Old title',
       instructions: '',
-      type: 'homework',
+      type: 'test',
       dueDate: new Date('2026-11-15T00:00:00.000Z'),
       status: 'published',
       createdBy: userId,
@@ -238,7 +238,7 @@ describe('Homework & Tests teacher authorization routes', () => {
     );
   });
 
-  it('allows an organization admin to create homework for any valid school class', async () => {
+  it('allows an organization admin to create tests for any valid school class', async () => {
     const campusId = '650000000000000000000004';
     const academicYearId = '650000000000000000000005';
     const classId = '650000000000000000000006';
@@ -264,9 +264,9 @@ describe('Homework & Tests teacher authorization routes', () => {
       classId,
       sectionId,
       subjectId,
-      title: 'Admin created homework',
-      instructions: 'Complete the worksheet.',
-      type: 'homework',
+      title: 'Admin created test',
+      instructions: 'Prepare for the assessment.',
+      type: 'test',
       dueDate: new Date('2026-11-15T00:00:00.000Z'),
       status: 'published',
       createdBy: userId,
@@ -287,9 +287,9 @@ describe('Homework & Tests teacher authorization routes', () => {
         classId,
         sectionId,
         subjectId,
-        title: 'Admin created homework',
-        instructions: 'Complete the worksheet.',
-        type: 'homework',
+        title: 'Admin created test',
+        instructions: 'Prepare for the assessment.',
+        type: 'test',
         dueDate: '2026-11-15',
         status: 'published',
       });
@@ -297,7 +297,7 @@ describe('Homework & Tests teacher authorization routes', () => {
     expect(response.status).toBe(201);
     expect(response.body.item).toMatchObject({
       id: created._id,
-      title: 'Admin created homework',
+      title: 'Admin created test',
       status: 'published',
     });
     expect(create).toHaveBeenCalledWith(
@@ -365,5 +365,87 @@ describe('Homework & Tests teacher authorization routes', () => {
       }),
     );
     expect(createHomework).not.toHaveBeenCalled();
+  });
+
+  it('allows teachers to record a quick class test in the daily diary for an assigned class', async () => {
+    const campusId = '650000000000000000000004';
+    const academicYearId = '650000000000000000000005';
+    const classId = '650000000000000000000006';
+    const sectionId = '650000000000000000000007';
+    const subjectId = '650000000000000000000008';
+    const staffQuery = {
+      select: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue([{ _id: userId }]),
+    };
+    vi.spyOn(StaffMemberModel, 'find').mockReturnValue(staffQuery as never);
+    vi.spyOn(TeacherAssignmentModel, 'exists').mockResolvedValue({
+      _id: userId,
+    } as never);
+    vi.spyOn(AcademicClassModel, 'exists').mockResolvedValue({
+      _id: classId,
+    } as never);
+    vi.spyOn(AcademicSectionModel, 'exists').mockResolvedValue({
+      _id: sectionId,
+    } as never);
+    vi.spyOn(SubjectModel, 'exists').mockResolvedValue({
+      _id: subjectId,
+    } as never);
+    vi.spyOn(AcademicYearModel, 'exists').mockResolvedValue({
+      _id: academicYearId,
+    } as never);
+    const created = {
+      _id: '650000000000000000000012',
+      organizationId,
+      campusId,
+      academicYearId,
+      classId,
+      sectionId,
+      subjectId,
+      title: 'Chapter 3 class test',
+      instructions: 'Short in-class assessment.',
+      type: 'class_test',
+      dueDate: new Date('2026-11-15T00:00:00.000Z'),
+      totalMarks: 10,
+      status: 'published',
+      createdBy: userId,
+      createdAt: new Date('2026-11-11T00:00:00.000Z'),
+      updatedAt: new Date('2026-11-11T00:00:00.000Z'),
+    };
+    const create = vi
+      .spyOn((await import('./homework.model.js')).HomeworkTestModel, 'create')
+      .mockResolvedValue(created as never);
+
+    const response = await request(appForRole('teacher'))
+      .post(`/${organizationId}/homework-tests`)
+      .set('Cookie', `instituteos_csrf=${csrfToken}`)
+      .set('X-CSRF-Token', csrfToken)
+      .send({
+        campusId,
+        academicYearId,
+        classId,
+        sectionId,
+        subjectId,
+        title: 'Chapter 3 class test',
+        instructions: 'Short in-class assessment.',
+        type: 'class_test',
+        dueDate: '2026-11-15',
+        totalMarks: 10,
+        status: 'published',
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.item).toMatchObject({
+      title: 'Chapter 3 class test',
+      type: 'class_test',
+      totalMarks: 10,
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId,
+        createdBy: userId,
+        type: 'class_test',
+      }),
+    );
   });
 });

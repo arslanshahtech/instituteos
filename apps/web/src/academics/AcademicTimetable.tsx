@@ -238,7 +238,15 @@ export function AcademicTimetable({
   });
   const remove = useMutation({
     mutationFn: (id: string) => deleteSectionTimetable(organizationId, id),
-    onSuccess: refresh,
+    onSuccess: async (_result, id) => {
+      if (editing?.id === id) {
+        setViewingOnly(false);
+        setEditing(null);
+        setSectionId('');
+        setDraft(null);
+      }
+      await refresh();
+    },
     onError: (reason) => setError(apiMessage(reason)),
   });
   const bulk = useMutation({
@@ -371,7 +379,12 @@ export function AcademicTimetable({
 
   if (sectionId)
     return (
-      <section className="academic-section-timetable page-stack">
+      <section
+        className={
+          'academic-section-timetable page-stack' +
+          (viewingOnly ? ' is-viewing-timetable' : '')
+        }
+      >
         <header className="academic-timetable-heading academic-timetable-editor-heading">
           <div className="academic-timetable-editor-title">
             <button
@@ -392,12 +405,21 @@ export function AcademicTimetable({
             <div>
               <h2>
                 {viewingOnly
-                  ? 'View Timetable'
+                  ? (sectionMap.get(sectionId)?.name ?? 'Section') +
+                    ' Timetable'
                   : editing
                     ? 'Edit Timetable'
                     : 'Add Timetable'}
               </h2>
-              <p>Set up the weekly class schedule for this section.</p>
+              <p>
+                {viewingOnly
+                  ? (classMap.get(sectionMap.get(sectionId)?.classId ?? '')
+                      ?.name ?? 'Class') +
+                    ' · ' +
+                    (sectionMap.get(sectionId)?.name ?? 'Section') +
+                    ' weekly schedule'
+                  : 'Set up the weekly class schedule for this section.'}
+              </p>
             </div>
           </div>
           <label className="academic-timetable-year">
@@ -414,7 +436,12 @@ export function AcademicTimetable({
             </select>
           </label>
         </header>
-        <div className="academic-timetable-editor-card">
+        <div
+          className={
+            'academic-timetable-editor-card' +
+            (viewingOnly ? ' is-viewing-timetable' : '')
+          }
+        >
           <section className="academic-editor-section-select">
             <label className="academic-timetable-field">
               Section
@@ -439,8 +466,12 @@ export function AcademicTimetable({
               </select>
             </label>
             <p>
-              Select the class section whose weekly schedule you want to
-              configure.
+              {viewingOnly
+                ? (classMap.get(sectionMap.get(sectionId)?.classId ?? '')
+                    ?.name ?? 'Class') +
+                  ' · ' +
+                  (sectionMap.get(sectionId)?.name ?? 'Section')
+                : 'Select the class section whose weekly schedule you want to configure.'}
             </p>
           </section>
           <section className="academic-editor-weekly">
@@ -448,11 +479,99 @@ export function AcademicTimetable({
               <div>
                 <h3>Weekly Schedule</h3>
                 <p>
-                  Click an empty slot to add a class, break, or activity. Each
-                  day can have its own timings.
+                  {viewingOnly
+                    ? 'Review each day, subject, teacher and period timing.'
+                    : 'Click an empty slot to add a class, break, or activity. Each day can have its own timings.'}
                 </p>
               </div>
               <span>{entries.length} entries</span>
+            </div>
+            <div className="academic-timetable-mobile-days">
+              {editorDays.map((day, dayIndex) => {
+                const dayEntries = entriesByDay[dayIndex] ?? [];
+                return (
+                  <section
+                    className="academic-timetable-mobile-day"
+                    key={day.value}
+                  >
+                    <header>
+                      <h4>{day.label}</h4>
+                      <span>
+                        {dayEntries.length}{' '}
+                        {dayEntries.length === 1 ? 'entry' : 'entries'}
+                      </span>
+                    </header>
+                    {dayEntries.length ? (
+                      dayEntries.map((entry, index) => (
+                        <article
+                          className={
+                            'academic-timetable-mobile-period is-' + entry.type
+                          }
+                          key={entry.id ?? day.value + index}
+                        >
+                          <div className="academic-timetable-mobile-period-time">
+                            <strong>{entry.startTime}</strong>
+                            <span>to</span>
+                            <strong>{entry.endTime}</strong>
+                          </div>
+                          <div className="academic-timetable-mobile-period-info">
+                            <strong>
+                              {entry.type === 'class'
+                                ? (subjectMap.get(entry.subjectId ?? '')
+                                    ?.name ?? 'Subject')
+                                : entry.name}
+                            </strong>
+                            <span>
+                              {entry.type === 'class'
+                                ? nameOf(
+                                    teacherMap.get(entry.teacherStaffId ?? ''),
+                                  ) || 'No teacher assigned'
+                                : entry.type === 'break'
+                                  ? 'Break'
+                                  : 'Activity'}
+                            </span>
+                            {entry.room && <small>{entry.room}</small>}
+                            {entry.description && (
+                              <small>{entry.description}</small>
+                            )}
+                          </div>
+                          <span className="academic-timetable-mobile-period-number">
+                            P{index + 1}
+                          </span>
+                          {!viewingOnly && (
+                            <button
+                              type="button"
+                              className="academic-timetable-mobile-period-edit"
+                              onClick={() => {
+                                setError('');
+                                setDraft({ ...entry });
+                              }}
+                            >
+                              <Pencil size={13} aria-hidden="true" /> Edit
+                            </button>
+                          )}
+                        </article>
+                      ))
+                    ) : (
+                      <p className="academic-timetable-mobile-empty">
+                        No scheduled periods
+                      </p>
+                    )}
+                    {!viewingOnly && (
+                      <button
+                        type="button"
+                        className="academic-timetable-mobile-add-period"
+                        onClick={() => {
+                          setError('');
+                          setDraft(nextEntryForDay(day.value));
+                        }}
+                      >
+                        <Plus size={14} aria-hidden="true" /> Add period
+                      </button>
+                    )}
+                  </section>
+                );
+              })}
             </div>
             <div className="academic-week-grid-wrap">
               <div className="academic-week-grid academic-week-grid-reference">
@@ -605,18 +724,43 @@ export function AcademicTimetable({
             </p>
           )}
           <div className="academic-timetable-form-actions">
-            <button
-              type="button"
-              className="button button-secondary"
-              onClick={() => {
-                setViewingOnly(false);
-                setEditing(null);
-                setSectionId('');
-                setDraft(null);
-              }}
-            >
-              {viewingOnly ? 'Back to Timetables' : 'Cancel'}
-            </button>
+            {!viewingOnly && (
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => {
+                  setViewingOnly(false);
+                  setEditing(null);
+                  setSectionId('');
+                  setDraft(null);
+                }}
+              >
+                Cancel
+              </button>
+            )}
+            {viewingOnly && canWrite && editing && (
+              <div className="academic-timetable-detail-actions">
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={() => startEdit(editing)}
+                >
+                  <Pencil size={15} aria-hidden="true" /> Edit
+                </button>
+                <button
+                  type="button"
+                  className="button academic-timetable-detail-delete"
+                  disabled={remove.isPending}
+                  onClick={() => {
+                    if (window.confirm('Delete this section timetable?')) {
+                      remove.mutate(editing.id);
+                    }
+                  }}
+                >
+                  <Trash2 size={15} aria-hidden="true" /> Delete
+                </button>
+              </div>
+            )}
             {!viewingOnly && (
               <button
                 type="button"
@@ -841,7 +985,7 @@ export function AcademicTimetable({
             <>
               <button
                 type="button"
-                className="button button-secondary"
+                className="button button-secondary academic-timetable-break-button"
                 onClick={() => {
                   setBulkOpen(true);
                   setError('');
@@ -851,7 +995,7 @@ export function AcademicTimetable({
               </button>
               <button
                 type="button"
-                className="button button-primary"
+                className="button button-primary academic-timetable-create-button"
                 onClick={startNew}
               >
                 <Plus size={16} aria-hidden="true" /> Create Timetable
@@ -995,6 +1139,41 @@ export function AcademicTimetable({
                 >
                   <Download size={15} aria-hidden="true" /> Download CSV
                 </button>
+              </div>
+              <div className="academic-timetable-mobile-list">
+                {filtered.map((item) => {
+                  const section = sectionMap.get(item.sectionId);
+                  const className =
+                    classMap.get(section?.classId ?? '')?.name ?? 'Class';
+                  return (
+                    <article
+                      className="academic-timetable-mobile-item"
+                      key={item.id}
+                    >
+                      <div className="academic-timetable-mobile-item-copy">
+                        <span>{className}</span>
+                        <h4>{section?.name ?? 'Section'}</h4>
+                        <small>
+                          {item.entries.length} scheduled{' '}
+                          {item.entries.length === 1 ? 'entry' : 'entries'}
+                        </small>
+                      </div>
+                      <button
+                        type="button"
+                        className="academic-timetable-mobile-view"
+                        onClick={() => startView(item)}
+                      >
+                        <Eye size={14} aria-hidden="true" /> View Details
+                      </button>
+                    </article>
+                  );
+                })}
+                {!filtered.length && (
+                  <p className="academic-timetable-empty">
+                    No timetables found. Create the first section timetable to
+                    get started.
+                  </p>
+                )}
               </div>
               <table className="academic-timetable-table">
                 <colgroup>

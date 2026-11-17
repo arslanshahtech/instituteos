@@ -46,12 +46,26 @@ function databaseErrorDetails(error: unknown): {
 
 export const errorHandler: ErrorRequestHandler = (
   error: unknown,
-  _request,
+  request,
   response,
-  _next,
+  next,
 ) => {
-  void _next;
   const requestId = response.locals.requestId as string | undefined;
+  const isDuplicateKey =
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 11000;
+  const isMongooseValidation =
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    error.name === 'ValidationError';
+  const isDatabaseUnavailable =
+    error instanceof Error &&
+    /Mongo(Network|ServerSelection|TopologyClosed)|MongooseServerSelection/i.test(
+      error.name,
+    );
   const normalizedError = isMalformedJson(error)
     ? new AppError(
         400,
@@ -60,7 +74,29 @@ export const errorHandler: ErrorRequestHandler = (
       )
     : isOversizedBody(error)
       ? new AppError(413, 'PAYLOAD_TOO_LARGE', 'The request body is too large.')
-      : error;
+      : isDuplicateKey
+        ? new AppError(
+            409,
+            'RESOURCE_CONFLICT',
+            'A record with these details already exists.',
+          )
+        : isMongooseValidation
+          ? new AppError(
+              400,
+              'VALIDATION_ERROR',
+              'The submitted data is not valid.',
+            )
+          : isDatabaseUnavailable
+            ? new AppError(
+                503,
+                'DATA_SERVICE_UNAVAILABLE',
+                'The data service is temporarily unavailable. Please try again.',
+              )
+            : error;
+  if (response.headersSent) {
+    next(normalizedError);
+    return;
+  }
   const appError = normalizedError instanceof AppError ? normalizedError : null;
   const statusCode = appError?.statusCode ?? 500;
   const code = appError?.code ?? 'INTERNAL_SERVER_ERROR';
@@ -72,11 +108,14 @@ export const errorHandler: ErrorRequestHandler = (
         level: 'error',
         event: 'http.error',
         requestId,
-        errorName:
-          normalizedError instanceof Error
-            ? normalizedError.name
-            : 'UnknownError',
-        ...databaseErrorDetails(normalizedError),
+        method: request.method,
+        path: request.path,
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        ...(error instanceof Error && error.stack
+          ? { stack: error.stack }
+          : {}),
+        ...databaseErrorDetails(error),
         code,
       }),
     );

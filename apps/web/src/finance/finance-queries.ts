@@ -25,6 +25,7 @@ import {
   saveFinanceExpenseBudget,
   listFinanceConcessions,
   createFinanceExpense,
+  updateFinanceExpense,
   deleteFinanceExpense,
 } from './finance-api.js';
 import type {
@@ -41,6 +42,7 @@ export function useFinanceWorkspace(
   enabled: boolean,
   filters: InvoiceFilters,
   operationFilters: FinanceOperationFilters = filters,
+  challanFilters: InvoiceFilters = {},
 ) {
   const key = financeQueryKey(organizationId);
   return {
@@ -58,7 +60,14 @@ export function useFinanceWorkspace(
       placeholderData: keepPreviousData,
     }),
     allInvoices: useQuery({
-      queryKey: [...key, 'all-invoices'],
+      queryKey: [...key, 'all-invoices', challanFilters],
+      queryFn: () => listInvoices(organizationId, challanFilters),
+      enabled,
+      retry: false,
+      placeholderData: keepPreviousData,
+    }),
+    paymentInvoices: useQuery({
+      queryKey: [...key, 'payment-invoices'],
       queryFn: () => listInvoices(organizationId),
       enabled,
       retry: false,
@@ -71,9 +80,26 @@ export function useFinanceWorkspace(
       retry: false,
       placeholderData: keepPreviousData,
     }),
+    paymentOverview: useQuery({
+      queryKey: [...key, 'payment-overview'],
+      queryFn: () => listFinancePayments(organizationId),
+      enabled,
+      retry: false,
+      placeholderData: keepPreviousData,
+    }),
     expenses: useQuery({
       queryKey: [...key, 'expenses', operationFilters],
       queryFn: () => listFinanceExpenses(organizationId, operationFilters),
+      enabled,
+      retry: false,
+      placeholderData: keepPreviousData,
+    }),
+    expenseOverview: useQuery({
+      queryKey: [...key, 'expense-overview', operationFilters.campusId],
+      queryFn: () =>
+        listFinanceExpenses(organizationId, {
+          campusId: operationFilters.campusId,
+        }),
       enabled,
       retry: false,
       placeholderData: keepPreviousData,
@@ -118,6 +144,17 @@ export function useCreateFinanceExpense(organizationId: string) {
   return useMutation({
     mutationFn: (input: Parameters<typeof createFinanceExpense>[1]) =>
       createFinanceExpense(organizationId, input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateFinanceExpense(organizationId: string) {
+  const invalidate = useInvalidateFinance(organizationId);
+  return useMutation({
+    mutationFn: (input: {
+      expenseId: string;
+      data: Parameters<typeof updateFinanceExpense>[2];
+    }) => updateFinanceExpense(organizationId, input.expenseId, input.data),
     onSuccess: invalidate,
   });
 }

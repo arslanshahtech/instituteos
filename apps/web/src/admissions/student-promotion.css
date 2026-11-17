@@ -532,12 +532,189 @@
   gap: 9px;
   margin-top: 20px;
 }
+.promotion-page-heading {
+  align-items: flex-start;
+}
+.promotion-page-heading > div {
+  min-width: 0;
+}
+.promotion-page-heading p {
+  max-width: 620px;
+  line-height: 1.45;
+}
+.promotion-page-heading > .button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 7px 11px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.promotion-stepper {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.promotion-step {
+  display: flex;
+  min-width: 0;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  border: 1px solid var(--border, #d7dce2);
+  border-radius: 8px;
+  color: var(--muted, #718096);
+  background: var(--surface, #fff);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+.promotion-step[aria-current='step'] {
+  border-color: #111827;
+  color: #111827;
+  background: var(--surface-subtle, #f7f8fa);
+}
+.promotion-map-card {
+  min-width: 0;
+}
+.promotion-create-session {
+  white-space: nowrap;
+}
 @media (max-width: 900px) {
   .promotion-review__counts {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 @media (max-width: 640px) {
+  .promotion-page-heading {
+    gap: 10px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .promotion-page-heading > .button {
+    align-self: flex-start;
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  .promotion-stepper {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .promotion-step {
+    min-height: 38px;
+    padding: 7px 6px;
+    font-size: 11px;
+    line-height: 1.25;
+  }
+  .promotion-map-card {
+    padding: 14px 12px !important;
+  }
+  .promotion-map-card > div {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+  }
+  .promotion-map-card div[style*='minmax(70px'] {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 7px !important;
+    padding: 9px;
+    border: 1px solid var(--border, #e1e5ea);
+    border-radius: 8px;
+  }
+  .promotion-map-card div[style*='minmax(70px'] > span {
+    font-weight: 650;
+  }
+  .promotion-create-session {
+    margin: 6px 0 0 !important;
+    min-height: 34px;
+    padding: 5px 9px;
+    font-size: 11px;
+  }
+  .promotion-fees {
+    gap: 14px;
+    padding: 12px;
+    border-radius: 12px;
+  }
+  .promotion-fees__intro {
+    align-items: flex-start;
+  }
+  .promotion-fees__intro h2 {
+    font-size: 17px;
+  }
+  .promotion-fees__intro p {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .promotion-fees__summary {
+    min-width: 78px;
+    padding: 7px 9px;
+  }
+  .promotion-fees__summary strong {
+    font-size: 19px;
+  }
+  .promotion-fees__toolbar,
+  .promotion-fees__selection {
+    align-items: stretch;
+    width: 100%;
+  }
+  .promotion-filter {
+    justify-content: flex-start;
+    width: 100%;
+    min-height: 38px;
+    padding: 7px 9px;
+    font-size: 12px;
+  }
+  .promotion-fees__selection {
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .promotion-fees__selection .button {
+    min-height: 34px;
+    padding: 6px 9px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .promotion-class-card__summary {
+    gap: 7px;
+    padding: 10px;
+  }
+  .promotion-class-card__title {
+    font-size: 13px;
+  }
+  .promotion-class-card__count,
+  .promotion-class-card__needs {
+    font-size: 11px;
+  }
+  .promotion-class-card__actions {
+    width: calc(100% - 29px);
+    margin: 2px 0 0 29px;
+    gap: 6px;
+  }
+  .promotion-class-card__actions .button {
+    min-height: 30px;
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+  .promotion-class-card__table-wrap {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .promotion-fees__table {
+    min-width: 790px;
+  }
+  .promotion-fees__table th,
+  .promotion-fees__table td {
+    padding: 9px 8px;
+    font-size: 11px;
+  }
+  .promotion-fees__table th:first-child {
+    padding-left: 36px;
+  }
+  .promotion-fee-select {
+    max-width: 132px;
+  }
   .promotion-review__counts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     padding: 10px;
@@ -555,5 +732,189 @@
   }
   .promotion-review__actions .button {
     width: 100%;
+  }
+}
+
+/* Compact class-map controls */
+.promotion-active-count__dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: #16a34a;
+}
+
+.promotion-class-map-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.promotion-class-map-actions > strong {
+  margin-right: auto;
+  color: var(--muted, #64748b);
+  white-space: nowrap;
+}
+
+.promotion-class-map-actions .button {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.promotion-outcome-select {
+  width: min(100%, 230px) !important;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.promotion-section-map-row {
+  grid-template-columns: max-content 18px minmax(0, 1fr) !important;
+  column-gap: 8px !important;
+  row-gap: 0 !important;
+  min-width: 0;
+}
+
+.promotion-section-map-label {
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  white-space: nowrap !important;
+  font-size: 12px !important;
+  font-weight: 650;
+  color: var(--text, #263238) !important;
+}
+
+.promotion-section-map-arrow {
+  display: grid;
+  place-items: center;
+  color: var(--muted, #718096);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.promotion-section-map-select {
+  justify-self: end;
+  width: min(100%, 160px) !important;
+  min-width: 0;
+  min-height: 34px !important;
+  height: 34px;
+  padding: 5px 8px !important;
+  font-size: 12px !important;
+  line-height: 1.2;
+}
+
+.promotion-section-map-fee {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 4px;
+  padding: 2px 0 0 1px;
+  color: var(--muted, #718096);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.promotion-section-map-fee > span:first-child {
+  flex: 0 0 auto;
+  font-weight: 650;
+  color: var(--text, #475467);
+}
+
+.promotion-section-map-fee > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .promotion-active-count {
+    gap: 8px !important;
+    margin-top: 12px !important;
+    padding: 8px 10px !important;
+  }
+
+  .promotion-active-count strong {
+    font-size: 13px !important;
+  }
+
+  .promotion-active-count span:not(.promotion-active-count__dot) {
+    font-size: 11px !important;
+  }
+
+  .promotion-class-map-actions {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center !important;
+    gap: 6px !important;
+    width: 100%;
+  }
+
+  .promotion-class-map-actions > strong {
+    grid-column: 1 / -1;
+    margin: 0 0 2px;
+    font-size: 11px !important;
+  }
+
+  .promotion-class-map-actions .promotion-leave-all {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: start;
+  }
+
+  .promotion-class-map-actions .promotion-include-all {
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: end;
+  }
+
+  .promotion-class-map-actions .button {
+    min-height: 32px;
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .promotion-section-map-row {
+    grid-template-columns: max-content 16px minmax(0, 1fr) !important;
+    column-gap: 8px !important;
+    padding: 7px 8px !important;
+  }
+
+  .promotion-section-map-label {
+    font-size: 11px !important;
+  }
+
+  .promotion-section-map-select {
+    width: min(100%, 145px) !important;
+    min-height: 33px !important;
+    height: 33px;
+    padding: 5px 6px !important;
+    font-size: 11px !important;
+  }
+
+  .promotion-section-map-fee {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 380px) {
+  .promotion-section-map-row {
+    grid-template-columns: max-content 14px minmax(0, 1fr) !important;
+    column-gap: 6px !important;
+    padding: 6px !important;
+  }
+
+  .promotion-section-map-select {
+    width: min(100%, 125px) !important;
+    padding: 4px 5px !important;
+    font-size: 10px !important;
+  }
+
+  .promotion-class-map-actions .button {
+    padding-inline: 6px;
+    font-size: 10px;
   }
 }

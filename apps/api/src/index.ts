@@ -98,7 +98,8 @@ mongoose.connection.on('error', (error: unknown) => {
 
 let stopAttendanceScheduler: (() => void) | undefined;
 void maintainDatabaseConnection(databaseRetryController.signal).then(() => {
-  if (!shuttingDown) stopAttendanceScheduler = startStudentAutoAbsentScheduler();
+  if (!shuttingDown)
+    stopAttendanceScheduler = startStudentAutoAbsentScheduler();
 });
 
 async function shutdown(signal: string): Promise<void> {

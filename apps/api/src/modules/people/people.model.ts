@@ -21,7 +21,12 @@ const studentSchema = new Schema(
       ref: 'Campus',
       default: null,
     },
-    familyId: { type: Schema.Types.ObjectId, ref: 'StudentFamily', default: null, index: true },
+    familyId: {
+      type: Schema.Types.ObjectId,
+      ref: 'StudentFamily',
+      default: null,
+      index: true,
+    },
     sourceApplicationId: {
       type: Schema.Types.ObjectId,
       ref: 'AdmissionApplication',
@@ -29,7 +34,12 @@ const studentSchema = new Schema(
     },
     firstName: { type: String, required: true, trim: true, maxlength: 80 },
     lastName: { type: String, required: true, trim: true, maxlength: 80 },
-    registrationNumber: { type: String, trim: true, uppercase: true, maxlength: 40 },
+    registrationNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      maxlength: 40,
+    },
     photoUrl: { type: String, trim: true, maxlength: 500 },
     fatherName: { type: String, trim: true, maxlength: 160 },
     motherName: { type: String, trim: true, maxlength: 160 },
@@ -207,7 +217,12 @@ const staffMemberSchema = new Schema(
     firstName: { type: String, required: true, trim: true, maxlength: 80 },
     lastName: { type: String, required: true, trim: true, maxlength: 80 },
     employeeCode: { type: String, trim: true, maxlength: 40 },
-    staffType: { type: String, enum: ['teacher', 'other_staff'], default: 'other_staff', required: true },
+    staffType: {
+      type: String,
+      enum: ['teacher', 'other_staff'],
+      default: 'other_staff',
+      required: true,
+    },
     department: { type: String, trim: true, maxlength: 100 },
     designation: { type: String, trim: true, maxlength: 100 },
     qualification: { type: String, trim: true, maxlength: 240 },
@@ -355,14 +370,31 @@ const enrollmentSchema = new Schema(
       default: null,
     },
     gradeLevel: { type: String, trim: true, maxlength: 80 },
-    academicYearId: { type: Schema.Types.ObjectId, ref: 'AcademicYear', default: null },
-    registrationNumber: { type: String, trim: true, uppercase: true, maxlength: 40 },
+    academicYearId: {
+      type: Schema.Types.ObjectId,
+      ref: 'AcademicYear',
+      default: null,
+    },
+    registrationNumber: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      maxlength: 40,
+    },
     admissionFee: { type: Schema.Types.Decimal128, min: 0, default: '0.00' },
     registrationFee: { type: Schema.Types.Decimal128, min: 0, default: '0.00' },
     securityDeposit: { type: Schema.Types.Decimal128, min: 0, default: '0.00' },
     monthlyFee: { type: Schema.Types.Decimal128, min: 0, default: '0.00' },
-    admissionType: { type: String, enum: ['single', 'family'], default: 'single' },
-    discountCategory: { type: String, enum: ['none', 'sibling', 'staff', 'merit', 'other'], default: 'none' },
+    admissionType: {
+      type: String,
+      enum: ['single', 'family'],
+      default: 'single',
+    },
+    discountCategory: {
+      type: String,
+      enum: ['none', 'sibling', 'staff', 'merit', 'other'],
+      default: 'none',
+    },
     discountType: { type: String, enum: ['fixed', 'percentage'] },
     discountValue: { type: Schema.Types.Decimal128, min: 0, default: '0.00' },
     previousSchool: { type: String, trim: true, maxlength: 160 },
@@ -381,14 +413,28 @@ const enrollmentSchema = new Schema(
 enrollmentSchema.index({ organizationId: 1, status: 1, studentId: 1 });
 enrollmentSchema.index(
   { organizationId: 1, sourceApplicationId: 1 },
-  { unique: true, name: 'uniq_enrollment_application_record', partialFilterExpression: { sourceApplicationId: { $type: 'objectId' } } },
+  {
+    unique: true,
+    name: 'uniq_enrollment_application_record',
+    partialFilterExpression: { sourceApplicationId: { $type: 'objectId' } },
+  },
 );
-
 
 const studentFamilySchema = new Schema(
   {
-    organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
-    familyNumber: { type: String, required: true, trim: true, uppercase: true, maxlength: 24 },
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: true,
+      index: true,
+    },
+    familyNumber: {
+      type: String,
+      required: true,
+      trim: true,
+      uppercase: true,
+      maxlength: 24,
+    },
     name: { type: String, trim: true, maxlength: 120 },
     primaryContactMobile: { type: String, trim: true, maxlength: 40 },
     guardianIds: [{ type: Schema.Types.ObjectId, ref: 'Guardian' }],
@@ -396,20 +442,34 @@ const studentFamilySchema = new Schema(
   },
   { timestamps: true, versionKey: false },
 );
-studentFamilySchema.index({ organizationId: 1, familyNumber: 1 }, { unique: true, name: 'uniq_family_number_per_organization' });
+studentFamilySchema.index(
+  { organizationId: 1, familyNumber: 1 },
+  { unique: true, name: 'uniq_family_number_per_organization' },
+);
 
 const peopleSequenceSchema = new Schema(
   {
-    organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true },
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: true,
+    },
     name: { type: String, required: true, trim: true, maxlength: 80 },
     value: { type: Number, required: true, min: 0, default: 0 },
   },
   { timestamps: true, versionKey: false },
 );
-peopleSequenceSchema.index({ organizationId: 1, name: 1 }, { unique: true, name: 'uniq_people_sequence_per_organization' });
+peopleSequenceSchema.index(
+  { organizationId: 1, name: 1 },
+  { unique: true, name: 'uniq_people_sequence_per_organization' },
+);
 
-export const StudentFamilyModel = mongoose.models.StudentFamily ?? mongoose.model('StudentFamily', studentFamilySchema);
-export const PeopleSequenceModel = mongoose.models.PeopleSequence ?? mongoose.model('PeopleSequence', peopleSequenceSchema);
+export const StudentFamilyModel =
+  mongoose.models.StudentFamily ??
+  mongoose.model('StudentFamily', studentFamilySchema);
+export const PeopleSequenceModel =
+  mongoose.models.PeopleSequence ??
+  mongoose.model('PeopleSequence', peopleSequenceSchema);
 
 export const StudentModel =
   mongoose.models.Student ?? mongoose.model('Student', studentSchema);

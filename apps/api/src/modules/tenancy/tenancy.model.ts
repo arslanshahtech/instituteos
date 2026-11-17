@@ -44,6 +44,7 @@ const organizationSchema = new Schema(
       country: { type: String, trim: true, maxlength: 100 },
     },
     timezone: { type: String, trim: true, maxlength: 80, default: 'UTC' },
+    rolePermissions: { type: Schema.Types.Mixed, default: {} },
     ownerMutationRevision: { type: Number, default: 0, select: false },
   },
   { timestamps: true, versionKey: false },

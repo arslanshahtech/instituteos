@@ -685,6 +685,7 @@ export function AcademicsDashboard() {
           campuses={workspace.campuses.data?.campuses ?? []}
           subjects={workspace.subjects.data?.items ?? []}
           studentsCount={organizationSummary.data?.summary.activeStudentCount}
+          summary={sessionSummary.data?.summary}
           onCreate={openCreate}
           onEdit={openEdit}
           onDelete={deleteAcademicRecord}
@@ -916,19 +917,16 @@ export function AcademicsDashboard() {
       return (
         <main className="page-stack academic-session-create-page">
           <WorkspacePageHeading
-            eyebrow="Curriculum"
-            title="Create New Session"
-            description="Add a new academic session to your school."
+            eyebrow=""
+            title="Add Session"
+            description="Set the academic session dates."
           />
           <section
             aria-labelledby="academic-session-information-title"
             className="academic-session-create-card"
           >
             <header>
-              <h2 id="academic-session-information-title">
-                Session Information
-              </h2>
-              <p>Enter the details for the new academic session</p>
+              <h2 id="academic-session-information-title">Session Details</h2>
             </header>
             <AcademicsForm
               choices={choices}
@@ -969,6 +967,8 @@ export function AcademicsDashboard() {
       <>
         <AcademicSessionsReferenceView
           sessions={workspace.years.data?.items ?? []}
+          classes={workspace.classes.data?.items ?? []}
+          sections={workspace.sections.data?.items ?? []}
           summary={
             sessionSummary.data?.summary ?? {
               totals: { classes: 0, sections: 0, students: 0 },

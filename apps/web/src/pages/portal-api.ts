@@ -13,21 +13,37 @@ export interface StudentPortalRecord {
     totalMarked: number;
     present: number;
     absent: number;
+    late: number;
     leave: number;
     percentage: number | null;
     records: Array<{ date: string | null; status: string; remarks: string }>;
   };
   fees: {
     totalOutstanding: number;
+    totalPaid: number;
+    totalInvoiced: number;
     invoices: Array<{
       id: string;
       invoiceNumber: string;
       billingCycle: string;
+      issueDate: string | null;
       dueDate: string | null;
       totalAmount: number;
       paidAmount: number;
+      discountAmount: number;
+      arrearsAmount: number;
       outstandingAmount: number;
       status: string;
+    }>;
+    receipts: Array<{
+      id: string;
+      receiptNumber: string;
+      invoiceNumber: string;
+      billingCycle: string;
+      amountPaid: number;
+      paymentMethod: string;
+      transactionReference: string;
+      paymentDate: string | null;
     }>;
   };
   results: Array<{
@@ -49,6 +65,7 @@ export interface StudentPortalRecord {
     instructions: string;
     type: string;
     dueDate: string | null;
+    assignedDate: string | null;
     totalMarks: number | null;
     subjectName: string;
     teacherName?: string;

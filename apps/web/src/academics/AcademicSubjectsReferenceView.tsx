@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { BookOpen, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { BookOpen, Eye, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import type { AcademicClass, AcademicSubject } from './academics-api.js';
 import type { ExamSchedule } from '../examinations/examinations-api.js';
 import { Button } from '../components/ui/Button.js';
+import { Dialog } from '../components/ui/Dialog.js';
 import {
   WorkspaceMetricCard,
   WorkspacePageHeading,
@@ -32,6 +33,9 @@ export function AcademicSubjectsReferenceView({
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [detailsSubject, setDetailsSubject] = useState<AcademicSubject | null>(
+    null,
+  );
   const classNames = useMemo(
     () => new Map(classes.map((item) => [item.id, item.name])),
     [classes],
@@ -136,12 +140,17 @@ export function AcademicSubjectsReferenceView({
   return (
     <main className="page-stack academic-subjects-page">
       <WorkspacePageHeading
-        eyebrow="Curriculum"
+        eyebrow=""
         title="Subjects"
         description="Manage the subjects offered across your classes."
         aside={
           canWrite ? (
-            <Button onClick={onCreate} type="button" variant="primary">
+            <Button
+              className="academic-subjects-add-button"
+              onClick={onCreate}
+              type="button"
+              variant="primary"
+            >
               <Plus size={16} aria-hidden="true" />
               Add Subject
             </Button>
@@ -197,7 +206,76 @@ export function AcademicSubjectsReferenceView({
             <h2>All Subjects ({filteredRows.length})</h2>
           </div>
         </header>
-        <div className="table-scroll">
+        <div className="academic-subjects-mobile-list">
+          {visibleRows.length ? (
+            visibleRows.map(
+              ({
+                subject,
+                classNames: names,
+                totalMarks,
+                passingPercentage,
+              }) => (
+                <article
+                  className="academic-subject-mobile-card"
+                  key={subject.id}
+                >
+                  <div className="academic-subject-mobile-copy">
+                    <span className="academic-subject-mobile-label">
+                      SUBJECT
+                    </span>
+                    <strong>{subject.name}</strong>
+                    <small>
+                      {subject.code} ·{' '}
+                      {names.length ? names.join(', ') : 'Not assigned'}
+                    </small>
+                    <small>
+                      {totalMarks > 0
+                        ? 'Total marks: ' + totalMarks
+                        : 'Marks not configured'}
+                      {passingPercentage === null
+                        ? ''
+                        : ' · Passing: ' + passingPercentage.toFixed(1) + '%'}
+                    </small>
+                  </div>
+                  <Button
+                    aria-label={'View details for ' + subject.name}
+                    onClick={() => setDetailsSubject(subject)}
+                    type="button"
+                    variant="secondary"
+                  >
+                    <Eye size={14} aria-hidden="true" />
+                    View Details
+                  </Button>
+                </article>
+              ),
+            )
+          ) : (
+            <div className="academic-subjects-empty">
+              <strong>
+                {search.trim() || classId !== 'all'
+                  ? 'No matching subjects'
+                  : 'No subjects yet'}
+              </strong>
+              <p>
+                {search.trim() || classId !== 'all'
+                  ? 'Change the search or class filter.'
+                  : 'Add a subject to start building your curriculum.'}
+              </p>
+              {!search.trim() && classId === 'all' && canWrite && (
+                <Button
+                  className="academic-subjects-add-button"
+                  onClick={onCreate}
+                  type="button"
+                  variant="secondary"
+                >
+                  <Plus size={15} aria-hidden="true" />
+                  Add Subject
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="table-scroll academic-subjects-desktop-list">
           <table className="data-table academic-sessions-table academic-subjects-table">
             <thead>
               <tr>
@@ -260,6 +338,7 @@ export function AcademicSubjectsReferenceView({
                             </Button>
                             <Button
                               aria-label={'Delete ' + subject.name}
+                              className="academic-subject-delete-button"
                               onClick={() => onDelete(subject)}
                               type="button"
                               variant="quiet"
@@ -290,6 +369,7 @@ export function AcademicSubjectsReferenceView({
                     </p>
                     {!search.trim() && classId === 'all' && canWrite && (
                       <Button
+                        className="academic-subjects-add-button"
                         onClick={onCreate}
                         type="button"
                         variant="secondary"
@@ -352,6 +432,127 @@ export function AcademicSubjectsReferenceView({
           </div>
         </footer>
       </section>
+      <Dialog
+        open={detailsSubject !== null}
+        onOpenChange={(open) => {
+          if (!open) setDetailsSubject(null);
+        }}
+        title={detailsSubject?.name ?? 'Subject details'}
+        description={
+          detailsSubject ? 'Subject code: ' + detailsSubject.code : undefined
+        }
+      >
+        {detailsSubject &&
+          (() => {
+            const detailRow = rows.find(
+              (item) => item.subject.id === detailsSubject.id,
+            );
+            const components = detailsSubject.markComponents ?? [];
+            return (
+              <div className="academic-subject-details">
+                <div className="academic-subject-details-grid">
+                  <div>
+                    <small>Subject name</small>
+                    <strong>{detailsSubject.name}</strong>
+                  </div>
+                  <div>
+                    <small>Subject code</small>
+                    <strong>{detailsSubject.code}</strong>
+                  </div>
+                  <div>
+                    <small>Assigned classes</small>
+                    <strong>
+                      {detailRow?.classNames.join(', ') || 'Not assigned'}
+                    </strong>
+                  </div>
+                  <div>
+                    <small>Total marks</small>
+                    <strong>
+                      {detailRow && detailRow.totalMarks > 0
+                        ? detailRow.totalMarks
+                        : 'Not configured'}
+                    </strong>
+                  </div>
+                  <div>
+                    <small>Passing percentage</small>
+                    <strong>
+                      {detailRow?.passingPercentage == null
+                        ? 'Not configured'
+                        : detailRow.passingPercentage.toFixed(1) + '%'}
+                    </strong>
+                  </div>
+                  <div>
+                    <small>Assessment components</small>
+                    <strong>
+                      {components.length
+                        ? String(
+                            components.filter((item) => item.enabled).length,
+                          ) + ' enabled'
+                        : 'Not configured'}
+                    </strong>
+                  </div>
+                </div>
+                <section className="academic-subject-details-components">
+                  <h3>Assessment breakdown</h3>
+                  {components.length ? (
+                    <ul>
+                      {components.map((component) => (
+                        <li key={component.key}>
+                          <span>
+                            {component.label}
+                            {component.enabled ? '' : ' · Disabled'}
+                          </span>
+                          <strong>
+                            {component.totalMarks} marks · Pass{' '}
+                            {component.passingMarks}
+                          </strong>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>
+                      No theory, practical or viva components have been
+                      configured for this subject.
+                    </p>
+                  )}
+                </section>
+                <section className="academic-subject-details-description">
+                  <h3>Description</h3>
+                  <p>
+                    {detailsSubject.description?.trim() ||
+                      'No description has been added.'}
+                  </p>
+                </section>
+                {canWrite && (
+                  <div className="academic-subject-details-actions">
+                    <Button
+                      onClick={() => {
+                        onEdit(detailsSubject);
+                        setDetailsSubject(null);
+                      }}
+                      type="button"
+                      variant="secondary"
+                    >
+                      <Pencil size={15} aria-hidden="true" />
+                      Edit Subject
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        onDelete(detailsSubject);
+                        setDetailsSubject(null);
+                      }}
+                      type="button"
+                      variant="danger"
+                    >
+                      <Trash2 size={15} aria-hidden="true" />
+                      Delete Subject
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+      </Dialog>
     </main>
   );
 }

@@ -34,7 +34,14 @@ function defaultSettings(
       smsAlerts: false,
       autoAttendanceAlerts: false,
     },
-    staffSetup: { departments: [], designations: [], employmentTypes: [], workShifts: [], qualifications: [], documentTypes: [] },
+    staffSetup: {
+      departments: [],
+      designations: [],
+      employmentTypes: [],
+      workShifts: [],
+      qualifications: [],
+      documentTypes: [],
+    },
     teacherSelfAttendance: {
       viewOwnAttendance: true,
       selfMarkingEnabled: false,
@@ -42,6 +49,29 @@ function defaultSettings(
     },
     createdAt: timestamp,
     updatedAt: timestamp,
+  };
+}
+
+function mergeSettingsWithDefaults(
+  existing: OrganizationSettingsRecord,
+  defaults: OrganizationSettingsRecord,
+): OrganizationSettingsRecord {
+  const record = existing as Partial<OrganizationSettingsRecord>;
+  return {
+    ...defaults,
+    ...record,
+    branding: { ...defaults.branding, ...record.branding },
+    contact: { ...defaults.contact, ...record.contact },
+    localization: { ...defaults.localization, ...record.localization },
+    notifications: { ...defaults.notifications, ...record.notifications },
+    teacherSelfAttendance: {
+      ...defaults.teacherSelfAttendance,
+      ...record.teacherSelfAttendance,
+      allowedStatuses:
+        record.teacherSelfAttendance?.allowedStatuses ??
+        defaults.teacherSelfAttendance.allowedStatuses,
+    },
+    staffSetup: { ...defaults.staffSetup, ...record.staffSetup },
   };
 }
 
@@ -68,7 +98,14 @@ function validateInput(input: OrganizationSettingsInput): void {
         'selfMarkingEnabled',
         'allowedStatuses',
       ],
-      staffSetup: ['departments', 'designations', 'employmentTypes', 'workShifts', 'qualifications', 'documentTypes'],
+      staffSetup: [
+        'departments',
+        'designations',
+        'employmentTypes',
+        'workShifts',
+        'qualifications',
+        'documentTypes',
+      ],
     }[section];
     const optionalTextFields = [
       'logoUrl',
@@ -88,10 +125,30 @@ function validateInput(input: OrganizationSettingsInput): void {
         );
       }
       if (section === 'staffSetup') {
-        if (!Array.isArray(value) || value.length > 100 || value.some((item) => !item || typeof item !== 'object' || typeof (item as { id?: unknown }).id !== 'string' || typeof (item as { name?: unknown }).name !== 'string' || !(item as { name: string }).name.trim() || (item as { name: string }).name.length > 120 || typeof (item as { isActive?: unknown }).isActive !== 'boolean')) {
-          throw new AppError(400, 'VALIDATION_ERROR', `Enter valid ${key} entries.`);
+        if (
+          !Array.isArray(value) ||
+          value.length > 100 ||
+          value.some(
+            (item) =>
+              !item ||
+              typeof item !== 'object' ||
+              typeof (item as { id?: unknown }).id !== 'string' ||
+              typeof (item as { name?: unknown }).name !== 'string' ||
+              !(item as { name: string }).name.trim() ||
+              (item as { name: string }).name.length > 120 ||
+              typeof (item as { isActive?: unknown }).isActive !== 'boolean',
+          )
+        ) {
+          throw new AppError(
+            400,
+            'VALIDATION_ERROR',
+            `Enter valid ${key} entries.`,
+          );
         }
-      } else if (section === 'notifications' || section === 'teacherSelfAttendance') {
+      } else if (
+        section === 'notifications' ||
+        section === 'teacherSelfAttendance'
+      ) {
         if (key === 'allowedStatuses') {
           if (
             !Array.isArray(value) ||
@@ -118,6 +175,66 @@ function validateInput(input: OrganizationSettingsInput): void {
         (key === 'tagLine' && value.length > 160)
       ) {
         throw new AppError(400, 'VALIDATION_ERROR', `Enter a valid ${key}.`);
+      }
+
+      if (section === 'localization' && typeof value === 'string') {
+        if (key === 'timezone') {
+          try {
+            new Intl.DateTimeFormat('en', { timeZone: value }).format();
+          } catch {
+            throw new AppError(
+              400,
+              'VALIDATION_ERROR',
+              'Enter a valid IANA time zone.',
+            );
+          }
+        }
+        if (key === 'currency' && !/^[A-Z]{3}$/.test(value)) {
+          throw new AppError(
+            400,
+            'VALIDATION_ERROR',
+            'Enter a valid three-letter currency code.',
+          );
+        }
+        if (
+          key === 'dateFormat' &&
+          !['YYYY-MM-DD', 'DD-MM-YYYY', 'MM-DD-YYYY', 'DD MMM YYYY'].includes(
+            value,
+          )
+        ) {
+          throw new AppError(
+            400,
+            'VALIDATION_ERROR',
+            'Select a supported date format.',
+          );
+        }
+      }
+
+      if (
+        section === 'branding' &&
+        key === 'primaryColor' &&
+        typeof value === 'string' &&
+        !/^#[0-9a-f]{6}$/i.test(value)
+      ) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Enter a valid six-digit brand color.',
+        );
+      }
+
+      if (
+        section === 'contact' &&
+        key === 'email' &&
+        typeof value === 'string' &&
+        value.length > 0 &&
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+      ) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Enter a valid contact email address.',
+        );
       }
     }
   }
@@ -167,10 +284,9 @@ export class SettingsService {
     organizationId: string,
   ): Promise<OrganizationSettingsRecord> {
     validateOrganizationId(organizationId);
-    return (
-      (await this.repository.findSettings(organizationId)) ??
-      defaultSettings(organizationId, this.now())
-    );
+    const defaults = defaultSettings(organizationId, this.now());
+    const existing = await this.repository.findSettings(organizationId);
+    return existing ? mergeSettingsWithDefaults(existing, defaults) : defaults;
   }
 
   async updateSettings(

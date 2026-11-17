@@ -449,6 +449,76 @@ export class MessagingService {
     return { thread, message };
   }
 
+  async startTeacherConversation(
+    organizationId: string,
+    teacherUserId: string,
+    guardianUserId: string,
+    input: CreateThreadInput,
+    campusId?: string,
+  ): Promise<{ thread: ConversationThread; message: DirectMessage }> {
+    const studentId = objectId(input.studentId, 'student');
+    const guardianId = objectId(guardianUserId, 'guardian');
+    const teacherId = objectId(teacherUserId, 'teacher');
+    if (!input.subjectTitle?.trim() || input.subjectTitle.trim().length > 120) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Enter a valid conversation subject.',
+      );
+    }
+    if (
+      !input.initialMessage?.trim() ||
+      input.initialMessage.trim().length > 2000
+    ) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Enter a valid message.');
+    }
+    const [isTeacherAssigned, isGuardianLinked] = await Promise.all([
+      this.verifier.isTeacherAssignedToStudent(
+        organizationId,
+        teacherId,
+        studentId,
+      ),
+      this.verifier.isGuardianLinkedToStudent(
+        organizationId,
+        guardianId,
+        studentId,
+      ),
+    ]);
+    if (!isTeacherAssigned) {
+      throw new AppError(
+        403,
+        'TEACHER_NOT_ASSIGNED',
+        'You can only contact families of students assigned to you.',
+      );
+    }
+    if (!isGuardianLinked) {
+      throw new AppError(
+        403,
+        'GUARDIAN_NOT_LINKED',
+        'Selected guardian is not linked to this student.',
+      );
+    }
+    const thread = await this.repository.createThread(
+      organizationId,
+      guardianId,
+      {
+        studentId,
+        teacherUserId: teacherId,
+        subjectTitle: input.subjectTitle.trim(),
+        initialMessage: input.initialMessage.trim(),
+      },
+      campusId,
+    );
+    const message = await this.repository.addMessage(
+      organizationId,
+      thread.id,
+      teacherId,
+      'teacher',
+      input.initialMessage.trim(),
+    );
+    return { thread, message };
+  }
+
   async listThreads(
     organizationId: string,
     userId: string,
@@ -479,11 +549,7 @@ export class MessagingService {
     const isParticipant =
       thread.guardianUserId === userId ||
       thread.teacherUserId === userId ||
-      [
-        'organization_owner',
-        'organization_admin',
-        'principal_director',
-      ].includes(role);
+      ['organization_owner', 'organization_admin'].includes(role);
 
     if (!isParticipant) {
       throw new AppError(

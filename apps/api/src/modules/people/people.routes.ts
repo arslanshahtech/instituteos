@@ -33,6 +33,7 @@ import {
   AcademicYearModel,
 } from '../academics/academics.model.js';
 import { StudentSectionPlacementModel } from '../attendance/attendance.model.js';
+import { MongoAttendanceRepository } from '../attendance/attendance.repository.js';
 import {
   FeeStructureModel,
   StudentInvoiceModel,
@@ -1278,6 +1279,46 @@ export function createPeopleRouter(
     asyncHandler(async (request, response) => {
       const context = organizationContext(response);
       const studentId = routeParameter(request, 'studentId');
+
+      if (context.role === 'teacher') {
+        const studentObjectId = new mongoose.Types.ObjectId(studentId);
+        const organizationObjectId = new mongoose.Types.ObjectId(
+          context.organizationId,
+        );
+        const authenticatedUserId = (
+          response.locals as { auth?: { user?: { id?: string } } }
+        ).auth?.user?.id;
+        const [placements, assignments] = await Promise.all([
+          StudentSectionPlacementModel.find({
+            organizationId: organizationObjectId,
+            studentId: studentObjectId,
+            status: 'active',
+          })
+            .select({ classId: 1, sectionId: 1, academicYearId: 1 })
+            .lean(),
+          authenticatedUserId
+            ? new MongoAttendanceRepository().listTeacherAssignmentsForUser(
+                context.organizationId,
+                authenticatedUserId,
+              )
+            : Promise.resolve([]),
+        ]);
+        const hasAssignedPlacement = placements.some((placement) =>
+          assignments.some(
+            (assignment) =>
+              assignment.classId === String(placement.classId) &&
+              assignment.sectionId === String(placement.sectionId) &&
+              assignment.academicYearId === String(placement.academicYearId),
+          ),
+        );
+        if (!hasAssignedPlacement) {
+          throw new AppError(
+            403,
+            'PERMISSION_DENIED',
+            'You can only view profiles of students in your assigned teaching sections.',
+          );
+        }
+      }
 
       // Parent Scoping Guard: Enforce linked child verification
       if (context.role === 'parent_guardian') {

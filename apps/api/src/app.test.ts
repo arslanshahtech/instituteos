@@ -99,6 +99,38 @@ describe('API foundation', () => {
     expect(response.headers['x-content-type-options']).toBe('nosniff');
   });
 
+  it('does not consume the broad API quota for automatic session bootstrap checks', async () => {
+    const limitedApp = createApp({
+      ...env,
+      rateLimitMax: 2,
+      rateLimitWindowMs: 60_000,
+    });
+
+    const first = await request(limitedApp).get('/api/v1/auth/me');
+    const second = await request(limitedApp).get('/api/v1/auth/me');
+    const third = await request(limitedApp).get('/api/v1/auth/me');
+    const contextChecks = await Promise.all(
+      Array.from({ length: 3 }, () =>
+        request(limitedApp).get(
+          '/api/v1/organizations/507f1f77bcf86cd799439011/context',
+        ),
+      ),
+    );
+
+    // Missing cookies must still fail authentication, but automatic session
+    // and tenant-access bootstrap checks must not consume the broad API quota.
+    expect(first.status).toBe(401);
+    expect(second.status).toBe(401);
+    expect(third.status).toBe(401);
+    expect(third.body.error.code).toBe('AUTHENTICATION_REQUIRED');
+    expect(contextChecks.map((response) => response.status)).toEqual([
+      401, 401, 401,
+    ]);
+
+    const regularRequest = await request(limitedApp).get('/api/v1');
+    expect(regularRequest.status).toBe(200);
+  });
+
   it('returns a structured 429 response when the configured limit is exceeded', async () => {
     const limitedApp = createApp({
       ...env,

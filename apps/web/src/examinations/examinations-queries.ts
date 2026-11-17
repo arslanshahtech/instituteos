@@ -7,7 +7,8 @@ import {
   getStudentExamReport,
   listExamSchedules,
   listPendingExamMarksReviews,
-  listExams,  saveExam,
+  listExams,
+  saveExam,
   setExamResultsPublication,
   saveExamMarks,
   submitExamMarksForReview,
@@ -34,8 +35,16 @@ export function useExaminationWorkspace(
   };
 }
 
-export function usePendingExamMarksReviews(organizationId: string, enabled: boolean) {
-  return useQuery({ queryKey: [...examinationsQueryKey(organizationId), 'pending-reviews'], queryFn: () => listPendingExamMarksReviews(organizationId), enabled, retry: false });
+export function usePendingExamMarksReviews(
+  organizationId: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: [...examinationsQueryKey(organizationId), 'pending-reviews'],
+    queryFn: () => listPendingExamMarksReviews(organizationId),
+    enabled,
+    retry: false,
+  });
 }
 
 export function useExamSchedules(
@@ -166,12 +175,20 @@ export function useDeleteGradingScale(organizationId: string) {
 
 export function useSubmitExamMarksForReview(organizationId: string) {
   const invalidate = useInvalidateExaminations(organizationId);
-  return useMutation({ mutationFn: (scheduleId: string) => submitExamMarksForReview(organizationId, scheduleId), onSuccess: invalidate });
+  return useMutation({
+    mutationFn: (scheduleId: string) =>
+      submitExamMarksForReview(organizationId, scheduleId),
+    onSuccess: invalidate,
+  });
 }
 
 export function useRequestExamMarksChanges(organizationId: string) {
   const invalidate = useInvalidateExaminations(organizationId);
-  return useMutation({ mutationFn: (scheduleId: string) => requestExamMarksChanges(organizationId, scheduleId), onSuccess: invalidate });
+  return useMutation({
+    mutationFn: (scheduleId: string) =>
+      requestExamMarksChanges(organizationId, scheduleId),
+    onSuccess: invalidate,
+  });
 }
 
 export function useSaveExamMarks(organizationId: string) {

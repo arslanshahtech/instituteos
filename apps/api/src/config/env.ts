@@ -72,7 +72,7 @@ export const env = {
   ),
   rateLimitMax: readInteger(
     process.env.API_RATE_LIMIT_MAX,
-    120,
+    600,
     'API_RATE_LIMIT_MAX',
   ),
   trustProxyHops: readInteger(

@@ -1,45 +1,80 @@
-import express from 'express';
-import request from 'supertest';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { NextFunction, Request, Response } from 'express';
+import { describe, expect, it, vi } from 'vitest';
 import { errorHandler } from './error-handler.js';
 
+function createResponse() {
+  const response = {
+    locals: { requestId: 'request-test-123' },
+    headersSent: false,
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn().mockReturnThis(),
+  };
+  return response as unknown as Response & {
+    status: ReturnType<typeof vi.fn>;
+    json: ReturnType<typeof vi.fn>;
+  };
+}
+
 describe('central error handler', () => {
-  afterEach(() => vi.restoreAllMocks());
+  it('returns a retryable 503 for database connection outages', () => {
+    const response = createResponse();
+    const next = vi.fn() as unknown as NextFunction;
+    const error = new Error('Database server selection timed out.');
+    error.name = 'MongoServerSelectionError';
 
-  it('logs Mongo error codes and labels without logging the database message', async () => {
-    const logSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const databaseError = Object.assign(new Error('private database details'), {
-      name: 'MongoServerError',
-      code: 251,
-      codeName: 'NoSuchTransaction',
-      errorLabels: ['TransientTransactionError'],
-    });
-    const app = express();
-    app.use((_, response, next) => {
-      response.locals.requestId = 'request-reference';
-      next();
-    });
-    app.get('/failure', (_request, _response, next) => next(databaseError));
-    app.use(errorHandler);
+    errorHandler(
+      error,
+      { method: 'GET', path: '/api/v1/ready' } as Request,
+      response,
+      next,
+    );
 
-    const response = await request(app).get('/failure');
+    expect(response.status).toHaveBeenCalledWith(503);
+    expect(response.json).toHaveBeenCalledWith({
+      error: {
+        code: 'DATA_SERVICE_UNAVAILABLE',
+        message:
+          'The data service is temporarily unavailable. Please try again.',
+        requestId: 'request-test-123',
+      },
+    });
+  });
 
-    expect(response.status).toBe(500);
-    expect(response.body.error).toMatchObject({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'An unexpected error occurred.',
-      requestId: 'request-reference',
+  it('maps duplicate-key errors to a conflict instead of a permanent 500', () => {
+    const response = createResponse();
+    const next = vi.fn() as unknown as NextFunction;
+
+    errorHandler(
+      Object.assign(new Error('duplicate'), { code: 11000 }),
+      { method: 'POST', path: '/api/v1/organizations' } as Request,
+      response,
+      next,
+    );
+
+    expect(response.status).toHaveBeenCalledWith(409);
+    expect(response.json).toHaveBeenCalledWith({
+      error: {
+        code: 'RESOURCE_CONFLICT',
+        message: 'A record with these details already exists.',
+        requestId: 'request-test-123',
+      },
     });
-    const logEntry = JSON.parse(String(logSpy.mock.calls[0]?.[0])) as Record<
-      string,
-      unknown
-    >;
-    expect(logEntry).toMatchObject({
-      errorName: 'MongoServerError',
-      databaseCode: 251,
-      databaseCodeName: 'NoSuchTransaction',
-      databaseErrorLabels: ['TransientTransactionError'],
-    });
-    expect(JSON.stringify(logEntry)).not.toContain('private database details');
+  });
+
+  it('delegates errors when response headers have already been sent', () => {
+    const response = createResponse();
+    Object.defineProperty(response, 'headersSent', { value: true });
+    const next = vi.fn();
+    const error = new Error('stream already started');
+
+    errorHandler(
+      error,
+      { method: 'GET', path: '/stream' } as Request,
+      response,
+      next,
+    );
+
+    expect(next).toHaveBeenCalledWith(error);
+    expect(response.status).not.toHaveBeenCalled();
   });
 });

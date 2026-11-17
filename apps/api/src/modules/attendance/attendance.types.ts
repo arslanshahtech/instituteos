@@ -126,6 +126,7 @@ export interface AttendanceRepository {
   getAttendanceSettings(organizationId: string): Promise<{
     timezone: string;
     markingCutoffTime: string;
+    teacherMarkingCutoffEnabled: boolean;
     autoMarkUnmarkedAbsent: boolean;
     allowAdminOverride: boolean;
   } | null>;

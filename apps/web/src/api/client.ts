@@ -39,20 +39,30 @@ export async function apiRequest<T>(
     .find((cookie) => cookie.startsWith('instituteos_csrf='))
     ?.slice('instituteos_csrf='.length);
   const method = init?.method?.toUpperCase() ?? 'GET';
-  const response = await fetch(`${API_BASE_URL}${normalizedPath}`, {
-    ...init,
-    credentials: 'include',
-    // Session and tenant-scoped API data must always be freshly validated.
-    cache: 'no-store',
-    headers: {
-      Accept: 'application/json',
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(method)
-        ? { 'X-CSRF-Token': decodeURIComponent(csrfToken) }
-        : {}),
-      ...init?.headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(API_BASE_URL + normalizedPath, {
+      ...init,
+      credentials: 'include',
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(method)
+          ? { 'X-CSRF-Token': decodeURIComponent(csrfToken) }
+          : {}),
+        ...init?.headers,
+      },
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError')
+      throw error;
+    throw new ApiError(
+      'The API service could not be reached. Check the connection and try again.',
+      0,
+      'NETWORK_ERROR',
+    );
+  }
 
   if (!response.ok) {
     const errorBody = (await response

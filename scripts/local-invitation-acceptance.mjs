@@ -30,7 +30,8 @@ async function findMail(subjectText) {
       const response = await fetch(
         `${mailpitUrl}/api/v1/message/${encodeURIComponent(message.ID)}`,
       );
-      if (!response.ok) throw new Error('Could not read the captured test email.');
+      if (!response.ok)
+        throw new Error('Could not read the captured test email.');
       return response.json();
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -42,7 +43,10 @@ function extractLink(message, route) {
   const match = String(message.Text ?? '').match(
     new RegExp(`http://127\\.0\\.0\\.1:5173/${route}#token=[^\\s]+`),
   );
-  if (!match) throw new Error(`Captured email did not contain the expected ${route} link.`);
+  if (!match)
+    throw new Error(
+      `Captured email did not contain the expected ${route} link.`,
+    );
   return match[0].replace(/[.)]$/, '');
 }
 
@@ -68,7 +72,9 @@ ws.addEventListener('message', (event) => {
     pending.delete(message.id);
   }
   if (message.method === 'Runtime.exceptionThrown') {
-    runtimeExceptions.push(message.params.exceptionDetails?.text ?? 'Browser exception');
+    runtimeExceptions.push(
+      message.params.exceptionDetails?.text ?? 'Browser exception',
+    );
   }
   if (message.method === 'Network.responseReceived') {
     const response = message.params.response;
@@ -132,7 +138,10 @@ async function waitFor(predicate, label, timeoutMs = 40000) {
 
 async function navigate(url) {
   await call('Page.navigate', { url });
-  await waitFor(() => evaluate('document.readyState === "complete"'), 'page load');
+  await waitFor(
+    () => evaluate('document.readyState === "complete"'),
+    'page load',
+  );
 }
 
 async function fill(selector, value, tagName = 'input') {
@@ -157,13 +166,17 @@ try {
   // unauthenticated invitee to sign-in and preserve the one-time URL.
   await navigate(invitationUrl);
   await waitFor(
-    () => evaluate('location.pathname === "/login" && Boolean(document.querySelector("input[type=email]"))'),
+    () =>
+      evaluate(
+        'location.pathname === "/login" && Boolean(document.querySelector("input[type=email]"))',
+      ),
     'unauthenticated invitation redirect to sign-in',
   );
   const returnLink = await evaluate(
     'Array.from(document.querySelectorAll("a")).find((a) => a.getAttribute("href") === "/register")?.getAttribute("href") || ""',
   );
-  if (!returnLink) throw new Error('Sign-in page did not offer account registration.');
+  if (!returnLink)
+    throw new Error('Sign-in page did not offer account registration.');
 
   await evaluate(`(() => {
     const link = [...document.querySelectorAll('a')]
@@ -173,7 +186,10 @@ try {
     return true;
   })()`);
   await waitFor(
-    () => evaluate('location.pathname === "/register" && Boolean(document.querySelector("input[autocomplete=name]"))'),
+    () =>
+      evaluate(
+        'location.pathname === "/register" && Boolean(document.querySelector("input[autocomplete=name]"))',
+      ),
     'new Teacher registration form',
   );
 
@@ -196,7 +212,9 @@ try {
     'Array.from(document.querySelectorAll("a")).find((a) => (a.getAttribute("href") || "").startsWith("/invitations/accept"))?.getAttribute("href") || ""',
   );
   if (!continueHref.includes('#token=')) {
-    throw new Error('Verification pending page did not preserve the invitation URL.');
+    throw new Error(
+      'Verification pending page did not preserve the invitation URL.',
+    );
   }
 
   // Verify the new account using the actual verification email captured by Mailpit.
@@ -204,7 +222,10 @@ try {
   const verificationUrl = extractLink(verificationMessage, 'verify-email');
   await navigate(verificationUrl);
   await waitFor(
-    () => evaluate('Boolean([...document.querySelectorAll("button")].find((b) => b.innerText.trim() === "Verify email"))'),
+    () =>
+      evaluate(
+        'Boolean([...document.querySelectorAll("button")].find((b) => b.innerText.trim() === "Verify email"))',
+      ),
     'Verify email action',
   );
   await evaluate(`(() => {
@@ -215,7 +236,10 @@ try {
   })()`);
 
   await waitFor(
-    () => evaluate('location.pathname === "/dashboard" || location.pathname.startsWith("/teacher/organizations/")'),
+    () =>
+      evaluate(
+        'location.pathname === "/dashboard" || location.pathname.startsWith("/teacher/organizations/")',
+      ),
     'verified account session',
     30000,
   );
@@ -227,26 +251,32 @@ try {
     verifiedUser.body.user?.email !== inviteEmail ||
     !verifiedUser.body.user?.emailVerifiedAt
   ) {
-    throw new Error('Email verification did not establish the expected authenticated user.');
+    throw new Error(
+      'Email verification did not establish the expected authenticated user.',
+    );
   }
 
   // Re-open the original email link after verification. This time acceptance
   // must create the membership and attach the exact StaffMember record.
   await navigate(invitationUrl);
   const teacherPath = await waitFor(
-    () => evaluate('location.pathname.startsWith("/teacher/organizations/") ? location.pathname : false'),
+    () =>
+      evaluate(
+        'location.pathname.startsWith("/teacher/organizations/") ? location.pathname : false',
+      ),
     'accepted Teacher membership and workspace',
     45000,
   );
   const teacherWorkspace = await waitFor(
-    () => evaluate(`({
+    () =>
+      evaluate(`({
       title: document.querySelector('main.main-content h1')?.innerText ||
         document.querySelector('main h1')?.innerText || '',
       nav: [...document.querySelectorAll('nav[aria-label="Main navigation"] a')]
         .map((item) => item.innerText.trim()),
       body: document.querySelector('main.main-content')?.innerText?.slice(0,1800) || '',
       sidebar: Boolean(document.querySelector('aside.sidebar')),
-    })`).then((value) => value.sidebar && value.title ? value : false),
+    })`).then((value) => (value.sidebar && value.title ? value : false)),
     'rendered Teacher dashboard',
   );
   if (!teacherWorkspace.nav.includes('My classes & students')) {
@@ -258,7 +288,8 @@ try {
   const afterLogout = await evaluate(
     'fetch("/api/v1/auth/me",{credentials:"include",cache:"no-store"}).then(r=>r.status)',
   );
-  if (afterLogout !== 401) throw new Error('Teacher logout did not invalidate the session.');
+  if (afterLogout !== 401)
+    throw new Error('Teacher logout did not invalidate the session.');
 
   const serverErrors = apiResponses.filter((item) => item.status >= 500);
   if (serverErrors.length || runtimeExceptions.length) {
@@ -267,22 +298,28 @@ try {
     );
   }
 
-  console.log(JSON.stringify({
-    invitationEmailCaptured: true,
-    unauthenticatedInviteRedirectedToLogin: true,
-    registrationCompleted: true,
-    verificationEmailCaptured: true,
-    emailVerifiedAndSessionCreated: true,
-    invitationAccepted: true,
-    teacherMembershipAndStaffLink: true,
-    teacherWorkspacePath: teacherPath,
-    teacherDashboardTitle: teacherWorkspace.title,
-    teacherNavigation: teacherWorkspace.nav,
-    logoutInvalidatedSession: true,
-    apiResponseCount: apiResponses.length,
-    apiServerErrors: serverErrors,
-    uncaughtBrowserExceptions: runtimeExceptions,
-  }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        invitationEmailCaptured: true,
+        unauthenticatedInviteRedirectedToLogin: true,
+        registrationCompleted: true,
+        verificationEmailCaptured: true,
+        emailVerifiedAndSessionCreated: true,
+        invitationAccepted: true,
+        teacherMembershipAndStaffLink: true,
+        teacherWorkspacePath: teacherPath,
+        teacherDashboardTitle: teacherWorkspace.title,
+        teacherNavigation: teacherWorkspace.nav,
+        logoutInvalidatedSession: true,
+        apiResponseCount: apiResponses.length,
+        apiServerErrors: serverErrors,
+        uncaughtBrowserExceptions: runtimeExceptions,
+      },
+      null,
+      2,
+    ),
+  );
 } finally {
   ws.close();
 }
@@ -311,5 +348,8 @@ async function cdpLogout() {
     button.click();
     return true;
   })()`);
-  await waitFor(() => evaluate('location.pathname === "/login"'), 'Teacher logout');
+  await waitFor(
+    () => evaluate('location.pathname === "/login"'),
+    'Teacher logout',
+  );
 }

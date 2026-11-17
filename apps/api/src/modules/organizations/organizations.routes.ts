@@ -105,11 +105,14 @@ function parseAddress(value: unknown): AddressInput | undefined {
   const body = bodyObject(value);
   const address: AddressInput = {};
   for (const key of addressKeys) {
-    const parsed = optionalString(
-      body[key],
-      key,
-      key === 'line1' || key === 'line2' ? 160 : 100,
-    );
+    const parsed =
+      body[key] === ''
+        ? ''
+        : optionalString(
+            body[key],
+            key,
+            key === 'line1' || key === 'line2' ? 160 : 100,
+          );
     if (parsed !== undefined) address[key] = parsed;
   }
   return address;
@@ -154,8 +157,13 @@ function parseOrganizationProfile(
       'Upload a PNG, JPG or WebP logo image.',
     );
   const contactEmail =
-    body.contactEmail === undefined ? undefined : email(body.contactEmail);
-  const phone = optionalString(body.phone, 'phone number', 40);
+    body.contactEmail === undefined
+      ? undefined
+      : body.contactEmail === ''
+        ? ''
+        : email(body.contactEmail);
+  const phone =
+    body.phone === '' ? '' : optionalString(body.phone, 'phone number', 40);
   const address = parseAddress(body.address);
   const timezone = optionalString(body.timezone, 'timezone', 80);
   if (timezone) {
@@ -181,8 +189,8 @@ function parseOrganizationProfile(
     ...(shortCode !== undefined ? { shortCode: shortCode.toUpperCase() } : {}),
     ...(tagline !== undefined ? { tagline } : {}),
     ...(logoDataUrl !== undefined ? { logoDataUrl } : {}),
-    ...(contactEmail ? { contactEmail } : {}),
-    ...(phone ? { phone } : {}),
+    ...(contactEmail !== undefined ? { contactEmail } : {}),
+    ...(phone !== undefined ? { phone } : {}),
     ...(address ? { address } : {}),
     ...(timezone ? { timezone } : {}),
   } as OrganizationProfileInput;
@@ -739,13 +747,18 @@ export function createOrganizationRouter(
     csrfProtection,
     organizationRateLimit,
     asyncHandler(async (request, response) => {
-      await service.invite(
+      const invitation = await service.invite(
         organizationContext(response),
         parseInvitation(request.body),
       );
       response.status(202).json({
-        message:
-          'If the invitation can be delivered, instructions will be sent to that address.',
+        message: invitation.emailSent
+          ? invitation.whatsappShareUrl
+            ? 'Invitation email sent. You can also share the secure invitation link through WhatsApp.'
+            : 'Invitation email sent successfully.'
+          : 'The invitation was created, but the email provider could not deliver it. Share the secure invitation link through WhatsApp or configure a verified sending domain.',
+        emailSent: invitation.emailSent,
+        whatsappShareUrl: invitation.whatsappShareUrl,
       });
     }),
   );

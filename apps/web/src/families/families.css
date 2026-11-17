@@ -483,3 +483,266 @@
     padding: 16px;
   }
 }
+
+/* Family workspace refinement */
+.families-heading {
+  align-items: center;
+}
+
+.families-heading h1 {
+  margin: 0 0 5px;
+}
+
+.families-heading p {
+  max-width: 520px;
+  line-height: 1.45;
+}
+
+.families-stats article {
+  min-height: 118px;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 5px 18px rgb(20 32 50 / 4%);
+}
+
+.families-mobile-list,
+.families-detail-mobile-list {
+  display: none;
+}
+
+.families-mobile-card,
+.families-person-card {
+  border: 1px solid var(--border, #e1e5ea);
+  border-radius: 11px;
+  background: var(--surface, #fff);
+  box-shadow: 0 4px 14px rgb(20 32 50 / 4%);
+}
+
+.families-mobile-card {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.families-mobile-card-heading,
+.families-person-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.families-mobile-card-heading > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.families-mobile-card-heading strong,
+.families-person-card-heading strong {
+  color: var(--text, #253044);
+  font-size: 14px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.families-mobile-card-heading small {
+  color: var(--muted, #718096);
+  font-size: 11px;
+}
+
+.families-mobile-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: var(--muted, #667085);
+  font-size: 11px;
+}
+
+.families-mobile-card-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.families-mobile-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border, #edf0f2);
+}
+
+.families-mobile-card-actions .button-primary {
+  flex: 1;
+  justify-content: center;
+}
+
+.families-mobile-card-actions .is-danger {
+  color: #c93636;
+}
+
+.families-person-card {
+  display: grid;
+  gap: 13px;
+  padding: 15px;
+}
+
+.families-person-card-heading {
+  align-items: center;
+}
+
+.families-person-card-heading .button {
+  min-height: 32px;
+  padding: 5px 9px;
+  font-size: 11px;
+}
+
+.families-person-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.families-person-card dl > div {
+  min-width: 0;
+}
+
+.families-person-card dt {
+  margin-bottom: 4px;
+  color: var(--muted, #718096);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.families-person-card dd {
+  margin: 0;
+  color: var(--text, #253044);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.families-person-relationship {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--surface-muted, #f2f4f7);
+  color: var(--muted, #667085);
+  font-size: 10px;
+  text-transform: capitalize;
+}
+
+.families-detail-empty {
+  margin: 0;
+  padding: 16px;
+  color: var(--muted, #718096);
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .families-heading {
+    align-items: center;
+    flex-direction: row;
+    gap: 12px;
+  }
+
+  .families-heading > div {
+    min-width: 0;
+  }
+
+  .families-heading h1 {
+    font-size: 23px;
+  }
+
+  .families-heading p {
+    max-width: 300px;
+    font-size: 12px;
+  }
+
+  .families-heading > .button {
+    flex: 0 0 auto;
+    min-height: 38px;
+    padding-inline: 10px;
+    font-size: 11px;
+  }
+
+  .families-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .families-stats article {
+    min-height: 106px;
+    gap: 6px;
+    padding: 12px 10px;
+  }
+
+  .families-stats article > span {
+    font-size: 9px;
+  }
+
+  .families-stats article > strong {
+    font-size: 21px;
+  }
+
+  .families-stats article > small {
+    font-size: 10px;
+    line-height: 1.3;
+  }
+
+  .families-stats article > svg {
+    top: 11px;
+    right: 10px;
+    width: 16px;
+    height: 16px;
+  }
+
+  .families-table-wrap {
+    display: none;
+  }
+
+  .families-mobile-list {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .families-detail-mobile-list {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .families-detail-panel h2 {
+    padding: 14px 15px;
+  }
+}
+
+@media (max-width: 390px) {
+  .families-heading {
+    align-items: flex-start;
+  }
+
+  .families-heading > .button {
+    padding-inline: 8px;
+    font-size: 10px;
+  }
+
+  .families-heading > .button svg {
+    width: 14px;
+  }
+
+  .families-stats article {
+    padding: 11px 8px;
+  }
+
+  .families-stats article > strong {
+    font-size: 19px;
+  }
+
+  .families-person-card dl {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+}

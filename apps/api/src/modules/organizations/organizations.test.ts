@@ -230,6 +230,113 @@ describe('organization administration routes', () => {
     expect(service.dashboard).toHaveBeenCalledOnce();
   });
 
+  it('protects invitation creation and pending invitation listing with organization permissions', async () => {
+    vi.mocked(service.invite).mockResolvedValueOnce({
+      emailSent: true,
+      whatsappShareUrl: 'https://wa.me/?text=invitation',
+    });
+    vi.mocked(service.listInvitations).mockResolvedValueOnce([
+      {
+        id: '690000000000000000000001',
+        email: 'invitee@example.test',
+        role: 'teacher',
+        status: 'pending',
+      },
+    ]);
+
+    const missingCsrf = await request(app)
+      .post(`/api/v1/organizations/${organizationA}/invitations`)
+      .set('Cookie', user.cookie)
+      .send({ email: 'invitee@example.test', role: 'teacher' });
+    const created = await request(app)
+      .post(`/api/v1/organizations/${organizationA}/invitations`)
+      .set('Cookie', user.cookie)
+      .set('X-CSRF-Token', user.csrfToken)
+      .send({ email: 'invitee@example.test', role: 'teacher' });
+    const listed = await request(app)
+      .get(`/api/v1/organizations/${organizationA}/invitations`)
+      .set('Cookie', user.cookie);
+
+    expect(missingCsrf.status).toBe(403);
+    expect(created.status).toBe(202);
+    expect(created.body.emailSent).toBe(true);
+    expect(created.body.whatsappShareUrl).toBe(
+      'https://wa.me/?text=invitation',
+    );
+    expect(listed.status).toBe(200);
+    expect(listed.body.invitations).toHaveLength(1);
+    expect(service.invite).toHaveBeenCalledOnce();
+    expect(service.invite).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: organizationA,
+        role: 'organization_owner',
+      }),
+      { email: 'invitee@example.test', role: 'teacher', campusIds: [] },
+    );
+    expect(service.listInvitations).toHaveBeenCalledOnce();
+  });
+
+  it('lists, creates, and changes campus status for an authorized organization owner', async () => {
+    vi.mocked(service.listCampuses).mockResolvedValueOnce([
+      { id: campusA, name: 'Main Campus', status: 'active' },
+    ]);
+    vi.mocked(service.createCampus).mockResolvedValueOnce({
+      id: campusB,
+      name: 'North Campus',
+      status: 'active',
+    });
+    vi.mocked(service.updateCampus).mockResolvedValueOnce({
+      id: campusA,
+      name: 'Main Campus',
+      status: 'inactive',
+    });
+
+    const listed = await request(app)
+      .get(`/api/v1/organizations/${organizationA}/campuses`)
+      .set('Cookie', user.cookie);
+    const created = await request(app)
+      .post(`/api/v1/organizations/${organizationA}/campuses`)
+      .set('Cookie', user.cookie)
+      .set('X-CSRF-Token', user.csrfToken)
+      .send({ name: 'North Campus', phone: '+92 300 0000000' });
+    const deactivated = await request(app)
+      .patch(
+        `/api/v1/organizations/${organizationA}/campuses/${campusA}/status`,
+      )
+      .set('Cookie', user.cookie)
+      .set('X-CSRF-Token', user.csrfToken)
+      .send({ status: 'inactive' });
+
+    expect(listed.status).toBe(200);
+    expect(listed.body.campuses).toHaveLength(1);
+    expect(created.status).toBe(201);
+    expect(created.body.campus).toMatchObject({
+      id: campusB,
+      status: 'active',
+    });
+    expect(deactivated.status).toBe(200);
+    expect(deactivated.body.campus).toMatchObject({
+      id: campusA,
+      status: 'inactive',
+    });
+    expect(service.listCampuses).toHaveBeenCalledOnce();
+    expect(service.createCampus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: organizationA,
+        userId: user.id,
+      }),
+      expect.objectContaining({ name: 'North Campus' }),
+    );
+    expect(service.updateCampus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: organizationA,
+        userId: user.id,
+      }),
+      campusA,
+      { status: 'inactive' },
+    );
+  });
+
   it('denies foreign campus and member IDs before service access', async () => {
     const campusResponse = await request(app)
       .get(`/api/v1/organizations/${organizationB}/campuses/${campusB}`)
@@ -269,6 +376,35 @@ describe('organization administration routes', () => {
     expect(ownCampus.status).toBe(200);
     expect(foreignCampus.status).toBe(404);
     expect(service.getCampus).toHaveBeenCalledOnce();
+  });
+
+  it('allows organization owners to clear optional profile fields', async () => {
+    access.members.set(`${user.id}:${organizationA}`, {
+      ...context(user.id, organizationA, 'organization_owner'),
+      permissions: ['organization.update'],
+    });
+    const changes = {
+      adminName: '',
+      shortCode: '',
+      tagline: '',
+      logoDataUrl: '',
+      contactEmail: '',
+      phone: '',
+      timezone: 'UTC',
+      address: { line1: '', city: '', country: '' },
+    };
+
+    const response = await request(app)
+      .patch(`/api/v1/organizations/${organizationA}/settings`)
+      .set('Cookie', user.cookie)
+      .set('X-CSRF-Token', user.csrfToken)
+      .send(changes);
+
+    expect(response.status).toBe(200);
+    expect(service.updateProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: organizationA }),
+      changes,
+    );
   });
 
   it('allows an active owner to archive and restore through the lifecycle routes', async () => {

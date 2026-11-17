@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import mongoose from 'mongoose';
 import { AppError } from '../../errors/app-error.js';
+import { env } from '../../config/env.js';
 import { hashOpaqueToken } from '../auth/auth.service.js';
 import { type OrganizationContext } from '../tenancy/tenancy.types.js';
 import { ORGANIZATION_PERMISSIONS } from '../tenancy/authorization.js';
@@ -17,6 +18,32 @@ import type {
 } from './organizations.types.js';
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function buildWhatsAppShareUrl(
+  authWebAppUrl: string,
+  message: string,
+): string | null {
+  try {
+    const url = new URL(authWebAppUrl);
+    const hostname = url.hostname.toLowerCase();
+    const isLocalHost =
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname === '[::1]' ||
+      hostname === '0.0.0.0' ||
+      hostname.endsWith('.localhost') ||
+      hostname.endsWith('.local') ||
+      hostname.endsWith('.test') ||
+      /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(
+        hostname,
+      );
+    if (url.protocol !== 'https:' || isLocalHost) return null;
+    return `https://wa.me/?text=${encodeURIComponent(message)}`;
+  } catch {
+    return null;
+  }
+}
 
 function isDuplicateKey(error: unknown): boolean {
   return (
@@ -302,7 +329,7 @@ export class OrganizationService implements OrganizationServices {
   async invite(
     context: OrganizationContext,
     input: MemberInvitationInput,
-  ): Promise<void> {
+  ): Promise<{ emailSent: boolean; whatsappShareUrl: string | null }> {
     if (
       (input.role === 'organization_owner' ||
         input.role === 'organization_admin') &&
@@ -362,12 +389,26 @@ export class OrganizationService implements OrganizationServices {
         );
       throw error;
     }
-    const sent = await this.emailDelivery.sendInvitation(
-      input.email.trim().toLowerCase(),
-      token,
-      String(organization.name),
+    let emailSent = false;
+    try {
+      emailSent = await this.emailDelivery.sendInvitation(
+        input.email.trim().toLowerCase(),
+        token,
+        String(organization.name),
+      );
+    } catch {
+      emailSent = false;
+    }
+    const invitationBaseUrl = env.authWebAppUrl.endsWith('/')
+      ? env.authWebAppUrl.slice(0, -1)
+      : env.authWebAppUrl;
+    const invitationUrl = `${invitationBaseUrl}/invitations/accept#token=${encodeURIComponent(token)}`;
+    const whatsappMessage = `You have been invited to join ${String(organization.name)} on InstituteOS. Sign in or create an account with this email address, then accept your invitation: ${invitationUrl}`;
+    const whatsappShareUrl = buildWhatsAppShareUrl(
+      env.authWebAppUrl,
+      whatsappMessage,
     );
-    if (!sent) {
+    if (!emailSent && !whatsappShareUrl) {
       await this.repository.revokeInvitation(
         context.organizationId,
         input.email.trim().toLowerCase(),
@@ -375,9 +416,10 @@ export class OrganizationService implements OrganizationServices {
       throw new AppError(
         503,
         'INVITATION_DELIVERY_UNAVAILABLE',
-        'The invitation could not be delivered. Try again later.',
+        'The email provider rejected delivery and this app is using a local-only invitation URL. Verify a sending domain and configure a public HTTPS AUTH_WEB_APP_URL before inviting external users.',
       );
     }
+    return { emailSent, whatsappShareUrl };
   }
 
   listInvitations(context: OrganizationContext) {

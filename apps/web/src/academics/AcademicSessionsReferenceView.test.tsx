@@ -37,7 +37,9 @@ const sessions: AcademicYear[] = [
 
 const summary: AcademicYearSummary = {
   totals: { classes: 3, sections: 5, students: 42 },
-  bySection: [],
+  bySection: [
+    { academicYearId: 'session-1', sectionId: 'section-1', students: 24 },
+  ],
   bySession: [
     { academicYearId: 'session-1', classes: 2, sections: 3, students: 24 },
     { academicYearId: 'session-2', classes: 1, sections: 2, students: 18 },
@@ -49,6 +51,28 @@ describe('AcademicSessionsReferenceView', () => {
     render(
       <AcademicSessionsReferenceView
         sessions={sessions}
+        classes={[
+          {
+            id: 'class-1',
+            organizationId: 'org-1',
+            campusId: 'campus-1',
+            name: 'Grade 1',
+            code: 'G1',
+            sortOrder: 1,
+            createdAt: '',
+            updatedAt: '',
+          },
+        ]}
+        sections={[
+          {
+            id: 'section-1',
+            organizationId: 'org-1',
+            classId: 'class-1',
+            name: 'A',
+            createdAt: '',
+            updatedAt: '',
+          },
+        ]}
         summary={summary}
         canWrite
         onCreate={vi.fn()}
@@ -58,24 +82,32 @@ describe('AcademicSessionsReferenceView', () => {
     );
 
     expect(
-      screen.getByRole('heading', { name: 'Academic Sessions' }),
+      screen.getByRole('heading', { name: 'Academy Session' }),
     ).toBeTruthy();
-    expect(screen.getByText('2026-2027')).toBeTruthy();
-    expect(screen.getByText('2025-2026')).toBeTruthy();
+    const desktopTable = within(screen.getByRole('table'));
+    expect(desktopTable.getByText('2026-2027')).toBeTruthy();
+    expect(desktopTable.getByText('2025-2026')).toBeTruthy();
     expect(screen.queryByText('2 sessions')).toBeNull();
-    const currentRow = screen.getByText('2026-2027').closest('tr');
-    expect(currentRow).not.toBeNull();
+    expect(screen.queryByText('Curriculum')).toBeNull();
     expect(
-      within(currentRow as HTMLTableRowElement).getByText('2'),
+      desktopTable.getByRole('columnheader', { name: 'Classes' }),
     ).toBeTruthy();
     expect(
-      within(currentRow as HTMLTableRowElement).getByText('3'),
-    ).toBeTruthy();
-    expect(
-      within(currentRow as HTMLTableRowElement).getByText('24'),
-    ).toBeTruthy();
-    const previousRow = screen.getByText('2025-2026').closest('tr');
-    expect(previousRow).not.toBeNull();
+      desktopTable.queryByRole('button', {
+        name: 'View details for 2026-2027',
+      }),
+    ).toBeNull();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'View details for 2026-2027' }),
+    );
+    const detailsDialog = within(screen.getByRole('dialog'));
+    expect(detailsDialog.getByText('Current session')).toBeTruthy();
+    expect(detailsDialog.getByText('Classes')).toBeTruthy();
+    expect(detailsDialog.getByText('Sections')).toBeTruthy();
+    expect(detailsDialog.getByText('Students')).toBeTruthy();
+    expect(detailsDialog.getByText('24')).toBeTruthy();
+    expect(detailsDialog.getByText('Grade 1')).toBeTruthy();
+    expect(detailsDialog.getByText('A · 24 students')).toBeTruthy();
     expect(screen.getByText('42')).toBeTruthy();
     expect(
       screen.queryByRole('columnheader', { name: 'Avg. / Section' }),
@@ -102,9 +134,9 @@ describe('AcademicSessionsReferenceView', () => {
         target: { value: '2025' },
       },
     );
-    expect(screen.getByText('2025-2026')).toBeTruthy();
-    expect(screen.queryByText('2 sessions')).toBeNull();
-    expect(screen.queryByText('2026-2027')).toBeNull();
+    const filteredTable = within(screen.getByRole('table'));
+    expect(filteredTable.getByText('2025-2026')).toBeTruthy();
+    expect(filteredTable.queryByText('2026-2027')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit 2025-2026' }));
     fireEvent.click(screen.getByRole('button', { name: 'Delete 2025-2026' }));
@@ -148,6 +180,9 @@ describe('AcademicSessionsReferenceView', () => {
     );
     expect(screen.queryByRole('button', { name: /Add Session/ })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Actions' })).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'View details for 2026-2027' }),
+    ).toBeTruthy();
     expect(screen.queryByText('Avg. / Section')).toBeNull();
     expect(screen.queryByText('N/A')).toBeNull();
   });

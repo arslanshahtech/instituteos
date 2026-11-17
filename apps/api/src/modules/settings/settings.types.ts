@@ -32,8 +32,19 @@ export interface TeacherSelfAttendancePolicy {
   allowedStatuses: TeacherSelfAttendanceStatus[];
 }
 
-export interface StaffSetupItem { id: string; name: string; isActive: boolean }
-export interface StaffSetupRecord { departments: StaffSetupItem[]; designations: StaffSetupItem[]; employmentTypes: StaffSetupItem[]; workShifts: StaffSetupItem[]; qualifications: StaffSetupItem[]; documentTypes: StaffSetupItem[] }
+export interface StaffSetupItem {
+  id: string;
+  name: string;
+  isActive: boolean;
+}
+export interface StaffSetupRecord {
+  departments: StaffSetupItem[];
+  designations: StaffSetupItem[];
+  employmentTypes: StaffSetupItem[];
+  workShifts: StaffSetupItem[];
+  qualifications: StaffSetupItem[];
+  documentTypes: StaffSetupItem[];
+}
 
 export interface OrganizationSettingsInput {
   branding?: Partial<OrganizationSettingsBranding>;

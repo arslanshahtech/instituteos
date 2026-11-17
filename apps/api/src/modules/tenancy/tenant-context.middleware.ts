@@ -61,6 +61,7 @@ export function createOrganizationContextMiddleware(
         permissions: permissionsForMembership(
           membership.role,
           membership.permissions,
+          membership.rolePermissions?.[membership.role],
         ),
       };
       return next();

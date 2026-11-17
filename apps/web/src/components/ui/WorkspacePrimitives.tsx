@@ -30,7 +30,7 @@ export function WorkspacePageHeading({
       className={`page-heading reference-dashboard-heading ${className}`.trim()}
     >
       <div>
-        <p className="eyebrow">{eyebrow}</p>
+        {eyebrow && <p className="eyebrow">{eyebrow}</p>}
         <h1>{title}</h1>
         <p className="page-description">{description}</p>
         {children}

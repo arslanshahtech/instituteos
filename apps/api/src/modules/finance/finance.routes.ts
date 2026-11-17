@@ -152,6 +152,7 @@ function invoiceQuery(query: Record<string, unknown>): InvoiceQuery {
   return {
     campusId: queryId(query.campusId, 'campus'),
     classId: queryId(query.classId, 'class'),
+    sectionId: queryId(query.sectionId, 'section'),
     studentId: queryId(query.studentId, 'student'),
     status: status as InvoiceStatus | undefined,
     dateFrom:
@@ -399,13 +400,15 @@ export function createFinanceRouter(
     asyncHandler(async (request, response) => {
       const studentId = objectId(request.params.studentId, 'student');
       const amount = bodyObject(request.body).amount;
-      response.status(200).json(
-        await service.setStudentPreviousDues(
-          organizationContext(response),
-          studentId,
-          amount,
-        ),
-      );
+      response
+        .status(200)
+        .json(
+          await service.setStudentPreviousDues(
+            organizationContext(response),
+            studentId,
+            amount,
+          ),
+        );
     }),
   );
 

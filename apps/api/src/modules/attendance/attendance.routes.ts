@@ -150,6 +150,7 @@ async function loadAttendanceSettings(organizationId: mongoose.Types.ObjectId) {
       schoolStartTime: 1,
       gracePeriodMinutes: 1,
       markingCutoffTime: 1,
+      teacherMarkingCutoffEnabled: 1,
       autoMarkUnmarkedAbsent: 1,
       allowAdminOverride: 1,
       workingDays: 1,
@@ -240,6 +241,7 @@ export function createAttendanceRouter(
         'schoolStartTime',
         'gracePeriodMinutes',
         'markingCutoffTime',
+        'teacherMarkingCutoffEnabled',
         'autoMarkUnmarkedAbsent',
         'allowAdminOverride',
         'workingDays',
@@ -286,7 +288,11 @@ export function createAttendanceRouter(
           'Grace period must be a whole number between 0 and 120 minutes.',
         );
       }
-      for (const key of ['autoMarkUnmarkedAbsent', 'allowAdminOverride']) {
+      for (const key of [
+        'teacherMarkingCutoffEnabled',
+        'autoMarkUnmarkedAbsent',
+        'allowAdminOverride',
+      ]) {
         if (body[key] !== undefined && typeof body[key] !== 'boolean') {
           throw new AppError(
             400,
@@ -362,6 +368,7 @@ export function createAttendanceRouter(
           schoolStartTime: 1,
           gracePeriodMinutes: 1,
           markingCutoffTime: 1,
+          teacherMarkingCutoffEnabled: 1,
           autoMarkUnmarkedAbsent: 1,
           allowAdminOverride: 1,
           workingDays: 1,
@@ -408,6 +415,7 @@ export function createAttendanceRouter(
         status: 'active',
       })
         .select({
+          _id: 1,
           firstName: 1,
           lastName: 1,
           designation: 1,
@@ -457,6 +465,7 @@ export function createAttendanceRouter(
       response.status(200).json({
         profile: profile
           ? {
+              staffId: String(profile._id),
               firstName: String(profile.firstName),
               lastName: String(profile.lastName),
               displayName: [profile.firstName, profile.lastName]

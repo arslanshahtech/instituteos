@@ -155,6 +155,23 @@ export function createFinanceOperationsRouter(
     }),
   );
 
+  router.put(
+    base + '/expenses/:expenseId',
+    ...write,
+    csrfProtection,
+    asyncHandler(async (request, response) => {
+      const expenseId = String(request.params.expenseId ?? '');
+      if (!mongoose.isValidObjectId(expenseId))
+        throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid expense.');
+      const expense = await service.updateExpense(
+        organizationContext(response),
+        expenseId,
+        bodyObject(request.body),
+      );
+      response.status(200).json({ expense });
+    }),
+  );
+
   router.delete(
     `${base}/expenses/:expenseId`,
     ...write,

@@ -102,7 +102,7 @@ function typeOf(value: unknown): WorkType {
     throw new AppError(
       400,
       'VALIDATION_ERROR',
-      'Type must be homework or test.',
+      'Type must be homework, class_test, or test.',
     );
   return value as WorkType;
 }
@@ -291,6 +291,10 @@ export function createHomeworkRouter(
       };
       if (request.query.type !== undefined)
         filter.type = typeOf(request.query.type);
+      // Managers own formal tests; teachers own daily-diary homework and class tests.
+      filter.type = isManager(context)
+        ? 'test'
+        : { $in: ['homework', 'class_test'] };
       if (request.query.classId !== undefined)
         filter.classId = idOf(request.query.classId, 'class');
       if (request.query.sectionId !== undefined)
@@ -467,6 +471,17 @@ export function createHomeworkRouter(
           'HOMEWORK_CREATION_ACCESS_DENIED',
           'This role cannot create homework or tests.',
         );
+      if (
+        (isManager(context) && input.type !== 'test') ||
+        (context.role === 'teacher' &&
+          input.type !== 'homework' &&
+          input.type !== 'class_test')
+      )
+        throw new AppError(
+          403,
+          'HOMEWORK_TYPE_ACCESS_DENIED',
+          'Administrators can create tests; teachers can create homework or class tests in the daily diary.',
+        );
       await verifyTeacherScope(context, input);
       const created = await HomeworkTestModel.create({
         organizationId: context.organizationId,
@@ -516,6 +531,17 @@ export function createHomeworkRouter(
           403,
           'HOMEWORK_ACCESS_DENIED',
           'This role cannot edit homework or tests.',
+        );
+      if (
+        (isManager(context) && item.type !== 'test') ||
+        (context.role === 'teacher' &&
+          item.type !== 'homework' &&
+          item.type !== 'class_test')
+      )
+        throw new AppError(
+          403,
+          'HOMEWORK_TYPE_ACCESS_DENIED',
+          'You cannot edit this type of academic record.',
         );
       if (
         context.role === 'teacher' &&
@@ -576,6 +602,17 @@ export function createHomeworkRouter(
           : { totalMarks: Number(body.totalMarks) }),
         status,
       };
+      if (
+        (isManager(context) && input.type !== 'test') ||
+        (context.role === 'teacher' &&
+          input.type !== 'homework' &&
+          input.type !== 'class_test')
+      )
+        throw new AppError(
+          403,
+          'HOMEWORK_TYPE_ACCESS_DENIED',
+          'Administrators can manage tests; teachers can manage homework or class tests in the daily diary.',
+        );
       if (
         input.totalMarks !== undefined &&
         (!Number.isFinite(input.totalMarks) ||
@@ -664,6 +701,7 @@ export function createHomeworkRouter(
           academicYearId: 1,
           subjectId: 1,
           createdBy: 1,
+          type: 1,
         })
         .lean();
       if (!item)
@@ -686,6 +724,17 @@ export function createHomeworkRouter(
           403,
           'HOMEWORK_ACCESS_DENIED',
           'This role cannot delete homework or tests.',
+        );
+      if (
+        (isManager(context) && item.type !== 'test') ||
+        (context.role === 'teacher' &&
+          item.type !== 'homework' &&
+          item.type !== 'class_test')
+      )
+        throw new AppError(
+          403,
+          'HOMEWORK_TYPE_ACCESS_DENIED',
+          'You cannot delete this type of academic record.',
         );
       if (
         context.role === 'teacher' &&

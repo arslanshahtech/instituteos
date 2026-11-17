@@ -135,7 +135,11 @@ export class AuthService {
     }
     const updated = await this.repository.updateUser(userId, { displayName });
     if (!updated) {
-      throw new AppError(404, 'ACCOUNT_NOT_FOUND', 'The account is unavailable.');
+      throw new AppError(
+        404,
+        'ACCOUNT_NOT_FOUND',
+        'The account is unavailable.',
+      );
     }
     return publicUser(updated);
   }

@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider } from '../auth/AuthProvider.js';
 import { createAppRouter } from '../app/router.js';
 import { ToastProvider } from '../components/ui/ToastProvider.js';
+import { ApiError } from '../api/client.js';
 import type { StaffInput, StaffRecord } from './staff-api.js';
 
 const attendanceMocks = vi.hoisted(() => ({ listStaffAttendance: vi.fn() }));
@@ -48,8 +49,12 @@ const organizationMocks = vi.hoisted(() => ({
 
 vi.mock('./staff-api.js', () => staffMocks);
 vi.mock('../attendance/attendance-api.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../attendance/attendance-api.js')>();
-  return { ...actual, listStaffAttendance: attendanceMocks.listStaffAttendance };
+  const actual =
+    await importOriginal<typeof import('../attendance/attendance-api.js')>();
+  return {
+    ...actual,
+    listStaffAttendance: attendanceMocks.listStaffAttendance,
+  };
 });
 vi.mock('../tenancy/tenancy-api.js', () => accessMocks);
 vi.mock('../auth/auth-api.js', () => authMocks);
@@ -193,7 +198,9 @@ describe('staff management pages', () => {
     expect(
       await screen.findByRole('columnheader', { name: 'Employee ID' }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Staff directory' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Staff directory' }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('columnheader', { name: 'Designation' }),
     ).toBeInTheDocument();
@@ -208,6 +215,12 @@ describe('staff management pages', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByText('EMP-014')).toBeInTheDocument();
     expect(screen.getAllByText('Teacher').length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('link', { name: 'View details for Ada Lovelace' }),
+    ).toHaveAttribute(
+      'href',
+      `/admin/organizations/${organizationId}/staff/${staffId}`,
+    );
     expect(
       screen.getByRole('link', { name: 'View profile for Ada Lovelace' }),
     ).toHaveAttribute(
@@ -255,6 +268,10 @@ describe('staff management pages', () => {
       screen.getByRole('textbox', { name: 'Last name' }),
       'Lovelace',
     );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Contact email' }),
+      'ada.smith@example.com',
+    );
     await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     await screen.findByRole('textbox', { name: 'Employee ID / code' });
@@ -281,6 +298,7 @@ describe('staff management pages', () => {
       expect.objectContaining({
         firstName: 'Ada',
         lastName: 'Lovelace',
+        email: 'ada.smith@example.com',
         employeeCode: 'EMP-014',
         subjects: ['Physics', 'Mathematics'],
       }),
@@ -293,19 +311,88 @@ describe('staff management pages', () => {
     expect(screen.getByText('Physics')).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Attendance' }));
-    expect(await screen.findByText('No attendance records yet')).toBeInTheDocument();
+    expect(
+      await screen.findByText('No attendance records yet'),
+    ).toBeInTheDocument();
     expect(attendanceMocks.listStaffAttendance).toHaveBeenCalledWith(
       organizationId,
       expect.objectContaining({ staffId }),
     );
 
     await user.click(screen.getByRole('tab', { name: 'Leave' }));
-    expect(screen.getByText('Leave management is not connected yet')).toBeInTheDocument();
+    expect(
+      screen.getByText('Leave management is not connected yet'),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Salary' }));
-    expect(screen.getByText('Payroll records are not configured yet')).toBeInTheDocument();
+    expect(
+      screen.getByText('Payroll records are not configured yet'),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Documents' }));
-    expect(screen.getByText('Staff document storage is not connected yet')).toBeInTheDocument();
+    expect(
+      screen.getByText('Staff document storage is not connected yet'),
+    ).toBeInTheDocument();
+  }, 10_000);
+
+  it('accepts valid plus-address and subdomain emails', async () => {
+    const user = userEvent.setup();
+    renderStaffRoute(`/admin/organizations/${organizationId}/staff/new`);
+
+    await screen.findByRole('textbox', { name: 'Contact email' });
+    await user.type(screen.getByRole('textbox', { name: 'First name' }), 'Ada');
+    await user.type(
+      screen.getByRole('textbox', { name: 'Last name' }),
+      'Lovelace',
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Contact email' }),
+      'ada+staff@school.example.co.uk',
+    );
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(
+      await screen.findByRole('textbox', { name: 'Employee ID / code' }),
+    ).toBeInTheDocument();
   });
+
+  it('shows a concise message when the staff email or employee ID already exists', async () => {
+    const user = userEvent.setup();
+    staffMocks.createStaff.mockRejectedValueOnce(
+      new ApiError(
+        'A staff member with this employee code or email already exists in this organization.',
+        409,
+        'STAFF_DUPLICATE',
+      ),
+    );
+    renderStaffRoute(`/admin/organizations/${organizationId}/staff/new`);
+
+    await screen.findByRole('textbox', { name: 'Contact email' });
+    await user.type(screen.getByRole('textbox', { name: 'First name' }), 'Ada');
+    await user.type(
+      screen.getByRole('textbox', { name: 'Last name' }),
+      'Lovelace',
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Contact email' }),
+      'ada.smith@example.com',
+    );
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Create staff member' }),
+    );
+
+    expect(
+      await screen.findByRole('alert', {
+        name: '',
+      }),
+    ).toHaveTextContent('Email or employee ID already exists.');
+    expect(
+      screen.queryByText(
+        'A staff member with this employee code or email already exists in this organization.',
+      ),
+    ).not.toBeInTheDocument();
+  });
+
   it('loads existing staff details into the edit form', async () => {
     renderStaffRoute(
       `/admin/organizations/${organizationId}/staff/${staffId}/edit`,

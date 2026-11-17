@@ -198,7 +198,7 @@ export interface OrganizationServices {
   invite(
     context: OrganizationContext,
     input: MemberInvitationInput,
-  ): Promise<void>;
+  ): Promise<{ emailSent: boolean; whatsappShareUrl: string | null }>;
   listInvitations(
     context: OrganizationContext,
   ): Promise<Record<string, unknown>[]>;

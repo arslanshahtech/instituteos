@@ -57,6 +57,7 @@ class MemoryOrganizationAccess implements OrganizationAccessRepository {
     }
   > = [];
   readonly platformRoles = new Set<string>();
+  readonly policies = new Map<string, Record<string, readonly string[]>>();
 
   async findActiveMembership(
     userId: string,
@@ -79,6 +80,7 @@ class MemoryOrganizationAccess implements OrganizationAccessRepository {
       ...(membership.permissions
         ? { permissions: membership.permissions }
         : {}),
+      rolePermissions: this.policies.get(organizationId) ?? {},
     };
   }
 
@@ -328,6 +330,31 @@ describe('organization authorization and tenant isolation', () => {
     expect(deniedWrite.body.error.code).toBe('PERMISSION_DENIED');
   });
 
+  it('enforces saved organization role policies for every member of that role', async () => {
+    const { app, authService, accessRepository } = buildHarness();
+    const admin = await addUser(authService, 'policy-admin@example.test');
+    addMembership(
+      accessRepository,
+      admin.userId,
+      organizationA,
+      'organization_admin',
+    );
+    accessRepository.policies.set(organizationA, {
+      organization_admin: ['organization.read'],
+    });
+    const context = await request(app)
+      .get(`/api/v1/organizations/${organizationA}/context`)
+      .set('Cookie', admin.cookie);
+    const write = await request(app)
+      .patch(`/api/v1/organizations/${organizationA}/resources/${resourceA}`)
+      .set('Cookie', admin.cookie)
+      .set('X-CSRF-Token', admin.csrfToken)
+      .send({ value: 'blocked by role policy' });
+    expect(context.status).toBe(200);
+    expect(context.body.permissions).toEqual(['organization.read']);
+    expect(write.status).toBe(403);
+    expect(write.body.error.code).toBe('PERMISSION_DENIED');
+  });
   it('allows same-tenant access and blocks cross-tenant read and update IDOR attempts', async () => {
     const { app, authService, accessRepository, fixtureStore } = buildHarness();
     const userA = await addUser(authService, 'a@example.test');
@@ -513,6 +540,24 @@ describe('organization authorization and tenant isolation', () => {
     );
   });
 
+  it('applies organization role policies to every membership while keeping owner immutable', () => {
+    expect(
+      permissionsForMembership('teacher', undefined, ['attendance.read']),
+    ).toEqual(['attendance.read']);
+    expect(
+      permissionsForMembership('parent_guardian', undefined, ['student.read']),
+    ).toEqual(['student.read']);
+    expect(
+      permissionsForMembership(
+        'organization_admin',
+        ['finance.read'],
+        ['organization.read'],
+      ),
+    ).toEqual(['organization.read']);
+    expect(permissionsForMembership('organization_owner', [], [])).toEqual(
+      permissionsForOrganizationRole('organization_owner'),
+    );
+  });
   it('uses explicit role capability sets rather than implied inheritance', () => {
     expect(permissionsForOrganizationRole('organization_admin')).toContain(
       'organization.update',

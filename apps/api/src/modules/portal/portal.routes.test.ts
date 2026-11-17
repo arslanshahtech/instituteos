@@ -83,31 +83,56 @@ describe('parent portal child-link resolution', () => {
     });
     expect(findLinks).toHaveBeenCalledWith({
       organizationId: organizationObjectId,
-      guardianId: guardianObjectId,
+      guardianId: { $in: [guardianObjectId] },
     });
     expect(findLegacyStudents).toHaveBeenCalledWith({
       organizationId: organizationObjectId,
       status: 'active',
-      guardianIds: guardianObjectId,
+      guardianIds: { $in: [guardianObjectId] },
     });
   });
 
-  it('blocks a parent account when the email matches multiple guardian records', async () => {
+  it('returns children linked to every guardian record sharing the verified parent email', async () => {
+    const firstGuardianId = new Types.ObjectId(guardianId);
+    const secondGuardianId = new Types.ObjectId(linkedStudentId);
     vi.spyOn(AuthUserModel, 'findById').mockReturnValue(
       activeUserQuery() as never,
     );
     vi.spyOn(GuardianModel, 'find').mockReturnValue(
       guardianQuery([
-        { _id: new Types.ObjectId(guardianId) },
-        { _id: new Types.ObjectId(linkedStudentId) },
+        { _id: firstGuardianId },
+        { _id: secondGuardianId },
       ]) as never,
     );
-    const findLinks = vi.spyOn(StudentGuardianLinkModel, 'find');
+    const findLinks = vi
+      .spyOn(StudentGuardianLinkModel, 'find')
+      .mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        lean: vi
+          .fn()
+          .mockResolvedValue([
+            { studentId: new Types.ObjectId(linkedStudentId) },
+          ]),
+      } as never);
+    const findLegacyStudents = vi.spyOn(StudentModel, 'find').mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      lean: vi
+        .fn()
+        .mockResolvedValue([{ _id: new Types.ObjectId(legacyStudentId) }]),
+    } as never);
 
     await expect(
       activeStudentIdsForAccount(organizationId, userId, 'parent_guardian'),
-    ).rejects.toMatchObject({ code: 'PORTAL_ACCOUNT_UNLINKED' });
-    expect(findLinks).not.toHaveBeenCalled();
+    ).resolves.toEqual([linkedStudentId, legacyStudentId]);
+    expect(findLinks).toHaveBeenCalledWith({
+      organizationId: new Types.ObjectId(organizationId),
+      guardianId: { $in: [firstGuardianId, secondGuardianId] },
+    });
+    expect(findLegacyStudents).toHaveBeenCalledWith({
+      organizationId: new Types.ObjectId(organizationId),
+      status: 'active',
+      guardianIds: { $in: [firstGuardianId, secondGuardianId] },
+    });
   });
 
   it('blocks inactive portal accounts before looking up guardian links', async () => {

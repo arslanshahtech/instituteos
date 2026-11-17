@@ -25,7 +25,9 @@ async function main() {
 
   try {
     if (await AuthUserModel.exists({ email })) {
-      throw new Error('The invitation test email already has an account; choose a fresh test email.');
+      throw new Error(
+        'The invitation test email already has an account; choose a fresh test email.',
+      );
     }
     const organization = await OrganizationModel.findOne({
       name: 'InstituteOS Local QA',
@@ -33,9 +35,18 @@ async function main() {
     }).lean();
     if (!organization) throw new Error('Local QA organization not found.');
     const [campus, academicYear, academicClass] = await Promise.all([
-      CampusModel.findOne({ organizationId: organization._id, name: 'Main Campus' }).lean(),
-      AcademicYearModel.findOne({ organizationId: organization._id, name: '2026-27 Local QA' }).lean(),
-      AcademicClassModel.findOne({ organizationId: organization._id, code: 'QA8' }).lean(),
+      CampusModel.findOne({
+        organizationId: organization._id,
+        name: 'Main Campus',
+      }).lean(),
+      AcademicYearModel.findOne({
+        organizationId: organization._id,
+        name: '2026-27 Local QA',
+      }).lean(),
+      AcademicClassModel.findOne({
+        organizationId: organization._id,
+        code: 'QA8',
+      }).lean(),
     ]);
     if (!campus || !academicYear || !academicClass) {
       throw new Error('Local QA campus, academic year or class is missing.');
@@ -51,7 +62,8 @@ async function main() {
         code: 'QAMATH',
       }).lean(),
     ]);
-    if (!section || !subject) throw new Error('Local QA section or subject is missing.');
+    if (!section || !subject)
+      throw new Error('Local QA section or subject is missing.');
 
     const staff = await StaffMemberModel.findOneAndUpdate(
       { organizationId: organization._id, email },
@@ -70,7 +82,8 @@ async function main() {
       },
       { returnDocument: 'after', upsert: true, setDefaultsOnInsert: true },
     );
-    if (!staff) throw new Error('Could not create the invitation staff profile.');
+    if (!staff)
+      throw new Error('Could not create the invitation staff profile.');
 
     await TeacherAssignmentModel.findOneAndUpdate(
       {
@@ -96,14 +109,18 @@ async function main() {
 
     console.log('Invitation-only Teacher staff profile is ready.');
     console.log(`Email: ${email}`);
-    console.log('No AuthUser or membership was created; registration and invitation acceptance remain to be tested in the browser.');
+    console.log(
+      'No AuthUser or membership was created; registration and invitation acceptance remain to be tested in the browser.',
+    );
   } finally {
     await mongoose.disconnect();
   }
 }
 
 main().catch(async (error: unknown) => {
-  console.error(error instanceof Error ? error.message : 'Invitation profile seed failed.');
+  console.error(
+    error instanceof Error ? error.message : 'Invitation profile seed failed.',
+  );
   await mongoose.disconnect().catch(() => undefined);
   process.exitCode = 1;
 });

@@ -279,3 +279,285 @@
 .academic-subject-form-card .student-form-grid > :last-child {
   grid-column: 1 / -1;
 }
+
+/* Mobile Subjects directory: compact filter row and session-style subject cards. */
+.academic-subjects-mobile-list {
+  display: none;
+}
+.academic-subject-details {
+  display: grid;
+  gap: 15px;
+  max-height: min(72vh, 620px);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.academic-subject-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+.academic-subject-details-grid > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid #e9e6e1;
+  border-radius: 10px;
+  background: #faf9f7;
+}
+.academic-subject-details-grid small {
+  color: #858078;
+  font-size: 10px;
+}
+.academic-subject-details-grid strong {
+  overflow-wrap: anywhere;
+  color: #292722;
+  font-size: 12px;
+}
+.academic-subject-details-components,
+.academic-subject-details-description {
+  display: grid;
+  gap: 8px;
+}
+.academic-subject-details-components h3,
+.academic-subject-details-description h3 {
+  margin: 0;
+  color: #292722;
+  font-size: 12px;
+  font-weight: 700;
+}
+.academic-subject-details-components ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.academic-subject-details-components li {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 11px;
+  border: 1px solid #e9e6e1;
+  border-radius: 9px;
+  background: #fff;
+  font-size: 11px;
+}
+.academic-subject-details-components li span {
+  color: #5d5851;
+}
+.academic-subject-details-components li strong {
+  color: #292722;
+  text-align: right;
+  font-size: 10px;
+}
+.academic-subject-details-components > p,
+.academic-subject-details-description > p {
+  margin: 0;
+  color: #77736d;
+  font-size: 11px;
+  line-height: 1.55;
+}
+.academic-subject-details-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 13px;
+  border-top: 1px solid #eeeae4;
+}
+@media (max-width: 620px) {
+  .academic-subjects-toolbar-panel {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+  }
+  .academic-subjects-toolbar-panel .academic-sessions-search {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    min-height: 40px;
+  }
+  .academic-subjects-filter {
+    flex: 0 0 126px;
+    min-width: 0;
+  }
+  .academic-subjects-filter select {
+    min-height: 40px;
+    padding-inline: 9px;
+    font-size: 11px;
+  }
+  .academic-subjects-desktop-list {
+    display: none;
+  }
+  .academic-subjects-mobile-list {
+    display: grid;
+    gap: 10px;
+    padding: 0 12px 14px;
+  }
+  .academic-subjects-table-heading {
+    padding: 15px 15px 13px;
+  }
+  .academic-subject-mobile-card {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid #e9e6e1;
+    border-radius: 12px;
+    background: linear-gradient(145deg, #fff 0%, #fdfcfb 100%);
+    box-shadow: 0 2px 8px rgb(15 23 42 / 3%);
+  }
+  .academic-subject-mobile-copy {
+    display: grid;
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 4px;
+  }
+  .academic-subject-mobile-label {
+    color: #8a8378;
+    font-size: 9px;
+    font-weight: 750;
+    letter-spacing: 0.1em;
+  }
+  .academic-subject-mobile-copy > strong {
+    overflow-wrap: anywhere;
+    color: #24221e;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .academic-subject-mobile-copy > small {
+    overflow-wrap: anywhere;
+    color: #89847c;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+  .academic-subject-mobile-card > .button {
+    display: inline-flex;
+    flex: 0 0 auto;
+    min-width: max-content;
+    min-height: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    border-radius: 8px;
+    padding: 0 9px;
+    font-size: 10px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 390px) {
+  .academic-subjects-toolbar-panel {
+    gap: 6px;
+    padding: 8px;
+  }
+  .academic-subjects-filter {
+    flex-basis: 112px;
+  }
+  .academic-subjects-filter select {
+    padding-inline: 7px;
+    font-size: 10px;
+  }
+  .academic-subject-mobile-card {
+    gap: 7px;
+    padding: 10px;
+  }
+  .academic-subject-mobile-card > .button {
+    gap: 3px;
+    padding-inline: 7px;
+    font-size: 9px;
+  }
+  .academic-subject-details-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .academic-subject-details-components li {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .academic-subject-details-components li strong {
+    text-align: left;
+  }
+  .academic-subject-details-actions {
+    flex-direction: column;
+  }
+  .academic-subject-details-actions > .button {
+    width: 100%;
+  }
+}
+
+/* Final heading and action polish for Subjects. */
+.academic-subjects-page .page-heading {
+  align-items: center;
+  margin-bottom: 0;
+}
+.academic-subjects-page .page-heading h1 {
+  margin: 0;
+}
+.academic-subjects-page .page-heading .page-description {
+  margin-top: 7px;
+}
+.academic-subjects-page .page-heading .academic-subjects-add-button,
+.academic-subjects-add-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-width: max-content;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 9px;
+  padding-inline: 16px;
+  white-space: nowrap;
+  line-height: 1;
+}
+.academic-subjects-add-button > svg {
+  flex: 0 0 auto;
+}
+@media (max-width: 620px) {
+  .academic-subjects-page .page-heading {
+    align-items: flex-start;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .academic-subjects-page .page-heading > div {
+    min-width: 0;
+  }
+  .academic-subjects-page .page-heading .academic-subjects-add-button {
+    min-height: 38px;
+    padding-inline: 10px;
+    gap: 6px;
+    font-size: 11px;
+  }
+}
+@media (max-width: 360px) {
+  .academic-subjects-page .page-heading .academic-subjects-add-button {
+    padding-inline: 8px;
+    gap: 5px;
+    font-size: 10px;
+  }
+}
+
+/* Final Subjects heading description and destructive-action treatment. */
+.academic-subjects-page .page-heading .page-description {
+  margin: 3px 0 0;
+  color: #858078;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.academic-subject-actions .academic-subject-delete-button {
+  color: #dc2626;
+}
+.academic-subject-actions .academic-subject-delete-button:hover {
+  background: #fef2f2;
+  color: #b91c1c;
+}

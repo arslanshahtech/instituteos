@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { EnrollmentModel, StaffMemberModel, StudentModel } from './people.model.js';
+import {
+  EnrollmentModel,
+  StaffMemberModel,
+  StudentModel,
+} from './people.model.js';
 
 describe('student schema indexes', () => {
   it('enforces registration uniqueness only for actual registration strings', () => {
     const index = StudentModel.schema
       .indexes()
-      .find(([, options]) => options.name === 'uniq_student_registration_number');
+      .find(
+        ([, options]) => options.name === 'uniq_student_registration_number',
+      );
 
     expect(index).toBeDefined();
     expect(index?.[0]).toEqual({ organizationId: 1, registrationNumber: 1 });
@@ -75,7 +81,9 @@ describe('enrollment schema indexes', () => {
   it('enforces application uniqueness only when a source application ObjectId exists', () => {
     const index = EnrollmentModel.schema
       .indexes()
-      .find(([, options]) => options.name === 'uniq_enrollment_application_record');
+      .find(
+        ([, options]) => options.name === 'uniq_enrollment_application_record',
+      );
 
     expect(index).toBeDefined();
     expect(index?.[0]).toEqual({ organizationId: 1, sourceApplicationId: 1 });

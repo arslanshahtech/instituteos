@@ -1,6 +1,18 @@
 import { apiRequest } from '../api/client.js';
 
-export type ExamType = 'midterm' | 'final' | 'quiz' | 'monthly_test' | 'class_test' | 'mid_year' | 'send_up' | 'annual' | 'practical' | 'viva' | 'supplementary' | 'improvement';
+export type ExamType =
+  | 'midterm'
+  | 'final'
+  | 'quiz'
+  | 'monthly_test'
+  | 'class_test'
+  | 'mid_year'
+  | 'send_up'
+  | 'annual'
+  | 'practical'
+  | 'viva'
+  | 'supplementary'
+  | 'improvement';
 
 export interface ExamRecord {
   id: string;
@@ -61,6 +73,7 @@ export interface ExamRosterStudent {
   id: string;
   firstName: string;
   lastName: string;
+  registrationNumber?: string;
   preferredName?: string;
   mark?: ExamMark;
 }
@@ -151,7 +164,9 @@ export function setExamResultsPublication(
 }
 
 export function listPendingExamMarksReviews(organizationId: string) {
-  return apiRequest<{ items: ExamSchedule[] }>(`${examPath(organizationId)}/pending-reviews`);
+  return apiRequest<{ items: ExamSchedule[] }>(
+    `${examPath(organizationId)}/pending-reviews`,
+  );
 }
 
 export function listExamSchedules(organizationId: string, examId: string) {
@@ -242,14 +257,20 @@ export function saveExamMarks(
   );
 }
 
-export function submitExamMarksForReview(organizationId: string, scheduleId: string) {
+export function submitExamMarksForReview(
+  organizationId: string,
+  scheduleId: string,
+) {
   return apiRequest<{ schedule: ExamSchedule }>(
     `${examPath(organizationId)}/schedules/${encodeURIComponent(scheduleId)}/marks/submission`,
     { method: 'POST', body: JSON.stringify({}) },
   );
 }
 
-export function requestExamMarksChanges(organizationId: string, scheduleId: string) {
+export function requestExamMarksChanges(
+  organizationId: string,
+  scheduleId: string,
+) {
   return apiRequest<{ schedule: ExamSchedule }>(
     `${examPath(organizationId)}/schedules/${encodeURIComponent(scheduleId)}/marks-review`,
     { method: 'PATCH', body: JSON.stringify({ action: 'request_changes' }) },

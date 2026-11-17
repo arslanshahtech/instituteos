@@ -25,6 +25,7 @@ export interface FinanceExpenseInput {
 }
 
 export interface FinanceExpenseRecord extends FinanceExpenseInput {
+  source: 'manual' | 'payroll';
   id: string;
   organizationId: string;
   recordedBy: string;
@@ -96,6 +97,11 @@ export interface FinanceOperationsRepository {
     context: FinanceOperationsContext,
     input: FinanceExpenseInput,
   ): Promise<FinanceExpenseRecord>;
+  updateExpense(
+    context: FinanceOperationsContext,
+    expenseId: string,
+    input: FinanceExpenseInput,
+  ): Promise<FinanceExpenseRecord | null>;
   deleteExpense(
     context: FinanceOperationsContext,
     expenseId: string,

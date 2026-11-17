@@ -144,6 +144,75 @@ describe('student import page', () => {
     expect(screen.queryByLabelText('Student register file')).toBeNull();
   });
 
+  it('shows a compact back arrow and a visible import heading', async () => {
+    renderImportPage();
+
+    expect(
+      await screen.findByRole('heading', { name: 'Import students' }),
+    ).toBeVisible();
+    expect(
+      screen.getByText('Upload a spreadsheet to add student records.'),
+    ).toBeVisible();
+    const backLink = screen.getByRole('link', { name: 'Back to students' });
+    expect(backLink).toBeVisible();
+    expect(backLink).toHaveTextContent('');
+    expect(backLink.querySelector('svg')).toBeInTheDocument();
+  });
+
+  it('automatically uses the only available campus', async () => {
+    mocks.getOrganizationAccessContext.mockResolvedValue({
+      organizationId,
+      role: 'organization_admin',
+      permissions: ['student.create', 'campus.read'],
+      campusIds: [],
+    });
+    mocks.getCampuses.mockResolvedValue({
+      campuses: [
+        {
+          id: '650000000000000000000003',
+          organizationId,
+          name: 'North Campus',
+          status: 'active',
+        },
+      ],
+    });
+
+    renderImportPage();
+    await screen.findByRole('heading', { name: 'Import students' });
+    expect(await screen.findByText('North Campus')).toBeVisible();
+    expect(
+      screen.queryByLabelText('Campus (optional)'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows campus selection when multiple campuses are available', async () => {
+    mocks.getOrganizationAccessContext.mockResolvedValue({
+      organizationId,
+      role: 'organization_admin',
+      permissions: ['student.create', 'campus.read'],
+      campusIds: [],
+    });
+    mocks.getCampuses.mockResolvedValue({
+      campuses: [
+        {
+          id: '650000000000000000000003',
+          organizationId,
+          name: 'North Campus',
+          status: 'active',
+        },
+        {
+          id: '650000000000000000000004',
+          organizationId,
+          name: 'South Campus',
+          status: 'active',
+        },
+      ],
+    });
+
+    renderImportPage();
+    expect(await screen.findByLabelText('Campus (optional)')).toBeVisible();
+  });
+
   it('parses, maps, previews and confirms rows, then displays the import report', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderImportPage();
@@ -152,7 +221,7 @@ describe('student import page', () => {
     expect(
       document.querySelector('.student-import-file-picker'),
     ).toBeInTheDocument();
-    expect(screen.getByText('Browse files')).toBeInTheDocument();
+    expect(screen.getByText('Choose file')).toBeInTheDocument();
     const file = new File(['sample workbook'], 'school-register.xlsx', {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
@@ -248,9 +317,9 @@ describe('student import page', () => {
     expect(screen.getByLabelText('Map Family contact Email')).toHaveValue(
       'guardianEmail',
     );
-    expect(screen.getByLabelText('Map Family contact Relationship')).toHaveValue(
-      'guardianRelationship',
-    );
+    expect(
+      screen.getByLabelText('Map Family contact Relationship'),
+    ).toHaveValue('guardianRelationship');
 
     fireEvent.click(screen.getByRole('button', { name: 'Preview rows' }));
     await screen.findByRole('heading', { name: '3. Review before import' });

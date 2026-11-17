@@ -24,6 +24,9 @@ try {
 
   $env:MONGODB_URI = $env:DEV_SEED_MONGODB_URI
   $env:NODE_ENV = 'development'
+  # Use the Windows trust store for SMTP TLS chains installed on this machine.
+  # Certificate validation remains enabled; this does not bypass TLS checks.
+  $env:NODE_USE_SYSTEM_CA = '1'
   Write-Host 'InstituteOS API: isolated instituteos_dev database selected.' -ForegroundColor Green
   npm run dev:watch
   if ($LASTEXITCODE -ne 0) {
@@ -32,5 +35,6 @@ try {
 }
 finally {
   Remove-Item Env:DEV_SEED_MONGODB_URI -ErrorAction SilentlyContinue
+  Remove-Item Env:NODE_USE_SYSTEM_CA -ErrorAction SilentlyContinue
   Pop-Location
 }

@@ -66,7 +66,22 @@ function makeRepository(assigned: boolean) {
     getSchedule: vi.fn().mockResolvedValue(schedule),
     getExam: vi.fn().mockResolvedValue(exam),
     listSchedules: vi.fn().mockResolvedValue([schedule]),
-    setMarksReviewStatus: vi.fn().mockImplementation(async (_organizationId: string, _scheduleId: string, status: 'draft' | 'submitted' | 'changes_requested', submittedBy: string | null) => ({ ...schedule, marksReviewStatus: status, marksSubmittedAt: status === 'submitted' ? '2026-11-07T00:00:00.000Z' : null, marksSubmittedBy: submittedBy })),
+    setMarksReviewStatus: vi
+      .fn()
+      .mockImplementation(
+        async (
+          _organizationId: string,
+          _scheduleId: string,
+          status: 'draft' | 'submitted' | 'changes_requested',
+          submittedBy: string | null,
+        ) => ({
+          ...schedule,
+          marksReviewStatus: status,
+          marksSubmittedAt:
+            status === 'submitted' ? '2026-11-07T00:00:00.000Z' : null,
+          marksSubmittedBy: submittedBy,
+        }),
+      ),
     setResultsPublication: vi
       .fn()
       .mockImplementation(
@@ -82,6 +97,9 @@ function makeRepository(assigned: boolean) {
         }),
       ),
     listRoster: vi.fn().mockResolvedValue([]),
+    saveMarks: vi.fn().mockResolvedValue([]),
+    getActiveGradingScale: vi.fn().mockResolvedValue(null),
+    getStudentReport: vi.fn().mockResolvedValue({ exam, results: [] }),
     validateAcademicYear: vi.fn().mockResolvedValue(true),
     validateCampus: vi.fn().mockResolvedValue(true),
     validateTerm: vi.fn().mockResolvedValue(true),
@@ -128,13 +146,26 @@ describe('ExaminationsService annual and term-based exams', () => {
     endDate: '2026-10-31',
   };
 
-  it.each(['monthly_test', 'class_test', 'mid_year', 'send_up', 'annual', 'practical', 'viva', 'supplementary', 'improvement'] as const)('accepts the %s internal exam category', async (type) => {
+  it.each([
+    'monthly_test',
+    'class_test',
+    'mid_year',
+    'send_up',
+    'annual',
+    'practical',
+    'viva',
+    'supplementary',
+    'improvement',
+  ] as const)('accepts the %s internal exam category', async (type) => {
     const repo = makeRepository(true);
     const service = new ExaminationsService(repo);
 
     await service.createExam(managerContext, { ...examInput, type });
 
-    expect(repo.createExam).toHaveBeenCalledWith(organizationId, expect.objectContaining({ type }));
+    expect(repo.createExam).toHaveBeenCalledWith(
+      organizationId,
+      expect.objectContaining({ type }),
+    );
   });
 
   it('creates an annual exam without requiring a term', async () => {
@@ -143,7 +174,10 @@ describe('ExaminationsService annual and term-based exams', () => {
 
     await service.createExam(managerContext, examInput);
 
-    expect(repo.validateAcademicYear).toHaveBeenCalledWith(organizationId, academicYearId);
+    expect(repo.validateAcademicYear).toHaveBeenCalledWith(
+      organizationId,
+      academicYearId,
+    );
     expect(repo.validateTerm).not.toHaveBeenCalled();
     expect(repo.createExam).toHaveBeenCalledWith(
       organizationId,
@@ -159,7 +193,11 @@ describe('ExaminationsService annual and term-based exams', () => {
     await service.createExam(managerContext, { ...examInput, termId });
 
     expect(repo.validateTerm).toHaveBeenCalledWith(
-      organizationId, academicYearId, termId, examInput.startDate, examInput.endDate,
+      organizationId,
+      academicYearId,
+      termId,
+      examInput.startDate,
+      examInput.endDate,
     );
   });
 
@@ -168,9 +206,12 @@ describe('ExaminationsService annual and term-based exams', () => {
     vi.mocked(repo.validateTerm).mockResolvedValue(false);
     const service = new ExaminationsService(repo);
 
-    await expect(service.createExam(managerContext, {
-      ...examInput, termId: '650000000000000000000010',
-    })).rejects.toMatchObject({ code: 'VALIDATION_ERROR', statusCode: 400 });
+    await expect(
+      service.createExam(managerContext, {
+        ...examInput,
+        termId: '650000000000000000000010',
+      }),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR', statusCode: 400 });
     expect(repo.createExam).not.toHaveBeenCalled();
   });
 
@@ -183,7 +224,9 @@ describe('ExaminationsService annual and term-based exams', () => {
 
     expect(repo.validateTerm).not.toHaveBeenCalled();
     expect(repo.updateExam).toHaveBeenCalledWith(
-      organizationId, examId, expect.objectContaining({ termId: null }),
+      organizationId,
+      examId,
+      expect.objectContaining({ termId: null }),
     );
   });
 });
@@ -230,33 +273,102 @@ describe('ExaminationsService result publication', () => {
 
   it('requires marks review before publishing even when marks exist', async () => {
     const repo = makeRepository(true);
-    vi.mocked(repo.listSchedules).mockResolvedValue([{ ...schedule, marksReviewStatus: 'draft' }]);
+    vi.mocked(repo.listSchedules).mockResolvedValue([
+      { ...schedule, marksReviewStatus: 'draft' },
+    ]);
     vi.mocked(repo.listRoster).mockResolvedValue([markedStudent]);
     const service = new ExaminationsService(repo);
-    await expect(service.setResultsPublication(managerContext, examId, true)).rejects.toMatchObject({ code: 'REVIEW_PENDING', statusCode: 409 });
+    await expect(
+      service.setResultsPublication(managerContext, examId, true),
+    ).rejects.toMatchObject({ code: 'REVIEW_PENDING', statusCode: 409 });
     expect(repo.setResultsPublication).not.toHaveBeenCalled();
   });
 
   it('locks teacher edits after submission until admin requests changes', async () => {
     const repo = makeRepository(true);
     const service = new ExaminationsService(repo);
-    await expect(service.saveMarks(teacherContext, scheduleId, [])).rejects.toMatchObject({ code: 'MARKS_ALREADY_SUBMITTED', statusCode: 409 });
+    await expect(
+      service.saveMarks(teacherContext, scheduleId, []),
+    ).rejects.toMatchObject({
+      code: 'MARKS_ALREADY_SUBMITTED',
+      statusCode: 409,
+    });
+  });
+
+  it('allows teachers to save an incomplete roster as a draft without submitting it', async () => {
+    const repo = makeRepository(true);
+    vi.mocked(repo.getSchedule).mockResolvedValue({
+      ...schedule,
+      marksReviewStatus: 'draft',
+    });
+    vi.mocked(repo.listRoster).mockResolvedValue([
+      markedStudent,
+      { id: '650000000000000000000013', firstName: 'Sara', lastName: 'Ali' },
+    ]);
+    const service = new ExaminationsService(repo);
+
+    await expect(
+      service.saveMarks(teacherContext, scheduleId, [
+        { studentId: markedStudent.id, isAbsent: false, marksObtained: 80 },
+        { studentId: '650000000000000000000013', isAbsent: false },
+      ]),
+    ).resolves.toBeDefined();
+    expect(repo.saveMarks).toHaveBeenCalled();
+    expect(repo.setMarksReviewStatus).not.toHaveBeenCalled();
+  });
+
+  it('blocks submission while any enrolled student still has no marks', async () => {
+    const repo = makeRepository(true);
+    vi.mocked(repo.getSchedule).mockResolvedValue({
+      ...schedule,
+      marksReviewStatus: 'draft',
+    });
+    vi.mocked(repo.listRoster).mockResolvedValue([
+      markedStudent,
+      { id: '650000000000000000000013', firstName: 'Sara', lastName: 'Ali' },
+    ]);
+    const service = new ExaminationsService(repo);
+
+    await expect(
+      service.submitMarksForReview(teacherContext, scheduleId),
+    ).rejects.toMatchObject({ code: 'MARKS_INCOMPLETE', statusCode: 409 });
+    expect(repo.setMarksReviewStatus).not.toHaveBeenCalled();
   });
 
   it('submits completed marks for admin review', async () => {
     const repo = makeRepository(true);
-    vi.mocked(repo.getSchedule).mockResolvedValue({ ...schedule, marksReviewStatus: 'draft' });
+    vi.mocked(repo.getSchedule).mockResolvedValue({
+      ...schedule,
+      marksReviewStatus: 'draft',
+    });
     vi.mocked(repo.listRoster).mockResolvedValue([markedStudent]);
     const service = new ExaminationsService(repo);
-    await expect(service.submitMarksForReview(teacherContext, scheduleId)).resolves.toMatchObject({ marksReviewStatus: 'submitted', marksSubmittedBy: userId });
-    expect(repo.setMarksReviewStatus).toHaveBeenCalledWith(organizationId, scheduleId, 'submitted', userId);
+    await expect(
+      service.submitMarksForReview(teacherContext, scheduleId),
+    ).resolves.toMatchObject({
+      marksReviewStatus: 'submitted',
+      marksSubmittedBy: userId,
+    });
+    expect(repo.setMarksReviewStatus).toHaveBeenCalledWith(
+      organizationId,
+      scheduleId,
+      'submitted',
+      userId,
+    );
   });
 
   it('returns submitted marks to the teacher for correction', async () => {
     const repo = makeRepository(true);
     const service = new ExaminationsService(repo);
-    await expect(service.requestMarksChanges(managerContext, scheduleId)).resolves.toMatchObject({ marksReviewStatus: 'changes_requested' });
-    expect(repo.setMarksReviewStatus).toHaveBeenCalledWith(organizationId, scheduleId, 'changes_requested', null);
+    await expect(
+      service.requestMarksChanges(managerContext, scheduleId),
+    ).resolves.toMatchObject({ marksReviewStatus: 'changes_requested' });
+    expect(repo.setMarksReviewStatus).toHaveBeenCalledWith(
+      organizationId,
+      scheduleId,
+      'changes_requested',
+      null,
+    );
   });
 
   it('publishes only after every scheduled roster has marks', async () => {
@@ -294,6 +406,56 @@ describe('ExaminationsService result publication', () => {
       statusCode: 409,
     });
     expect(repo.listRoster).not.toHaveBeenCalled();
+  });
+});
+
+describe('ExaminationsService student result calculation', () => {
+  it('does not report zero percent while a scheduled subject has no mark yet', async () => {
+    const repo = makeRepository(true);
+    vi.mocked(repo.getStudentReport).mockResolvedValue({
+      exam,
+      results: [
+        { schedule, subjectName: 'Computer', mark: null },
+        {
+          schedule: {
+            ...schedule,
+            id: '650000000000000000000014',
+            totalMarks: 50,
+          },
+          subjectName: 'English',
+          mark: null,
+        },
+      ],
+    });
+    const service = new ExaminationsService(repo);
+
+    await expect(
+      service.getStudentReport(managerContext, examId, markedStudent.id),
+    ).resolves.toMatchObject({
+      totalMarksObtained: 0,
+      totalMarksPossible: 150,
+      percentage: null,
+      overallGrade: null,
+    });
+  });
+
+  it('calculates the overall percentage when every subject is assessed', async () => {
+    const repo = makeRepository(true);
+    vi.mocked(repo.getStudentReport).mockResolvedValue({
+      exam,
+      results: [
+        { schedule, subjectName: 'Computer', mark: markedStudent.mark ?? null },
+      ],
+    });
+    const service = new ExaminationsService(repo);
+
+    await expect(
+      service.getStudentReport(managerContext, examId, markedStudent.id),
+    ).resolves.toMatchObject({
+      totalMarksObtained: 80,
+      totalMarksPossible: 100,
+      percentage: 80,
+    });
   });
 });
 

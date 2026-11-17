@@ -143,9 +143,7 @@ describe('student management pages', () => {
       ),
     ).toBeVisible();
     expect(document.body).not.toHaveTextContent(studentId);
-    expect(
-      screen.getByRole('button', { name: 'CSV' }),
-    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'CSV' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Bulk Upload' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Enroll Student' })).toBeVisible();
     await user.type(
@@ -177,6 +175,65 @@ describe('student management pages', () => {
         expect.objectContaining({ page: 2, pageSize: 20 }),
       );
     });
+  });
+
+  it('toggles selection for the visible students from the same control', async () => {
+    const user = userEvent.setup();
+    renderStudentRoute(`/admin/organizations/${organizationId}/students`);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Select shown' }),
+    );
+    expect(screen.getByText('1 selected')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Withdraw selected' }),
+    ).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Deselect shown' }));
+    expect(screen.queryByText('1 selected')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Withdraw selected' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Select shown' }),
+    ).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('requires typed confirmation before bulk withdrawing selected students', async () => {
+    const user = userEvent.setup();
+    renderStudentRoute(`/admin/organizations/${organizationId}/students`);
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Select shown' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Withdraw selected' }));
+
+    const dialog = screen.getByRole('dialog', {
+      name: 'Withdraw selected students?',
+    });
+    expect(dialog).toHaveTextContent(
+      'This does not permanently delete student records.',
+    );
+    const confirmButton = screen.getByRole('button', {
+      name: 'Confirm withdrawal',
+    });
+    expect(confirmButton).toBeDisabled();
+
+    const confirmationInput = screen.getByPlaceholderText('WITHDRAW');
+    await user.type(confirmationInput, 'WITHDRAW');
+    expect(confirmationInput).toHaveValue('WITHDRAW');
+    expect(confirmButton).toBeEnabled();
+    await user.click(confirmButton);
+
+    await waitFor(() => {
+      expect(studentMocks.updateStudent).toHaveBeenCalledWith(
+        organizationId,
+        studentId,
+        expect.objectContaining({ status: 'withdrawn' }),
+      );
+    });
+    expect(await screen.findByText(/student\(s\) withdrawn/)).toBeVisible();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('shows an empty state when the backend returns no students', async () => {
@@ -302,6 +359,11 @@ describe('student management pages', () => {
     expect(
       await screen.findByRole('heading', { name: 'Student details', level: 2 }),
     ).toBeVisible();
+    expect(screen.getByText('Pickup verification')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Fees' }));
+    expect(screen.queryByText('Pickup verification')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Fee challans' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Overview' }));
     expect(document.body).not.toHaveTextContent(studentId);
     expect(studentMocks.getStudent).toHaveBeenCalledWith(
       organizationId,

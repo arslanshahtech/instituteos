@@ -19,7 +19,10 @@ export interface AcademicYearInput {
   status?: AcademicYearStatus;
 }
 
-export interface AcademicYearCreateInput extends Omit<AcademicYearInput, 'startDate' | 'endDate'> {
+export interface AcademicYearCreateInput extends Omit<
+  AcademicYearInput,
+  'startDate' | 'endDate'
+> {
   startDate?: string;
   endDate?: string;
 }

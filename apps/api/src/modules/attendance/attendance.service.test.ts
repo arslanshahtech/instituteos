@@ -119,6 +119,7 @@ describe('AttendanceService', () => {
       getAttendanceSettings: vi.fn().mockResolvedValue({
         timezone: 'Asia/Karachi',
         markingCutoffTime: '00:00',
+        teacherMarkingCutoffEnabled: true,
         autoMarkUnmarkedAbsent: false,
         allowAdminOverride: false,
       }),
@@ -133,6 +134,41 @@ describe('AttendanceService', () => {
     ).rejects.toMatchObject({ code: 'ATTENDANCE_CUTOFF_PASSED' });
     expect(repo.listStudentRoster).not.toHaveBeenCalled();
     expect(repo.saveStudentAttendance).not.toHaveBeenCalled();
+  });
+
+  it('allows teachers to mark today after the saved time when teacher cutoff is disabled', async () => {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Karachi',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
+        .formatToParts(new Date())
+        .map((part) => [part.type, part.value]),
+    );
+    const today =
+      String(parts.year) + '-' + String(parts.month) + '-' + String(parts.day);
+    const repo = repository({
+      getAttendanceSettings: vi.fn().mockResolvedValue({
+        timezone: 'Asia/Karachi',
+        markingCutoffTime: '00:00',
+        teacherMarkingCutoffEnabled: false,
+        autoMarkUnmarkedAbsent: false,
+        allowAdminOverride: false,
+      }),
+    });
+    const service = new AttendanceService(repo);
+
+    await service.saveStudentAttendance(
+      {
+        ...context,
+        role: 'teacher',
+        userId: '650000000000000000000008',
+      },
+      { ...baseBulkInput, date: today },
+    );
+    expect(repo.saveStudentAttendance).toHaveBeenCalledOnce();
   });
 
   it('allows an organization admin to correct attendance after cutoff when override is enabled', async () => {
@@ -152,6 +188,7 @@ describe('AttendanceService', () => {
       getAttendanceSettings: vi.fn().mockResolvedValue({
         timezone: 'Asia/Karachi',
         markingCutoffTime: '00:00',
+        teacherMarkingCutoffEnabled: true,
         autoMarkUnmarkedAbsent: false,
         allowAdminOverride: true,
       }),
@@ -386,14 +423,32 @@ describe('AttendanceService', () => {
     expect(repo.getClassCampus).not.toHaveBeenCalled();
   });
 
-  it('requires the complete section roster for a bulk submission', async () => {
+  it('allows partial attendance updates for active students in the selected section', async () => {
+    const repo = repository();
+    const service = new AttendanceService(repo);
+
+    await service.saveStudentAttendance(context, {
+      ...baseBulkInput,
+      records: [{ studentId, status: 'present' }],
+    });
+
+    expect(repo.saveStudentAttendance).toHaveBeenCalledWith(
+      organizationId,
+      expect.objectContaining({
+        records: [{ studentId, status: 'present' }],
+      }),
+    );
+  });
+
+  it('rejects attendance updates for students outside the selected section roster', async () => {
+    const outsideStudentId = '650000000000000000000099';
     const repo = repository();
     const service = new AttendanceService(repo);
 
     await expect(
       service.saveStudentAttendance(context, {
         ...baseBulkInput,
-        records: [{ studentId, status: 'present' }],
+        records: [{ studentId: outsideStudentId, status: 'present' }],
       }),
     ).rejects.toMatchObject({ code: 'ROSTER_MISMATCH' });
 

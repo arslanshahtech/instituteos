@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../auth/AuthProvider.js';
+import { notifyAuthSessionChanged } from '../auth/auth-session-sync.js';
 import { apiRequest } from '../api/client.js';
 import { Button } from '../components/ui/Button.js';
-import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
 import { ErrorState } from '../components/ui/States.js';
 import './settings.css';
 
@@ -18,7 +18,12 @@ export function ProfileSettingsPage() {
   const [error, setError] = useState('');
 
   if (!auth.user) {
-    return <ErrorState title="Profile unavailable" description="Sign in again to view your account profile." />;
+    return (
+      <ErrorState
+        title="Profile unavailable"
+        description="Sign in again to view your account profile."
+      />
+    );
   }
 
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
@@ -30,7 +35,11 @@ export function ProfileSettingsPage() {
       await auth.updateProfile({ displayName });
       setMessage('Your profile name has been updated.');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Profile could not be updated.');
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Profile could not be updated.',
+      );
     } finally {
       setSavingProfile(false);
     }
@@ -54,30 +63,30 @@ export function ProfileSettingsPage() {
         method: 'POST',
         body: JSON.stringify({ currentPassword, newPassword }),
       });
+      notifyAuthSessionChanged();
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setMessage('Your password has been changed. Other sessions have been signed out.');
+      setMessage(
+        'Your password has been changed. Other sessions have been signed out.',
+      );
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Password could not be changed.');
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Password could not be changed.',
+      );
     } finally {
       setSavingPassword(false);
     }
   }
 
   return (
-    <div className="settings-page reference-live-module">
-      <WorkspacePageHeading
-        className="settings-heading"
-        eyebrow="Personal account"
-        title="My Profile & Settings"
-        description="View your account details, update your name, and manage your sign-in password. These settings do not change organization records."
-      />
+    <div className="settings-profile-content reference-live-module">
       <section className="settings-card">
         <div className="settings-card-heading">
           <div>
             <h2>Profile information</h2>
-            <p>Your personal account details for this InstituteOS login.</p>
           </div>
         </div>
         <form className="settings-fields" onSubmit={saveProfile}>
@@ -95,7 +104,6 @@ export function ProfileSettingsPage() {
           <label className="settings-field">
             <span>Email address</span>
             <input type="email" value={auth.user.email} readOnly />
-            <small>Email changes require a separate verification process, so this address is currently read-only.</small>
           </label>
           <div className="settings-save-row">
             <Button type="submit" variant="primary" disabled={savingProfile}>
@@ -108,21 +116,42 @@ export function ProfileSettingsPage() {
         <div className="settings-card-heading">
           <div>
             <h2>Change password</h2>
-            <p>Use your current password to set a new password. Other active sessions will be signed out.</p>
           </div>
         </div>
         <form className="settings-fields" onSubmit={savePassword}>
           <label className="settings-field">
             <span>Current password</span>
-            <input autoComplete="current-password" required type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
+            <input
+              autoComplete="current-password"
+              required
+              type="password"
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+            />
           </label>
           <label className="settings-field">
             <span>New password</span>
-            <input autoComplete="new-password" minLength={12} maxLength={128} required type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
+            <input
+              autoComplete="new-password"
+              minLength={12}
+              maxLength={128}
+              required
+              type="password"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+            />
           </label>
           <label className="settings-field">
             <span>Confirm new password</span>
-            <input autoComplete="new-password" minLength={12} maxLength={128} required type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+            <input
+              autoComplete="new-password"
+              minLength={12}
+              maxLength={128}
+              required
+              type="password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+            />
           </label>
           <div className="settings-save-row">
             <Button type="submit" variant="primary" disabled={savingPassword}>
@@ -131,8 +160,16 @@ export function ProfileSettingsPage() {
           </div>
         </form>
       </section>
-      {message && <p className="settings-readonly-note" role="status">{message}</p>}
-      {error && <p className="settings-error" role="alert">{error}</p>}
+      {message && (
+        <p className="settings-readonly-note" role="status">
+          {message}
+        </p>
+      )}
+      {error && (
+        <p className="settings-error" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

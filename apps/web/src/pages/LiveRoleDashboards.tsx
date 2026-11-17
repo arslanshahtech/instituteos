@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import {
-  BookOpenText,
   CalendarCheck,
+  CalendarDays,
   ClipboardList,
-  GraduationCap,
+  FileText,
+  BookOpen,
+  ArrowUpRight,
   ReceiptText,
   Users,
   WalletCards,
@@ -21,11 +23,17 @@ import {
 } from '../attendance/attendance-api.js';
 import type {
   StaffAttendanceStatus,
-  StudentAttendanceRecord,
   TeacherAttendanceAssignment,
 } from '../attendance/attendance-api.js';
 import { listDailyCollections, listInvoices } from '../finance/finance-api.js';
 import type { StudentInvoice } from '../finance/finance-api.js';
+import { listTeacherTimetable } from '../staff/teacher-timetable-api.js';
+import { listHomeworkTests } from '../homework/homework-api.js';
+import { useTeacherAnnouncements } from '../communications/communications-api.js';
+import {
+  listExams,
+  listExamSchedules,
+} from '../examinations/examinations-api.js';
 
 function localDate(date = new Date()) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
@@ -74,24 +82,6 @@ function teacherAttendanceQuery(
       }),
     ),
   ).then((responses) => responses.flatMap((response) => response.items));
-}
-
-function dayStatistics(records: StudentAttendanceRecord[], days: string[]) {
-  return days.map((date) => {
-    const items = records.filter((record) => record.date === date);
-    return {
-      date,
-      label: formatDay(date),
-      count: items.length,
-      percentage: items.length
-        ? Math.round(
-            (items.filter((record) => record.status === 'present').length /
-              items.length) *
-              100,
-          )
-        : 0,
-    };
-  });
 }
 
 function MetricCard({
@@ -147,12 +137,64 @@ export function TeacherLiveDashboard({
   });
   const teacherDisplayName =
     teacherProfileQuery.data?.profile?.displayName || userName;
+  const teacherAnnouncementsQuery = useTeacherAnnouncements(
+    organizationId,
+    Boolean(organizationId),
+  );
+  const teacherNotices = (teacherAnnouncementsQuery.data?.items ?? [])
+    .slice()
+    .sort(
+      (a, b) =>
+        Number(b.isPinned) - Number(a.isPinned) ||
+        b.publishDate.localeCompare(a.publishDate),
+    )
+    .slice(0, 4);
+  const teacherStaffId = teacherProfileQuery.data?.profile?.staffId;
   const assignmentsQuery = useQuery({
     queryKey: ['attendance', organizationId, 'teacher-assignments'],
     queryFn: () => listTeacherAttendanceAssignments(organizationId),
     retry: false,
   });
   const assignments = assignmentsQuery.data?.items ?? [];
+  const timetableQuery = useQuery({
+    queryKey: ['teacher-timetable', organizationId, teacherStaffId],
+    queryFn: () => listTeacherTimetable(organizationId, teacherStaffId!),
+    enabled: Boolean(teacherStaffId),
+    retry: false,
+  });
+  const diaryQuery = useQuery({
+    queryKey: ['homework-tests', organizationId, 'teacher-dashboard'],
+    queryFn: () => listHomeworkTests(organizationId),
+    enabled: assignmentsQuery.isSuccess,
+    retry: false,
+  });
+  const examsQuery = useQuery({
+    queryKey: ['examinations', organizationId, 'teacher-dashboard'],
+    queryFn: () => listExams(organizationId),
+    enabled: assignmentsQuery.isSuccess,
+    retry: false,
+  });
+  const exams = examsQuery.data?.items ?? [];
+  const examSchedulesQuery = useQuery({
+    queryKey: [
+      'teacher-dashboard-exam-schedules',
+      organizationId,
+      exams.map((exam) => exam.id).join('|'),
+    ],
+    queryFn: () =>
+      Promise.all(
+        exams.map(async (exam) => {
+          const response = await listExamSchedules(organizationId, exam.id);
+          return response.items.map((schedule) => ({
+            ...schedule,
+            examName: exam.name,
+            academicYearId: exam.academicYearId,
+          }));
+        }),
+      ).then((items) => items.flat()),
+    enabled: examsQuery.isSuccess && exams.length > 0,
+    retry: false,
+  });
   const rosterQuery = useQuery({
     queryKey: [
       'teacher-live-dashboard-rosters',
@@ -194,7 +236,7 @@ export function TeacherLiveDashboard({
     queryKey: ['attendance', organizationId, 'teacher-self', today],
     queryFn: () =>
       getTeacherSelfAttendance(organizationId, {
-        dateFrom: dateFrom,
+        dateFrom,
         dateTo: today,
       }),
     retry: false,
@@ -217,34 +259,149 @@ export function TeacherLiveDashboard({
   });
   const roster = rosterQuery.data ?? [];
   const records = attendanceQuery.data ?? [];
-  const weeks = useMemo(() => dayStatistics(records, days), [records, days]);
   const markedToday = roster.filter((item) => Boolean(item.status)).length;
   const presentToday = roster.filter(
     (item) => item.status === 'present',
   ).length;
-  const distinctCampuses = new Set(assignments.map((item) => item.campusId))
-    .size;
-  const distinctYears = new Set(assignments.map((item) => item.academicYearId))
-    .size;
   const students = new Set(roster.map((item) => item.id)).size;
+  const selfAttendanceItems = selfAttendanceQuery.data?.items ?? [];
+  const todaySelfAttendance = selfAttendanceItems.find(
+    (item) => item.date === today,
+  );
+  const recentSelfAttendance = selfAttendanceItems
+    .filter((item) => item.date !== today)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 5);
+  const hasMarkedOwnAttendance = Boolean(todaySelfAttendance);
+  const weekdayOrder = [
+    'sunday',
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+  ];
+  const todayIndex = new Date().getDay();
+  const todayName = weekdayOrder[todayIndex]!;
+  const currentTime = new Date().toTimeString().slice(0, 5);
+  const timetableItems = timetableQuery.data?.items ?? [];
+  const todayPeriods = timetableItems
+    .filter((item) => item.dayOfWeek === todayName)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const nextDayOffset = todayPeriods.length
+    ? 0
+    : Array.from({ length: 7 }, (_, index) => index + 1).find((offset) =>
+        timetableItems.some(
+          (item) => item.dayOfWeek === weekdayOrder[(todayIndex + offset) % 7],
+        ),
+      );
+  const displayDayOffset = nextDayOffset ?? 0;
+  const displayDayName = weekdayOrder[(todayIndex + displayDayOffset) % 7]!;
+  const displayPeriods = (
+    todayPeriods.length
+      ? todayPeriods
+      : timetableItems.filter((item) => item.dayOfWeek === displayDayName)
+  ).sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const displayDate = new Date();
+  displayDate.setDate(displayDate.getDate() + displayDayOffset);
+  const currentPeriod = todayPeriods.find(
+    (item) => item.startTime <= currentTime && item.endTime > currentTime,
+  );
+  const nextPeriod = todayPeriods.length
+    ? todayPeriods.find((item) => item.startTime > currentTime)
+    : displayPeriods[0];
+  const upcomingDiary = (diaryQuery.data?.items ?? [])
+    .filter(
+      (item) =>
+        item.status === 'published' &&
+        item.dueDate >= today &&
+        assignments.some(
+          (assignment) =>
+            assignment.classId === item.classId &&
+            assignment.sectionId === item.sectionId &&
+            assignment.academicYearId === item.academicYearId,
+        ),
+    )
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    .slice(0, 3);
+  const assignedClassGroups = Array.from(
+    new Map(
+      assignments.map((item) => {
+        const key = item.classId + ':' + item.sectionId;
+        const subjects = assignments
+          .filter(
+            (entry) =>
+              entry.classId === item.classId &&
+              entry.sectionId === item.sectionId,
+          )
+          .map((entry) => entry.subjectName)
+          .filter((name): name is string => Boolean(name));
+        return [
+          key,
+          { ...item, assignedSubjects: [...new Set(subjects)] },
+        ] as const;
+      }),
+    ).values(),
+  );
+  const upcomingExams = (examSchedulesQuery.data ?? [])
+    .filter(
+      (item) =>
+        item.date >= today &&
+        assignments.some(
+          (assignment) =>
+            assignment.classId === item.classId &&
+            assignment.sectionId === item.sectionId &&
+            assignment.academicYearId === item.academicYearId,
+        ),
+    )
+    .sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime),
+    )
+    .slice(0, 3);
+  const classPerformance = assignedClassGroups.map((group) => {
+    const classRecords = records.filter(
+      (record) =>
+        record.classId === group.classId &&
+        record.sectionId === group.sectionId,
+    );
+    const present = classRecords.filter(
+      (record) => record.status === 'present' || record.status === 'late',
+    ).length;
+    const absent = classRecords.filter(
+      (record) => record.status === 'absent',
+    ).length;
+    const eligible = present + absent;
+    return {
+      ...group,
+      attendanceRate: eligible ? Math.round((present / eligible) * 100) : null,
+      studentCount: new Set(classRecords.map((record) => record.studentId))
+        .size,
+      recordCount: classRecords.length,
+    };
+  });
+  const performancePresent = records.filter(
+    (record) => record.status === 'present' || record.status === 'late',
+  ).length;
+  const performanceAbsent = records.filter(
+    (record) => record.status === 'absent',
+  ).length;
+  const performanceDenominator = performancePresent + performanceAbsent;
+  const overallClassPerformance = performanceDenominator
+    ? Math.round((performancePresent / performanceDenominator) * 100)
+    : null;
 
   return (
-    <main className="page-stack role-dashboard reference-dashboard-preview live-role-dashboard">
+    <main className="page-stack role-dashboard reference-dashboard-preview live-role-dashboard teacher-live-dashboard-v1">
       <section className="page-heading reference-dashboard-heading">
-        <div>
-          <p className="eyebrow">Teacher workspace</p>
-          <h1>Teaching overview</h1>
-          <p className="page-description">
-            Your assigned classes, student records and daily attendance.
+        <div className="teacher-dashboard-welcome">
+          <p className="reference-dashboard-greeting">
+            Welcome back, {teacherDisplayName || 'Teacher'}
           </p>
-          {teacherDisplayName && (
-            <p className="reference-dashboard-greeting">
-              Welcome back, {teacherDisplayName}
-              {teacherProfileQuery.data?.profile?.designation
-                ? ` · ${teacherProfileQuery.data.profile.designation}`
-                : ''}
-            </p>
-          )}
+          <p className="teacher-dashboard-intro">
+            Here’s your teaching overview for today.
+          </p>
           {teacherProfileQuery.isSuccess &&
             !teacherProfileQuery.data.profile && (
               <p className="reference-scope-note" role="status">
@@ -254,317 +411,641 @@ export function TeacherLiveDashboard({
             )}
         </div>
       </section>
-      <nav
-        aria-label="Teacher quick actions"
-        className="reference-quick-actions"
-      >
-        <QuickAction
-          to={`/teacher/organizations/${encodeURIComponent(organizationId)}/students`}
-        >
-          <Users size={13} aria-hidden="true" /> My classes &amp; students
-        </QuickAction>
-        <QuickAction
-          to={`/teacher/organizations/${encodeURIComponent(organizationId)}/attendance`}
-        >
-          <CalendarCheck size={13} aria-hidden="true" /> Mark attendance
-        </QuickAction>
-        <QuickAction
-          to={`/teacher/organizations/${encodeURIComponent(organizationId)}/homework-tests`}
-        >
-          <BookOpenText size={13} aria-hidden="true" /> Homework &amp; tests
-        </QuickAction>
-        <QuickAction
-          to={`/teacher/organizations/${encodeURIComponent(organizationId)}/examinations`}
-        >
-          <GraduationCap size={13} aria-hidden="true" /> Examinations & Marks
-        </QuickAction>
-        <QuickAction
-          to={`/teacher/organizations/${encodeURIComponent(organizationId)}/communications`}
-        >
-          <ClipboardList size={13} aria-hidden="true" /> Messages
-        </QuickAction>
-      </nav>
+
       <section
-        className="reference-dashboard-panel"
-        aria-labelledby="teacher-self-attendance-title"
+        className="teacher-dashboard-summary"
+        aria-label="Teaching summary"
       >
-        <div className="reference-panel-heading">
-          <h2 id="teacher-self-attendance-title">My staff attendance</h2>
-          <span>{today}</span>
-        </div>
-        {selfAttendanceQuery.isPending ? (
-          <p className="reference-scope-note">
-            Loading your attendance policy and history…
-          </p>
-        ) : selfAttendanceQuery.isError ? (
-          <p className="reference-scope-note" role="status">
-            Your own attendance is currently unavailable. Your institute may
-            have disabled attendance history, or your staff profile needs to be
-            linked by an administrator.
-          </p>
+        {assignmentsQuery.isError ? (
+          <section className="reference-dashboard-panel">
+            <h2>Teaching records unavailable</h2>
+            <p className="page-description">
+              We could not load your assigned sections. Please open My classes
+              &amp; students and try again.
+            </p>
+            <p className="teacher-panel-description">
+              If your teaching assignment has recently changed, ask your
+              administrator to review your staff profile and class allocation.
+            </p>
+          </section>
         ) : (
-          <>
-            {selfAttendanceQuery.data.items.length ? (
-              <div className="reference-activity-list">
-                {selfAttendanceQuery.data.items.map((item) => (
-                  <div className="reference-activity-row" key={item.id}>
-                    <span
-                      className="reference-activity-dot"
-                      aria-hidden="true"
-                    />
-                    <span className="reference-activity-copy">
-                      <strong>{item.date}</strong>
-                      <small>{item.remarks || 'Staff attendance record'}</small>
-                    </span>
-                    <span className="reference-status reference-status-info">
-                      {item.status.replace('-', ' ')}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="reference-scope-note">
-                No staff attendance records found for this period.
-              </p>
-            )}
-            {selfAttendanceQuery.data.policy.selfMarkingEnabled &&
-            !selfAttendanceQuery.data.items.some(
-              (item) => item.date === today,
-            ) ? (
-              <form
-                className="settings-fields"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  selfAttendanceMutation.mutate();
-                }}
-              >
-                <label className="settings-field">
-                  <span>Today's attendance</span>
-                  <select
-                    value={selfAttendanceStatus}
-                    onChange={(event) =>
-                      setSelfAttendanceStatus(
-                        event.target.value as StaffAttendanceStatus,
-                      )
-                    }
-                  >
-                    {selfAttendanceQuery.data.policy.allowedStatuses.map(
-                      (status) => (
-                        <option key={status} value={status}>
-                          {status.replace('-', ' ')}
-                        </option>
-                      ),
-                    )}
-                  </select>
-                </label>
-                <label className="settings-field">
-                  <span>Remarks (optional)</span>
-                  <input
-                    maxLength={500}
-                    value={selfAttendanceRemarks}
-                    onChange={(event) =>
-                      setSelfAttendanceRemarks(event.target.value)
-                    }
-                    placeholder="Add a short note"
-                  />
-                </label>
-                <button
-                  className="button button-primary"
-                  type="submit"
-                  disabled={
-                    selfAttendanceMutation.isPending ||
-                    !selfAttendanceQuery.data.policy.allowedStatuses.length
-                  }
-                >
-                  {selfAttendanceMutation.isPending
-                    ? 'Saving…'
-                    : 'Mark my attendance'}
-                </button>
-                {selfAttendanceMutation.error && (
-                  <p className="settings-error" role="alert">
-                    {selfAttendanceMutation.error.message}
-                  </p>
-                )}
-              </form>
-            ) : selfAttendanceQuery.data.policy.selfMarkingEnabled ? (
-              <p className="reference-scope-note">
-                Today's attendance has already been recorded. Contact your
-                administrator if it needs correction.
-              </p>
-            ) : (
-              <p className="reference-scope-note">
-                Self-marking is disabled by your institute. You can view your
-                history here.
-              </p>
-            )}
-          </>
-        )}
-      </section>
-      {assignmentsQuery.isError ? (
-        <section className="reference-dashboard-panel">
-          <h2>Assigned classes unavailable</h2>
-          <p className="page-description">
-            We could not load your assigned teaching sections. Open My classes
-            &amp; students and retry.
-          </p>
-          <QuickAction
-            to={`/teacher/organizations/${encodeURIComponent(organizationId)}/students`}
-          >
-            Open assigned classes
-          </QuickAction>
-        </section>
-      ) : (
-        <>
           <section
-            aria-label="Live teaching metrics"
-            className="reference-metrics-grid"
+            aria-label="Teaching summary metrics"
+            className="reference-metrics-grid teacher-dashboard-metrics"
           >
+            <article className="reference-metric-card teacher-summary-card">
+              <div className="reference-metric-icon">
+                <BookOpen size={17} aria-hidden="true" />
+              </div>
+              <span className="reference-metric-label">My classes</span>
+              <strong>
+                {assignmentsQuery.isPending
+                  ? '—'
+                  : String(
+                      new Set(assignments.map((item) => item.classId)).size,
+                    )}
+              </strong>
+              <small>
+                {assignmentsQuery.isPending
+                  ? 'Loading class and section totals…'
+                  : assignments.length +
+                    ' assigned ' +
+                    (assignments.length === 1 ? 'section' : 'sections') +
+                    ' across your classes'}
+              </small>
+            </article>
             <MetricCard
-              label="Assigned sections"
-              value={String(assignments.length)}
-              note="Active teaching assignments"
-              icon={GraduationCap}
-            />
-            <MetricCard
-              label="Students in roster"
-              value={rosterQuery.isSuccess ? String(students) : '—'}
+              label="Students"
+              value={
+                assignmentsQuery.isSuccess && assignments.length === 0
+                  ? '0'
+                  : rosterQuery.isSuccess
+                    ? String(students)
+                    : '—'
+              }
               note={
-                rosterQuery.isError
-                  ? 'Roster unavailable'
-                  : 'Current assigned sections'
+                assignmentsQuery.isSuccess && assignments.length === 0
+                  ? 'No active sections assigned'
+                  : rosterQuery.isPending
+                    ? 'Loading assigned students…'
+                    : rosterQuery.isError
+                      ? 'Student roster unavailable'
+                      : 'Across your assigned sections'
               }
               icon={Users}
             />
             <MetricCard
               label="Attendance marked"
-              value={rosterQuery.isSuccess ? String(markedToday) : '—'}
-              note="For today’s selected date"
+              value={
+                assignmentsQuery.isSuccess && assignments.length === 0
+                  ? '0'
+                  : rosterQuery.isSuccess
+                    ? String(markedToday)
+                    : '—'
+              }
+              note={
+                rosterQuery.isPending
+                  ? 'Loading student attendance…'
+                  : rosterQuery.isError
+                    ? 'Attendance data unavailable'
+                    : 'Student records saved today'
+              }
               icon={CalendarCheck}
             />
             <MetricCard
               label="Present today"
-              value={rosterQuery.isSuccess ? String(presentToday) : '—'}
-              note="Saved attendance records"
+              value={
+                assignmentsQuery.isSuccess && assignments.length === 0
+                  ? '0'
+                  : rosterQuery.isSuccess
+                    ? String(presentToday)
+                    : '—'
+              }
+              note={
+                rosterQuery.isPending
+                  ? 'Loading student attendance…'
+                  : rosterQuery.isError
+                    ? 'Attendance data unavailable'
+                    : 'Students marked present'
+              }
               icon={ClipboardList}
             />
-            <MetricCard
-              label="Campuses"
-              value={String(distinctCampuses)}
-              note="In your assignments"
-              icon={GraduationCap}
-            />
-            <MetricCard
-              label="Academic years"
-              value={String(distinctYears)}
-              note="Included in assignments"
-              icon={BookOpenText}
-            />
           </section>
-          <section className="reference-dashboard-bottom">
-            <section className="reference-dashboard-panel">
+        )}
+      </section>
+
+      {!assignmentsQuery.isError && (
+        <>
+          <section className="reference-dashboard-bottom teacher-dashboard-workspace">
+            <section className="reference-dashboard-panel teacher-dashboard-timetable">
               <div className="reference-panel-heading">
-                <h2>My assigned classes</h2>
+                <div>
+                  <h2>My timetable</h2>
+                  <p className="teacher-panel-description">
+                    {todayPeriods.length
+                      ? 'Your periods for today, with the current class highlighted.'
+                      : 'Your next scheduled teaching day.'}
+                  </p>
+                </div>
+                <span className="teacher-panel-date">
+                  {new Intl.DateTimeFormat('en-PK', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short',
+                  }).format(displayDate)}
+                </span>
+              </div>
+              {teacherProfileQuery.isPending ? (
+                <p className="reference-scope-note">
+                  Loading your teacher profile…
+                </p>
+              ) : teacherProfileQuery.isError ? (
+                <p className="reference-scope-note" role="status">
+                  Your teacher profile could not be loaded right now. Please try
+                  again later.
+                </p>
+              ) : !teacherStaffId ? (
+                <p className="reference-scope-note" role="status">
+                  Your teacher profile is not linked yet, so a personal
+                  timetable cannot be loaded.
+                </p>
+              ) : timetableQuery.isPending ? (
+                <p className="reference-scope-note">Loading your timetable…</p>
+              ) : timetableQuery.isError ? (
+                <p className="reference-scope-note" role="status">
+                  Your timetable is unavailable right now. Please try again
+                  later.
+                </p>
+              ) : displayPeriods.length === 0 ? (
+                <div className="teacher-dashboard-empty">
+                  <CalendarDays size={22} />
+                  <strong>No timetable available</strong>
+                  <span>
+                    Your assigned periods will appear here when the institute
+                    publishes the timetable.
+                  </span>
+                </div>
+              ) : (
+                <div className="teacher-today-periods">
+                  {displayPeriods.slice(0, 5).map((period) => {
+                    const isCurrent = currentPeriod?.id === period.id;
+                    const isNext = nextPeriod?.id === period.id;
+                    return (
+                      <article
+                        className={
+                          'teacher-period-row' +
+                          (isCurrent ? ' is-current' : '')
+                        }
+                        key={period.id}
+                      >
+                        <div className="teacher-period-time">
+                          <strong>{period.startTime}</strong>
+                          <span>{period.endTime}</span>
+                        </div>
+                        <div className="teacher-period-marker">
+                          <span />
+                        </div>
+                        <div className="teacher-period-copy">
+                          <strong>
+                            {period.subjectName || 'Scheduled period'}
+                          </strong>
+                          <span>
+                            {period.sectionName || 'Assigned section'}
+                            {period.room ? ' · Room ' + period.room : ''}
+                          </span>
+                        </div>
+                        {isCurrent ? (
+                          <span className="teacher-period-state">Now</span>
+                        ) : isNext ? (
+                          <span className="teacher-period-state is-next">
+                            Next
+                          </span>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+            <section className="reference-dashboard-panel teacher-dashboard-classes teacher-class-performance">
+              <div className="reference-panel-heading">
+                <div>
+                  <h2>My class performance</h2>
+                  <p className="teacher-panel-description">
+                    Attendance across your assigned classes · last 7 days.
+                  </p>
+                </div>
                 <Link
                   className="reference-view-all"
-                  to={`/teacher/organizations/${encodeURIComponent(organizationId)}/students`}
+                  to={
+                    '/teacher/organizations/' +
+                    encodeURIComponent(organizationId) +
+                    '/students'
+                  }
                 >
-                  View students ↗
+                  My classes <ArrowUpRight size={13} />
                 </Link>
               </div>
               {assignmentsQuery.isPending ? (
                 <p className="reference-scope-note">
-                  Loading assigned sections…
+                  Loading class performance…
                 </p>
               ) : assignments.length === 0 ? (
                 <p className="reference-scope-note">
                   No active class assignments are linked to this account yet.
                 </p>
               ) : (
-                <div className="reference-activity-list">
-                  {assignments.map((item) => (
-                    <Link
-                      className="reference-activity-row live-assignment-row"
-                      key={item.id}
-                      to={`/teacher/organizations/${encodeURIComponent(organizationId)}/students?assignmentId=${encodeURIComponent(item.id)}`}
+                <div className="teacher-performance-content">
+                  <div className="teacher-performance-summary">
+                    <div
+                      className="teacher-performance-ring"
+                      style={{
+                        background:
+                          overallClassPerformance === null
+                            ? 'var(--color-border)'
+                            : 'conic-gradient(var(--color-ink) 0 ' +
+                              overallClassPerformance +
+                              '%, var(--color-border) ' +
+                              overallClassPerformance +
+                              '% 100%)',
+                      }}
                     >
-                      <span
-                        className="reference-activity-dot"
-                        aria-hidden="true"
-                      />
-                      <span className="reference-activity-copy">
+                      <div>
                         <strong>
-                          {item.className} · {item.sectionName}
+                          {overallClassPerformance === null
+                            ? '—'
+                            : overallClassPerformance + '%'}
                         </strong>
-                        {item.subjectName && (
-                          <small>Subject: {item.subjectName}</small>
+                        <span>Class average</span>
+                      </div>
+                    </div>
+                    <div className="teacher-performance-summary-copy">
+                      <strong>
+                        {classPerformance.length} assigned{' '}
+                        {classPerformance.length === 1 ? 'section' : 'sections'}
+                      </strong>
+                      <span>
+                        {attendanceQuery.isPending
+                          ? 'Attendance data is loading.'
+                          : performanceDenominator
+                            ? 'Based on saved present, late and absent records.'
+                            : 'Attendance performance will appear after records are saved.'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="teacher-performance-list">
+                    {classPerformance.map((item) => (
+                      <Link
+                        className="teacher-performance-row"
+                        key={item.id}
+                        to={
+                          '/teacher/organizations/' +
+                          encodeURIComponent(organizationId) +
+                          '/students?assignmentId=' +
+                          encodeURIComponent(item.id)
+                        }
+                      >
+                        <span className="teacher-performance-copy">
+                          <strong>
+                            {item.className} · {item.sectionName}
+                          </strong>
+                          <small>
+                            {item.assignedSubjects.join(', ') ||
+                              'Subject not specified'}{' '}
+                            ·{' '}
+                            {item.studentCount
+                              ? item.studentCount +
+                                ' students in attendance records'
+                              : 'No attendance records yet'}
+                          </small>
+                        </span>
+                        <span
+                          className="teacher-performance-meter"
+                          aria-hidden="true"
+                        >
+                          <i
+                            style={{ width: (item.attendanceRate ?? 0) + '%' }}
+                          />
+                        </span>
+                        <strong className="teacher-performance-value">
+                          {item.attendanceRate === null
+                            ? '—'
+                            : item.attendanceRate + '%'}
+                        </strong>
+                      </Link>
+                    ))}
+                  </div>
+                  {attendanceQuery.isError && (
+                    <p className="reference-scope-note" role="status">
+                      Class attendance data is unavailable right now.
+                    </p>
+                  )}
+                </div>
+              )}
+            </section>
+          </section>
+
+          <section className="reference-dashboard-bottom teacher-dashboard-workspace teacher-dashboard-upcoming">
+            <section
+              className="reference-dashboard-panel teacher-self-attendance-panel"
+              aria-labelledby="teacher-self-attendance-title"
+            >
+              <div className="reference-panel-heading">
+                <div>
+                  <h2 id="teacher-self-attendance-title">
+                    My staff attendance
+                  </h2>
+                  <p className="teacher-panel-description">
+                    Your attendance record and daily check-in.
+                  </p>
+                </div>
+                <span className="teacher-self-attendance-today">
+                  {new Intl.DateTimeFormat('en-PK', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  }).format(new Date(today + 'T00:00:00'))}
+                </span>
+              </div>
+              {selfAttendanceQuery.isPending ? (
+                <p className="reference-scope-note">
+                  Loading your attendance policy and history…
+                </p>
+              ) : selfAttendanceQuery.isError ? (
+                <p className="reference-scope-note" role="status">
+                  Your own attendance is currently unavailable. Your institute
+                  may have disabled attendance history, or your staff profile
+                  needs to be linked by an administrator.
+                </p>
+              ) : (
+                <>
+                  <div className="teacher-self-attendance-overview">
+                    <span className="teacher-self-attendance-overview-label">
+                      Today
+                    </span>
+                    <strong className="teacher-self-attendance-today-status">
+                      {todaySelfAttendance?.status.replace('-', ' ') ||
+                        'Not marked'}
+                    </strong>
+                  </div>
+                  <div className="teacher-self-attendance-history">
+                    <div className="teacher-self-attendance-section-heading">
+                      <strong>Recent</strong>
+                      <span>Last 7 days</span>
+                    </div>
+                    {recentSelfAttendance.length ? (
+                      <div className="teacher-self-attendance-records">
+                        {recentSelfAttendance.map((item) => (
+                          <article
+                            className="teacher-self-attendance-record"
+                            key={item.id}
+                          >
+                            <span className="teacher-self-attendance-date">
+                              <strong>
+                                {new Intl.DateTimeFormat('en-PK', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                }).format(new Date(item.date + 'T00:00:00'))}
+                              </strong>
+                              <small>{formatDay(item.date)}</small>
+                            </span>
+                            <strong className="teacher-self-attendance-status">
+                              {item.status.replace('-', ' ')}
+                            </strong>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="teacher-self-attendance-empty">
+                        No earlier records this week.
+                      </p>
+                    )}
+                  </div>
+                  <div className="teacher-self-attendance-action">
+                    {selfAttendanceQuery.data.policy.selfMarkingEnabled &&
+                    !hasMarkedOwnAttendance ? (
+                      <form
+                        className="settings-fields teacher-self-attendance-fields"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          selfAttendanceMutation.mutate();
+                        }}
+                      >
+                        <label className="settings-field">
+                          <span>Today's attendance</span>
+                          <select
+                            value={selfAttendanceStatus}
+                            onChange={(event) =>
+                              setSelfAttendanceStatus(
+                                event.target.value as StaffAttendanceStatus,
+                              )
+                            }
+                          >
+                            {selfAttendanceQuery.data.policy.allowedStatuses.map(
+                              (status) => (
+                                <option key={status} value={status}>
+                                  {status.replace('-', ' ')}
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        </label>
+                        <label className="settings-field">
+                          <span>Remarks (optional)</span>
+                          <input
+                            maxLength={500}
+                            value={selfAttendanceRemarks}
+                            onChange={(event) =>
+                              setSelfAttendanceRemarks(event.target.value)
+                            }
+                            placeholder="Add a short note"
+                          />
+                        </label>
+                        <button
+                          className="button button-primary"
+                          type="submit"
+                          disabled={
+                            selfAttendanceMutation.isPending ||
+                            !selfAttendanceQuery.data.policy.allowedStatuses
+                              .length
+                          }
+                        >
+                          {selfAttendanceMutation.isPending
+                            ? 'Saving…'
+                            : 'Mark my attendance'}
+                        </button>
+                        {selfAttendanceMutation.error && (
+                          <p className="settings-error" role="alert">
+                            {selfAttendanceMutation.error.message}
+                          </p>
                         )}
+                      </form>
+                    ) : selfAttendanceQuery.data.policy.selfMarkingEnabled ? (
+                      <p className="reference-scope-note">
+                        Today's attendance has already been recorded. Contact
+                        your administrator if it needs correction.
+                      </p>
+                    ) : (
+                      <p className="reference-scope-note">
+                        Self-marking is disabled by your institute. You can view
+                        your history here.
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+            </section>
+
+            <section className="reference-dashboard-panel">
+              <div className="reference-panel-heading">
+                <div>
+                  <h2>Pending assignments</h2>
+                  <p className="teacher-panel-description">
+                    Published homework and class tests for your classes.
+                  </p>
+                </div>
+                <Link
+                  className="reference-view-all"
+                  to={
+                    '/teacher/organizations/' +
+                    encodeURIComponent(organizationId) +
+                    '/homework-tests'
+                  }
+                >
+                  View All
+                </Link>
+              </div>
+              {diaryQuery.isPending ? (
+                <p className="reference-scope-note">Loading assignments…</p>
+              ) : diaryQuery.isError ? (
+                <p className="reference-scope-note" role="status">
+                  Assignments could not be loaded right now.
+                </p>
+              ) : upcomingDiary.length === 0 ? (
+                <div className="teacher-dashboard-empty">
+                  <FileText size={21} />
+                  <strong>No pending assignments</strong>
+                  <span>
+                    Published work for your assigned classes will appear here.
+                  </span>
+                </div>
+              ) : (
+                <div className="teacher-upcoming-list">
+                  {upcomingDiary.map((item) => (
+                    <article className="teacher-upcoming-row" key={item.id}>
+                      <span className="teacher-upcoming-icon">
+                        <FileText size={16} />
+                      </span>
+                      <span className="teacher-upcoming-copy">
+                        <strong>{item.title}</strong>
                         <small>
-                          {item.campusName} · {item.academicYearName}
+                          {item.className} · {item.sectionName} ·{' '}
+                          {item.subjectName}
                         </small>
                       </span>
-                      <span className="reference-status reference-status-info">
-                        Open roster
+                      <span className="teacher-upcoming-date">
+                        <small>Due</small>
+                        <strong>{item.dueDate}</strong>
                       </span>
-                    </Link>
+                    </article>
                   ))}
                 </div>
               )}
             </section>
+          </section>
+
+          <section className="reference-dashboard-bottom teacher-dashboard-workspace teacher-dashboard-notices-row">
             <section className="reference-dashboard-panel">
               <div className="reference-panel-heading">
-                <h2>Attendance · This week</h2>
-                <span>{records.length} records</span>
+                <div>
+                  <h2>Upcoming exams</h2>
+                  <p className="teacher-panel-description">
+                    Exam schedule for your assigned classes.
+                  </p>
+                </div>
+                <Link
+                  className="reference-view-all"
+                  to={
+                    '/teacher/organizations/' +
+                    encodeURIComponent(organizationId) +
+                    '/examinations'
+                  }
+                >
+                  View exams <ArrowUpRight size={13} />
+                </Link>
               </div>
-              {attendanceQuery.isPending ? (
-                <p className="reference-scope-note">
-                  Loading attendance history…
+              {examsQuery.isPending ||
+              (exams.length > 0 && examSchedulesQuery.isPending) ? (
+                <p className="reference-scope-note">Loading exam schedule…</p>
+              ) : examsQuery.isError ||
+                (exams.length > 0 && examSchedulesQuery.isError) ? (
+                <p className="reference-scope-note" role="status">
+                  Upcoming exams could not be loaded right now.
                 </p>
-              ) : attendanceQuery.isError ? (
+              ) : upcomingExams.length === 0 ? (
+                <div className="teacher-dashboard-empty">
+                  <CalendarDays size={21} />
+                  <strong>No upcoming exams</strong>
+                  <span>
+                    Scheduled exams for your classes will appear here.
+                  </span>
+                </div>
+              ) : (
+                <div className="teacher-upcoming-list">
+                  {upcomingExams.map((item) => {
+                    const assignment = assignments.find(
+                      (entry) =>
+                        entry.sectionId === item.sectionId &&
+                        entry.classId === item.classId,
+                    );
+                    return (
+                      <article className="teacher-upcoming-row" key={item.id}>
+                        <span className="teacher-upcoming-icon">
+                          <CalendarCheck size={16} />
+                        </span>
+                        <span className="teacher-upcoming-copy">
+                          <strong>{item.examName}</strong>
+                          <small>
+                            {assignment?.className || 'Class'} ·{' '}
+                            {assignment?.sectionName || 'Section'} ·{' '}
+                            {item.startTime}
+                          </small>
+                        </span>
+                        <span className="teacher-upcoming-date">
+                          <small>Exam date</small>
+                          <strong>{item.date}</strong>
+                        </span>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+            <section className="reference-dashboard-panel teacher-announcements-panel">
+              <div className="reference-panel-heading">
+                <div>
+                  <h2>Institute notices</h2>
+                  <p className="teacher-panel-description">
+                    Published updates for staff and the whole institute.
+                  </p>
+                </div>
+                <span className="teacher-notice-count">
+                  {teacherAnnouncementsQuery.isSuccess
+                    ? teacherNotices.length
+                    : '—'}
+                </span>
+              </div>
+              {teacherAnnouncementsQuery.isPending ? (
                 <p className="reference-scope-note">
-                  Attendance history is unavailable. The weekly chart is not
-                  shown until it can be loaded.
+                  Loading institute notices…
                 </p>
-              ) : records.length === 0 ? (
+              ) : teacherAnnouncementsQuery.isError ? (
+                <p className="reference-scope-note" role="status">
+                  Institute notices are unavailable right now.
+                </p>
+              ) : teacherNotices.length === 0 ? (
                 <p className="reference-scope-note">
-                  No saved attendance records were found for the last seven
-                  days.
+                  There are no published staff notices right now.
                 </p>
               ) : (
-                <>
-                  <div className="reference-chart-bars">
-                    {weeks.map((item) => (
-                      <div
-                        className="reference-chart-day"
-                        key={item.date}
-                        title={`${item.date}: ${item.count} records, ${item.percentage}% present`}
-                      >
-                        <div className="reference-chart-track">
-                          <span
-                            className="reference-chart-fill"
-                            style={{
-                              height: `${item.count ? Math.max(6, item.percentage) : 0}%`,
-                            }}
-                          />
-                        </div>
-                        <small>{item.label}</small>
+                <div className="teacher-notice-list">
+                  {teacherNotices.map((notice) => (
+                    <article className="teacher-notice-item" key={notice.id}>
+                      <div>
+                        <strong>{notice.title}</strong>
+                        {notice.isPinned && <span>Pinned</span>}
                       </div>
-                    ))}
-                  </div>
-                  <div className="reference-chart-summary">
-                    <span
-                      className="reference-chart-status-dot"
-                      aria-hidden="true"
-                    />
-                    Actual saved attendance ·{' '}
-                    {Math.round(
-                      (records.filter((item) => item.status === 'present')
-                        .length /
-                        records.length) *
-                        100,
-                    )}
-                    % present across {records.length} marked records
-                  </div>
-                </>
+                      <small>
+                        {new Intl.DateTimeFormat('en-PK', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        }).format(new Date(notice.publishDate))}
+                      </small>
+                      <p>{notice.content}</p>
+                    </article>
+                  ))}
+                </div>
               )}
             </section>
           </section>

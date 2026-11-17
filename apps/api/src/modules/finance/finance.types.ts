@@ -34,6 +34,7 @@ export interface FeeStructureRecord extends FeeStructureInput {
 export interface InvoiceQuery {
   campusId?: string;
   classId?: string;
+  sectionId?: string;
   studentId?: string;
   status?: InvoiceStatus;
   dateFrom?: string;
@@ -55,6 +56,7 @@ export interface StudentInvoiceRecord {
   feeStructureId: string;
   feeStructureName: string;
   classId: string;
+  sectionId?: string;
   academicYearId: string;
   campusId: string;
   organizationId: string;

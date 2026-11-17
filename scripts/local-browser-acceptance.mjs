@@ -9,7 +9,8 @@ const passwordFile = path.join(
   'password.txt',
 );
 const password =
-  process.env.DEV_TEST_PASSWORD || (await fs.readFile(passwordFile, 'utf8')).trim();
+  process.env.DEV_TEST_PASSWORD ||
+  (await fs.readFile(passwordFile, 'utf8')).trim();
 if (!password || password.length < 12) {
   throw new Error('The local QA password is missing or invalid.');
 }
@@ -21,9 +22,9 @@ const accounts = [
     expectedPath: '/admin/organizations/',
     requiredNavigation: [
       'Students',
-      'Academics & Classes',
-      'Guardians',
-      'Teachers / Staff',
+      'Curriculum',
+      'Families',
+      'Staff',
       'Attendance',
       'Finance',
       'Settings',
@@ -155,7 +156,9 @@ async function ensureAnonymous() {
   await navigate(`${baseUrl}/login`);
   // Keep the dedicated QA browser's sidebar expanded so its visible labels
   // can be asserted consistently at the desktop test viewport.
-  await evaluate('localStorage.setItem("instituteos-sidebar-collapsed", "false")');
+  await evaluate(
+    'localStorage.setItem("instituteos-sidebar-collapsed", "false")',
+  );
   const currentStatus = await evaluate(
     'fetch("/api/v1/auth/me",{credentials:"include",cache:"no-store"}).then(r=>r.status)',
   );
@@ -172,7 +175,9 @@ async function ensureAnonymous() {
       }).then((response) => response.status);
     })()`);
     if (logoutStatus !== 204) {
-      throw new Error(`Could not clear the previous test session: ${logoutStatus}`);
+      throw new Error(
+        `Could not clear the previous test session: ${logoutStatus}`,
+      );
     }
   }
   const finalStatus = await evaluate(
@@ -187,9 +192,10 @@ async function login(account) {
   await ensureAnonymous();
   await navigate(`${baseUrl}/${account.role}/login`);
   await waitFor(
-    () => evaluate(
-      'Boolean(document.querySelector("input[type=email]") && document.querySelector("input[type=password]"))',
-    ),
+    () =>
+      evaluate(
+        'Boolean(document.querySelector("input[type=email]") && document.querySelector("input[type=password]"))',
+      ),
     `${account.role} login form`,
   );
 
@@ -214,19 +220,24 @@ async function login(account) {
     return true;
   })()`);
 
-  const state = await waitFor(async () => {
-    const current = await evaluate(
-      '({path:location.pathname,body:document.body.innerText,alert:document.querySelector("[role=alert]")?.innerText||""})',
-    );
-    if (current.path.startsWith(account.expectedPath)) return current;
-    if (current.alert) {
-      throw new Error(`${account.role} login failed: ${current.alert}`);
-    }
-    return false;
-  }, `${account.role} authenticated workspace`, 40000);
+  const state = await waitFor(
+    async () => {
+      const current = await evaluate(
+        '({path:location.pathname,body:document.body.innerText,alert:document.querySelector("[role=alert]")?.innerText||""})',
+      );
+      if (current.path.startsWith(account.expectedPath)) return current;
+      if (current.alert) {
+        throw new Error(`${account.role} login failed: ${current.alert}`);
+      }
+      return false;
+    },
+    `${account.role} authenticated workspace`,
+    40000,
+  );
 
-  const workspace = await waitFor(async () => {
-    const current = await evaluate(`({
+  const workspace = await waitFor(
+    async () => {
+      const current = await evaluate(`({
       path: location.pathname,
       title: document.querySelector('main.main-content h1')?.innerText ||
         document.querySelector('main h1')?.innerText || '',
@@ -238,19 +249,29 @@ async function login(account) {
       sidebar: Boolean(document.querySelector('aside.sidebar')),
       loading: document.body.innerText.includes('Verifying your institute workspace access'),
     })`);
-    return current.sidebar && !current.loading ? current : false;
-  }, `${account.role} workspace layout`, 30000);
+      return current.sidebar && !current.loading ? current : false;
+    },
+    `${account.role} workspace layout`,
+    30000,
+  );
 
   if (account.role === 'teacher') {
     const teacherProfile = await waitFor(
-      () => evaluate(`fetch('/api/v1/organizations/' + encodeURIComponent(location.pathname.split('/')[3]) + '/attendance/teacher-profile', { credentials: 'include', cache: 'no-store' }).then(r => r.ok ? r.json() : null)`),
+      () =>
+        evaluate(
+          `fetch('/api/v1/organizations/' + encodeURIComponent(location.pathname.split('/')[3]) + '/attendance/teacher-profile', { credentials: 'include', cache: 'no-store' }).then(r => r.ok ? r.json() : null)`,
+        ),
       'Teacher profile API response',
       30000,
     );
     const expectedTeacherName = teacherProfile?.profile?.displayName;
-    if (!expectedTeacherName) throw new Error('Teacher account has no linked active staff profile.');
+    if (!expectedTeacherName)
+      throw new Error('Teacher account has no linked active staff profile.');
     await waitFor(
-      () => evaluate(`document.querySelector('main.main-content')?.innerText.includes(${JSON.stringify(expectedTeacherName)}) || document.querySelector('main')?.innerText.includes(${JSON.stringify(expectedTeacherName)})`),
+      () =>
+        evaluate(
+          `document.querySelector('main.main-content')?.innerText.includes(${JSON.stringify(expectedTeacherName)}) || document.querySelector('main')?.innerText.includes(${JSON.stringify(expectedTeacherName)})`,
+        ),
       'updated Staff profile name in Teacher dashboard',
       30000,
     );
@@ -258,17 +279,24 @@ async function login(account) {
       'document.querySelector(".topbar-user-name")?.innerText || document.querySelector(".current-user-name")?.innerText || ""',
     );
     if (workspace.user !== expectedTeacherName) {
-      throw new Error(`Teacher topbar name mismatch: expected ${expectedTeacherName}, received ${workspace.user}.`);
+      throw new Error(
+        `Teacher topbar name mismatch: expected ${expectedTeacherName}, received ${workspace.user}.`,
+      );
     }
     const teacherAssignments = await waitFor(
-      () => evaluate(`fetch('/api/v1/organizations/' + encodeURIComponent(location.pathname.split('/')[3]) + '/attendance/teacher-assignments', { credentials: 'include', cache: 'no-store' }).then(async r => { const data = r.ok ? await r.json() : null; return data?.items?.length ? data : false; })`),
+      () =>
+        evaluate(
+          `fetch('/api/v1/organizations/' + encodeURIComponent(location.pathname.split('/')[3]) + '/attendance/teacher-assignments', { credentials: 'include', cache: 'no-store' }).then(async r => { const data = r.ok ? await r.json() : null; return data?.items?.length ? data : false; })`,
+        ),
       'Teacher class/subject assignments API response',
       30000,
     );
     const assignedSections = teacherAssignments?.items ?? [];
-    if (!assignedSections.length) throw new Error('Teacher has no active class/subject assignments.');
+    if (!assignedSections.length)
+      throw new Error('Teacher has no active class/subject assignments.');
     await waitFor(
-      () => evaluate(`(() => {
+      () =>
+        evaluate(`(() => {
         const body = document.querySelector('main.main-content')?.innerText || document.querySelector('main')?.innerText || '';
         return ${JSON.stringify(assignedSections)}.every((item) => body.includes(item.className) && body.includes(item.sectionName) && (!item.subjectName || body.includes(item.subjectName)));
       })()`),
@@ -282,17 +310,23 @@ async function login(account) {
 
   if (account.role === 'parent') {
     const portalData = await waitFor(
-      () => evaluate(`fetch('/api/v1/organizations/' + encodeURIComponent(location.pathname.split('/')[3]) + '/portal/me', { credentials: 'include', cache: 'no-store' }).then(r => r.ok ? r.json() : null)`),
+      () =>
+        evaluate(
+          `fetch('/api/v1/organizations/' + encodeURIComponent(location.pathname.split('/')[3]) + '/portal/me', { credentials: 'include', cache: 'no-store' }).then(r => r.ok ? r.json() : null)`,
+        ),
       'Parent linked-family API response',
       30000,
     );
     const expectedParentName = portalData?.guardian?.displayName;
     const linkedChildren = portalData?.students ?? [];
     if (!expectedParentName || linkedChildren.length === 0) {
-      throw new Error('Parent guardian profile or linked children are missing in the database response.');
+      throw new Error(
+        'Parent guardian profile or linked children are missing in the database response.',
+      );
     }
     await waitFor(
-      () => evaluate(`(() => {
+      () =>
+        evaluate(`(() => {
         const body = document.querySelector('main.main-content')?.innerText || document.querySelector('main')?.innerText || '';
         const linkedList = document.querySelector('section[aria-label="All linked children"]');
         return body.includes(${JSON.stringify(expectedParentName)}) &&
@@ -308,7 +342,9 @@ async function login(account) {
       'document.querySelector(".topbar-user-name")?.innerText || document.querySelector(".current-user-name")?.innerText || ""',
     );
     if (workspace.user !== expectedParentName) {
-      throw new Error(`Parent topbar name mismatch: expected ${expectedParentName}, received ${workspace.user}.`);
+      throw new Error(
+        `Parent topbar name mismatch: expected ${expectedParentName}, received ${workspace.user}.`,
+      );
     }
     workspace.title = await evaluate(
       'document.querySelector("main.main-content h1")?.innerText || document.querySelector("main h1")?.innerText || ""',
@@ -316,7 +352,8 @@ async function login(account) {
     workspace.body = await evaluate(
       'document.querySelector("main.main-content")?.innerText?.slice(0,2200) || ""',
     );
-    if (!workspace.title) throw new Error('Parent portal did not render its page heading.');
+    if (!workspace.title)
+      throw new Error('Parent portal did not render its page heading.');
   }
   const missing = account.requiredNavigation.filter(
     (label) => !workspace.navigation.includes(label),
@@ -328,7 +365,8 @@ async function login(account) {
   }
 
   const orgId = state.path.split('/')[3];
-  if (!orgId) throw new Error(`${account.role} organization ID missing in route.`);
+  if (!orgId)
+    throw new Error(`${account.role} organization ID missing in route.`);
 
   const screenshot = await cdp('Page.captureScreenshot', {
     format: 'png',
@@ -348,7 +386,10 @@ async function login(account) {
   // A hard refresh must restore the same cookie-backed account and workspace.
   await cdp('Page.reload', { ignoreCache: true });
   await waitFor(
-    () => evaluate(`location.pathname.startsWith(${JSON.stringify(account.expectedPath)})`),
+    () =>
+      evaluate(
+        `location.pathname.startsWith(${JSON.stringify(account.expectedPath)})`,
+      ),
     `${account.role} session after refresh`,
     30000,
   );
@@ -373,21 +414,32 @@ async function login(account) {
       ? `${baseUrl}/teacher/organizations/${orgId}`
       : `${baseUrl}/admin/organizations/${orgId}`;
   const expectedGuardPath =
-    account.role === 'admin'
-      ? '/admin/organizations/'
-      : account.expectedPath;
+    account.role === 'admin' ? '/admin/organizations/' : account.expectedPath;
   await navigate(protectedAttempt);
   await waitFor(
-    () => evaluate(`location.pathname.startsWith(${JSON.stringify(expectedGuardPath)})`),
+    () =>
+      evaluate(
+        `location.pathname.startsWith(${JSON.stringify(expectedGuardPath)})`,
+      ),
     `${account.role} role guard`,
     30000,
   );
   const guarded = await evaluate('({path:location.pathname})');
-  if (account.role !== 'admin' && guarded.path.startsWith('/admin/organizations/')) {
-    throw new Error(`${account.role} was not blocked from the Admin workspace.`);
+  if (
+    account.role !== 'admin' &&
+    guarded.path.startsWith('/admin/organizations/')
+  ) {
+    throw new Error(
+      `${account.role} was not blocked from the Admin workspace.`,
+    );
   }
-  if (account.role === 'admin' && guarded.path.startsWith('/teacher/organizations/')) {
-    throw new Error('Admin was incorrectly redirected into the Teacher workspace.');
+  if (
+    account.role === 'admin' &&
+    guarded.path.startsWith('/teacher/organizations/')
+  ) {
+    throw new Error(
+      'Admin was incorrectly redirected into the Teacher workspace.',
+    );
   }
 
   // Return to this account's own route and sign out using the actual UI button.
@@ -396,6 +448,38 @@ async function login(account) {
     () => evaluate('Boolean(document.querySelector("button.sign-out-button"))'),
     `${account.role} sign-out control`,
   );
+
+  let multiTabSessionCheck = null;
+  if (account.role === 'admin') {
+    const openedSecondTab = await evaluate(`(() => {
+      const tab = window.open(location.href, '_blank');
+      window.__instituteosQaSecondTab = tab;
+      return Boolean(tab);
+    })()`);
+    if (!openedSecondTab) {
+      throw new Error('Could not open the second QA browser tab.');
+    }
+    await waitFor(
+      () =>
+        evaluate(`(() => {
+        const tab = window.__instituteosQaSecondTab;
+        return Boolean(tab && !tab.closed &&
+          tab.location.pathname.startsWith(${JSON.stringify(account.expectedPath)}) &&
+          tab.document.querySelector('aside.sidebar'));
+      })()`),
+      'second tab authenticated workspace',
+      30000,
+    );
+    const secondTabSessionStatus = await evaluate(
+      `window.__instituteosQaSecondTab.fetch('/api/v1/auth/me', { credentials: 'include', cache: 'no-store' }).then(r => r.status)`,
+    );
+    if (secondTabSessionStatus !== 200) {
+      throw new Error(
+        `Second tab did not share the authenticated session: ${secondTabSessionStatus}`,
+      );
+    }
+    multiTabSessionCheck = { secondTabSessionBeforeLogout: true };
+  }
   await evaluate(`(() => {
     const button = [...document.querySelectorAll('button.sign-out-button')]
       .find((item) => item.getClientRects().length > 0);
@@ -417,6 +501,36 @@ async function login(account) {
     );
   }
 
+  if (account.role === 'admin') {
+    await waitFor(
+      () =>
+        evaluate(`(() => {
+        const tab = window.__instituteosQaSecondTab;
+        return Boolean(tab && !tab.closed && tab.location.pathname === '/login' &&
+          !tab.document.querySelector('aside.sidebar'));
+      })()`),
+      'second tab logout synchronization',
+      15000,
+    );
+    const secondTabLogoutStatus = await evaluate(
+      `window.__instituteosQaSecondTab.fetch('/api/v1/auth/me', { credentials: 'include', cache: 'no-store' }).then(r => r.status)`,
+    );
+    if (secondTabLogoutStatus !== 401) {
+      throw new Error(
+        `Second tab retained an invalidated session: ${secondTabLogoutStatus}`,
+      );
+    }
+    multiTabSessionCheck = {
+      secondTabSessionBeforeLogout: true,
+      secondTabRedirectedToLogin: true,
+      secondTabAuthMeAfterLogout: secondTabLogoutStatus,
+    };
+    await evaluate(`(() => {
+      window.__instituteosQaSecondTab.close();
+      delete window.__instituteosQaSecondTab;
+    })()`);
+  }
+
   return {
     role: account.role,
     email: account.email,
@@ -427,6 +541,7 @@ async function login(account) {
     refreshRestoredSession: true,
     roleGuardPassed: true,
     logoutInvalidatedSession: true,
+    multiTabSessionCheck,
     screenshotPath,
     organizationId: orgId,
   };
@@ -439,15 +554,14 @@ try {
   const selectedAccounts = process.env.ONLY_ROLE
     ? accounts.filter((account) => account.role === process.env.ONLY_ROLE)
     : accounts;
-  if (!selectedAccounts.length) throw new Error('ONLY_ROLE did not match a known role.');
+  if (!selectedAccounts.length)
+    throw new Error('ONLY_ROLE did not match a known role.');
   const results = [];
   for (const account of selectedAccounts) {
     results.push(await login(account));
   }
 
-  const failedApiResponses = apiResponses.filter(
-    (item) => item.status >= 500,
-  );
+  const failedApiResponses = apiResponses.filter((item) => item.status >= 500);
   const report = {
     browser: 'Chrome via local DevTools Protocol',
     origin: baseUrl,

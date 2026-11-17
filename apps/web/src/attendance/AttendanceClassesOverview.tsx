@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { paginateItems } from './attendance-utils.js';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/ui/Button.js';
 import {
@@ -55,6 +56,23 @@ function localDateLabel(value: string) {
   }).format(new Date(`${value}T12:00:00`));
 }
 
+function periodRange(date: string, period: 'week' | 'month') {
+  const anchor = new Date(`${date}T00:00:00`);
+  const key = (value: Date) =>
+    `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  if (period === 'week') {
+    const from = new Date(anchor);
+    from.setDate(anchor.getDate() - ((anchor.getDay() + 6) % 7));
+    const to = new Date(from);
+    to.setDate(from.getDate() + 6);
+    return { dateFrom: key(from), dateTo: key(to) };
+  }
+  return {
+    dateFrom: key(new Date(anchor.getFullYear(), anchor.getMonth(), 1)),
+    dateTo: key(new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0)),
+  };
+}
+
 export function AttendanceClassesOverview({
   organizationId,
   campusId,
@@ -68,6 +86,8 @@ export function AttendanceClassesOverview({
 }: Props) {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<RegisterFilter>('All');
+  const [period, setPeriod] = useState<'week' | 'month'>('month');
+  const range = useMemo(() => periodRange(date, period), [date, period]);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const pageSize = 6;
@@ -98,8 +118,30 @@ export function AttendanceClassesOverview({
     enabled: Boolean(organizationId && campusId && date),
   });
 
+  const historyQuery = useQuery({
+    queryKey: [
+      'attendance',
+      organizationId,
+      'class-period-summary',
+      campusId,
+      academicYearId,
+      period,
+      range.dateFrom,
+      range.dateTo,
+    ],
+    queryFn: () =>
+      listStudentAttendance(organizationId, {
+        dateFrom: range.dateFrom,
+        dateTo: range.dateTo,
+        campusId,
+        academicYearId,
+      }),
+    enabled: Boolean(organizationId && campusId && academicYearId),
+  });
+
   const sectionTotals = summaryQuery.data?.summary.bySection ?? [];
   const dailyRecords = dailyQuery.data?.items ?? [];
+  const historyRecords = historyQuery.data?.items ?? [];
   const cards = useMemo(
     () =>
       sections.map((section) => {
@@ -120,6 +162,20 @@ export function AttendanceClassesOverview({
           ]),
         ) as Record<StudentAttendanceStatus, number>;
         const marked = records.length;
+        const periodRecords = historyRecords.filter(
+          (item) => item.sectionId === section.id,
+        );
+        const periodCounts = Object.fromEntries(
+          statuses.map((status) => [
+            status,
+            periodRecords.filter((item) => item.status === status).length,
+          ]),
+        ) as Record<StudentAttendanceStatus, number>;
+        const periodRecorded = periodRecords.length;
+        const attended = periodCounts.present + periodCounts.late;
+        const attendanceRate = periodRecorded
+          ? Math.round((attended / periodRecorded) * 100)
+          : null;
         const status: RegisterFilter =
           total > 0 && marked >= total
             ? 'Marked'
@@ -134,13 +190,23 @@ export function AttendanceClassesOverview({
           total,
           marked,
           counts,
+          periodCounts,
+          periodRecorded,
+          attendanceRate,
           status,
           percent: total
             ? Math.min(100, Math.round((marked / total) * 100))
             : 0,
         };
       }),
-    [sections, classes, sectionTotals, dailyRecords, academicYearId],
+    [
+      sections,
+      classes,
+      sectionTotals,
+      dailyRecords,
+      historyRecords,
+      academicYearId,
+    ],
   );
 
   const filteredCards = cards.filter((card) => {
@@ -154,11 +220,13 @@ export function AttendanceClassesOverview({
     return matchesFilter && matchesSearch;
   });
 
-  const pageCount = Math.max(1, Math.ceil(filteredCards.length / pageSize));
-  const visibleCards = filteredCards.slice(
-    (page - 1) * pageSize,
-    page * pageSize,
-  );
+  const {
+    items: visibleCards,
+    pageCount,
+    currentPage,
+    start: pageStart,
+    end: pageEnd,
+  } = paginateItems(filteredCards, page, pageSize);
 
   const totals = cards.reduce(
     (result, card) => ({
@@ -171,7 +239,19 @@ export function AttendanceClassesOverview({
     }),
     { students: 0, marked: 0, present: 0, absent: 0, late: 0, leave: 0 },
   );
+  const periodTotals = cards.reduce(
+    (result, card) => ({
+      recorded: result.recorded + card.periodRecorded,
+      present: result.present + card.periodCounts.present,
+      absent: result.absent + card.periodCounts.absent,
+      late: result.late + card.periodCounts.late,
+      leave: result.leave + card.periodCounts.leave,
+    }),
+    { recorded: 0, present: 0, absent: 0, late: 0, leave: 0 },
+  );
+
   const fullyMarked = cards.filter((card) => card.status === 'Marked').length;
+  const totalClasses = new Set(cards.map((card) => card.classId)).size;
   const filterCounts: Record<RegisterFilter, number> = {
     All: cards.length,
     'Not marked': cards.filter((card) => card.status === 'Not marked').length,
@@ -232,21 +312,32 @@ export function AttendanceClassesOverview({
     }
   }
 
-  if (summaryQuery.isPending || dailyQuery.isPending) {
+  if (
+    summaryQuery.isPending ||
+    dailyQuery.isPending ||
+    historyQuery.isPending
+  ) {
     return <LoadingState message="Loading class attendance overview..." />;
   }
-  if (summaryQuery.isError || dailyQuery.isError) {
+  if (summaryQuery.isError || dailyQuery.isError || historyQuery.isError) {
     return (
       <ErrorState
         title="Class attendance overview unavailable"
         description={
-          (summaryQuery.error ?? dailyQuery.error) instanceof Error
-            ? (summaryQuery.error ?? (dailyQuery.error as Error)).message
+          (summaryQuery.error ??
+            dailyQuery.error ??
+            historyQuery.error) instanceof Error
+            ? (
+                summaryQuery.error ??
+                dailyQuery.error ??
+                (historyQuery.error as Error)
+              ).message
             : 'Attendance data could not be loaded.'
         }
         onRetry={() => {
           void summaryQuery.refetch();
           void dailyQuery.refetch();
+          void historyQuery.refetch();
         }}
       />
     );
@@ -255,7 +346,7 @@ export function AttendanceClassesOverview({
     return (
       <EmptyState
         title="No class sections available"
-        description="Create classes and sections in Academics before taking attendance."
+        description="Add classes and sections in Academics to start taking attendance."
       />
     );
   }
@@ -265,34 +356,54 @@ export function AttendanceClassesOverview({
       className="attendance-classes-overview"
       data-testid="attendance-classes-overview"
     >
-      <div className="attendance-classes-stats">
-        <article className="attendance-classes-stat">
-          <span>Registers Marked</span>
-          <strong>
-            {fullyMarked} <small>/ {cards.length}</small>
-          </strong>
-          <p>Classes fully marked</p>
-        </article>
-        <article className="attendance-classes-stat">
-          <span>Students Marked</span>
-          <strong>
-            {totals.marked} <small>/ {totals.students}</small>
-          </strong>
-          <p>Attendance records saved</p>
-        </article>
-        <article className="attendance-classes-stat">
-          <span>Present</span>
-          <strong>{totals.present}</strong>
-          <p>
-            {totals.late} late · {totals.leave} on leave
-          </p>
-        </article>
-        <article className="attendance-classes-stat">
-          <span>Absent</span>
-          <strong>{totals.absent}</strong>
-          <p>Needs follow-up</p>
-        </article>
-      </div>
+      <section
+        className="attendance-classes-summary"
+        aria-label="Attendance summary"
+      >
+        <div className="attendance-classes-summary-heading">
+          <div>
+            <h2>Attendance summary</h2>
+            <p>
+              {period === 'week' ? 'This week' : 'This month'} ·{' '}
+              {periodTotals.recorded} recorded entries
+            </p>
+          </div>
+          <span>
+            {totalClasses} {totalClasses === 1 ? 'class' : 'classes'} ·{' '}
+            {cards.length} sections · {totals.students} students
+          </span>
+        </div>
+        <div className="attendance-classes-stats">
+          {(
+            [
+              {
+                status: 'present',
+                label: 'Present',
+                count: periodTotals.present,
+              },
+              { status: 'absent', label: 'Absent', count: periodTotals.absent },
+              { status: 'late', label: 'Late', count: periodTotals.late },
+              { status: 'leave', label: 'Leave', count: periodTotals.leave },
+            ] as const
+          ).map((item) => (
+            <article
+              className={`attendance-classes-stat attendance-classes-stat--${item.status}`}
+              key={item.status}
+            >
+              <span className="attendance-classes-stat-label">
+                <span aria-hidden="true" />
+                {item.label}
+              </span>
+              <strong>{item.count}</strong>
+              <p>
+                {periodTotals.recorded
+                  ? `${Math.round((item.count / periodTotals.recorded) * 100)}% of recorded entries`
+                  : 'No records in this period'}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <section
         className="attendance-classes-filter-panel"
@@ -308,9 +419,22 @@ export function AttendanceClassesOverview({
               value={date}
             />
           </label>
+          <label className="attendance-classes-period">
+            <span>Summary period</span>
+            <select
+              aria-label="Attendance summary period"
+              value={period}
+              onChange={(event) =>
+                setPeriod(event.target.value as 'week' | 'month')
+              }
+            >
+              <option value="week">This week</option>
+              <option value="month">This month</option>
+            </select>
+          </label>
           <div className="attendance-classes-search-row">
             <label className="attendance-classes-search">
-              <span className="sr-only">Search classes and sections</span>
+              <span>Search classes</span>
               <input
                 aria-label="Search classes and sections"
                 onChange={(event) => {
@@ -349,33 +473,30 @@ export function AttendanceClassesOverview({
         className="attendance-classes-list-panel"
         aria-label="Class registers"
       >
-        <div
-          className="attendance-classes-chips"
-          aria-label="Register status filter"
-        >
-          {(
-            ['All', 'Not marked', 'Partly marked', 'Marked'] as RegisterFilter[]
-          ).map((item) => (
-            <button
-              aria-pressed={filter === item}
-              className={filter === item ? 'is-active' : ''}
-              key={item}
-              onClick={() => {
-                setFilter(item);
-                setPage(1);
-              }}
-              type="button"
-            >
-              {item === 'All' ? 'All Students' : item}{' '}
-              <span>{filterCounts[item]}</span>
-            </button>
-          ))}
-        </div>
+        <label className="attendance-classes-status-filter">
+          <span>Attendance status</span>
+          <select
+            aria-label="Attendance status"
+            onChange={(event) => {
+              setFilter(event.target.value as RegisterFilter);
+              setPage(1);
+            }}
+            value={filter}
+          >
+            <option value="All">All Students ({filterCounts.All})</option>
+            <option value="Not marked">
+              Not marked ({filterCounts['Not marked']})
+            </option>
+            <option value="Partly marked">
+              Partly marked ({filterCounts['Partly marked']})
+            </option>
+            <option value="Marked">Marked ({filterCounts.Marked})</option>
+          </select>
+        </label>
         <div className="attendance-classes-list-toolbar">
           <div className="attendance-classes-results" aria-live="polite">
-            Showing {filteredCards.length === 0 ? 0 : (page - 1) * pageSize + 1}{' '}
-            to {Math.min(page * pageSize, filteredCards.length)} of{' '}
-            {filteredCards.length} class sections
+            Showing {pageStart + (filteredCards.length > 0 ? 1 : 0)} to{' '}
+            {pageEnd} of {filteredCards.length} class sections
           </div>
           {canWrite && (
             <Button disabled={bulkSaving} onClick={() => void markAllPresent()}>
@@ -396,7 +517,10 @@ export function AttendanceClassesOverview({
                   <h3>
                     {card.className} <span>· Sec {card.sectionName}</span>
                   </h3>
-                  <p>{card.total} students enrolled</p>
+                  <p>
+                    {card.total} students enrolled · {card.periodRecorded}{' '}
+                    records
+                  </p>
                 </div>
                 <span
                   className={`attendance-class-status attendance-class-status-${card.status.toLowerCase().replaceAll(' ', '-')}`}
@@ -406,21 +530,25 @@ export function AttendanceClassesOverview({
               </div>
               <div className="attendance-class-progress">
                 <div>
-                  <strong>
-                    {card.marked} of {card.total} marked
-                  </strong>
-                  <span>{card.percent}%</span>
+                  <strong>Attendance rate</strong>
+                  <span>
+                    {card.attendanceRate === null
+                      ? '—'
+                      : `${card.attendanceRate}%`}
+                  </span>
                 </div>
                 <div className="attendance-class-progress-track">
-                  <span style={{ width: `${card.percent}%` }} />
+                  <span style={{ width: `${card.attendanceRate ?? 0}%` }} />
                 </div>
               </div>
               <div className="attendance-class-counts">
-                <span className="is-present">P: {card.counts.present}</span>
-                <span className="is-absent">A: {card.counts.absent}</span>
-                <span className="is-late">L: {card.counts.late}</span>
+                <span className="is-present">
+                  P: {card.periodCounts.present}
+                </span>
+                <span className="is-absent">A: {card.periodCounts.absent}</span>
+                <span className="is-late">L: {card.periodCounts.late}</span>
                 <span className="is-leave" title="LV = Leave">
-                  LV: {card.counts.leave}
+                  LV: {card.periodCounts.leave}
                 </span>
               </div>
               <Button
@@ -435,7 +563,7 @@ export function AttendanceClassesOverview({
           ))}
           {filteredCards.length === 0 && (
             <div className="attendance-classes-empty">
-              <strong>No classes match this filter.</strong>
+              <strong>No class sections match these filters.</strong>
               <button
                 onClick={() => {
                   setFilter('All');
@@ -454,23 +582,21 @@ export function AttendanceClassesOverview({
           aria-label="Class register pages"
         >
           <span>
-            Page {page} of {pageCount}
+            Page {currentPage} of {pageCount}
           </span>
           <div>
             <button
               aria-label="Previous page"
-              disabled={page <= 1}
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={currentPage <= 1}
+              onClick={() => setPage(currentPage - 1)}
               type="button"
             >
               <span aria-hidden="true">‹</span>
             </button>
             <button
               aria-label="Next page"
-              disabled={page >= pageCount}
-              onClick={() =>
-                setPage((current) => Math.min(pageCount, current + 1))
-              }
+              disabled={currentPage >= pageCount}
+              onClick={() => setPage(currentPage + 1)}
               type="button"
             >
               <span aria-hidden="true">›</span>

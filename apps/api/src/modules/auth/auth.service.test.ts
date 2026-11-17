@@ -68,6 +68,27 @@ describe('authentication service', () => {
     });
   });
 
+  it('rejects an expired session before the MongoDB TTL cleanup runs', async () => {
+    let now = new Date('2026-01-01T00:00:00.000Z');
+    const { service } = makeService(
+      false,
+      new MemoryAuthEmailDelivery(),
+      () => now,
+    );
+    await service.register({
+      email: 'person@example.test',
+      displayName: 'User',
+      password: 'a long test password',
+    });
+    const signedIn = await service.login(
+      'person@example.test',
+      'a long test password',
+    );
+
+    now = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000 + 1);
+    expect(await service.authenticate(signedIn.sessionToken)).toBeNull();
+  });
+
   it('verifies an email using a one-time token and activates the account', async () => {
     const { service, repository, emailDelivery } = makeService(true);
     const registration = await service.register({
@@ -201,5 +222,11 @@ describe('authentication service', () => {
     );
     expect(await service.authenticate(earlier.sessionToken)).toBeNull();
     expect(await service.authenticate(changed.sessionToken)).not.toBeNull();
+    await expect(
+      service.login('person@example.test', 'a long test password'),
+    ).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS' });
+    await expect(
+      service.login('person@example.test', 'a different new password'),
+    ).resolves.toMatchObject({ user: { email: 'person@example.test' } });
   });
 });

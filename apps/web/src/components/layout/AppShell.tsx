@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { LucideIcon } from 'lucide-react';
 import {
   ArrowUpRight,
   BarChart3,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   BookOpenText,
   ClipboardCheck,
   ClipboardList,
@@ -14,17 +12,21 @@ import {
   GraduationCap,
   LayoutDashboard,
   Menu,
+  PanelLeftClose,
   Megaphone,
+  MessageSquare,
+  Bell,
+  Building2,
   Plus,
   ReceiptText,
   Search,
   Settings2,
-  ShieldCheck,
   Users,
   UserCheck,
   UserPlus,
   WalletCards,
   X,
+  CircleUserRound,
 } from 'lucide-react';
 import {
   Link,
@@ -40,6 +42,7 @@ import type { RoleLayoutConfig } from '../../layouts/layoutTypes.js';
 import { useAuth } from '../../auth/AuthProvider.js';
 import { ApiError } from '../../api/client.js';
 import { getOrganizationAccessContext } from '../../tenancy/tenancy-api.js';
+import { getOrganizationProfile } from '../../organizations/organizations-api.js';
 import { getTeacherProfile } from '../../attendance/attendance-api.js';
 import { getPortalMe } from '../../pages/portal-api.js';
 import { getRoleLayout } from '../../layouts/layoutTypes.js';
@@ -48,7 +51,6 @@ import {
   LoadingState,
   PermissionDeniedState,
 } from '../ui/States.js';
-import { Button } from '../ui/Button.js';
 
 interface NavigationItem {
   label: string;
@@ -57,6 +59,81 @@ interface NavigationItem {
   end?: boolean;
   queryTab?: string;
   children?: NavigationItem[];
+}
+
+const ADMIN_NAVIGATION_PERMISSIONS: Record<string, readonly string[]> = {
+  Admission: ['admission.read', 'admission.create'],
+  'Enroll Student': ['admission.create'],
+  'Promote Students': ['student.update'],
+  Students: ['student.read'],
+  Families: ['guardian.read'],
+  Curriculum: ['academics.read'],
+  Sessions: ['academics.read'],
+  Sections: ['academics.read'],
+  Subjects: ['academics.read'],
+  Timetable: ['academics.read'],
+  Staff: ['staff.read', 'staff.create', 'staff.update'],
+  'Add Staff': ['staff.create'],
+  'All Staff': ['staff.read'],
+  'Staff Setup': ['staff.read'],
+  Attendance: ['attendance.read'],
+  Classes: ['attendance.read', 'academics.read'],
+  'Attendance Settings': ['attendance.read'],
+  Tests: ['examination.read'],
+  Exam: ['examination.read'],
+  Overview: ['examination.read'],
+  Exams: ['examination.read'],
+  Schedule: ['examination.read'],
+  Marks: ['examination.read'],
+  Results: ['examination.read'],
+  'Events & Holidays': ['examination.read'],
+  Finance: ['finance.read'],
+  'Financial Overview': ['finance.read'],
+  'Fee Operations': ['finance.read'],
+  'Payments & Receipts': ['finance.read'],
+  'Expense Management': ['finance.read'],
+  'Payroll & Salaries': ['finance.read'],
+  'Accounts & Ledger': ['finance.read'],
+  Messages: ['communication.read'],
+  Announcements: ['communication.read'],
+  'Import & Export': ['reporting.read'],
+  Organization: [
+    'organization.read',
+    'campus.read',
+    'member.read',
+    'member.manage',
+    'member.invite',
+  ],
+  'Organization Profile': ['organization.read'],
+  Campuses: ['campus.read'],
+  Members: ['member.read'],
+  Invitations: ['member.manage'],
+};
+
+function filterAdminNavigationItems(
+  items: NavigationItem[],
+  permissions: readonly string[],
+): NavigationItem[] {
+  const granted = new Set(permissions);
+  const canSee = (label: string, parentLabel?: string) => {
+    if (parentLabel === 'Attendance' && label === 'Staff')
+      return granted.has('staff.read') && granted.has('attendance.read');
+    const required =
+      parentLabel === 'Attendance' && label === 'Students'
+        ? ['attendance.read']
+        : parentLabel === 'Curriculum' && label === 'Classes'
+          ? ['academics.read']
+          : ADMIN_NAVIGATION_PERMISSIONS[label];
+    return !required || required.some((permission) => granted.has(permission));
+  };
+
+  return items.flatMap((item) => {
+    if (!item.children) return canSee(item.label) ? [item] : [];
+    const children = item.children.filter((child) =>
+      canSee(child.label, item.label),
+    );
+    return children.length ? [{ ...item, children }] : [];
+  });
 }
 
 const previewRoleOptions = [
@@ -121,69 +198,218 @@ function getNavigationItems(
         { label: 'Families', to: base + '/families', icon: UserCheck },
         { label: 'Staff', to: base + '/staff', icon: GraduationCap },
         {
-        label: 'Attendance',
-        to: base + '/attendance',
-        icon: ClipboardCheck,
-        children: [
-          { label: 'Classes', to: base + '/attendance', icon: GraduationCap, end: true },
-          { label: 'Students', to: base + '/attendance?tab=students', icon: Users },
-          { label: 'Staff', to: base + '/attendance?tab=staff', icon: UserCheck },
-          { label: 'Attendance Settings', to: base + '/attendance?tab=settings', icon: Settings2 },
-        ],
-      },
+          label: 'Attendance',
+          to: base + '/attendance',
+          icon: ClipboardCheck,
+          children: [
+            {
+              label: 'Classes',
+              to: base + '/attendance',
+              icon: GraduationCap,
+              queryTab: 'classes',
+              end: true,
+            },
+            {
+              label: 'Students',
+              to: base + '/attendance?tab=students',
+              queryTab: 'students',
+              icon: Users,
+            },
+            {
+              label: 'Staff',
+              to: base + '/attendance?tab=staff',
+              queryTab: 'staff',
+              icon: UserCheck,
+            },
+            {
+              label: 'Attendance Settings',
+              to: base + '/attendance?tab=settings',
+              queryTab: 'settings',
+              icon: Settings2,
+            },
+          ],
+        },
         {
           label: 'Homework & Tests',
           to: base + '/homework',
           icon: BookOpenText,
         },
         { label: 'Admissions', to: base + '/admissions', icon: UserPlus },
-        { label: 'Finance', to: base + '/finance', icon: WalletCards },
-        { label: 'Concessions', to: base + '/concessions', icon: ReceiptText },
-        { label: 'Messages', to: base + '/communications', icon: Megaphone },
-        { label: 'Reports & Export', to: base + '/reports', icon: BarChart3 },
-        { label: 'Settings', to: base + '/settings', icon: Settings2 },
+        {
+          label: 'Finance',
+          to: base + '/finance',
+          icon: WalletCards,
+          children: [
+            {
+              label: 'Financial Overview',
+              to: base + '/finance?tab=overview',
+              queryTab: 'overview',
+              icon: LayoutDashboard,
+            },
+            {
+              label: 'Fee Operations',
+              to: base + '/finance?tab=fees',
+              queryTab: 'fees',
+              icon: ReceiptText,
+            },
+            {
+              label: 'Payments & Receipts',
+              to: base + '/finance?tab=payments',
+              queryTab: 'payments',
+              icon: WalletCards,
+            },
+            {
+              label: 'Expense Management',
+              to: base + '/finance?tab=expenses',
+              queryTab: 'expenses',
+              icon: ClipboardList,
+            },
+            {
+              label: 'Payroll & Salaries',
+              to: base + '/payroll',
+              icon: Users,
+            },
+            {
+              label: 'Accounts & Ledger',
+              to: base + '/finance?tab=accounts',
+              queryTab: 'accounts',
+              icon: BarChart3,
+            },
+          ],
+        },
+        {
+          label: 'Messages',
+          to: base + '/communications/messages',
+          icon: MessageSquare,
+        },
+        {
+          label: 'Announcements',
+          to: base + '/communications/announcements',
+          icon: Bell,
+        },
+        { label: 'Import & Export', to: base + '/reports', icon: BarChart3 },
+        {
+          label: 'Settings',
+          to: base + '/settings?tab=notifications',
+          icon: Settings2,
+          children: [
+            {
+              label: 'Notifications',
+              to: base + '/settings?tab=notifications',
+              icon: Bell,
+              queryTab: 'notifications',
+            },
+            {
+              label: 'My Profile',
+              to: base + '/settings?tab=my-profile',
+              icon: UserCheck,
+              queryTab: 'my-profile',
+            },
+          ],
+        },
       );
     } else if (role.key === 'teacher') {
       items.push(
         { label: 'Students', to: base + '/students', icon: Users },
         {
-        label: 'Attendance',
-        to: base + '/attendance',
-        icon: ClipboardCheck,
-        children: [
-          { label: 'Classes', to: base + '/attendance', icon: GraduationCap, end: true },
-          { label: 'Students', to: base + '/attendance?tab=students', icon: Users },
-          { label: 'Staff', to: base + '/attendance?tab=staff', icon: UserCheck },
-          { label: 'Attendance Settings', to: base + '/attendance?tab=settings', icon: Settings2 },
-        ],
-      },
+          label: 'Attendance',
+          to: base + '/attendance',
+          icon: ClipboardCheck,
+          children: [
+            {
+              label: 'Classes',
+              to: base + '/attendance',
+              icon: GraduationCap,
+              queryTab: 'classes',
+              end: true,
+            },
+            {
+              label: 'Students',
+              to: base + '/attendance?tab=students',
+              queryTab: 'students',
+              icon: Users,
+            },
+            {
+              label: 'Staff',
+              to: base + '/attendance?tab=staff',
+              queryTab: 'staff',
+              icon: UserCheck,
+            },
+            {
+              label: 'Attendance Settings',
+              to: base + '/attendance?tab=settings',
+              queryTab: 'settings',
+              icon: Settings2,
+            },
+          ],
+        },
         {
           label: 'Homework & Tests',
           to: base + '/homework',
           icon: BookOpenText,
         },
-        { label: 'Messages', to: base + '/communications', icon: Megaphone },
-        { label: 'Reports & Export', to: base + '/reports', icon: BarChart3 },
+        {
+          label: 'Messages',
+          to: base + '/communications/messages',
+          icon: MessageSquare,
+        },
+        { label: 'Import & Export', to: base + '/reports', icon: BarChart3 },
         { label: 'Settings', to: base + '/settings', icon: Settings2 },
       );
     } else if (role.key === 'accountant') {
       items.push(
         { label: 'Students', to: base + '/students', icon: Users },
-        { label: 'Finance', to: base + '/finance', icon: WalletCards },
-        { label: 'Concessions', to: base + '/concessions', icon: ReceiptText },
-        { label: 'Reports & Export', to: base + '/reports', icon: BarChart3 },
+        {
+          label: 'Finance',
+          to: base + '/finance',
+          icon: WalletCards,
+          children: [
+            {
+              label: 'Financial Overview',
+              to: base + '/finance?tab=overview',
+              queryTab: 'overview',
+              icon: LayoutDashboard,
+            },
+            {
+              label: 'Fee Operations',
+              to: base + '/finance?tab=fees',
+              queryTab: 'fees',
+              icon: ReceiptText,
+            },
+            {
+              label: 'Payments & Receipts',
+              to: base + '/finance?tab=payments',
+              queryTab: 'payments',
+              icon: WalletCards,
+            },
+            {
+              label: 'Expense Management',
+              to: base + '/finance?tab=expenses',
+              queryTab: 'expenses',
+              icon: ClipboardList,
+            },
+            {
+              label: 'Payroll & Salaries',
+              to: base + '/payroll',
+              icon: Users,
+            },
+            {
+              label: 'Accounts & Ledger',
+              to: base + '/finance?tab=accounts',
+              queryTab: 'accounts',
+              icon: BarChart3,
+            },
+          ],
+        },
+        { label: 'Import & Export', to: base + '/reports', icon: BarChart3 },
         { label: 'Settings', to: base + '/settings', icon: Settings2 },
       );
     } else if (role.key === 'parent') {
       items.push(
-        { label: 'Students', to: base + '/students', icon: Users },
         { label: 'Attendance', to: base + '/attendance', icon: ClipboardCheck },
-        {
-          label: 'Homework & Tests',
-          to: base + '/homework',
-          icon: BookOpenText,
-        },
         { label: 'Fees & receipts', to: base + '/fees', icon: WalletCards },
+        { label: 'Daily Diary', to: base + '/homework', icon: BookOpenText },
+        { label: 'Results', to: base + '/results', icon: ClipboardList },
         { label: 'Messages', to: base + '/messages', icon: Megaphone },
         { label: 'Settings', to: base + '/settings', icon: Settings2 },
       );
@@ -278,62 +504,252 @@ function getNavigationItems(
         to: base + '/attendance',
         icon: ClipboardCheck,
         children: [
-          { label: 'Classes', to: base + '/attendance', icon: GraduationCap, end: true },
-          { label: 'Students', to: base + '/attendance?tab=students', icon: Users },
-          { label: 'Staff', to: base + '/attendance?tab=staff', icon: UserCheck },
-          { label: 'Attendance Settings', to: base + '/attendance?tab=settings', icon: Settings2 },
+          {
+            label: 'Classes',
+            to: base + '/attendance',
+            icon: GraduationCap,
+            queryTab: 'classes',
+            end: true,
+          },
+          {
+            label: 'Students',
+            to: base + '/attendance?tab=students',
+            queryTab: 'students',
+            icon: Users,
+          },
+          {
+            label: 'Staff',
+            to: base + '/attendance?tab=staff',
+            queryTab: 'staff',
+            icon: UserCheck,
+          },
+          {
+            label: 'Attendance Settings',
+            to: base + '/attendance?tab=settings',
+            queryTab: 'settings',
+            icon: Settings2,
+          },
         ],
       },
       {
-        label: 'Homework & Tests',
+        label: 'Tests',
         to: base + '/homework-tests',
         icon: BookOpenText,
       },
       {
-        label: 'Examinations',
+        label: 'Exam',
         to: base + '/examinations',
         icon: ClipboardList,
+        children: [
+          {
+            label: 'Overview',
+            to: base + '/examinations?tab=exam-overview',
+            queryTab: 'exam-overview',
+            icon: LayoutDashboard,
+          },
+          {
+            label: 'Exams',
+            to: base + '/examinations?tab=exam-exams',
+            queryTab: 'exam-exams',
+            icon: ClipboardList,
+          },
+          {
+            label: 'Schedule',
+            to: base + '/examinations?tab=exam-schedule',
+            queryTab: 'exam-schedule',
+            icon: CalendarDays,
+          },
+          {
+            label: 'Marks',
+            to: base + '/examinations?tab=exam-marks',
+            queryTab: 'exam-marks',
+            icon: ClipboardCheck,
+          },
+          {
+            label: 'Results',
+            to: base + '/examinations?tab=exam-results',
+            queryTab: 'exam-results',
+            icon: GraduationCap,
+          },
+        ],
       },
       {
         label: 'Events & Holidays',
         to: base + '/events-holidays',
         icon: CalendarDays,
       },
-      { label: 'Finance', to: base + '/finance', icon: WalletCards },
-      { label: 'Concessions', to: base + '/concessions', icon: ReceiptText },
-      { label: 'Messages', to: base + '/communications', icon: Megaphone },
-      { label: 'Reports & Export', to: base + '/reports', icon: BarChart3 },
+      {
+        label: 'Finance',
+        to: base + '/finance',
+        icon: WalletCards,
+        children: [
+          {
+            label: 'Financial Overview',
+            to: base + '/finance?tab=overview',
+            queryTab: 'overview',
+            icon: LayoutDashboard,
+          },
+          {
+            label: 'Fee Operations',
+            to: base + '/finance?tab=fees',
+            queryTab: 'fees',
+            icon: ReceiptText,
+          },
+          {
+            label: 'Payments & Receipts',
+            to: base + '/finance?tab=payments',
+            queryTab: 'payments',
+            icon: WalletCards,
+          },
+          {
+            label: 'Expense Management',
+            to: base + '/finance?tab=expenses',
+            queryTab: 'expenses',
+            icon: ClipboardList,
+          },
+          {
+            label: 'Payroll & Salaries',
+            to: base + '/payroll',
+            icon: Users,
+          },
+          {
+            label: 'Accounts & Ledger',
+            to: base + '/finance?tab=accounts',
+            queryTab: 'accounts',
+            icon: BarChart3,
+          },
+        ],
+      },
+      {
+        label: 'Messages',
+        to: base + '/communications/messages',
+        icon: MessageSquare,
+      },
+      {
+        label: 'Announcements',
+        to: base + '/communications/announcements',
+        icon: Bell,
+      },
+      { label: 'Import & Export', to: base + '/reports', icon: BarChart3 },
+      {
+        label: 'Organization',
+        to: base + '?tab=overview',
+        icon: Building2,
+        children: [
+          {
+            label: 'Organization Profile',
+            to: base + '?tab=settings',
+            icon: Building2,
+            queryTab: 'settings',
+          },
+          {
+            label: 'Campuses',
+            to: base + '?tab=campuses',
+            icon: GraduationCap,
+            queryTab: 'campuses',
+          },
+          {
+            label: 'Members',
+            to: base + '?tab=members',
+            icon: Users,
+            queryTab: 'members',
+          },
+          {
+            label: 'Invitations',
+            to: base + '?tab=invitations',
+            icon: UserPlus,
+            queryTab: 'invitations',
+          },
+        ],
+      },
       { label: 'Settings', to: base + '/settings', icon: Settings2 },
-      { label: 'My Profile', to: base + '/profile', icon: UserCheck },
     );
   } else if (role.key === 'teacher') {
     items.push(
       { label: 'My classes & students', to: base + '/students', icon: Users },
       { label: 'Attendance', to: base + '/attendance', icon: ClipboardCheck },
       {
-        label: 'Homework & Tests',
+        label: 'Daily Diary',
         to: base + '/homework-tests',
         icon: BookOpenText,
       },
       {
-        label: 'Examinations & Marks',
-        to: base + '/examinations',
+        label: 'Exam',
+        to: base + '/examinations?tab=exam-marks',
         icon: ClipboardList,
+        children: [
+          {
+            label: 'Marks',
+            to: base + '/examinations?tab=exam-marks',
+            queryTab: 'exam-marks',
+            icon: ClipboardCheck,
+          },
+          {
+            label: 'Results',
+            to: base + '/examinations?tab=exam-results',
+            queryTab: 'exam-results',
+            icon: GraduationCap,
+          },
+        ],
       },
-      { label: 'Messages', to: base + '/communications', icon: Megaphone },
+      {
+        label: 'Messages',
+        to: base + '/communications/messages',
+        icon: MessageSquare,
+      },
       { label: 'Settings', to: base + '/settings', icon: Settings2 },
     );
   } else if (role.key === 'accountant') {
     items.push(
-      { label: 'Finance', to: base + '/finance', icon: WalletCards },
-      { label: 'Concessions', to: base + '/concessions', icon: ReceiptText },
-      { label: 'Reports & Export', to: base + '/reports', icon: BarChart3 },
+      {
+        label: 'Finance',
+        to: base + '/finance',
+        icon: WalletCards,
+        children: [
+          {
+            label: 'Financial Overview',
+            to: base + '/finance?tab=overview',
+            queryTab: 'overview',
+            icon: LayoutDashboard,
+          },
+          {
+            label: 'Fee Operations',
+            to: base + '/finance?tab=fees',
+            queryTab: 'fees',
+            icon: ReceiptText,
+          },
+          {
+            label: 'Payments & Receipts',
+            to: base + '/finance?tab=payments',
+            queryTab: 'payments',
+            icon: WalletCards,
+          },
+          {
+            label: 'Expense Management',
+            to: base + '/finance?tab=expenses',
+            queryTab: 'expenses',
+            icon: ClipboardList,
+          },
+          {
+            label: 'Payroll & Salaries',
+            to: base + '/payroll',
+            icon: Users,
+          },
+          {
+            label: 'Accounts & Ledger',
+            to: base + '/finance?tab=accounts',
+            queryTab: 'accounts',
+            icon: BarChart3,
+          },
+        ],
+      },
+      { label: 'Import & Export', to: base + '/reports', icon: BarChart3 },
     );
   } else if (role.key === 'parent') {
     items.push(
-      { label: 'Homework & Tests', to: base + '/homework', icon: BookOpenText },
       { label: 'Attendance', to: base + '/attendance', icon: ClipboardCheck },
       { label: 'Fees & receipts', to: base + '/fees', icon: WalletCards },
+      { label: 'Daily Diary', to: base + '/homework', icon: BookOpenText },
       { label: 'Results', to: base + '/results', icon: ClipboardList },
       { label: 'Messages', to: base + '/messages', icon: Megaphone },
       { label: 'Settings', to: base + '/settings', icon: Settings2 },
@@ -354,17 +770,22 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () =>
-      window.localStorage.getItem('instituteos-sidebar-collapsed') === 'true',
+      window.localStorage?.getItem('instituteos-sidebar-collapsed') === 'true',
   );
   const [signOutError, setSignOutError] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [globalQuery, setGlobalQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+  const quickActionsRef = useRef<HTMLDivElement>(null);
   const [curriculumExpanded, setCurriculumExpanded] = useState(
     () =>
       new URLSearchParams(window.location.search)
         .get('tab')
         ?.startsWith('curriculum-') ?? false,
+  );
+  const [examExpanded, setExamExpanded] = useState(() =>
+    window.location.pathname.includes('/examinations'),
   );
   const [admissionExpanded, setAdmissionExpanded] = useState(() =>
     window.location.pathname.includes('/admissions'),
@@ -375,14 +796,31 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
   const [attendanceExpanded, setAttendanceExpanded] = useState(() =>
     /\/attendance(?:\/|$)/.test(window.location.pathname),
   );
+  const [financeExpanded, setFinanceExpanded] = useState(() =>
+    /\/finance(?:\/|$)/.test(window.location.pathname),
+  );
+  const [settingsExpanded, setSettingsExpanded] = useState(() =>
+    window.location.pathname.endsWith('/settings'),
+  );
+  const [organizationExpanded, setOrganizationExpanded] = useState(() =>
+    ['settings', 'campuses', 'members', 'invitations'].includes(
+      new URLSearchParams(window.location.search).get('tab') ?? '',
+    ),
+  );
   const navigate = useNavigate();
   const location = useLocation();
   useEffect(() => {
     const activeTab = new URLSearchParams(location.search).get('tab');
     setCurriculumExpanded(activeTab?.startsWith('curriculum-') ?? false);
+    setExamExpanded(location.pathname.includes('/examinations'));
     setAdmissionExpanded(location.pathname.includes('/admissions'));
     setStaffExpanded(/\/staff(?:\/|$)/.test(location.pathname));
     setAttendanceExpanded(/\/attendance(?:\/|$)/.test(location.pathname));
+    setFinanceExpanded(/\/finance(?:\/|$)/.test(location.pathname));
+    setOrganizationExpanded(
+      ['campuses', 'members', 'invitations'].includes(activeTab ?? ''),
+    );
+    setSettingsExpanded(location.pathname.endsWith('/settings'));
   }, [location.pathname, location.search]);
   const { organizationId } = useParams();
   const auth = useAuth();
@@ -398,8 +836,36 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
     enabled: Boolean(
       organizationId && !isDemoPreview && role.key !== 'platform',
     ),
-    retry: false,
+    retry: (failureCount, error) =>
+      failureCount < 2 &&
+      (!(error instanceof ApiError) ||
+        error.status === 0 ||
+        error.status >= 500 ||
+        error.status === 408),
+    retryDelay: (attempt) => Math.min(700 * 2 ** attempt, 3_000),
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: false,
     staleTime: 30_000,
+  });
+  const organizationProfile = useQuery({
+    queryKey: ['organization-header-profile', organizationId],
+    queryFn: () => getOrganizationProfile(organizationId!),
+    enabled: Boolean(
+      organizationId &&
+      !isDemoPreview &&
+      role.key === 'admin' &&
+      organizationAccess.data?.permissions.includes('organization.read'),
+    ),
+    retry: (failureCount, error) =>
+      failureCount < 2 &&
+      (!(error instanceof ApiError) ||
+        error.status === 0 ||
+        error.status >= 500 ||
+        error.status === 408),
+    retryDelay: (attempt) => Math.min(700 * 2 ** attempt, 3_000),
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
   });
   const teacherProfile = useQuery({
     queryKey: ['teacher-profile', organizationId],
@@ -421,6 +887,9 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
     ),
     retry: false,
   });
+  const workspaceOrganization = organizationProfile.data?.organization;
+  const workspaceOrganizationName =
+    workspaceOrganization?.name || 'Institute workspace';
   const workspaceDisplayName =
     (role.key === 'teacher'
       ? teacherProfile.data?.profile?.displayName
@@ -444,14 +913,31 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
     () => getNavigationItems(role, navigationOrganizationId, isDemoPreview),
     [role, navigationOrganizationId, isDemoPreview],
   );
+  const visibleItems = useMemo(
+    () =>
+      role.key === 'admin' && organizationId && !isDemoPreview
+        ? filterAdminNavigationItems(
+            items,
+            organizationAccess.data?.permissions ?? [],
+          )
+        : items,
+    [items, role.key, organizationId, isDemoPreview, organizationAccess.data],
+  );
   const navigationGroups = useMemo(() => {
+    // Teacher and parent workspaces use direct module links without headings.
+    // Admin navigation remains grouped for easier scanning at larger scale.
+    if (role.key === 'teacher' || role.key === 'parent')
+      return [{ label: '', items: visibleItems }];
+
     const sectionFor = (label: string) => {
-      if (label === 'Overview' || label === 'Dashboard') return 'Overview';
+      if (label === 'Dashboard') return '';
       if (
         [
           'Curriculum',
           'Timetable',
           'Homework & Tests',
+          'Tests',
+          'Exam',
           'Examinations',
           'Events & Holidays',
           'Examinations & Marks',
@@ -471,31 +957,37 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
       )
         return 'People';
       if (label === 'Attendance') return 'Attendance & Leaves';
+      if (label === 'Messages' || label === 'Announcements')
+        return 'Communication';
       if (['Finance', 'Fees & receipts', 'Concessions'].includes(label))
         return 'Finance';
-      if (label === 'Reports & Export' || label === 'Results')
+      if (label === 'Import & Export' || label === 'Results')
         return 'Accounting & Reports';
-      if (label === 'Messages') return 'Communication';
-      if (label === 'Settings' || label === 'My Profile') return 'System';
-      return 'Workspace';
+      if (
+        label === 'Organization' ||
+        label === 'Settings' ||
+        label === 'My Profile'
+      )
+        return 'System';
+      return 'Other';
     };
     const groups = new Map<string, NavigationItem[]>();
-    for (const item of items) {
+    for (const item of visibleItems) {
       const section = sectionFor(item.label);
       const group = groups.get(section) ?? [];
       group.push(item);
       groups.set(section, group);
     }
     const sectionOrder = [
-      'Overview',
+      '',
       'Academics',
       'People',
       'Attendance & Leaves',
       'Finance',
-      'Accounting & Reports',
       'Communication',
+      'Accounting & Reports',
       'System',
-      'Workspace',
+      'Other',
     ];
     return [...groups.entries()]
       .sort(
@@ -503,30 +995,48 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
           sectionOrder.indexOf(left) - sectionOrder.indexOf(right),
       )
       .map(([label, groupItems]) => ({ label, items: groupItems }));
-  }, [items]);
+  }, [visibleItems, role.key]);
   const homePath = workspaceBasePath(role, navigationOrganizationId);
   const searchResults = useMemo(() => {
     const query = globalQuery.trim().toLowerCase();
-    if (!query) return items.slice(0, 5);
+    if (!query) return visibleItems.slice(0, 5);
     const normalizedQuery =
       query === 'fees' || query === 'fee' ? 'finance' : query;
-    return items
+    return visibleItems
       .filter((item) => item.label.toLowerCase().includes(normalizedQuery))
       .slice(0, 6);
-  }, [globalQuery, items]);
+  }, [globalQuery, visibleItems]);
   const quickActions = useMemo(() => {
     const base = homePath;
     const preview = isDemoPreview;
-    if (role.key === 'admin')
-      return [
+    if (role.key === 'admin') {
+      const actions = [
         {
           label: 'Add Student',
           to: base + (preview ? '/students' : '/students/new'),
+          permission: 'student.create',
         },
-        { label: 'Collect Fee', to: base + '/finance' },
-        { label: 'Mark Attendance', to: base + '/attendance' },
-        { label: 'Generate Report', to: base + '/reports' },
+        {
+          label: 'Collect Fee',
+          to: base + '/finance',
+          permission: 'finance.write',
+        },
+        {
+          label: 'Mark Attendance',
+          to: base + '/attendance',
+          permission: 'attendance.write',
+        },
+        {
+          label: 'Generate Report',
+          to: base + '/reports',
+          permission: 'reporting.read',
+        },
       ];
+      if (preview) return actions;
+      if (!organizationId) return [];
+      const granted = new Set(organizationAccess.data?.permissions ?? []);
+      return actions.filter((action) => granted.has(action.permission));
+    }
     if (role.key === 'teacher')
       return [
         {
@@ -535,7 +1045,7 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
         },
         { label: 'Mark Attendance', to: base + '/attendance' },
         {
-          label: 'Homework & Tests',
+          label: 'Daily Diary',
           to: base + (preview ? '/homework' : '/homework-tests'),
         },
         { label: 'Examinations & Marks', to: base + '/examinations' },
@@ -546,7 +1056,7 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
         { label: 'Collect Fee', to: base + '/finance' },
         {
           label: 'Concessions',
-          to: base + '/concessions',
+          to: base + '/finance?tab=concessions',
         },
         { label: 'Generate Report', to: base + '/reports' },
       ];
@@ -562,7 +1072,13 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
           { label: 'Results', to: base + '/results' },
         ]
       : [];
-  }, [homePath, isDemoPreview, role.key]);
+  }, [
+    homePath,
+    isDemoPreview,
+    role.key,
+    organizationId,
+    organizationAccess.data,
+  ]);
 
   const changePreviewRole = (
     nextRole: (typeof previewRoleOptions)[number]['key'],
@@ -576,7 +1092,7 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
   const toggleSidebar = () => {
     setSidebarCollapsed((collapsed) => {
       const next = !collapsed;
-      window.localStorage.setItem(
+      window.localStorage?.setItem(
         'instituteos-sidebar-collapsed',
         String(next),
       );
@@ -600,7 +1116,28 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
 
   useEffect(() => {
     setMobileNavOpen(false);
-  }, [location.pathname]);
+    setAccountMenuOpen(false);
+    setQuickActionsOpen(false);
+    setSearchOpen(false);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (!quickActionsOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!quickActionsRef.current?.contains(event.target as Node)) {
+        setQuickActionsOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setQuickActionsOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [quickActionsOpen]);
 
   useEffect(() => {
     if (!mobileNavOpen) return;
@@ -614,15 +1151,31 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
   const isLiveOrganizationWorkspace = Boolean(
     organizationId && !isDemoPreview && role.key !== 'platform',
   );
+  const hasCachedAccessDuringTransientError = Boolean(
+    organizationAccess.data &&
+    organizationAccess.error instanceof ApiError &&
+    (organizationAccess.error.status === 0 ||
+      organizationAccess.error.status === 408 ||
+      organizationAccess.error.status === 429 ||
+      organizationAccess.error.status >= 500),
+  );
 
-  if (isLiveOrganizationWorkspace && organizationAccess.isPending)
+  if (
+    isLiveOrganizationWorkspace &&
+    organizationAccess.isPending &&
+    !organizationAccess.data
+  )
     return (
       <main className="auth-bootstrap">
         <LoadingState message="Verifying your institute workspace access…" />
       </main>
     );
 
-  if (isLiveOrganizationWorkspace && organizationAccess.isError) {
+  if (
+    isLiveOrganizationWorkspace &&
+    organizationAccess.isError &&
+    !hasCachedAccessDuringTransientError
+  ) {
     if (
       organizationAccess.error instanceof ApiError &&
       organizationAccess.error.status === 404
@@ -649,7 +1202,21 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
       <main className="auth-bootstrap">
         <ErrorState
           title="Unable to verify workspace access"
-          description="The institute access service could not be reached. No workspace data has been opened. Please try again."
+          description={
+            organizationAccess.error instanceof ApiError &&
+            organizationAccess.error.status === 0
+              ? 'The API server could not be reached. Your workspace data remains protected. Check your connection and retry.'
+              : organizationAccess.error instanceof ApiError &&
+                  organizationAccess.error.status === 429
+                ? 'Workspace verification was temporarily rate-limited (HTTP 429). Please wait a moment and retry.'
+                : organizationAccess.error instanceof ApiError &&
+                    organizationAccess.error.status >= 500
+                  ? 'The workspace service returned a server error. Please retry in a moment.' +
+                    (organizationAccess.error.requestId
+                      ? ' Reference: ' + organizationAccess.error.requestId
+                      : '')
+                  : 'Workspace verification did not complete. Your institute data remains protected. Please retry.'
+          }
           onRetry={() => void organizationAccess.refetch()}
         />
       </main>
@@ -696,46 +1263,51 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
       <aside
         className={`sidebar${mobileNavOpen ? ' sidebar-open' : ''}${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}
       >
-        <Link
-          aria-label="InstituteOS home"
-          className="brand-lockup"
-          to={homePath}
-        >
-          <span aria-hidden="true" className="brand-mark">
-            I
-          </span>
-          <span className="brand-name">
-            <strong>InstituteOS</strong>
-            <small>College management</small>
-          </span>
-        </Link>
-
-        <div className="sidebar-heading-row">
-          <div className="sidebar-label">Workspace</div>
-          <button
-            className="sidebar-collapse-button"
-            type="button"
-            onClick={toggleSidebar}
+        <div className="sidebar-top-row">
+          <Link
             aria-label={
-              sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
+              sidebarCollapsed ? 'Expand sidebar' : 'InstituteOS home'
             }
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="brand-lockup"
+            onClick={(event) => {
+              if (sidebarCollapsed) {
+                event.preventDefault();
+                toggleSidebar();
+              }
+            }}
+            to={homePath}
           >
-            {sidebarCollapsed ? (
-              <ChevronRight size={16} />
-            ) : (
-              <ChevronLeft size={16} />
-            )}
-          </button>
+            <span aria-hidden="true" className="brand-mark">
+              I
+            </span>
+            <span className="brand-name">
+              <strong>InstituteOS</strong>
+              <small>College management</small>
+            </span>
+          </Link>
+          {!sidebarCollapsed && (
+            <button
+              className="sidebar-collapse-button sidebar-top-toggle"
+              type="button"
+              onClick={toggleSidebar}
+              aria-label="Collapse sidebar"
+              title="Collapse sidebar"
+            >
+              <PanelLeftClose size={18} aria-hidden="true" />
+            </button>
+          )}
         </div>
+
         <nav
           aria-label="Main navigation"
           className="primary-navigation sidebar-navigation-scroll"
           id="main-navigation"
         >
           {navigationGroups.map((group) => (
-            <div className="navigation-group" key={group.label}>
-              <div className="navigation-group-heading">{group.label}</div>
+            <div className="navigation-group" key={group.label || 'primary'}>
+              {group.label && (
+                <div className="navigation-group-heading">{group.label}</div>
+              )}
               {group.items.map((item) => {
                 const Icon = item.icon;
                 return (
@@ -751,7 +1323,15 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                                 ? staffExpanded
                                 : item.label === 'Attendance'
                                   ? attendanceExpanded
-                                  : curriculumExpanded
+                                  : item.label === 'Exam'
+                                    ? examExpanded
+                                    : item.label === 'Finance'
+                                      ? financeExpanded
+                                      : item.label === 'Organization'
+                                        ? organizationExpanded
+                                        : item.label === 'Settings'
+                                          ? settingsExpanded
+                                          : curriculumExpanded
                             : undefined
                         }
                         className={({ isActive }) => {
@@ -759,15 +1339,12 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                             location.search,
                           ).get('tab');
                           const tabMatches = item.children
-                            ? !activeTab
+                            ? true
                             : item.queryTab
                               ? activeTab === item.queryTab
                               : !activeTab;
                           const pathMatches = item.children
-                            ? location.pathname.startsWith(
-                                new URL(item.to, window.location.origin)
-                                  .pathname,
-                              )
+                            ? false
                             : item.queryTab
                               ? true
                               : isActive;
@@ -783,7 +1360,19 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                                 } else if (item.label === 'Staff') {
                                   setStaffExpanded((expanded) => !expanded);
                                 } else if (item.label === 'Attendance') {
-                                  setAttendanceExpanded((expanded) => !expanded);
+                                  setAttendanceExpanded(
+                                    (expanded) => !expanded,
+                                  );
+                                } else if (item.label === 'Exam') {
+                                  setExamExpanded((expanded) => !expanded);
+                                } else if (item.label === 'Finance') {
+                                  setFinanceExpanded((expanded) => !expanded);
+                                } else if (item.label === 'Organization') {
+                                  setOrganizationExpanded(
+                                    (expanded) => !expanded,
+                                  );
+                                } else if (item.label === 'Settings') {
+                                  setSettingsExpanded((expanded) => !expanded);
                                 } else {
                                   setCurriculumExpanded(
                                     (expanded) => !expanded,
@@ -813,7 +1402,15 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                           ? staffExpanded
                           : item.label === 'Attendance'
                             ? attendanceExpanded
-                            : curriculumExpanded) &&
+                            : item.label === 'Exam'
+                              ? examExpanded
+                              : item.label === 'Finance'
+                                ? financeExpanded
+                                : item.label === 'Organization'
+                                  ? organizationExpanded
+                                  : item.label === 'Settings'
+                                    ? settingsExpanded
+                                    : curriculumExpanded) &&
                       item.children.map((child) => {
                         const ChildIcon = child.icon;
                         return (
@@ -823,7 +1420,27 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                               const activeTab = new URLSearchParams(
                                 location.search,
                               ).get('tab');
-                              return `navigation-link navigation-sublink${isActive && (!child.queryTab || activeTab === child.queryTab) ? ' navigation-sublink-active' : ''}`;
+                              const activeFinanceTab = [
+                                'fee-setup',
+                                'create-invoices',
+                                'concessions',
+                              ].includes(activeTab ?? '')
+                                ? 'fees'
+                                : activeTab === 'payment-history'
+                                  ? 'payments'
+                                  : activeTab;
+                              const attendanceTab = activeTab ?? 'classes';
+                              const isAttendanceChildActive =
+                                item.label === 'Attendance' &&
+                                isActive &&
+                                attendanceTab === (child.queryTab ?? 'classes');
+                              const isChildActive =
+                                item.label === 'Attendance'
+                                  ? isAttendanceChildActive
+                                  : isActive &&
+                                    (!child.queryTab ||
+                                      activeFinanceTab === child.queryTab);
+                              return `navigation-link navigation-sublink${isChildActive ? ' navigation-sublink-active' : ''}`;
                             }}
                             onClick={() => {
                               if (item.label === 'Admission')
@@ -832,6 +1449,14 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                                 setStaffExpanded(true);
                               else if (item.label === 'Attendance')
                                 setAttendanceExpanded(true);
+                              else if (item.label === 'Exam')
+                                setExamExpanded(true);
+                              else if (item.label === 'Finance')
+                                setFinanceExpanded(true);
+                              else if (item.label === 'Organization')
+                                setOrganizationExpanded(true);
+                              else if (item.label === 'Settings')
+                                setSettingsExpanded(true);
                               else setCurriculumExpanded(true);
                               closeMobileNav();
                             }}
@@ -853,42 +1478,6 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
             </div>
           ))}
         </nav>
-
-        {isDevelopment && !isDemoPreview && role.key !== 'platform' && (
-          <Link
-            className="navigation-link reference-preview-link"
-            onClick={closeMobileNav}
-            to={`/${role.key}/organizations/preview?preview=demo`}
-          >
-            <LayoutDashboard size={17} strokeWidth={1.8} aria-hidden="true" />
-            <span>Open reference UI preview</span>
-          </Link>
-        )}
-
-        <div className="mobile-account-actions">
-          <div className="account-identity">
-            <span className="user-avatar" aria-hidden="true">
-              {(workspaceDisplayName.trim().charAt(0) || 'U').toUpperCase()}
-            </span>
-            <span className="current-user-name">{workspaceDisplayName}</span>
-          </div>
-          <Button
-            className="sign-out-button"
-            onClick={signOut}
-            type="button"
-            variant="quiet"
-          >
-            Sign out
-          </Button>
-        </div>
-
-        <div className="sidebar-bottom">
-          <span className="environment-indicator" aria-hidden="true" />
-          <span>{role.label}</span>
-          {role.key !== 'platform' && (
-            <ShieldCheck size={14} aria-label="Role-based workspace" />
-          )}
-        </div>
       </aside>
 
       <div className="main-column">
@@ -911,10 +1500,39 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                 <Menu size={19} aria-hidden="true" />
               )}
             </button>
-            <div className="mobile-workspace-identity">
-              <strong>{role.label}</strong>
-              <span>{workspaceDisplayName}</span>
-            </div>
+            {role.key === 'admin' &&
+            organizationId &&
+            !isDemoPreview &&
+            organizationAccess.data?.permissions.includes(
+              'organization.read',
+            ) ? (
+              <Link
+                className="topbar-org-identity"
+                to={homePath + '?tab=settings'}
+                aria-label={
+                  'Open ' + workspaceOrganizationName + ' organization profile'
+                }
+              >
+                <span className="topbar-org-logo">
+                  {workspaceOrganization?.logoDataUrl ? (
+                    <img src={workspaceOrganization.logoDataUrl} alt="" />
+                  ) : (
+                    <Building2 size={18} aria-hidden="true" />
+                  )}
+                </span>
+                <span className="topbar-org-copy">
+                  <strong>{workspaceOrganizationName}</strong>
+                  <small>
+                    {workspaceOrganization?.shortCode || 'Institute workspace'}
+                  </small>
+                </span>
+              </Link>
+            ) : (
+              <div className="mobile-workspace-identity">
+                <strong>{role.label}</strong>
+                <span>{workspaceDisplayName}</span>
+              </div>
+            )}
           </div>
 
           <div className="topbar-actions">
@@ -1004,52 +1622,112 @@ export function AppShell({ role }: { role: RoleLayoutConfig }) {
                 </div>
               )}
             </div>
-            <div className="topbar-quick-actions">
-              <button
-                aria-label="Open quick actions"
-                aria-expanded={quickActionsOpen}
-                className="topbar-add-button"
-                onClick={() => {
-                  setQuickActionsOpen((open) => !open);
-                  setSearchOpen(false);
-                }}
-                type="button"
-              >
-                <Plus size={18} aria-hidden="true" />
-              </button>
-              {quickActionsOpen && (
-                <div
-                  className="quick-actions-popover"
-                  aria-label="Quick actions"
+            {quickActions.length > 0 && (
+              <div className="topbar-quick-actions" ref={quickActionsRef}>
+                <button
+                  aria-label="Open quick actions"
+                  aria-expanded={quickActionsOpen}
+                  className="topbar-add-button"
+                  onClick={() => {
+                    setQuickActionsOpen((open) => !open);
+                    setSearchOpen(false);
+                  }}
+                  type="button"
                 >
-                  {quickActions.map((action) => (
-                    <Link
-                      className="quick-action-option"
-                      key={action.label}
-                      onClick={() => setQuickActionsOpen(false)}
-                      to={action.to}
-                    >
-                      <Plus size={13} aria-hidden="true" />
-                      {action.label}
-                    </Link>
-                  ))}
+                  <Plus size={18} aria-hidden="true" />
+                </button>
+                {quickActionsOpen && (
+                  <div
+                    className="quick-actions-popover"
+                    role="menu"
+                    aria-label="Quick actions"
+                  >
+                    {quickActions.map((action) => (
+                      <Link
+                        className="quick-action-option"
+                        role="menuitem"
+                        key={action.label}
+                        onClick={() => setQuickActionsOpen(false)}
+                        to={action.to}
+                      >
+                        <Plus size={13} aria-hidden="true" />
+                        {action.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {role.key === 'admin' &&
+              organizationId &&
+              !isDemoPreview &&
+              organizationAccess.data?.permissions.includes(
+                'communication.read',
+              ) && (
+                <Link
+                  className="topbar-icon-link"
+                  to={homePath + '/communications/announcements'}
+                  aria-label="Open announcements"
+                  title="Announcements"
+                >
+                  <Bell size={18} aria-hidden="true" />
+                </Link>
+              )}
+            <div
+              className="account-menu"
+              onBlur={(event) => {
+                if (
+                  !event.currentTarget.contains(
+                    event.relatedTarget as Node | null,
+                  )
+                )
+                  setAccountMenuOpen(false);
+              }}
+            >
+              <button
+                className="account-menu-trigger"
+                type="button"
+                aria-haspopup="menu"
+                aria-label={`Open account menu for ${workspaceDisplayName}`}
+                aria-expanded={accountMenuOpen}
+                onClick={() => setAccountMenuOpen((open) => !open)}
+              >
+                <span
+                  className="user-avatar topbar-user-avatar"
+                  aria-hidden="true"
+                >
+                  {(workspaceDisplayName.trim().charAt(0) || 'U').toUpperCase()}
+                </span>
+                <span className="current-user-name topbar-user-name">
+                  {workspaceDisplayName}
+                </span>
+                <ChevronDown size={14} aria-hidden="true" />
+              </button>
+              {accountMenuOpen && (
+                <div
+                  className="account-menu-popover"
+                  role="menu"
+                  aria-label="My account"
+                >
+                  <div className="account-menu-heading">
+                    <strong>{workspaceDisplayName}</strong>
+                    <small>{auth.user?.email}</small>
+                  </div>
+                  <Link
+                    role="menuitem"
+                    onClick={() => setAccountMenuOpen(false)}
+                    to={homePath + '/settings?tab=my-profile'}
+                  >
+                    <CircleUserRound size={15} aria-hidden="true" />
+                    My Profile
+                  </Link>
+                  <button role="menuitem" type="button" onClick={signOut}>
+                    <X size={15} aria-hidden="true" />
+                    Sign out
+                  </button>
                 </div>
               )}
             </div>
-            <span className="user-avatar topbar-user-avatar" aria-hidden="true">
-              {(workspaceDisplayName.trim().charAt(0) || 'U').toUpperCase()}
-            </span>
-            <span className="current-user-name topbar-user-name">
-              {workspaceDisplayName}
-            </span>
-            <Button
-              className="sign-out-button"
-              onClick={signOut}
-              type="button"
-              variant="quiet"
-            >
-              Sign out
-            </Button>
           </div>
           {signOutError && (
             <span className="visually-hidden" role="alert">

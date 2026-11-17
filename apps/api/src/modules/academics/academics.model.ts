@@ -116,7 +116,11 @@ sectionSchema.index(
 
 const subjectMarkComponentSchema = new Schema(
   {
-    key: { type: String, enum: ['theory', 'practical', 'viva'], required: true },
+    key: {
+      type: String,
+      enum: ['theory', 'practical', 'viva'],
+      required: true,
+    },
     label: { type: String, required: true, trim: true, maxlength: 40 },
     totalMarks: { type: Number, required: true, min: 0, max: 100000 },
     passingMarks: { type: Number, required: true, min: 0, max: 100000 },

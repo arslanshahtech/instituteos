@@ -4,6 +4,7 @@ import type { PaymentMethod } from './finance.types.js';
 import type { ExpenseCategory } from './finance-operations.model.js';
 import type {
   FinanceDateFilters,
+  FinanceExpenseInput,
   FinanceOperationsContext,
   FinanceOperationsRepository,
 } from './finance-operations.types.js';
@@ -104,6 +105,81 @@ function validFilters(
   return { dateFrom, dateTo, campusId, classId, paymentMethod, category };
 }
 
+function validateExpenseInput(
+  context: FinanceOperationsContext,
+  raw: Record<string, unknown>,
+): FinanceExpenseInput {
+  const description =
+    typeof raw.description === 'string' ? raw.description.trim() : '';
+  if (!description || description.length > 180)
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Enter an expense description (max 180 characters).',
+    );
+  const category = raw.category as ExpenseCategory;
+  if (!categories.includes(category))
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Select a valid expense category.',
+    );
+  if (
+    typeof raw.amount !== 'number' ||
+    !Number.isFinite(raw.amount) ||
+    raw.amount <= 0 ||
+    raw.amount > 100000000000
+  )
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Enter an expense amount greater than zero.',
+    );
+  if (Math.round(raw.amount * 100) !== raw.amount * 100)
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Expense amount can have at most two decimal places.',
+    );
+  if (
+    typeof raw.paymentMethod !== 'string' ||
+    !methods.includes(raw.paymentMethod as PaymentMethod)
+  )
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Select a valid payment method.',
+    );
+  if (typeof raw.expenseDate !== 'string')
+    throw new AppError(400, 'VALIDATION_ERROR', 'Enter a valid expense date.');
+  const expenseDate = validDate(raw.expenseDate, 'expense date');
+  const campusId =
+    typeof raw.campusId === 'string' && raw.campusId ? raw.campusId : undefined;
+  if (campusId && !mongoose.isValidObjectId(campusId))
+    throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid campus.');
+  if (
+    context.campusIds.length &&
+    (!campusId || !context.campusIds.includes(campusId))
+  )
+    throw new AppError(403, 'FORBIDDEN', 'Select a campus you have access to.');
+  const reference =
+    typeof raw.reference === 'string' ? raw.reference.trim() : '';
+  if (reference.length > 160)
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'Reference must be 160 characters or fewer.',
+    );
+  return {
+    description,
+    category,
+    amount: raw.amount,
+    paymentMethod: raw.paymentMethod as PaymentMethod,
+    expenseDate: expenseDate!,
+    campusId,
+    ...(reference ? { reference } : {}),
+  };
+}
 export class FinanceOperationsService {
   constructor(private readonly repository: FinanceOperationsRepository) {}
 
@@ -164,97 +240,27 @@ export class FinanceOperationsService {
     context: FinanceOperationsContext,
     raw: Record<string, unknown>,
   ) {
-    const description =
-      typeof raw.description === 'string' ? raw.description.trim() : '';
-    if (!description || description.length > 180) {
-      throw new AppError(
-        400,
-        'VALIDATION_ERROR',
-        'Enter an expense description (max 180 characters).',
-      );
-    }
-    const category = raw.category as ExpenseCategory;
-    if (!categories.includes(category)) {
-      throw new AppError(
-        400,
-        'VALIDATION_ERROR',
-        'Select a valid expense category.',
-      );
-    }
-    if (
-      typeof raw.amount !== 'number' ||
-      !Number.isFinite(raw.amount) ||
-      raw.amount <= 0 ||
-      raw.amount > 100000000000
-    ) {
-      throw new AppError(
-        400,
-        'VALIDATION_ERROR',
-        'Enter an expense amount greater than zero.',
-      );
-    }
-    if (Math.round(raw.amount * 100) !== raw.amount * 100) {
-      throw new AppError(
-        400,
-        'VALIDATION_ERROR',
-        'Expense amount can have at most two decimal places.',
-      );
-    }
-    if (
-      typeof raw.paymentMethod !== 'string' ||
-      !methods.includes(raw.paymentMethod as PaymentMethod)
-    ) {
-      throw new AppError(
-        400,
-        'VALIDATION_ERROR',
-        'Select a valid payment method.',
-      );
-    }
-    if (typeof raw.expenseDate !== 'string') {
-      throw new AppError(
-        400,
-        'VALIDATION_ERROR',
-        'Enter a valid expense date.',
-      );
-    }
-    const expenseDate = validDate(raw.expenseDate, 'expense date');
-    const campusId =
-      typeof raw.campusId === 'string' && raw.campusId
-        ? raw.campusId
-        : undefined;
-    if (campusId && !mongoose.isValidObjectId(campusId)) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid campus.');
-    }
-    if (
-      context.campusIds.length &&
-      (!campusId || !context.campusIds.includes(campusId))
-    ) {
-      throw new AppError(
-        403,
-        'FORBIDDEN',
-        'Select a campus you have access to.',
-      );
-    }
-    const reference =
-      typeof raw.reference === 'string' ? raw.reference.trim() : '';
-    if (reference.length > 160) {
-      throw new AppError(
-        400,
-        'VALIDATION_ERROR',
-        'Reference must be 160 characters or fewer.',
-      );
-    }
-    return this.repository.createExpense(context, {
-      description,
-      category,
-      amount: raw.amount,
-      paymentMethod: raw.paymentMethod as PaymentMethod,
-      expenseDate: expenseDate!,
-      campusId,
-      ...(reference ? { reference } : {}),
-    });
+    return this.repository.createExpense(
+      context,
+      validateExpenseInput(context, raw),
+    );
   }
 
+  async updateExpense(
+    context: FinanceOperationsContext,
+    rawId: string,
+    raw: Record<string, unknown>,
+  ) {
+    if (!mongoose.isValidObjectId(rawId))
+      throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid expense.');
+    const expense = await this.repository.updateExpense(
+      context,
+      rawId,
+      validateExpenseInput(context, raw),
+    );
+    if (!expense) throw new AppError(404, 'NOT_FOUND', 'Expense not found.');
+    return expense;
+  }
   listExpenseBudgets(
     context: FinanceOperationsContext,
     raw: Record<string, unknown>,

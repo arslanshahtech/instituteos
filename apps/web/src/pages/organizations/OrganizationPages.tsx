@@ -2,9 +2,6 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UseQueryResult } from '@tanstack/react-query';
 import {
-  ArrowUpRight,
-  BarChart3,
-  CalendarCheck,
   ChevronDown,
   GraduationCap,
   MapPin,
@@ -12,11 +9,7 @@ import {
   Phone,
   Plus,
   Eye,
-  ReceiptText,
-  UserCheck,
   UserPlus,
-  Users,
-  WalletCards,
   X,
 } from 'lucide-react';
 import {
@@ -26,14 +19,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { ApiError } from '../../api/client.js';
-import {
-  WorkspaceMetricCard,
-  WorkspacePageHeading,
-  WorkspaceQuickAction,
-} from '../../components/ui/WorkspacePrimitives.js';
-import { listApplications } from '../../admissions/admissions-api.js';
-import type { ApplicationRecord } from '../../admissions/admissions-api.js';
-import { listStudentAttendance } from '../../attendance/attendance-api.js';
+import { WorkspacePageHeading } from '../../components/ui/WorkspacePrimitives.js';
 import { useAuth } from '../../auth/AuthProvider.js';
 import { Button } from '../../components/ui/Button.js';
 import { Dialog } from '../../components/ui/Dialog.js';
@@ -63,15 +49,10 @@ import {
   updateOrganization,
 } from '../../organizations/organizations-api.js';
 import { getOrganizationAccessContext } from '../../tenancy/tenancy-api.js';
-import { listFamilyContacts } from '../../families/family-contacts-api.js';
-import { listDailyCollections } from '../../finance/finance-api.js';
-import type { FamilyContactListResponse } from '../../families/family-contacts-api.js';
-import { useOrganizationSummary } from '../../reporting/reporting-api.js';
-import type { OrganizationSummary } from '../../reporting/reporting-api.js';
+import { AdminDashboardOverview } from './AdminDashboardOverview.js';
 import type {
   AccessibleOrganization,
   Campus,
-  OrganizationDashboard,
   OrganizationInvitation,
   OrganizationMember,
 } from '../../organizations/organizations-api.js';
@@ -407,10 +388,9 @@ function parseAdminTab(value: string | null): AdminTab {
 
 export function OrganizationAdminPage() {
   const { organizationId = '' } = useParams();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const auth = useAuth();
   const [tab, setTab] = useState<AdminTab>(() =>
     parseAdminTab(searchParams.get('tab')),
   );
@@ -430,81 +410,6 @@ export function OrganizationAdminPage() {
     queryKey: ['organization-dashboard', organizationId],
     queryFn: () => getOrganizationDashboard(organizationId),
     enabled: Boolean(organizationId && access.data),
-    retry: false,
-  });
-  const summary = useOrganizationSummary(
-    organizationId,
-    undefined,
-    Boolean(organizationId && access.data && tab === 'overview'),
-  );
-  const guardians = useQuery({
-    queryKey: ['organization-family-contact-count', organizationId],
-    queryFn: () => listFamilyContacts(organizationId, { page: 1, pageSize: 1 }),
-    enabled: Boolean(
-      organizationId &&
-      access.data?.permissions.includes('guardian.read') &&
-      tab === 'overview',
-    ),
-    retry: false,
-  });
-  const collectionRange = useMemo(() => {
-    const now = new Date();
-    const key = (date: Date) =>
-      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    return { dateFrom: key(monthStart), dateTo: key(now) };
-  }, []);
-  const monthlyCollections = useQuery({
-    queryKey: [
-      'organization-dashboard-monthly-collections',
-      organizationId,
-      collectionRange.dateFrom,
-      collectionRange.dateTo,
-    ],
-    queryFn: () => listDailyCollections(organizationId, collectionRange),
-    enabled: Boolean(
-      organizationId &&
-      access.data?.permissions.includes('finance.read') &&
-      tab === 'overview',
-    ),
-    retry: false,
-  });
-  const attendanceRange = useMemo(() => {
-    const dateTo = new Date();
-    const dateFrom = new Date(dateTo);
-    dateFrom.setDate(dateTo.getDate() - 6);
-    const toKey = (date: Date) =>
-      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    return { dateFrom: toKey(dateFrom), dateTo: toKey(dateTo) };
-  }, []);
-  const recentAdmissions = useQuery({
-    queryKey: ['organization-dashboard-recent-admissions', organizationId],
-    queryFn: () =>
-      listApplications(organizationId, {
-        search: '',
-        page: 1,
-        pageSize: 3,
-      }),
-    enabled: Boolean(
-      organizationId &&
-      access.data?.permissions.includes('admission.read') &&
-      tab === 'overview',
-    ),
-    retry: false,
-  });
-  const weeklyAttendance = useQuery({
-    queryKey: [
-      'organization-dashboard-weekly-attendance',
-      organizationId,
-      attendanceRange.dateFrom,
-      attendanceRange.dateTo,
-    ],
-    queryFn: () => listStudentAttendance(organizationId, attendanceRange),
-    enabled: Boolean(
-      organizationId &&
-      access.data?.permissions.includes('attendance.read') &&
-      tab === 'overview',
-    ),
     retry: false,
   });
   const campuses = useQuery({
@@ -543,6 +448,9 @@ export function OrganizationAdminPage() {
       queryKey: ['organization-dashboard', organizationId],
     });
     await queryClient.invalidateQueries({
+      queryKey: ['organization-header-profile', organizationId],
+    });
+    await queryClient.invalidateQueries({
       queryKey: ['organization-campuses', organizationId],
     });
     await queryClient.invalidateQueries({
@@ -568,7 +476,6 @@ export function OrganizationAdminPage() {
     access.data?.permissions.includes('member.read') ?? false;
   const canInvite = access.data?.permissions.includes('member.invite') ?? false;
   const canAssignOwner = access.data?.role === 'organization_owner';
-  const organizationPath = `/admin/organizations/${encodeURIComponent(organizationId)}`;
 
   useEffect(() => {
     const accessUnavailable =
@@ -594,134 +501,35 @@ export function OrganizationAdminPage() {
     <main className="page-stack organization-admin-page">
       <WorkspacePageHeading
         className="organization-heading"
-        eyebrow={`Organization workspace · ${access.data.role.replaceAll('_', ' ')}`}
-        title="Institute Overview"
-        description={`${dashboard.data?.organization.name ?? 'Your college'} · Welcome back, ${auth.user?.displayName ?? 'there'}.`}
+        eyebrow=""
+        title={
+          tab === 'overview'
+            ? 'Institute Overview'
+            : tab === 'settings'
+              ? 'Organization Profile'
+              : tab[0]!.toUpperCase() + tab.slice(1)
+        }
+        description={
+          tab === 'overview'
+            ? 'Your organization at a glance.'
+            : tab === 'campuses'
+              ? 'Create and manage your organization’s campus locations.'
+              : tab === 'members'
+                ? 'Invite people, assign roles, and manage organization access.'
+                : tab === 'invitations'
+                  ? 'Review pending invitations and their status.'
+                  : 'Manage your organization profile and settings.'
+        }
       />
-      {tab === 'overview' && (
-        <nav
-          aria-label="College quick actions"
-          className="reference-quick-actions"
-        >
-          {(
-            [
-              {
-                label: 'Add Student',
-                to: `${organizationPath}/students/new`,
-                permission: 'student.create',
-                icon: UserPlus,
-              },
-              {
-                label: 'Collect Fee',
-                to: `${organizationPath}/finance`,
-                permission: 'finance.write',
-                icon: WalletCards,
-              },
-              {
-                label: 'Mark Attendance',
-                to: `${organizationPath}/attendance`,
-                permission: 'attendance.write',
-                icon: CalendarCheck,
-              },
-              {
-                label: 'Generate Report',
-                to: `${organizationPath}/reports`,
-                permission: 'reporting.read',
-                icon: BarChart3,
-              },
-            ] as const
-          ).map((action) => {
-            const Icon = action.icon;
-            const permitted = access.data.permissions.includes(
-              action.permission,
-            );
-            return permitted ? (
-              <WorkspaceQuickAction key={action.label} {...action} />
-            ) : (
-              <span
-                aria-disabled="true"
-                className="organization-dashboard-action reference-quick-action is-unavailable"
-                key={action.label}
-                title={`Your current role does not have permission to: ${action.label.toLowerCase()}.`}
-              >
-                <Icon size={14} aria-hidden="true" />
-                {action.label}
-              </span>
-            );
-          })}
-        </nav>
-      )}
-      <>
-        <label className="organization-section-selector">
-          <span>Organization section</span>
-          <select
-            aria-label="Organization section"
-            value={tab}
-            onChange={(event) => {
-              const nextTab = event.target.value as AdminTab;
-              setTab(nextTab);
-              setSearchParams(nextTab === 'overview' ? {} : { tab: nextTab });
-              setNotice('');
-            }}
-          >
-            {(
-              [
-                'overview',
-                'settings',
-                'campuses',
-                'members',
-                'invitations',
-              ] as const
-            ).map((item) => (
-              <option key={item} value={item}>
-                {item[0]!.toUpperCase() + item.slice(1)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <nav
-          className="organization-tabs"
-          aria-label="Organization administration"
-        >
-          {(
-            [
-              'overview',
-              'settings',
-              'campuses',
-              'members',
-              'invitations',
-            ] as const
-          ).map((item) => (
-            <button
-              key={item}
-              type="button"
-              aria-current={tab === item ? 'page' : undefined}
-              onClick={() => {
-                setTab(item);
-                setSearchParams(item === 'overview' ? {} : { tab: item });
-                setNotice('');
-              }}
-            >
-              {item}
-            </button>
-          ))}
-        </nav>
-      </>
       {notice && (
         <p role="status" className="success-note">
           {notice}
         </p>
       )}
       {tab === 'overview' && (
-        <OverviewPanel
-          dashboard={dashboard}
-          summary={summary}
-          guardians={guardians}
-          recentAdmissions={recentAdmissions}
-          weeklyAttendance={weeklyAttendance}
-          attendanceRange={attendanceRange}
-          monthlyCollections={monthlyCollections}
-          collectionRange={collectionRange}
+        <AdminDashboardOverview
+          organizationId={organizationId}
+          permissions={access.data.permissions}
         />
       )}
       {tab === 'settings' && (
@@ -764,321 +572,6 @@ export function OrganizationAdminPage() {
         />
       )}
     </main>
-  );
-}
-
-function formatPKR(value: string | number | undefined): string {
-  if (value === undefined || value === null || value === '') return '—';
-  const amount = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(amount)) return '—';
-  return `Rs ${new Intl.NumberFormat('en-PK', { maximumFractionDigits: 0 }).format(amount)}`;
-}
-
-function getWeekDays(endDate: string) {
-  const anchor = new Date(`${endDate}T12:00:00`);
-  const days: Array<{ key: string; label: string; fullLabel: string }> = [];
-  for (let daysBack = 6; daysBack >= 0; daysBack -= 1) {
-    const date = new Date(anchor);
-    date.setDate(anchor.getDate() - daysBack);
-    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    days.push({
-      key,
-      label: date.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1),
-      fullLabel: date.toLocaleDateString('en-PK', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'short',
-      }),
-    });
-  }
-  return days;
-}
-
-function formatDateShort(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? 'Date unavailable'
-    : date.toLocaleDateString('en-PK', { day: 'numeric', month: 'short' });
-}
-
-function formatApplicationStatus(value: ApplicationRecord['status']) {
-  const labels: Record<ApplicationRecord['status'], string> = {
-    draft: 'Draft',
-    submitted: 'Pending',
-    in_review: 'In review',
-    approved: 'Approved',
-    rejected: 'Rejected',
-    admitted: 'Enrolled',
-  };
-  return labels[value];
-}
-
-function OverviewPanel({
-  dashboard,
-  summary,
-  guardians,
-  recentAdmissions,
-  weeklyAttendance,
-  attendanceRange,
-  monthlyCollections,
-  collectionRange,
-}: {
-  dashboard: UseQueryResult<OrganizationDashboard>;
-  summary: UseQueryResult<{ summary: OrganizationSummary }>;
-  guardians: UseQueryResult<FamilyContactListResponse>;
-  recentAdmissions: UseQueryResult<
-    Awaited<ReturnType<typeof listApplications>>
-  >;
-  weeklyAttendance: UseQueryResult<
-    Awaited<ReturnType<typeof listStudentAttendance>>
-  >;
-  attendanceRange: { dateFrom: string; dateTo: string };
-  monthlyCollections: UseQueryResult<
-    Awaited<ReturnType<typeof listDailyCollections>>
-  >;
-  collectionRange: { dateFrom: string; dateTo: string };
-}) {
-  const data = dashboard.data;
-  if (dashboard.isPending)
-    return <LoadingState message="Loading college overview…" />;
-  if (dashboard.isError || !data)
-    return (
-      <ErrorState
-        title="College overview unavailable"
-        description="Your college information could not be loaded."
-        onRetry={() => void dashboard.refetch()}
-      />
-    );
-
-  const totals = summary.data?.summary;
-  const monthlyCollectionTotal = (monthlyCollections.data?.items ?? []).reduce(
-    (sum, item) => sum + item.amountCollected,
-    0,
-  );
-  const weekDays = getWeekDays(attendanceRange.dateTo);
-  const attendanceItems = weeklyAttendance.data?.items ?? [];
-  const dailyAttendance = weekDays.map((day) => {
-    const records = attendanceItems.filter(
-      (record) => record.date.slice(0, 10) === day.key,
-    );
-    const attended = records.filter(
-      (record) => record.status === 'present',
-    ).length;
-    return {
-      ...day,
-      rate: records.length ? Math.round((attended / records.length) * 100) : 0,
-      count: records.length,
-    };
-  });
-  const recordedDays = dailyAttendance.filter((day) => day.count > 0);
-  const weeklyRate = recordedDays.length
-    ? Math.round(
-        recordedDays.reduce((sum, day) => sum + day.rate, 0) /
-          recordedDays.length,
-      )
-    : null;
-
-  return (
-    <section
-      className="organization-overview admin-dashboard reference-dashboard-preview"
-      aria-label="College overview"
-    >
-      <div className="admin-metrics-grid reference-metrics-grid">
-        {[
-          {
-            label: 'Active students',
-            value: totals
-              ? totals.activeStudentCount.toLocaleString('en-PK')
-              : '—',
-            detail: 'Currently enrolled learners',
-            icon: Users,
-          },
-          {
-            label: 'Staff & teachers',
-            value: totals
-              ? totals.activeStaffCount.toLocaleString('en-PK')
-              : '—',
-            detail: 'Active college staff',
-            icon: GraduationCap,
-          },
-          {
-            label: 'Family contacts',
-            value: guardians.data
-              ? guardians.data.total.toLocaleString('en-PK')
-              : '—',
-            detail: 'Family contact records in your college',
-            icon: UserCheck,
-          },
-          {
-            label: 'Monthly collection',
-            value:
-              monthlyCollections.isPending || monthlyCollections.isError
-                ? '—'
-                : formatPKR(monthlyCollectionTotal),
-            detail: monthlyCollections.isError
-              ? 'Monthly receipts unavailable'
-              : `${collectionRange.dateFrom} to ${collectionRange.dateTo}`,
-            icon: ReceiptText,
-          },
-          {
-            label: 'Outstanding dues',
-            value: formatPKR(totals?.finance.totalPending),
-            detail: totals
-              ? 'Overdue: ' + formatPKR(totals.finance.totalOverdue)
-              : 'Dues load from college finance records',
-            icon: WalletCards,
-          },
-          {
-            label: 'Today’s attendance',
-            value:
-              typeof totals?.attendance.todayAttendanceRate === 'number'
-                ? String(totals.attendance.todayAttendanceRate) + '%'
-                : '—',
-            detail: totals
-              ? String(totals.attendance.recordsCount.toLocaleString('en-PK')) +
-                ' attendance records'
-              : 'Attendance summary',
-            icon: CalendarCheck,
-          },
-        ].map((metric) => (
-          <WorkspaceMetricCard key={metric.label} metric={metric} />
-        ))}
-      </div>
-      <div className="admin-overview-bottom reference-dashboard-bottom">
-        <section
-          aria-labelledby="admin-recent-admissions-title"
-          className="admin-activity-panel reference-dashboard-panel"
-        >
-          <div className="admin-panel-heading reference-panel-heading">
-            <div>
-              <h2 id="admin-recent-admissions-title">Recent admissions</h2>
-              <p>Latest applications received by the college</p>
-            </div>
-            {data.organization.id && (
-              <Link
-                className="admin-panel-link reference-view-all"
-                to={`/admin/organizations/${encodeURIComponent(data.organization.id)}/admissions`}
-              >
-                View all <ArrowUpRight size={14} aria-hidden="true" />
-              </Link>
-            )}
-          </div>
-          {recentAdmissions.isPending ? (
-            <LoadingState message="Loading recent applications…" />
-          ) : recentAdmissions.isError ? (
-            <p className="admin-inline-message" role="status">
-              Recent applications are temporarily unavailable.
-            </p>
-          ) : (recentAdmissions.data?.items.length ?? 0) === 0 ? (
-            <div className="admin-inline-empty">
-              <span className="admin-inline-empty-mark" aria-hidden="true">
-                <GraduationCap size={17} />
-              </span>
-              <div>
-                <strong>No recent applications</strong>
-                <p>
-                  New applicants will appear here when the college receives
-                  them.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="admin-recent-list reference-activity-list">
-              {recentAdmissions.data!.items.slice(0, 3).map((application) => (
-                <Link
-                  className="admin-recent-row reference-activity-row"
-                  key={application.id}
-                  to={`/admin/organizations/${encodeURIComponent(data.organization.id)}/admissions/applications/${encodeURIComponent(application.id)}`}
-                >
-                  <span className="admin-recent-avatar" aria-hidden="true">
-                    {(
-                      application.firstName.trim().charAt(0) || 'A'
-                    ).toUpperCase()}
-                    {(
-                      application.lastName.trim().charAt(0) || ''
-                    ).toUpperCase()}
-                  </span>
-                  <span className="admin-recent-copy reference-activity-copy">
-                    <strong>
-                      {application.firstName} {application.lastName}
-                    </strong>
-                    <small>
-                      {application.program || 'Application'} ·{' '}
-                      {formatDateShort(application.createdAt)}
-                    </small>
-                  </span>
-                  <span
-                    className={`admin-status-pill admin-status-${application.status} reference-status reference-status-${application.status === 'admitted' ? 'enrolled' : application.status === 'approved' ? 'approved' : application.status === 'rejected' ? 'info' : 'pending'}`}
-                  >
-                    {formatApplicationStatus(application.status)}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section
-          aria-labelledby="admin-weekly-attendance-title"
-          className="admin-activity-panel admin-attendance-panel reference-dashboard-panel"
-        >
-          <div className="admin-panel-heading reference-panel-heading">
-            <div>
-              <h2 id="admin-weekly-attendance-title">Attendance · This week</h2>
-              <p>Daily student attendance records</p>
-            </div>
-          </div>
-          {weeklyAttendance.isPending ? (
-            <LoadingState message="Loading attendance…" />
-          ) : weeklyAttendance.isError ? (
-            <p className="admin-inline-message" role="status">
-              Weekly attendance is temporarily unavailable.
-            </p>
-          ) : (
-            <>
-              <div
-                aria-label="Daily student attendance rate for the last seven days"
-                className="admin-weekly-bars reference-chart-bars"
-                role="img"
-              >
-                {dailyAttendance.map((day) => (
-                  <div
-                    className="admin-weekly-day reference-chart-day"
-                    key={day.key}
-                  >
-                    <div
-                      className="admin-weekly-track reference-chart-track"
-                      title={`${day.fullLabel}: ${day.count ? `${day.rate}% attendance` : 'No records'}`}
-                    >
-                      <span
-                        className="admin-weekly-fill reference-chart-fill"
-                        style={{ height: `${day.rate}%` }}
-                      />
-                    </div>
-                    <span className="admin-weekly-label">{day.label}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="admin-weekly-summary reference-chart-summary">
-                <span
-                  className="admin-weekly-summary-dot reference-chart-status-dot"
-                  aria-hidden="true"
-                />
-                {weeklyRate === null
-                  ? `No attendance records from ${attendanceRange.dateFrom} to ${attendanceRange.dateTo}`
-                  : `${weeklyRate}% average · ${recordedDays.length} day${recordedDays.length === 1 ? '' : 's'} with records`}
-              </div>
-            </>
-          )}
-        </section>
-      </div>
-      {(summary.isError || guardians.isError) && (
-        <p className="admin-data-note" role="status">
-          Some overview totals are temporarily unavailable. No sample figures
-          are being substituted; open the relevant module to review its records.
-        </p>
-      )}
-    </section>
   );
 }
 
@@ -1145,16 +638,15 @@ function SettingsPanel({
           setLogoError('');
           save.mutate({
             name: String(form.get('name')),
-            adminName: String(form.get('adminName') || '').trim() || undefined,
-            shortCode:
-              String(form.get('shortCode') || '')
-                .trim()
-                .toUpperCase() || undefined,
-            tagline: String(form.get('tagline') || '').trim() || undefined,
+            adminName: String(form.get('adminName') || '').trim(),
+            shortCode: String(form.get('shortCode') || '')
+              .trim()
+              .toUpperCase(),
+            tagline: String(form.get('tagline') || '').trim(),
             logoDataUrl,
-            contactEmail: String(form.get('contactEmail')) || undefined,
-            phone: String(form.get('phone')) || undefined,
-            timezone: String(form.get('timezone')) || undefined,
+            contactEmail: String(form.get('contactEmail') || ''),
+            phone: String(form.get('phone') || ''),
+            timezone: String(form.get('timezone') || 'UTC'),
             address: {
               line1: String(form.get('line1') || ''),
               city: String(form.get('city') || ''),
@@ -1207,10 +699,15 @@ function SettingsPanel({
           <div className="organization-logo-control">
             <div
               className="organization-logo-preview"
-              aria-label="Organization logo preview"
+              role="img"
+              aria-label={
+                logoDataUrl
+                  ? 'Current organization logo'
+                  : 'No organization logo selected'
+              }
             >
               {logoDataUrl ? (
-                <img src={logoDataUrl} alt="Organization logo preview" />
+                <img src={logoDataUrl} alt="" />
               ) : (
                 <GraduationCap size={24} aria-hidden="true" />
               )}
@@ -1220,6 +717,7 @@ function SettingsPanel({
                 Choose image
                 <input
                   aria-label="Upload organization logo"
+                  aria-describedby="organization-logo-help"
                   accept="image/png,image/jpeg,image/webp"
                   type="file"
                   onChange={(event) => {
@@ -1249,12 +747,16 @@ function SettingsPanel({
                         'Could not read this image. Please try another file.',
                       );
                     reader.readAsDataURL(file);
+                    event.target.value = '';
                     setLogoError('');
                   }}
                 />
               </label>
-              <span className="organization-logo-help">
-                PNG, JPG or WebP · up to 350 KB
+              <span
+                className="organization-logo-help"
+                id="organization-logo-help"
+              >
+                PNG, JPG or WebP (max 350 KB)
               </span>
               {logoDataUrl && (
                 <Button
@@ -1296,6 +798,7 @@ function SettingsPanel({
             name="timezone"
             defaultValue={organization.timezone ?? 'UTC'}
             maxLength={80}
+            required
           />
         </label>
         <label>
@@ -1340,9 +843,8 @@ function SettingsPanel({
             <p className="eyebrow">Danger Zone</p>
             <h2 id="danger-zone-title">Archive organization</h2>
             <p>
-              Archiving stops normal organization operations and removes this
-              organization from active workspaces. It does not delete data;
-              owners can restore it from My Organizations.
+              Temporarily closes this workspace. Your data stays safe and an
+              owner can restore it from My Organizations.
             </p>
           </div>
           {archive.isError && (
@@ -1351,6 +853,7 @@ function SettingsPanel({
             </p>
           )}
           <Button
+            className="organization-archive-action"
             disabled={archive.isPending}
             onClick={() => setArchiveOpen(true)}
             variant="danger"
@@ -1456,11 +959,6 @@ function CampusesPanel({
   return (
     <section className="organization-section campus-management">
       <div className="campus-panel-heading">
-        <div>
-          <p className="eyebrow">Organization locations</p>
-          <h2>Campuses</h2>
-          <p>Manage each campus and its contact details in one place.</p>
-        </div>
         {canCreate && (
           <Button
             variant="primary"
@@ -1790,6 +1288,8 @@ function MembersPanel({
   onDone: (message: string) => Promise<void>;
 }) {
   const [email, setEmail] = useState('');
+  const [whatsappShareUrl, setWhatsappShareUrl] = useState('');
+  const [inviteDeliveryNotice, setInviteDeliveryNotice] = useState('');
   const [role, setRole] = useState<string>('teacher');
   const [inviteCampusIds, setInviteCampusIds] = useState<string[]>([]);
   const [invitePermissions, setInvitePermissions] = useState<string[]>([
@@ -1816,9 +1316,26 @@ function MembersPanel({
           ? { permissions: invitePermissions }
           : {}),
       }),
-    onSuccess: async () => {
+    onMutate: () => {
+      setWhatsappShareUrl('');
+      setInviteDeliveryNotice('');
+    },
+    onSuccess: async (result) => {
       setEmail('');
-      await onDone('Invitation sent when delivery is available.');
+      setInviteCampusIds([]);
+      setWhatsappShareUrl(result.whatsappShareUrl ?? '');
+      setInviteDeliveryNotice(
+        result.emailSent
+          ? result.whatsappShareUrl
+            ? 'Invitation email sent successfully. You can also share the same secure link through WhatsApp.'
+            : 'Invitation email sent successfully.'
+          : 'Invitation link created, but the email provider rejected delivery. Share it through WhatsApp, or verify your sending domain to enable email invitations.',
+      );
+      await onDone(
+        result.emailSent
+          ? 'Invitation email sent.'
+          : 'Invitation created; email delivery needs sender-domain setup.',
+      );
     },
   });
   const save = useMutation({
@@ -1858,10 +1375,8 @@ function MembersPanel({
     <section className="organization-section">
       <div className="section-heading">
         <div>
-          <h2>Members</h2>
-          <p>
-            Membership roles and campus assignments are enforced by the API.
-          </p>
+          <h2>Team access</h2>
+          <p>Manage current members, roles, and campus access.</p>
         </div>
       </div>
       {canInvite && (
@@ -1872,21 +1387,32 @@ function MembersPanel({
             invite.mutate();
           }}
         >
+          <div className="member-invite-card-heading">
+            <span className="member-invite-icon" aria-hidden="true">
+              <UserPlus size={18} />
+            </span>
+            <div>
+              <h3>Invite a team member</h3>
+              <p>Send a secure invitation and choose the access they need.</p>
+            </div>
+          </div>
           <label>
-            Email
+            Email address
             <input
               type="email"
               required
+              autoComplete="email"
+              placeholder="name@organization.com"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
             />
           </label>
           <small className="field-hint">
             {role === 'parent_guardian'
-              ? 'Parent/guardian ko invite karte waqt wohi verified email use karein jo student ke Family contact record mein saved hai. Is email ka match hona zaroori hai.'
+              ? 'Use the same email saved in the student’s Family contact record.'
               : role === 'teacher'
-                ? 'Teacher ko invite karte waqt wohi email use karein jo Staff / Teachers profile mein save ki hai.'
-                : 'Invitee ko isi email address se account verify karke invitation accept karna hoga.'}
+                ? 'Use the same email saved in the Staff / Teachers profile.'
+                : 'The recipient must sign in with this exact email address to accept the invitation.'}
           </small>
           <label>
             Role
@@ -1943,9 +1469,32 @@ function MembersPanel({
               </div>
             </details>
           )}
-          <Button type="submit" disabled={invite.isPending}>
-            Invite member
+          <Button type="submit" disabled={invite.isPending || !email.trim()}>
+            <UserPlus size={15} aria-hidden="true" />
+            {invite.isPending ? 'Sending invitation…' : 'Send invitation'}
           </Button>
+          {inviteDeliveryNotice && (
+            <p
+              className={
+                inviteDeliveryNotice.includes('rejected')
+                  ? 'form-error'
+                  : 'admin-inline-message'
+              }
+              role="status"
+            >
+              {inviteDeliveryNotice}
+            </p>
+          )}
+          {whatsappShareUrl && (
+            <Button
+              type="button"
+              onClick={() =>
+                window.open(whatsappShareUrl, '_blank', 'noopener,noreferrer')
+              }
+            >
+              Share invitation via WhatsApp
+            </Button>
+          )}
         </form>
       )}
       {!list?.length ? (

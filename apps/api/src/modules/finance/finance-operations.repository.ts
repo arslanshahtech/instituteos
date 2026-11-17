@@ -36,11 +36,20 @@ function dateQuery(filters: FinanceDateFilters, field: string) {
 }
 
 function expenseRecord(value: Record<string, unknown>): FinanceExpenseRecord {
+  const description = String(value.description ?? '');
+  const isLegacyPayrollExpense =
+    value.source == null &&
+    value.category === 'salaries' &&
+    /^Salary (?:payment|advance)\s*[—-]\s/i.test(description);
   return {
     id: String(value._id),
     organizationId: String(value.organizationId),
     campusId: value.campusId ? String(value.campusId) : undefined,
-    description: String(value.description),
+    description,
+    source:
+      value.source === 'payroll' || isLegacyPayrollExpense
+        ? 'payroll'
+        : 'manual',
     category: value.category as ExpenseCategory,
     amount: decimalNumber(value.amount),
     paymentMethod: value.paymentMethod as PaymentMethod,
@@ -192,6 +201,50 @@ export class MongoFinanceOperationsRepository implements FinanceOperationsReposi
     );
   }
 
+  async updateExpense(
+    context: FinanceOperationsContext,
+    expenseId: string,
+    input: FinanceExpenseInput,
+  ): Promise<FinanceExpenseRecord | null> {
+    const query: Record<string, unknown> = {
+      _id: oid(expenseId),
+      organizationId: oid(context.organizationId),
+      $nor: [
+        { source: 'payroll' },
+        {
+          source: { $exists: false },
+          category: 'salaries',
+          description: {
+            $regex: '^Salary (payment|advance) [—-] ',
+            $options: 'i',
+          },
+        },
+      ],
+    };
+    if (context.campusIds.length)
+      query.campusId = { $in: context.campusIds.map(oid) };
+    const record = await FinanceExpenseModel.findOneAndUpdate(
+      query,
+      {
+        $set: {
+          campusId: input.campusId ? oid(input.campusId) : null,
+          description: input.description,
+          category: input.category,
+          amount: mongoose.Types.Decimal128.fromString(input.amount.toFixed(2)),
+          paymentMethod: input.paymentMethod,
+          expenseDate: new Date(input.expenseDate + 'T00:00:00.000Z'),
+          reference: input.reference,
+        },
+      },
+      { new: true, runValidators: true },
+    )
+      .lean()
+      .exec();
+    return record
+      ? expenseRecord(record as unknown as Record<string, unknown>)
+      : null;
+  }
+
   async deleteExpense(
     context: FinanceOperationsContext,
     expenseId: string,
@@ -199,6 +252,17 @@ export class MongoFinanceOperationsRepository implements FinanceOperationsReposi
     const query: Record<string, unknown> = {
       _id: oid(expenseId),
       organizationId: oid(context.organizationId),
+      $nor: [
+        { source: 'payroll' },
+        {
+          source: { $exists: false },
+          category: 'salaries',
+          description: {
+            $regex: '^Salary (payment|advance) [—-] ',
+            $options: 'i',
+          },
+        },
+      ],
     };
     if (context.campusIds.length) {
       query.campusId = { $in: context.campusIds.map(oid) };

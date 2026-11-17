@@ -27,7 +27,14 @@ function settingsRecord(
       smsAlerts: false,
       autoAttendanceAlerts: false,
     },
-    staffSetup: { departments: [], designations: [], employmentTypes: [], workShifts: [], qualifications: [], documentTypes: [] },
+    staffSetup: {
+      departments: [],
+      designations: [],
+      employmentTypes: [],
+      workShifts: [],
+      qualifications: [],
+      documentTypes: [],
+    },
     teacherSelfAttendance: {
       viewOwnAttendance: true,
       selfMarkingEnabled: false,
@@ -82,6 +89,39 @@ describe('SettingsService', () => {
     await expect(service.getSettings(organizationId)).resolves.toEqual(
       settingsRecord(),
     );
+  });
+
+  it('fills newly added settings sections for older stored records', async () => {
+    const legacyRecord = {
+      organizationId,
+      branding: { primaryColor: '#111111' },
+      contact: {},
+      localization: { timezone: 'UTC' },
+      notifications: { emailAlerts: false },
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z',
+    } as unknown as OrganizationSettingsRecord;
+    const service = new SettingsService(
+      repository({
+        findSettings: vi.fn().mockResolvedValue(legacyRecord),
+      }),
+      () => new Date('2026-01-01T00:00:00.000Z'),
+    );
+
+    const result = await service.getSettings(organizationId);
+
+    expect(result.branding.primaryColor).toBe('#111111');
+    expect(result.localization).toEqual({
+      timezone: 'UTC',
+      currency: 'PKR',
+      dateFormat: 'YYYY-MM-DD',
+    });
+    expect(result.staffSetup.departments).toEqual([]);
+    expect(result.teacherSelfAttendance).toEqual({
+      viewOwnAttendance: true,
+      selfMarkingEnabled: false,
+      allowedStatuses: ['present'],
+    });
   });
 
   it('persists updates and writes an audit log for changed settings', async () => {
@@ -145,17 +185,32 @@ describe('SettingsService', () => {
     );
   });
 
-
   it('persists organization-specific staff setup lists', async () => {
     const repo = repository();
-    const service = new SettingsService(repo, () => new Date('2026-01-01T00:00:00.000Z'));
+    const service = new SettingsService(
+      repo,
+      () => new Date('2026-01-01T00:00:00.000Z'),
+    );
     const staffSetup = {
       departments: [{ id: 'dept-1', name: 'Academics', isActive: true }],
-      designations: [], employmentTypes: [], workShifts: [], qualifications: [], documentTypes: [],
+      designations: [],
+      employmentTypes: [],
+      workShifts: [],
+      qualifications: [],
+      documentTypes: [],
     };
-    await service.updateSettings(organizationId, { staffSetup }, { userId, role: 'organization_owner' });
-    expect(repo.updateSettings).toHaveBeenCalledWith(organizationId, { staffSetup });
-    expect(repo.createSettingsAuditLog).toHaveBeenCalledWith(organizationId, userId);
+    await service.updateSettings(
+      organizationId,
+      { staffSetup },
+      { userId, role: 'organization_owner' },
+    );
+    expect(repo.updateSettings).toHaveBeenCalledWith(organizationId, {
+      staffSetup,
+    });
+    expect(repo.createSettingsAuditLog).toHaveBeenCalledWith(
+      organizationId,
+      userId,
+    );
   });
 
   it('rejects an empty or unsupported self-attendance status list', async () => {
@@ -176,6 +231,45 @@ describe('SettingsService', () => {
         { userId, role: 'organization_owner' },
       ),
     ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+  });
+
+  it('validates localization, contact email and branding values before persistence', async () => {
+    const repo = repository();
+    const service = new SettingsService(repo);
+
+    await expect(
+      service.updateSettings(
+        organizationId,
+        { localization: { timezone: 'Mars/Olympus' } },
+        { userId, role: 'organization_owner' },
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+
+    await expect(
+      service.updateSettings(
+        organizationId,
+        { localization: { currency: 'US' } },
+        { userId, role: 'organization_owner' },
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+
+    await expect(
+      service.updateSettings(
+        organizationId,
+        { contact: { email: 'not-an-email' } },
+        { userId, role: 'organization_owner' },
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+
+    await expect(
+      service.updateSettings(
+        organizationId,
+        { branding: { primaryColor: 'teal' } },
+        { userId, role: 'organization_owner' },
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+
+    expect(repo.updateSettings).not.toHaveBeenCalled();
   });
 
   it('rejects settings updates from non-manager roles', async () => {

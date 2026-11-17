@@ -18,7 +18,10 @@ import {
   StudentAttendanceModel,
   StudentSectionPlacementModel,
 } from '../attendance/attendance.model.js';
-import { StudentInvoiceModel } from '../finance/finance.model.js';
+import {
+  PaymentReceiptModel,
+  StudentInvoiceModel,
+} from '../finance/finance.model.js';
 import { HomeworkTestModel } from '../homework/homework.model.js';
 import {
   ExamMarkModel,
@@ -122,28 +125,28 @@ export async function activeStudentIdsForAccount(
     email,
   })
     .select({ _id: 1 })
-    .limit(2)
+    .limit(100)
     .lean();
-  if (guardians.length !== 1) {
+  if (guardians.length === 0) {
     throw new AppError(
       403,
       'PORTAL_ACCOUNT_UNLINKED',
-      'Your account must match exactly one guardian record. Please contact the college office.',
+      'Your account must match at least one guardian record. Please contact the college office.',
     );
   }
 
-  const guardianId = guardians[0]!._id;
+  const guardianIds = guardians.map((guardian) => guardian._id);
   const [links, legacyLinkedStudents] = await Promise.all([
     StudentGuardianLinkModel.find({
       organizationId: organizationObjectId,
-      guardianId,
+      guardianId: { $in: guardianIds },
     })
       .select({ studentId: 1 })
       .lean(),
     StudentModel.find({
       organizationId: organizationObjectId,
       status: 'active',
-      guardianIds: guardianId,
+      guardianIds: { $in: guardianIds },
     })
       .select({ _id: 1 })
       .lean(),
@@ -277,31 +280,39 @@ export async function publishedHomeworkForPlacement(
 async function studentPortalRecord(organizationId: string, studentId: string) {
   const organizationObjectId = oid(organizationId);
   const studentObjectId = oid(studentId);
-  const [student, attendance, invoices, activeYear] = await Promise.all([
-    StudentModel.findOne({
-      _id: studentObjectId,
-      organizationId: organizationObjectId,
-      status: 'active',
-    }).lean(),
-    StudentAttendanceModel.find({
-      organizationId: organizationObjectId,
-      studentId: studentObjectId,
-    })
-      .sort({ date: -1 })
-      .lean(),
-    StudentInvoiceModel.find({
-      organizationId: organizationObjectId,
-      studentId: studentObjectId,
-    })
-      .sort({ dueDate: -1 })
-      .lean(),
-    AcademicYearModel.findOne({
-      organizationId: organizationObjectId,
-      status: 'active',
-    })
-      .sort({ startDate: -1 })
-      .lean(),
-  ]);
+  const [student, attendance, invoices, receipts, activeYear] =
+    await Promise.all([
+      StudentModel.findOne({
+        _id: studentObjectId,
+        organizationId: organizationObjectId,
+        status: 'active',
+      }).lean(),
+      StudentAttendanceModel.find({
+        organizationId: organizationObjectId,
+        studentId: studentObjectId,
+      })
+        .sort({ date: -1 })
+        .lean(),
+      StudentInvoiceModel.find({
+        organizationId: organizationObjectId,
+        studentId: studentObjectId,
+      })
+        .sort({ dueDate: -1 })
+        .lean(),
+      PaymentReceiptModel.find({
+        organizationId: organizationObjectId,
+        studentId: studentObjectId,
+      })
+        .sort({ paymentDate: -1, createdAt: -1 })
+        .limit(100)
+        .lean(),
+      AcademicYearModel.findOne({
+        organizationId: organizationObjectId,
+        status: 'active',
+      })
+        .sort({ startDate: -1 })
+        .lean(),
+    ]);
   if (!student) return null;
 
   const placement = await StudentSectionPlacementModel.findOne({
@@ -372,10 +383,11 @@ async function studentPortalRecord(organizationId: string, studentId: string) {
   const absent = attendance.filter(
     (record) => record.status === 'absent',
   ).length;
+  const late = attendance.filter((record) => record.status === 'late').length;
   const leave = attendance.filter((record) => record.status === 'leave').length;
-  const totalMarked = present + absent + leave;
+  const totalMarked = present + absent + late + leave;
   const attendancePercentage = totalMarked
-    ? Math.round((present / totalMarked) * 1000) / 10
+    ? Math.round(((present + late) / totalMarked) * 1000) / 10
     : null;
 
   const feeItems = invoices.map((invoice) => {
@@ -388,11 +400,32 @@ async function studentPortalRecord(organizationId: string, studentId: string) {
       id: String(invoice._id),
       invoiceNumber: String(invoice.invoiceNumber),
       billingCycle: String(invoice.billingCycle),
+      issueDate: dateOnly(invoice.issueDate),
       dueDate: dateOnly(invoice.dueDate),
       totalAmount,
       paidAmount,
+      discountAmount: numeric(invoice.discountAmount),
+      arrearsAmount,
       outstandingAmount: Math.max(0, totalAmount - paidAmount) + arrearsAmount,
       status: String(invoice.status),
+    };
+  });
+  const invoiceById = new Map(
+    invoices.map((invoice) => [String(invoice._id), invoice]),
+  );
+  const receiptItems = receipts.map((receipt) => {
+    const invoice = invoiceById.get(String(receipt.invoiceId));
+    return {
+      id: String(receipt._id),
+      receiptNumber: String(receipt.receiptNumber),
+      invoiceNumber: invoice ? String(invoice.invoiceNumber) : '?',
+      billingCycle: invoice ? String(invoice.billingCycle) : 'Fee payment',
+      amountPaid: numeric(receipt.amountPaid),
+      paymentMethod: String(receipt.paymentMethod),
+      transactionReference: receipt.transactionReference
+        ? String(receipt.transactionReference)
+        : '',
+      paymentDate: dateOnly(receipt.paymentDate),
     };
   });
 
@@ -418,6 +451,7 @@ async function studentPortalRecord(organizationId: string, studentId: string) {
       totalMarked,
       present,
       absent,
+      late,
       leave,
       percentage: attendancePercentage,
       records: attendance.map((record) => ({
@@ -431,7 +465,19 @@ async function studentPortalRecord(organizationId: string, studentId: string) {
         Math.round(
           feeItems.reduce((sum, fee) => sum + fee.outstandingAmount, 0) * 100,
         ) / 100,
+      totalPaid:
+        Math.round(
+          feeItems.reduce((sum, fee) => sum + fee.paidAmount, 0) * 100,
+        ) / 100,
+      totalInvoiced:
+        Math.round(
+          feeItems.reduce(
+            (sum, fee) => sum + fee.totalAmount + fee.arrearsAmount,
+            0,
+          ) * 100,
+        ) / 100,
       invoices: feeItems,
+      receipts: receiptItems,
     },
     results: publishedResults,
     resultsAvailable: publishedResults.length > 0,
@@ -441,6 +487,7 @@ async function studentPortalRecord(organizationId: string, studentId: string) {
       instructions: String(record.instructions ?? ''),
       type: String(record.type),
       dueDate: dateOnly(record.dueDate),
+      assignedDate: dateOnly(record.createdAt),
       totalMarks:
         record.totalMarks === undefined ? null : numeric(record.totalMarks),
       subjectName:

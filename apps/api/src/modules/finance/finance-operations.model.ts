@@ -20,6 +20,12 @@ const financeExpenseSchema = new Schema(
     },
     campusId: { type: Schema.Types.ObjectId, ref: 'Campus', default: null },
     description: { type: String, required: true, trim: true, maxlength: 180 },
+    source: {
+      type: String,
+      enum: ['manual', 'payroll'],
+      default: 'manual',
+      immutable: true,
+    },
     category: {
       type: String,
       enum: [

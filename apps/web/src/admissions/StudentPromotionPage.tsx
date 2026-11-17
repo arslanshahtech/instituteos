@@ -417,20 +417,17 @@ export function StudentPromotionPage() {
 
   return (
     <main className="page-stack">
-      <header className="page-heading">
+      <header className="page-heading promotion-page-heading">
         <div>
           <h1>Promote students</h1>
-          <p>
-            Move students to their next class at the end of a session. You
-            choose who moves where, and what they pay.
-          </p>
+          <p>Move students to a new session, map classes and confirm fees.</p>
         </div>
         <button
           type="button"
           className="button button-secondary"
           onClick={() => setShowHistory((value) => !value)}
         >
-          {showHistory ? 'Hide history' : 'Past promotions'}
+          {showHistory ? 'Hide history' : 'Past Promotion'}
         </button>
       </header>
 
@@ -482,28 +479,14 @@ export function StudentPromotionPage() {
         </section>
       )}
 
-      <nav
-        aria-label="Promotion steps"
-        style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}
-      >
+      <nav className="promotion-stepper" aria-label="Promotion steps">
         {(
           ['Sessions', 'Class map', 'Students and fees', 'Review'] as const
         ).map((label, index) => (
           <div
             key={label}
+            className="promotion-step"
             aria-current={step === index + 1 ? 'step' : undefined}
-            style={{
-              padding: '8px 12px',
-              border: `1px solid ${step === index + 1 ? 'var(--color-primary, #2563eb)' : 'var(--border, #d7dce2)'}`,
-              borderRadius: 7,
-              color:
-                step === index + 1
-                  ? 'var(--text, inherit)'
-                  : 'var(--muted, #718096)',
-              background:
-                step === index + 1 ? 'var(--surface, white)' : 'transparent',
-              fontSize: 13,
-            }}
           >
             {index + 1}. {label}
           </div>
@@ -620,10 +603,7 @@ export function StudentPromotionPage() {
             )}
             {!yearsQuery.isLoading && years.length === 0 && (
               <div role="status" style={{ marginTop: 16 }}>
-                <p>
-                  No academic sessions have been created yet. Create a session
-                  first to continue.
-                </p>
+                <p>No sessions found. Create one to continue.</p>
                 <button
                   type="button"
                   className="button button-secondary"
@@ -646,7 +626,7 @@ export function StudentPromotionPage() {
                   <span
                     style={{ fontWeight: 600, color: 'var(--text, #20252b)' }}
                   >
-                    Moving into a session that is not listed?
+                    Need another session?
                   </span>{' '}
                   <button
                     type="button"
@@ -663,41 +643,30 @@ export function StudentPromotionPage() {
                       )
                     }
                   >
-                    Create a new session
+                    Create session
                   </button>
                 </p>
               )}
             {sourceAcademicYearId && (
               <div
+                className="promotion-active-count"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 14,
-                  marginTop: 18,
-                  padding: '13px 16px',
+                  gap: 10,
+                  marginTop: 14,
+                  padding: '9px 12px',
                   border: '1px solid var(--border, #e1e5ea)',
-                  borderRadius: 9,
-                  background: 'var(--surface-subtle, #f7f9fb)',
+                  borderRadius: 8,
+                  background: 'var(--surface, white)',
                 }}
                 role="status"
                 aria-live="polite"
               >
-                <div
-                  style={{
-                    display: 'grid',
-                    placeItems: 'center',
-                    width: 36,
-                    height: 36,
-                    flex: '0 0 36px',
-                    borderRadius: 9,
-                    background: 'var(--surface, white)',
-                    color: 'var(--color-primary, #2563eb)',
-                    fontSize: 18,
-                    fontWeight: 700,
-                  }}
-                >
-                  #
-                </div>
+                <span
+                  className="promotion-active-count__dot"
+                  aria-hidden="true"
+                />
                 <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
                   <strong style={{ fontSize: 14, lineHeight: 1.35 }}>
                     {sourceCountQuery.isLoading ||
@@ -717,11 +686,6 @@ export function StudentPromotionPage() {
                   >
                     {years.find((year) => year.id === sourceAcademicYearId)
                       ?.name ?? 'Selected session'}
-                    {sourceCountQuery.isLoading || !campusId
-                      ? ' · Loading the session student summary.'
-                      : sourceCountQuery.data?.count === 0
-                        ? ' · No active students found in this session.'
-                        : ' · Students currently assigned to this session.'}
                   </span>
                   {sourceCountQuery.error && (
                     <span
@@ -762,11 +726,11 @@ export function StudentPromotionPage() {
                 <p
                   style={{ margin: '5px 0 0', color: 'var(--muted, #718096)' }}
                 >
-                  Choose which classes move forward. Sections are matched
-                  automatically; you can change any destination.
+                  Set each class destination and adjust section placement.
                 </p>
               </div>
               <div
+                className="promotion-class-map-actions"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -780,14 +744,14 @@ export function StudentPromotionPage() {
                 </strong>
                 <button
                   type="button"
-                  className="button button-secondary"
+                  className="button button-secondary promotion-include-all"
                   onClick={() => setExcludedClassIds([])}
                 >
                   Include all
                 </button>
                 <button
                   type="button"
-                  className="button button-secondary"
+                  className="button button-secondary promotion-leave-all"
                   onClick={() => {
                     setExcludedClassIds(sourceClasses.map((item) => item.id));
                     setSelectedIds([]);
@@ -817,6 +781,7 @@ export function StudentPromotionPage() {
                 return (
                   <article
                     key={source.id}
+                    className="promotion-map-card"
                     style={{
                       padding: '16px 20px',
                       borderBottom: '1px solid var(--border, #e1e5ea)',
@@ -903,6 +868,7 @@ export function StudentPromotionPage() {
                             ? 'Promote to'
                             : ''}
                           <select
+                            className="promotion-outcome-select"
                             style={controlStyle}
                             value={firstMapping?.outcome ?? 'graduated'}
                             disabled={excluded || !firstSection}
@@ -998,15 +964,17 @@ export function StudentPromotionPage() {
                                 return (
                                   <div
                                     key={section.id}
+                                    className="promotion-section-map-row"
                                     style={{
                                       display: 'grid',
                                       gridTemplateColumns:
-                                        'minmax(70px, 0.55fr) minmax(130px, 1fr) minmax(130px, 1fr)',
-                                      gap: 8,
+                                        'minmax(56px, auto) 18px minmax(0, 1fr)',
+                                      gap: 7,
                                       alignItems: 'center',
                                     }}
                                   >
                                     <span
+                                      className="promotion-section-map-label"
                                       style={{
                                         fontSize: 13,
                                         color: 'var(--muted, #718096)',
@@ -1014,52 +982,12 @@ export function StudentPromotionPage() {
                                     >
                                       {section.name}
                                     </span>
-                                    <select
-                                      aria-label={
-                                        source.name +
-                                        ' ' +
-                                        section.name +
-                                        ' destination class'
-                                      }
-                                      style={controlStyle}
-                                      value={mapping.targetClassId ?? ''}
-                                      disabled={mapping.outcome === 'repeated'}
-                                      onChange={(event) => {
-                                        const targetClassId =
-                                          event.target.value;
-                                        const matchingSection =
-                                          (preview?.sections ?? []).find(
-                                            (item) =>
-                                              item.classId === targetClassId &&
-                                              item.name.toLowerCase() ===
-                                                section.name.toLowerCase(),
-                                          ) ??
-                                          (preview?.sections ?? []).find(
-                                            (item) =>
-                                              item.classId === targetClassId,
-                                          );
-                                        updateMapping(source.id, section.id, {
-                                          targetClassId,
-                                          targetSectionId: matchingSection?.id,
-                                          feeStructureId:
-                                            preferredFeeForClass(targetClassId)
-                                              ?.id,
-                                        });
-                                      }}
+                                    <span
+                                      className="promotion-section-map-arrow"
+                                      aria-hidden="true"
                                     >
-                                      <option value="">Select class</option>
-                                      {(preview?.classes ?? [])
-                                        .filter(
-                                          (item) =>
-                                            mapping.outcome === 'repeated' ||
-                                            item.id !== source.id,
-                                        )
-                                        .map((item) => (
-                                          <option key={item.id} value={item.id}>
-                                            {item.name}
-                                          </option>
-                                        ))}
-                                    </select>
+                                      →
+                                    </span>
                                     <select
                                       aria-label={
                                         source.name +
@@ -1067,6 +995,7 @@ export function StudentPromotionPage() {
                                         section.name +
                                         ' destination section'
                                       }
+                                      className="promotion-section-map-select"
                                       style={controlStyle}
                                       value={mapping.targetSectionId ?? ''}
                                       onChange={(event) =>
@@ -1086,17 +1015,13 @@ export function StudentPromotionPage() {
                                         </option>
                                       ))}
                                     </select>
-                                    <small
-                                      style={{
-                                        gridColumn: '2 / -1',
-                                        color: 'var(--muted, #718096)',
-                                        fontSize: 12,
-                                      }}
-                                    >
-                                      Destination class fee:{' '}
-                                      {destinationFee
-                                        ? `${destinationFee.name} · ${formatMoney(destinationFee.total)}`
-                                        : `No fee structure for ${years.find((year) => year.id === targetAcademicYearId)?.name ?? 'the target session'}`}
+                                    <small className="promotion-section-map-fee">
+                                      <span>Fee</span>
+                                      <span>
+                                        {destinationFee
+                                          ? `${destinationFee.name} · ${formatMoney(destinationFee.total)}`
+                                          : `No fee structure for ${years.find((year) => year.id === targetAcademicYearId)?.name ?? 'the target session'}`}
+                                      </span>
                                     </small>
                                   </div>
                                 );

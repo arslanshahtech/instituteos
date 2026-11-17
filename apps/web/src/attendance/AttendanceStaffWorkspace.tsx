@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { paginateItems } from './attendance-utils.js';
 import type { StaffRecord } from '../staff/staff-api.js';
 import type {
   StaffAttendanceRecord,
@@ -8,12 +9,19 @@ import type {
 type StaffFilter =
   'all' | 'present' | 'absent' | 'on-leave' | 'half-day' | 'not-marked';
 
+const staffMarkableStatuses: StaffAttendanceStatus[] = [
+  'present',
+  'absent',
+  'on-leave',
+  'half-day',
+];
+
 interface AttendanceStaffWorkspaceProps {
-  date: string;
-  onDateChange: (date: string) => void;
   staff: StaffRecord[];
   records: StaffAttendanceRecord[];
   canWrite: boolean;
+  date: string;
+  onDateChange: (date: string) => void;
   isSaving: boolean;
   saveError?: string;
   onSave: (
@@ -45,11 +53,11 @@ function formatTime(value?: string) {
 }
 
 export function AttendanceStaffWorkspace({
-  date,
-  onDateChange,
   staff,
   records,
   canWrite,
+  date,
+  onDateChange,
   isSaving,
   saveError,
   onSave,
@@ -63,6 +71,7 @@ export function AttendanceStaffWorkspace({
   const [manualStatus, setManualStatus] =
     useState<StaffAttendanceStatus>('present');
   const [remarks, setRemarks] = useState('');
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const recordsByStaffId = useMemo(
     () => new Map(records.map((record) => [record.staffId, record])),
@@ -76,6 +85,7 @@ export function AttendanceStaffWorkspace({
       checkedIn: statuses.filter((status) => status === 'present').length,
       present: statuses.filter((status) => status === 'present').length,
       absent: statuses.filter((status) => status === 'absent').length,
+      halfDay: statuses.filter((status) => status === 'half-day').length,
       leave: statuses.filter((status) => status === 'on-leave').length,
     };
   }, [recordsByStaffId, staff]);
@@ -105,12 +115,13 @@ export function AttendanceStaffWorkspace({
     });
   }, [filter, recordsByStaffId, search, staff]);
 
-  const pageCount = Math.max(1, Math.ceil(visibleStaff.length / pageSize));
-  const currentPage = Math.min(page, pageCount);
-  const pageStart =
-    visibleStaff.length === 0 ? 0 : (currentPage - 1) * pageSize;
-  const pageEnd = Math.min(pageStart + pageSize, visibleStaff.length);
-  const paginatedStaff = visibleStaff.slice(pageStart, pageEnd);
+  const {
+    items: paginatedStaff,
+    pageCount,
+    currentPage,
+    start: pageStart,
+    end: pageEnd,
+  } = paginateItems(visibleStaff, page, pageSize);
 
   const manualStaff = staff.find((person) => person.id === manualStaffId);
 
@@ -126,6 +137,24 @@ export function AttendanceStaffWorkspace({
     }
   }
 
+  async function markAllPresent() {
+    if (!canWrite || isSaving || bulkSaving || staff.length === 0) return;
+    if (
+      !window.confirm(
+        `Mark all ${staff.length} active staff members present for today?`,
+      )
+    )
+      return;
+    setBulkSaving(true);
+    try {
+      await Promise.all(staff.map((person) => onSave(person.id, 'present')));
+    } catch {
+      // The parent displays the save error for the failed attendance request.
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
   return (
     <section
       className="attendance-staff-workspace"
@@ -134,21 +163,8 @@ export function AttendanceStaffWorkspace({
       <header className="attendance-staff-heading">
         <div>
           <h2>Staff Attendance</h2>
-          <p>Team attendance status for the selected day.</p>
+          <p>Record and review staff attendance.</p>
         </div>
-        <button
-          className="attendance-staff-manual attendance-staff-manual-top"
-          disabled={!canWrite || isSaving || staff.length === 0}
-          onClick={() => {
-            setManualStaffId('');
-            setManualStatus('present');
-            setRemarks('');
-            setManualOpen(true);
-          }}
-          type="button"
-        >
-          + Manual Mark
-        </button>
       </header>
 
       <div
@@ -156,8 +172,8 @@ export function AttendanceStaffWorkspace({
         aria-label="Staff attendance summary"
       >
         <article className="attendance-staff-metric attendance-staff-metric-checked">
-          <span className="attendance-staff-metric-label">Checked In</span>
-          <strong>{counts.checkedIn}</strong>
+          <span className="attendance-staff-metric-label">Total Staff</span>
+          <strong>{staff.length}</strong>
           <span className="attendance-staff-metric-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
               <path d="m5 12 4.2 4.2L19 6.5" />
@@ -184,8 +200,10 @@ export function AttendanceStaffWorkspace({
           </span>
         </article>
         <article className="attendance-staff-metric attendance-staff-metric-leave">
-          <span className="attendance-staff-metric-label">On Leave</span>
-          <strong>{counts.leave}</strong>
+          <span className="attendance-staff-metric-label">
+            Leave / Half day
+          </span>
+          <strong>{counts.leave + counts.halfDay}</strong>
           <span className="attendance-staff-metric-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="8" />
@@ -195,65 +213,69 @@ export function AttendanceStaffWorkspace({
         </article>
       </div>
 
-      <div className="attendance-staff-toolbar attendance-staff-filter-panel">
-        <label className="attendance-staff-date">
-          <span className="attendance-staff-date-icon" aria-hidden="true">
-            ▦
-          </span>
-          <input
-            aria-label="Attendance date"
-            onChange={(event) => onDateChange(event.target.value)}
-            type="date"
-            value={date}
-          />
-        </label>
-        <label className="attendance-staff-search">
-          <input
-            aria-label="Search staff"
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
-            placeholder="Search staff by name, ID or role"
-            type="search"
-            value={search}
-          />
-          <svg
-            className="attendance-staff-search-icon"
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-          >
-            <circle cx="10.8" cy="10.8" r="6.3" />
-            <path d="m16 16 4.2 4.2" />
-          </svg>
-        </label>
-        <label className="attendance-staff-filter">
-          <select
-            aria-label="Staff attendance status"
-            onChange={(event) => {
-              setFilter(event.target.value as StaffFilter);
-              setPage(1);
-            }}
-            value={filter}
-          >
-            <option value="all">All Staff</option>
-            <option value="present">Present</option>
-            <option value="absent">Absent</option>
-            <option value="on-leave">Leave</option>
-            <option value="half-day">Half day</option>
-            <option value="not-marked">Not checked in</option>
-          </select>
-        </label>
-      </div>
-
       <div className="attendance-staff-table-card">
+        <div className="attendance-staff-table-toolbar">
+          <label className="attendance-staff-search">
+            <input
+              aria-label="Search staff"
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+              placeholder="Search staff by name, ID or role"
+              type="search"
+              value={search}
+            />
+            <svg
+              className="attendance-staff-search-icon"
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+            >
+              <circle cx="10.8" cy="10.8" r="6.3" />
+              <path d="m16 16 4.2 4.2" />
+            </svg>
+          </label>
+          <label className="attendance-staff-date">
+            <input
+              aria-label="Attendance date"
+              onChange={(event) => onDateChange(event.target.value)}
+              type="date"
+              value={date}
+            />
+          </label>
+          <label className="attendance-staff-filter">
+            <select
+              aria-label="Staff attendance status"
+              onChange={(event) => {
+                setFilter(event.target.value as StaffFilter);
+                setPage(1);
+              }}
+              value={filter}
+            >
+              <option value="all">All Staff</option>
+              <option value="present">Present</option>
+              <option value="absent">Absent</option>
+              <option value="on-leave">Leave</option>
+              <option value="half-day">Half day</option>
+              <option value="not-marked">Not marked</option>
+            </select>
+          </label>
+          <button
+            className="attendance-staff-checkin attendance-staff-bulk-button"
+            disabled={!canWrite || isSaving || bulkSaving || staff.length === 0}
+            onClick={() => void markAllPresent()}
+            type="button"
+          >
+            {bulkSaving ? 'Saving...' : 'Mark All Present'}
+          </button>
+        </div>
         <div className="attendance-staff-table-scroll">
           <table className="attendance-staff-table">
             <thead>
               <tr>
                 <th scope="col">Staff</th>
                 <th scope="col">Role</th>
-                <th scope="col">Check-in</th>
+                <th scope="col">Time</th>
                 <th scope="col">Status</th>
                 <th scope="col">Action</th>
               </tr>
@@ -273,9 +295,9 @@ export function AttendanceStaffWorkspace({
                           <strong>
                             {person.firstName} {person.lastName}
                           </strong>
-                          <small>
-                            {person.employeeCode || 'Employee ID not set'}
-                          </small>
+                          {person.employeeCode ? (
+                            <small>{person.employeeCode}</small>
+                          ) : null}
                         </span>
                       </div>
                     </td>
@@ -299,12 +321,13 @@ export function AttendanceStaffWorkspace({
                       <span
                         className={`attendance-staff-status attendance-staff-status-${status || 'not-marked'}`}
                       >
-                        {status ? statusLabels[status] : 'Not checked in'}
+                        {status ? statusLabels[status] : 'Not marked'}
                       </span>
                     </td>
                     <td>
                       <div className="attendance-staff-row-actions">
                         <button
+                          aria-label="Mark Present"
                           className="attendance-staff-checkin"
                           disabled={
                             !canWrite || isSaving || status === 'present'
@@ -316,9 +339,18 @@ export function AttendanceStaffWorkspace({
                           }}
                           type="button"
                         >
-                          {status === 'present' ? 'Checked in' : 'Check-in'}
+                          <span className="attendance-staff-action-desktop">
+                            {status === 'present' ? 'Present' : 'Mark Present'}
+                          </span>
+                          <span
+                            className="attendance-staff-action-mobile"
+                            aria-hidden="true"
+                          >
+                            ✓
+                          </span>
                         </button>
                         <button
+                          aria-label="Manual Mark"
                           className="attendance-staff-manual"
                           disabled={!canWrite || isSaving}
                           onClick={() => {
@@ -329,7 +361,12 @@ export function AttendanceStaffWorkspace({
                           }}
                           type="button"
                         >
-                          Manual Mark
+                          <span className="attendance-staff-action-desktop">
+                            Manual Mark
+                          </span>
+                          <span className="attendance-staff-action-mobile">
+                            Manual
+                          </span>
                         </button>
                       </div>
                     </td>
@@ -363,7 +400,7 @@ export function AttendanceStaffWorkspace({
           <button
             aria-label="Previous page"
             disabled={currentPage <= 1}
-            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            onClick={() => setPage(currentPage - 1)}
             type="button"
           >
             <span aria-hidden="true">‹</span>
@@ -371,9 +408,7 @@ export function AttendanceStaffWorkspace({
           <button
             aria-label="Next page"
             disabled={currentPage >= pageCount}
-            onClick={() =>
-              setPage((current) => Math.min(pageCount, current + 1))
-            }
+            onClick={() => setPage(currentPage + 1)}
             type="button"
           >
             <span aria-hidden="true">›</span>
@@ -437,9 +472,9 @@ export function AttendanceStaffWorkspace({
                 }
                 value={manualStatus}
               >
-                {Object.entries(statusLabels).map(([value, label]) => (
+                {staffMarkableStatuses.map((value) => (
                   <option key={value} value={value}>
-                    {label}
+                    {statusLabels[value]}
                   </option>
                 ))}
               </select>

@@ -11,7 +11,20 @@ import type {
   StudentExamReport,
 } from './examinations.types.js';
 
-const examTypes = ['midterm', 'final', 'quiz', 'monthly_test', 'class_test', 'mid_year', 'send_up', 'annual', 'practical', 'viva', 'supplementary', 'improvement'] as const;
+const examTypes = [
+  'midterm',
+  'final',
+  'quiz',
+  'monthly_test',
+  'class_test',
+  'mid_year',
+  'send_up',
+  'annual',
+  'practical',
+  'viva',
+  'supplementary',
+  'improvement',
+] as const;
 
 function text(value: string | undefined, field: string, max: number): string {
   const normalized = value?.trim();
@@ -236,18 +249,27 @@ export class ExaminationsService {
       ))
     )
       throw new AppError(400, 'VALIDATION_ERROR', 'Select an active campus.');
-    if (!(await this.repository.validateAcademicYear(
-      context.organizationId,
-      normalized.academicYearId,
-    )))
-      throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid academic year.');
-    if (normalized.termId && !(await this.repository.validateTerm(
-      context.organizationId,
-      normalized.academicYearId,
-      normalized.termId,
-      normalized.startDate,
-      normalized.endDate,
-    )))
+    if (
+      !(await this.repository.validateAcademicYear(
+        context.organizationId,
+        normalized.academicYearId,
+      ))
+    )
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Select a valid academic year.',
+      );
+    if (
+      normalized.termId &&
+      !(await this.repository.validateTerm(
+        context.organizationId,
+        normalized.academicYearId,
+        normalized.termId,
+        normalized.startDate,
+        normalized.endDate,
+      ))
+    )
       throw new AppError(
         400,
         'VALIDATION_ERROR',
@@ -272,19 +294,32 @@ export class ExaminationsService {
       ))
     )
       throw new AppError(400, 'VALIDATION_ERROR', 'Select an active campus.');
-    if (!(await this.repository.validateAcademicYear(
-      context.organizationId,
-      normalized.academicYearId,
-    )))
-      throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid academic year.');
-    if (normalized.termId && !(await this.repository.validateTerm(
-      context.organizationId,
-      normalized.academicYearId,
-      normalized.termId,
-      normalized.startDate,
-      normalized.endDate,
-    )))
-      throw new AppError(400, 'VALIDATION_ERROR', 'Select a term within the selected academic year and exam dates, or leave Term empty for an annual exam.');
+    if (
+      !(await this.repository.validateAcademicYear(
+        context.organizationId,
+        normalized.academicYearId,
+      ))
+    )
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Select a valid academic year.',
+      );
+    if (
+      normalized.termId &&
+      !(await this.repository.validateTerm(
+        context.organizationId,
+        normalized.academicYearId,
+        normalized.termId,
+        normalized.startDate,
+        normalized.endDate,
+      ))
+    )
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Select a term within the selected academic year and exam dates, or leave Term empty for an annual exam.',
+      );
     return this.requiredResult(
       this.repository.updateExam(context.organizationId, examId, normalized),
       'Exam',
@@ -337,7 +372,12 @@ export class ExaminationsService {
           'Add at least one exam schedule before publishing results.',
         );
       for (const schedule of schedules) {
-        if (schedule.marksReviewStatus !== 'submitted') throw new AppError(409, 'REVIEW_PENDING', 'Submit all marks for review before publishing.');
+        if (schedule.marksReviewStatus !== 'submitted')
+          throw new AppError(
+            409,
+            'REVIEW_PENDING',
+            'Submit all marks for review before publishing.',
+          );
         const roster = await this.repository.listRoster(
           context.organizationId,
           schedule.id,
@@ -367,7 +407,10 @@ export class ExaminationsService {
   }
 
   listPendingMarksReviews(context: ExaminationsContext) {
-    return this.repository.listPendingMarksReviews(context.organizationId, campusScope(context));
+    return this.repository.listPendingMarksReviews(
+      context.organizationId,
+      campusScope(context),
+    );
   }
 
   async listSchedules(context: ExaminationsContext, examId: string) {
@@ -611,8 +654,15 @@ export class ExaminationsService {
       ...schedule,
       academicYearId: exam.academicYearId,
     });
-    if (context.role === 'teacher' && schedule.marksReviewStatus === 'submitted')
-      throw new AppError(409, 'MARKS_ALREADY_SUBMITTED', 'Marks are under review.');
+    if (
+      context.role === 'teacher' &&
+      schedule.marksReviewStatus === 'submitted'
+    )
+      throw new AppError(
+        409,
+        'MARKS_ALREADY_SUBMITTED',
+        'Marks are under review.',
+      );
     if (
       !Array.isArray(records) ||
       records.length === 0 ||
@@ -634,9 +684,10 @@ export class ExaminationsService {
       if (
         (record.isAbsent && record.marksObtained !== undefined) ||
         (!record.isAbsent &&
+          record.marksObtained !== undefined &&
           (!Number.isFinite(record.marksObtained) ||
-            (record.marksObtained ?? -1) < 0 ||
-            (record.marksObtained ?? Infinity) > schedule.totalMarks))
+            record.marksObtained < 0 ||
+            record.marksObtained > schedule.totalMarks))
       )
         throw new AppError(
           400,
@@ -696,13 +747,52 @@ export class ExaminationsService {
     const exam = await this.requiredExam(context, schedule.examId);
     assertCampus(context, exam.campusId);
     this.assertResultsNotPublished(exam);
-    await this.assertTeacherAssignment(context, { ...schedule, academicYearId: exam.academicYearId });
-    if (schedule.marksReviewStatus === 'submitted') throw new AppError(409, 'MARKS_ALREADY_SUBMITTED', 'Marks are under review.');
-    if (!context.userId) throw new AppError(403, 'SUBMIT_USER_REQUIRED', 'Sign in to submit marks.');
-    const roster = await this.repository.listRoster(context.organizationId, schedule.id, schedule.classId, schedule.sectionId, exam.academicYearId);
-    if (roster.length === 0 || roster.some((student) => !student.mark || (!student.mark.isAbsent && typeof student.mark.marksObtained !== 'number')))
-      throw new AppError(409, 'MARKS_INCOMPLETE', 'Complete all marks before submission.');
-    return this.requiredResult(this.repository.setMarksReviewStatus(context.organizationId, scheduleId, 'submitted', context.userId), 'Marks submission');
+    await this.assertTeacherAssignment(context, {
+      ...schedule,
+      academicYearId: exam.academicYearId,
+    });
+    if (schedule.marksReviewStatus === 'submitted')
+      throw new AppError(
+        409,
+        'MARKS_ALREADY_SUBMITTED',
+        'Marks are under review.',
+      );
+    if (!context.userId)
+      throw new AppError(
+        403,
+        'SUBMIT_USER_REQUIRED',
+        'Sign in to submit marks.',
+      );
+    const roster = await this.repository.listRoster(
+      context.organizationId,
+      schedule.id,
+      schedule.classId,
+      schedule.sectionId,
+      exam.academicYearId,
+    );
+    if (
+      roster.length === 0 ||
+      roster.some(
+        (student) =>
+          !student.mark ||
+          (!student.mark.isAbsent &&
+            typeof student.mark.marksObtained !== 'number'),
+      )
+    )
+      throw new AppError(
+        409,
+        'MARKS_INCOMPLETE',
+        'Complete all marks before submission.',
+      );
+    return this.requiredResult(
+      this.repository.setMarksReviewStatus(
+        context.organizationId,
+        scheduleId,
+        'submitted',
+        context.userId,
+      ),
+      'Marks submission',
+    );
   }
 
   async requestMarksChanges(context: ExaminationsContext, scheduleId: string) {
@@ -710,8 +800,21 @@ export class ExaminationsService {
     const exam = await this.requiredExam(context, schedule.examId);
     assertCampus(context, exam.campusId);
     this.assertResultsNotPublished(exam);
-    if (schedule.marksReviewStatus !== 'submitted') throw new AppError(409, 'MARKS_NOT_SUBMITTED', 'Marks are not awaiting review.');
-    return this.requiredResult(this.repository.setMarksReviewStatus(context.organizationId, scheduleId, 'changes_requested', null), 'Marks review');
+    if (schedule.marksReviewStatus !== 'submitted')
+      throw new AppError(
+        409,
+        'MARKS_NOT_SUBMITTED',
+        'Marks are not awaiting review.',
+      );
+    return this.requiredResult(
+      this.repository.setMarksReviewStatus(
+        context.organizationId,
+        scheduleId,
+        'changes_requested',
+        null,
+      ),
+      'Marks review',
+    );
   }
 
   async getStudentReport(
@@ -766,8 +869,14 @@ export class ExaminationsService {
       (sum, result) => sum + (result.mark?.marksObtained ?? 0),
       0,
     );
+    // A missing mark is an unassessed subject, not a zero score. Only show
+    // an overall percentage once every scheduled subject has a recorded mark
+    // (an explicit Absent record counts as assessed with zero marks).
+    const allSubjectsAssessed =
+      report.results.length > 0 &&
+      report.results.every((result) => result.mark !== null);
     const percentage =
-      totalMarksPossible > 0
+      allSubjectsAssessed && totalMarksPossible > 0
         ? Math.round((totalMarksObtained / totalMarksPossible) * 10000) / 100
         : null;
     const scale = await this.repository.getActiveGradingScale(

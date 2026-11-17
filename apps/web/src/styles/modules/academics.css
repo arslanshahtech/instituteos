@@ -2594,3 +2594,611 @@
   font-size: 0.78rem;
   line-height: 1.35;
 }
+
+/* Classes mobile cards and on-demand details. Desktop table remains unchanged. */
+.classes-reference-page .cr-class-mobile-list {
+  display: none;
+}
+.classes-reference-page .cr-table-icon-button.danger {
+  border-color: #fecaca;
+  background: #fff5f5;
+  color: #dc2626;
+}
+.classes-reference-page .cr-table-icon-button.danger:hover {
+  border-color: #fca5a5;
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.classes-reference-page .cr-class-mobile-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #e4e4e7;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 3px 12px rgb(15 23 42 / 4%);
+}
+.classes-reference-page .cr-class-mobile-card-copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.3rem;
+}
+.classes-reference-page .cr-class-mobile-label {
+  color: #71717a;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.classes-reference-page .cr-class-mobile-card-copy > strong {
+  overflow-wrap: anywhere;
+  color: #18181b;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+.classes-reference-page .cr-class-mobile-card-copy > small,
+.classes-reference-page .cr-class-mobile-meta {
+  color: #71717a;
+  font-size: 0.76rem;
+}
+.classes-reference-page .cr-mobile-view-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0 0.75rem;
+  border: 1px solid #e4e4e7;
+  border-radius: 999px;
+  background: #fafafa;
+  color: #27272a;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.classes-reference-page .cr-mobile-view-button:hover {
+  border-color: #a1a1aa;
+  background: #f4f4f5;
+}
+.cr-class-details {
+  display: grid;
+  gap: 1rem;
+}
+.cr-class-details-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  color: #52525b;
+  font-size: 0.82rem;
+}
+.cr-class-details-code {
+  padding: 0.25rem 0.55rem;
+  border: 1px solid #e4e4e7;
+  border-radius: 999px;
+  background: #fafafa;
+  color: #27272a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+}
+.cr-class-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+.cr-class-details-grid > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.3rem;
+  padding: 0.85rem;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  background: #fafafa;
+}
+.cr-class-details-grid small {
+  color: #71717a;
+  font-size: 0.7rem;
+}
+.cr-class-details-grid strong {
+  overflow-wrap: anywhere;
+  color: #18181b;
+  font-size: 0.85rem;
+}
+.cr-class-details-section {
+  overflow: hidden;
+  border: 1px solid #e4e4e7;
+  border-radius: 13px;
+  background: #fff;
+}
+.cr-class-details-section header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.8rem 0.9rem;
+  border-bottom: 1px solid #f0f0f1;
+}
+.cr-class-details-section header h3 {
+  margin: 0;
+  color: #18181b;
+  font-size: 0.86rem;
+}
+.cr-class-details-section header span {
+  color: #71717a;
+  font-size: 0.72rem;
+}
+.cr-class-details-section ul {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cr-class-details-section li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid #f4f4f5;
+}
+.cr-class-details-section li:last-child {
+  border-bottom: 0;
+}
+.cr-class-details-section li strong {
+  color: #27272a;
+  font-size: 0.8rem;
+}
+.cr-class-details-section li span,
+.cr-class-details-section > p {
+  color: #71717a;
+  font-size: 0.74rem;
+}
+.cr-class-details-section > p {
+  margin: 0;
+  padding: 0.9rem;
+}
+.cr-class-details-note {
+  margin: 0;
+  color: #71717a;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+.cr-class-details-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+.cr-class-details-actions .cr-danger-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+@media (max-width: 680px) {
+  .classes-reference-page .cr-class-table-wrap {
+    display: none;
+  }
+  .classes-reference-page .cr-class-mobile-list {
+    display: grid;
+    gap: 0.7rem;
+  }
+}
+@media (max-width: 420px) {
+  .classes-reference-page .cr-class-mobile-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .classes-reference-page .cr-mobile-view-button {
+    align-self: flex-end;
+  }
+  .cr-class-details-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cr-class-details-actions {
+    flex-direction: column;
+  }
+  .cr-class-details-actions button {
+    width: 100%;
+  }
+}
+
+.classes-reference-page .cr-class-mobile-card-copy > strong {
+  min-height: 2.35em;
+}
+.classes-reference-page .cr-class-mobile-meta {
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+.classes-reference-page .cr-class-details {
+  max-height: min(72vh, 680px);
+  overflow-y: auto;
+  padding-right: 0.15rem;
+}
+.classes-reference-page .cr-class-details-grid > div {
+  min-height: 68px;
+}
+@media (max-width: 680px) {
+  .classes-reference-page .cr-class-mobile-card {
+    min-height: 170px;
+  }
+}
+
+/* Final Classes layout: compact controls and a two-column mobile directory. */
+.classes-reference-page .classes-page-heading {
+  flex-direction: row;
+  align-items: center;
+}
+.classes-reference-page .classes-page-heading-action {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+.classes-reference-page .cr-search-panel .cr-search {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.classes-reference-page .cr-search-panel .classes-page-actions {
+  width: auto;
+  flex: 0 0 auto;
+}
+.classes-reference-page .cr-education-level-control > .cr-secondary-button {
+  min-width: 112px;
+  min-height: 42px;
+  padding-inline: 0.7rem;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .classes-reference-page .classes-page-heading {
+    flex-direction: row;
+    align-items: center;
+  }
+  .classes-reference-page .classes-page-heading-action {
+    width: auto;
+    flex: 0 0 auto;
+  }
+}
+@media (max-width: 680px) {
+  .classes-reference-page .cr-search-panel {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.7rem;
+    padding: 0.55rem;
+  }
+  .classes-reference-page .cr-search-panel .cr-search {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
+  .classes-reference-page .cr-search-panel .cr-search input {
+    min-width: 0;
+    font-size: 0.76rem;
+  }
+  .classes-reference-page .cr-search-panel .classes-page-actions {
+    width: auto;
+    flex: 0 0 auto;
+  }
+  .classes-reference-page .cr-education-level-control > .cr-secondary-button {
+    min-width: 106px;
+    min-height: 40px;
+    padding-inline: 0.55rem;
+    gap: 0.3rem;
+    font-size: 0.74rem;
+  }
+  .classes-reference-page .cr-class-table-wrap {
+    display: none;
+  }
+  .classes-reference-page .cr-class-mobile-list {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 0.65rem;
+    padding: 0 0.7rem;
+  }
+  .classes-reference-page .cr-class-mobile-card {
+    display: flex;
+    min-width: 0;
+    min-height: 124px;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 0.8rem;
+    padding: 0.8rem;
+    border: 1px solid #e4e4e7;
+    border-radius: 11px;
+  }
+  .classes-reference-page .cr-class-mobile-card-copy {
+    display: grid;
+    min-width: 0;
+    gap: 0.35rem;
+  }
+  .classes-reference-page .cr-class-mobile-card-copy > strong {
+    min-height: 0;
+    font-size: 0.88rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+  .classes-reference-page .cr-class-mobile-card-copy > small {
+    font-size: 0.74rem;
+    line-height: 1.35;
+  }
+  .classes-reference-page .cr-mobile-view-button {
+    width: 100%;
+    min-width: 0;
+    min-height: 34px;
+    align-self: stretch;
+    padding-inline: 0.35rem;
+    font-size: 0.7rem;
+    white-space: nowrap;
+  }
+  .classes-reference-page .cr-pagination {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.55rem;
+    padding: 0.75rem;
+  }
+  .classes-reference-page .cr-pagination-summary {
+    flex: 1 1 100%;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.72rem;
+  }
+  .classes-reference-page .cr-pagination-summary label {
+    display: none;
+  }
+  .classes-reference-page .cr-pagination-controls {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+    gap: 0.55rem;
+    font-size: 0.75rem;
+  }
+}
+@media (max-width: 360px) {
+  .classes-reference-page .cr-search-panel {
+    gap: 0.35rem;
+    padding: 0.45rem;
+  }
+  .classes-reference-page .cr-education-level-control > .cr-secondary-button {
+    min-width: 98px;
+    padding-inline: 0.4rem;
+    font-size: 0.7rem;
+  }
+  .classes-reference-page .cr-class-mobile-list {
+    gap: 0.45rem;
+    padding-inline: 0.55rem;
+  }
+  .classes-reference-page .cr-class-mobile-card {
+    min-height: 116px;
+    padding: 0.65rem;
+  }
+  .classes-reference-page .cr-class-mobile-card-copy > strong {
+    font-size: 0.82rem;
+  }
+  .classes-reference-page .cr-mobile-view-button {
+    font-size: 0.66rem;
+  }
+}
+
+/* Final mobile directory correction: two columns from 360px to 680px. */
+@media (min-width: 360px) and (max-width: 680px) {
+  .classes-reference-page .cr-class-table-wrap {
+    display: none !important;
+  }
+  .classes-reference-page .cr-class-mobile-list {
+    display: grid !important;
+    width: 100%;
+    box-sizing: border-box;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    align-items: stretch;
+    gap: 0.55rem;
+    padding: 0 0.65rem;
+  }
+  .classes-reference-page .cr-class-mobile-card {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 0.65rem;
+    padding: 0.7rem;
+    border: 1px solid #e4e4e7;
+    border-radius: 10px;
+    background: #fff;
+  }
+  .classes-reference-page .cr-class-mobile-name {
+    display: block;
+    min-width: 0;
+    color: #18181b;
+    font-size: 0.84rem;
+    font-weight: 650;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+  .classes-reference-page .cr-class-mobile-card-footer {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+  }
+  .classes-reference-page .cr-class-mobile-card-footer > small {
+    min-width: 0;
+    color: #71717a;
+    font-size: 0.67rem;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  .classes-reference-page .cr-class-mobile-card-footer .cr-mobile-view-button {
+    display: inline-flex;
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    min-height: 30px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.38rem;
+    border: 1px solid #e4e4e7;
+    border-radius: 7px;
+    background: #fafafa;
+    color: #27272a;
+    font-size: 0.61rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 359px) {
+  .classes-reference-page .cr-class-table-wrap {
+    display: none !important;
+  }
+  .classes-reference-page .cr-class-mobile-list {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* Final mobile Classes layout: one full-width row per class, matching Sessions. */
+@media (max-width: 680px) {
+  .classes-reference-page .cr-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+  }
+  .classes-reference-page .cr-stat-card {
+    min-width: 0;
+    padding: 0.85rem;
+    border-radius: 13px;
+  }
+  .classes-reference-page .cr-stat-card p {
+    margin-top: 0.55rem;
+    font-size: 0.72rem;
+  }
+  .classes-reference-page .cr-stat-card strong {
+    font-size: 1.35rem;
+  }
+  .classes-reference-page .cr-stat-card small {
+    margin-top: 0.25rem;
+    font-size: 0.65rem;
+    line-height: 1.3;
+  }
+  .classes-reference-page .cr-class-table-wrap {
+    display: none !important;
+  }
+  .classes-reference-page .cr-class-mobile-list {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 0.6rem;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0 0.75rem;
+  }
+  .classes-reference-page .cr-class-mobile-card {
+    display: flex;
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    min-width: 0;
+    min-height: 76px !important;
+    box-sizing: border-box;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid #e4e4e7;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgb(15 23 42 / 3%);
+  }
+  .classes-reference-page .cr-class-mobile-copy {
+    display: grid;
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 0.3rem;
+  }
+  .classes-reference-page .cr-class-mobile-name {
+    display: block;
+    min-width: 0;
+    color: #18181b;
+    font-size: 0.88rem;
+    font-weight: 650;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+  .classes-reference-page .cr-class-mobile-copy > small {
+    color: #71717a;
+    font-size: 0.73rem;
+    line-height: 1.3;
+  }
+  .classes-reference-page .cr-mobile-view-button {
+    display: inline-flex;
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 88px;
+    min-height: 34px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.7rem;
+    border: 1px solid #e4e4e7;
+    border-radius: 8px;
+    background: #fafafa;
+    color: #27272a;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 390px) {
+  .classes-reference-page .cr-stat-grid {
+    gap: 0.5rem;
+  }
+  .classes-reference-page .cr-stat-card {
+    padding: 0.7rem;
+  }
+  .classes-reference-page .cr-stat-card small {
+    font-size: 0.61rem;
+  }
+  .classes-reference-page .cr-class-mobile-card {
+    padding: 0.7rem;
+    gap: 0.5rem;
+  }
+  .classes-reference-page .cr-mobile-view-button {
+    min-width: 82px;
+    padding-inline: 0.5rem;
+    font-size: 0.68rem;
+  }
+}
+
+/* Final compact Classes mobile action sizing. */
+@media (max-width: 680px) {
+  .classes-reference-page .cr-class-mobile-card {
+    min-height: 68px !important;
+  }
+  .classes-reference-page .cr-mobile-view-button {
+    min-width: 0;
+    min-height: 30px;
+    height: 30px;
+    padding: 0 0.6rem;
+    border-radius: 7px;
+    font-size: 0.68rem;
+    line-height: 1;
+  }
+}
+@media (max-width: 390px) {
+  .classes-reference-page .cr-mobile-view-button {
+    min-height: 29px;
+    height: 29px;
+    padding-inline: 0.5rem;
+    font-size: 0.65rem;
+  }
+  .classes-reference-page .cr-class-details {
+    max-height: min(68vh, 560px);
+    padding-right: 0;
+  }
+}

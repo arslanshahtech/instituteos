@@ -3,7 +3,15 @@ import type { FormEvent, ReactNode } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
+import {
+  Award,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardCheck,
+  FileText,
+  Printer,
+} from 'lucide-react';
 import { Button } from '../components/ui/Button.js';
 import {
   EmptyState,
@@ -46,7 +54,20 @@ import {
 
 const examSchema = z.object({
   name: z.string().trim().min(1, 'Enter an exam name.').max(120),
-  type: z.enum(['midterm', 'final', 'quiz', 'monthly_test', 'class_test', 'mid_year', 'send_up', 'annual', 'practical', 'viva', 'supplementary', 'improvement']),
+  type: z.enum([
+    'midterm',
+    'final',
+    'quiz',
+    'monthly_test',
+    'class_test',
+    'mid_year',
+    'send_up',
+    'annual',
+    'practical',
+    'viva',
+    'supplementary',
+    'improvement',
+  ]),
   academicYearId: z.string().min(1, 'Select an academic year.'),
   termId: z.string(),
   campusId: z.string().min(1, 'Select a campus.'),
@@ -55,12 +76,21 @@ const examSchema = z.object({
 });
 type ExamFormValues = z.infer<typeof examSchema>;
 
-const examTypeLabels: Record<import('./examinations-api.js').ExamType, string> = {
-  midterm: 'Midterm', final: 'Final', quiz: 'Quiz (legacy)',
-  monthly_test: 'Monthly Test', class_test: 'Class Test', mid_year: 'Mid-Year / Half-Yearly',
-  send_up: 'Send-up / Pre-Board', annual: 'Annual Examination', practical: 'Practical Examination',
-  viva: 'Viva / Oral', supplementary: 'Supplementary', improvement: 'Improvement',
-};
+const examTypeLabels: Record<import('./examinations-api.js').ExamType, string> =
+  {
+    midterm: 'Midterm',
+    final: 'Final',
+    quiz: 'Quiz (legacy)',
+    monthly_test: 'Monthly Test',
+    class_test: 'Class Test',
+    mid_year: 'Mid-Year / Half-Yearly',
+    send_up: 'Send-up / Pre-Board',
+    annual: 'Annual Examination',
+    practical: 'Practical Examination',
+    viva: 'Viva / Oral',
+    supplementary: 'Supplementary',
+    improvement: 'Improvement',
+  };
 
 function examTypeLabel(type: import('./examinations-api.js').ExamType): string {
   return examTypeLabels[type] ?? type;
@@ -87,17 +117,31 @@ const defaultGrades: GradeBreakdown[] = [
   { grade: 'A+', minPercentage: 90, maxPercentage: 100, gpa: 4 },
 ];
 
-const tabs = [
-  'Exams & schedules',
-  'Marks entry sheet',
-  'Grading scales',
-  'Student report',
-] as const;
-type Tab = (typeof tabs)[number];
+type Tab =
+  | 'Overview'
+  | 'Exams'
+  | 'Schedules'
+  | 'Exam calendar'
+  | 'Marks sheet'
+  | 'Student report'
+  | 'Grading scales';
 
-// MVP navigation: advanced grading and report tools stay in the codebase but are not exposed in the first launch.
-const managerTabs: readonly Tab[] = ['Exams & schedules', 'Marks entry sheet'];
-const teacherTabs: readonly Tab[] = ['Marks entry sheet'];
+const examTabByQuery: Record<string, Tab> = {
+  'exam-overview': 'Overview',
+  'exam-exams': 'Exams',
+  'exam-schedule': 'Schedules',
+  'exam-marks': 'Marks sheet',
+  'exam-results': 'Student report',
+};
+
+const examQueryByTab: Partial<Record<Tab, string>> = {
+  Overview: 'exam-overview',
+  Exams: 'exam-exams',
+  Schedules: 'exam-schedule',
+  'Exam calendar': 'exam-schedule',
+  'Marks sheet': 'exam-marks',
+  'Student report': 'exam-results',
+};
 
 function SelectField({
   label,
@@ -157,7 +201,7 @@ export function ExaminationDashboard() {
       'principal_director',
       'academic_coordinator',
     ].includes(access.data?.role ?? '');
-  const visibleTabs = canManageExams ? managerTabs : teacherTabs;
+  const isTeacher = access.data?.role === 'teacher';
   const workspace = useExaminationWorkspace(
     organizationId,
     Boolean(access.data && canRead),
@@ -167,19 +211,39 @@ export function ExaminationDashboard() {
     Boolean(access.data && canRead),
   );
   const exams = workspace.exams.data?.items ?? [];
+  const [viewExam, setViewExam] = useState<(typeof exams)[number] | null>(null);
+  const [viewSchedule, setViewSchedule] = useState<ExamSchedule | null>(null);
   const campuses = academics.campuses.data?.campuses ?? [];
   const years = academics.years.data?.items ?? [];
   const terms = academics.terms.data?.items ?? [];
   const classes = academics.classes.data?.items ?? [];
   const sections = academics.sections.data?.items ?? [];
   const subjects = academics.subjects.data?.items ?? [];
-  const [tab, setTab] = useState<Tab>('Exams & schedules');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab =
+    examTabByQuery[searchParams.get('tab') ?? ''] ?? 'Overview';
+  // The URL is the single source of truth for the active sub-module. Keeping
+  // a second local tab state caused a render -> effect -> URL -> render cycle
+  // whenever a sidebar item was selected, which looked like screen flicker.
+  const tab: Tab =
+    isTeacher &&
+    requestedTab !== 'Marks sheet' &&
+    requestedTab !== 'Student report'
+      ? 'Marks sheet'
+      : requestedTab;
+  function setTab(nextTab: Tab) {
+    const nextQueryTab = examQueryByTab[nextTab];
+    if (!nextQueryTab || searchParams.get('tab') === nextQueryTab) return;
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.set('tab', nextQueryTab);
+        return next;
+      },
+      { replace: true },
+    );
+  }
 
-  useEffect(() => {
-    if (access.data && !canManageExams && tab !== 'Marks entry sheet') {
-      setTab('Marks entry sheet');
-    }
-  }, [access.data, canManageExams, tab]);
   const [campusFilter, setCampusFilter] = useState('');
   const [termFilter, setTermFilter] = useState('');
   const [examId, setExamId] = useState('');
@@ -203,28 +267,52 @@ export function ExaminationDashboard() {
     examId,
     Boolean(access.data && canRead),
   );
-  const pendingReviews = usePendingExamMarksReviews(organizationId, Boolean(access.data && canManageExams));
+  const pendingReviews = usePendingExamMarksReviews(
+    organizationId,
+    Boolean(access.data && canManageExams),
+  );
   const schedules = examSchedules.data?.items ?? [];
   const selectedExam = exams.find((item) => item.id === examId);
-  const examClasses = classes.filter(
-    (item: AcademicClass) =>
-      !selectedExam || item.campusId === selectedExam.campusId,
+  const selectedReportExam = exams.find((item) => item.id === reportExamId);
+  // Teacher schedules are already assignment-filtered by the API. Build each
+  // selector from that trusted list so unrelated classes and subjects stay hidden.
+  const examClasses = classes.filter((item: AcademicClass) =>
+    isTeacher
+      ? schedules.some((schedule) => schedule.classId === item.id)
+      : !selectedExam || item.campusId === selectedExam.campusId,
   );
   const currentClassId =
     classId && examClasses.some((item) => item.id === classId)
       ? classId
       : (examClasses[0]?.id ?? '');
   const classSections = sections.filter(
-    (item: AcademicSection) => item.classId === currentClassId,
+    (item: AcademicSection) =>
+      item.classId === currentClassId &&
+      (!isTeacher ||
+        schedules.some(
+          (schedule) =>
+            schedule.classId === currentClassId &&
+            schedule.sectionId === item.id,
+        )),
   );
   const currentSectionId =
     sectionId && classSections.some((item) => item.id === sectionId)
       ? sectionId
       : (classSections[0]?.id ?? '');
+  const availableMarkSubjects = subjects.filter(
+    (item: AcademicSubject) =>
+      !isTeacher ||
+      schedules.some(
+        (schedule) =>
+          schedule.classId === currentClassId &&
+          schedule.sectionId === currentSectionId &&
+          schedule.subjectId === item.id,
+      ),
+  );
   const currentSubjectId =
-    subjectId && subjects.some((item) => item.id === subjectId)
+    subjectId && availableMarkSubjects.some((item) => item.id === subjectId)
       ? subjectId
-      : (subjects[0]?.id ?? '');
+      : (availableMarkSubjects[0]?.id ?? '');
   const filteredSchedules = schedules.filter(
     (schedule) =>
       schedule.classId === currentClassId &&
@@ -240,12 +328,51 @@ export function ExaminationDashboard() {
     currentSectionId,
     Boolean(access.data && canRead),
   );
+  const markRoster = markSheet.data?.items ?? [];
+  const markAbsentCount = markRoster.filter(
+    (student) => marksByStudent[student.id]?.absent,
+  ).length;
+  const markEnteredCount = markRoster.filter((student) => {
+    const value = marksByStudent[student.id]?.marks.trim() ?? '';
+    const score = Number(value);
+    return (
+      !marksByStudent[student.id]?.absent &&
+      value !== '' &&
+      Number.isFinite(score) &&
+      score >= 0 &&
+      score <= (selectedSchedule?.totalMarks ?? 0)
+    );
+  }).length;
+  const markRemainingCount =
+    markRoster.length - markAbsentCount - markEnteredCount;
+  const invalidMarkCount = markRoster.filter((student) => {
+    const value = marksByStudent[student.id]?.marks.trim() ?? '';
+    if (marksByStudent[student.id]?.absent || value === '') return false;
+    const score = Number(value);
+    return (
+      !Number.isFinite(score) ||
+      score < 0 ||
+      score > (selectedSchedule?.totalMarks ?? 0)
+    );
+  }).length;
+  const reportStudent = markSheet.data?.items.find(
+    (item) => item.id === reportStudentId,
+  );
   const report = useStudentExamReport(
     organizationId,
     reportExamId,
     reportStudentId,
     Boolean(access.data && canRead),
   );
+  const reportResults = report.data?.report.results ?? [];
+  const reportAssessedCount = reportResults.filter(
+    (result) => result.mark !== null,
+  ).length;
+  const reportPendingCount = reportResults.length - reportAssessedCount;
+  const reportAbsentCount = reportResults.filter(
+    (result) => result.mark?.isAbsent,
+  ).length;
+  const reportIsComplete = reportResults.length > 0 && reportPendingCount === 0;
   const saveExam = useSaveExam(organizationId);
   const removeExam = useDeleteExam(organizationId);
   const setResultsPublication = useSetExamResultsPublication(organizationId);
@@ -290,8 +417,38 @@ export function ExaminationDashboard() {
     (exam) =>
       (!campusFilter || exam.campusId === campusFilter) &&
       (!termFilter || exam.termId === termFilter),
-  );  // Grading scales are outside the first-launch MVP; do not fetch or depend on them.
-  const scales: Array<{ id: string; name: string; gradeBreakdowns: GradeBreakdown[]; isActive: boolean }> = [];
+  );
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const scheduledExamCount = exams.filter(
+    (exam) => exam.endDate >= todayKey && !exam.resultsPublishedAt,
+  ).length;
+  const completedExamCount = exams.filter(
+    (exam) => exam.endDate < todayKey,
+  ).length;
+  const publishedExamCount = exams.filter((exam) =>
+    Boolean(exam.resultsPublishedAt),
+  ).length;
+  const upcomingExams = [...visibleExams]
+    .filter((exam) => exam.startDate >= todayKey && !exam.resultsPublishedAt)
+    .sort((left, right) => left.startDate.localeCompare(right.startDate))
+    .slice(0, 4);
+  const publishedExams = [...visibleExams]
+    .filter((exam) => Boolean(exam.resultsPublishedAt))
+    .sort((left, right) =>
+      (right.resultsPublishedAt ?? '').localeCompare(
+        left.resultsPublishedAt ?? '',
+      ),
+    )
+    .slice(0, 4);
+  const pendingReviewItems = pendingReviews.data?.items ?? [];
+  // Grading scales are outside the first-launch MVP; do not fetch or depend on them.
+  const scales: Array<{
+    id: string;
+    name: string;
+    gradeBreakdowns: GradeBreakdown[];
+    isActive: boolean;
+  }> = [];
 
   useEffect(() => {
     if (!examId && exams[0]) setExamId(exams[0].id);
@@ -377,6 +534,7 @@ export function ExaminationDashboard() {
       });
       setExamEditId('');
       examForm.reset();
+      setTab('Exams');
     } catch (error) {
       setFormError(apiMessage(error));
     }
@@ -420,9 +578,8 @@ export function ExaminationDashboard() {
     }
   }
 
-  async function submitMarkSheet() {
-    if (!selectedSchedule || !markSheet.data?.items.length) return;
-    const records = markSheet.data.items.map((student) => {
+  function markRecords() {
+    return (markSheet.data?.items ?? []).map((student) => {
       const current = marksByStudent[student.id] ?? {
         marks: '',
         absent: false,
@@ -431,17 +588,36 @@ export function ExaminationDashboard() {
       return {
         studentId: student.id,
         isAbsent: current.absent,
-        ...(current.absent ? {} : { marksObtained: Number(current.marks) }),
-        ...(current.remarks ? { remarks: current.remarks } : {}),
+        ...(!current.absent && current.marks.trim() !== ''
+          ? { marksObtained: Number(current.marks) }
+          : {}),
+        ...(current.remarks.trim() ? { remarks: current.remarks.trim() } : {}),
       };
     });
+  }
+
+  async function saveMarkDraft() {
+    if (!selectedSchedule || !markSheet.data?.items.length) return;
     setFormError('');
     try {
       await saveMarks.mutateAsync({
         scheduleId: selectedSchedule.id,
-        records,
+        records: markRecords(),
       });
-      if (!canManageExams) await submitMarksForReview.mutateAsync(selectedSchedule.id);
+    } catch (error) {
+      setFormError(apiMessage(error));
+    }
+  }
+
+  async function submitMarkSheet() {
+    if (!selectedSchedule || !markSheet.data?.items.length) return;
+    setFormError('');
+    try {
+      await saveMarks.mutateAsync({
+        scheduleId: selectedSchedule.id,
+        records: markRecords(),
+      });
+      await submitMarksForReview.mutateAsync(selectedSchedule.id);
     } catch (error) {
       setFormError(apiMessage(error));
     }
@@ -499,7 +675,7 @@ export function ExaminationDashboard() {
   }
 
   if (access.isLoading)
-    return <LoadingState message="Checking examination access..." />;
+    return <LoadingState message="Checking exam access..." />;
   if (access.error)
     return (
       <ErrorState
@@ -516,21 +692,24 @@ export function ExaminationDashboard() {
     academics.classes.isLoading ||
     academics.sections.isLoading ||
     academics.subjects.isLoading ||
-    (canManageExams && (academics.years.isLoading || academics.campuses.isLoading));
+    (canManageExams &&
+      (academics.years.isLoading || academics.campuses.isLoading));
   const queryError =
     workspace.exams.error ||
     academics.classes.error ||
     academics.sections.error ||
     academics.subjects.error ||
     (canManageExams ? academics.years.error || academics.campuses.error : null);
-  if (loading) return <LoadingState message="Loading examinations..." />;
+  if (loading) return <LoadingState message="Loading exams..." />;
   if (queryError)
     return (
       <ErrorState
-        title="Examinations could not be loaded"
+        title="Exams could not be loaded"
         description={apiMessage(queryError)}
         onRetry={() => {
-          void workspace.exams.refetch();          void academics.years.refetch();          void academics.classes.refetch();
+          void workspace.exams.refetch();
+          void academics.years.refetch();
+          void academics.classes.refetch();
           void academics.sections.refetch();
           void academics.subjects.refetch();
           void academics.campuses.refetch();
@@ -540,53 +719,79 @@ export function ExaminationDashboard() {
 
   return (
     <main className="examinations-page reference-live-module">
-      <WorkspacePageHeading
-        className="examinations-page-heading"
-        eyebrow="Academic workspace"
-        title="Examinations & assessment"
-        description={canManageExams ? 'Create exams, set teacher access through class and subject assignments, review marks, and publish results.' : 'View your assigned exams and enter or update marks for your assigned students.'}
-      />
-      <label className="examinations-mobile-tab-switcher">
-        <span className="visually-hidden">Examination view</span>
-        <select
-          aria-label="Examination view"
-          value={tab}
-          onChange={(event) => {
-            const nextTab = tabs.find(
-              (item) => item === event.currentTarget.value,
-            );
-            if (nextTab) {
-              setTab(nextTab);
-              setFormError('');
-            }
-          }}
-        >
-          {visibleTabs.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-      </label>
-      <nav
-        className="academics-tabs attendance-tabs"
-        aria-label="Examination sections"
-      >
-        {visibleTabs.map((item) => (
-          <button
-            aria-current={tab === item ? 'page' : undefined}
-            className={`academics-tab${tab === item ? ' academics-tab-active' : ''}`}
-            key={item}
-            onClick={() => {
-              setTab(item);
-              setFormError('');
-            }}
-            type="button"
-          >
-            {item}
-          </button>
-        ))}
-      </nav>
+      {tab === 'Overview' ? (
+        <WorkspacePageHeading
+          className="examinations-page-heading"
+          eyebrow=""
+          title="Exam"
+          description="Exams and student results."
+          aside={
+            canManageExams ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  setExamEditId('');
+                  examForm.reset();
+                  setTab('Exams');
+                }}
+              >
+                + Create exam
+              </Button>
+            ) : undefined
+          }
+        />
+      ) : (
+        <div className="examinations-subpage-heading">
+          {(!isTeacher || tab === 'Student report') && (
+            <button
+              type="button"
+              className="examinations-back-button"
+              onClick={() => {
+                setTab(isTeacher ? 'Marks sheet' : 'Overview');
+                setFormError('');
+                setExamEditId('');
+                setScheduleEditId('');
+              }}
+              aria-label={
+                isTeacher
+                  ? 'Back to marks sheet'
+                  : 'Back to examinations overview'
+              }
+            >
+              <span aria-hidden="true">←</span>
+              <span>{isTeacher ? 'Back to marks' : 'Back to overview'}</span>
+            </button>
+          )}
+          <div>
+            {tab !== 'Marks sheet' && tab !== 'Student report' && (
+              <span className="examinations-subpage-eyebrow">EXAMINATIONS</span>
+            )}
+            <h1>
+              {tab === 'Exams'
+                ? examEditId
+                  ? 'Edit exam'
+                  : 'Create exam'
+                : tab === 'Schedules'
+                  ? 'Schedule'
+                  : tab === 'Marks sheet'
+                    ? 'Marks sheet'
+                    : 'Student results'}
+            </h1>
+            {tab === 'Marks sheet' && isTeacher && (
+              <p className="examinations-subpage-description">
+                Select your assigned assessment, then enter marks for each
+                student.
+              </p>
+            )}
+            {tab === 'Student report' && (
+              <p className="examinations-subpage-description">
+                Review a student’s subject-wise performance and assessment
+                status.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
       {formError && (
         <div className="examinations-form-error" role="alert">
           {formError}
@@ -598,9 +803,291 @@ export function ExaminationDashboard() {
         </div>
       )}
 
-      {tab === 'Exams & schedules' && (
+      {tab === 'Overview' && canManageExams && (
+        <section className="examinations-overview">
+          <div className="examinations-stats-grid" aria-label="Exam summary">
+            <article className="examinations-stat-card">
+              <span className="examinations-stat-icon">
+                <FileText size={19} />
+              </span>
+              <span className="examinations-stat-copy">
+                <strong>{exams.length}</strong>
+                <small>Total exams</small>
+              </span>
+            </article>
+            <article className="examinations-stat-card">
+              <span className="examinations-stat-icon">
+                <CalendarDays size={19} />
+              </span>
+              <span className="examinations-stat-copy">
+                <strong>{scheduledExamCount}</strong>
+                <small>Scheduled</small>
+              </span>
+            </article>
+            <article className="examinations-stat-card">
+              <span className="examinations-stat-icon">
+                <CheckCircle2 size={19} />
+              </span>
+              <span className="examinations-stat-copy">
+                <strong>{completedExamCount}</strong>
+                <small>Completed</small>
+              </span>
+            </article>
+            <article className="examinations-stat-card">
+              <span className="examinations-stat-icon">
+                <Award size={19} />
+              </span>
+              <span className="examinations-stat-copy">
+                <strong>{publishedExamCount}</strong>
+                <small>Results published</small>
+              </span>
+            </article>
+          </div>
+
+          <div className="examinations-overview-panels">
+            <section className="examinations-card examinations-upcoming-card">
+              <div className="examinations-panel-heading">
+                <div>
+                  <h2>Upcoming exams</h2>
+                  <p>Next assessments across your campus</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="quiet"
+                  onClick={() => setTab('Schedules')}
+                >
+                  View all
+                </Button>
+              </div>
+              {upcomingExams.length === 0 ? (
+                <EmptyState
+                  title="No upcoming exams"
+                  description="Your scheduled examinations will appear here."
+                />
+              ) : (
+                <ul className="examinations-overview-list">
+                  {upcomingExams.map((exam) => (
+                    <li key={exam.id}>
+                      <span className="examinations-overview-list-icon">
+                        <CalendarDays size={17} />
+                      </span>
+                      <span className="examinations-overview-list-copy">
+                        <strong>{exam.name}</strong>
+                        <small>
+                          {examTypeLabel(exam.type)} · {exam.startDate}
+                          {exam.endDate !== exam.startDate
+                            ? ` – ${exam.endDate}`
+                            : ''}
+                        </small>
+                      </span>
+                      <Button
+                        type="button"
+                        variant="quiet"
+                        onClick={() => {
+                          setExamId(exam.id);
+                          setScheduleEditId('');
+                          setTab('Schedules');
+                        }}
+                      >
+                        Open
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="examinations-card examinations-quick-actions">
+              <div className="examinations-panel-heading">
+                <div>
+                  <h2>Quick actions</h2>
+                  <p>Common examination tasks</p>
+                </div>
+              </div>
+              <div className="examinations-quick-action-list">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScheduleEditId('');
+                    setTab('Schedules');
+                  }}
+                >
+                  <span className="examinations-quick-action-icon">
+                    <CalendarDays size={18} />
+                  </span>
+                  <span>
+                    <strong>Manage schedule</strong>
+                    <small>Create and update exam papers</small>
+                  </span>
+                  <span
+                    className="examinations-action-arrow"
+                    aria-hidden="true"
+                  >
+                    →
+                  </span>
+                </button>
+                <button type="button" onClick={() => setTab('Marks sheet')}>
+                  <span className="examinations-quick-action-icon">
+                    <ClipboardCheck size={18} />
+                  </span>
+                  <span>
+                    <strong>Marks & review</strong>
+                    <small>Check submissions and student marks</small>
+                  </span>
+                  <span
+                    className="examinations-action-arrow"
+                    aria-hidden="true"
+                  >
+                    →
+                  </span>
+                </button>
+                <button type="button" onClick={() => setTab('Student report')}>
+                  <span className="examinations-quick-action-icon">
+                    <Award size={18} />
+                  </span>
+                  <span>
+                    <strong>Result cards</strong>
+                    <small>View published student results</small>
+                  </span>
+                  <span
+                    className="examinations-action-arrow"
+                    aria-hidden="true"
+                  >
+                    →
+                  </span>
+                </button>
+              </div>
+            </section>
+          </div>
+
+          <div className="examinations-overview-panels examinations-overview-lower-panels">
+            <section className="examinations-card examinations-review-card">
+              <div className="examinations-panel-heading">
+                <div>
+                  <h2>Marks review</h2>
+                  <p>Teacher submissions awaiting Admin review</p>
+                </div>
+                <span className="examinations-review-count">
+                  {pendingReviewItems.length}
+                </span>
+              </div>
+              {pendingReviews.isLoading ? (
+                <LoadingState message="Loading submissions..." />
+              ) : pendingReviews.isError ? (
+                <ErrorState
+                  title="Review queue unavailable"
+                  description="Pending submissions could not be loaded."
+                  onRetry={() => void pendingReviews.refetch()}
+                />
+              ) : pendingReviewItems.length === 0 ? (
+                <EmptyState
+                  title="All caught up"
+                  description="New teacher submissions will appear here for review."
+                />
+              ) : (
+                <ul className="examinations-overview-list">
+                  {pendingReviewItems.slice(0, 5).map((schedule) => (
+                    <li key={schedule.id}>
+                      <span className="examinations-overview-list-icon examinations-review-list-icon">
+                        <ClipboardCheck size={17} />
+                      </span>
+                      <span className="examinations-overview-list-copy">
+                        <strong>
+                          {exams.find((exam) => exam.id === schedule.examId)
+                            ?.name ?? 'Examination'}
+                        </strong>
+                        <small>
+                          {subjects.find(
+                            (subject) => subject.id === schedule.subjectId,
+                          )?.name ?? 'Subject'}
+                          {' · '}
+                          {classes.find((item) => item.id === schedule.classId)
+                            ?.name ?? 'Class'}
+                          {' · '}
+                          {sections.find(
+                            (item) => item.id === schedule.sectionId,
+                          )?.name ?? 'Section'}
+                        </small>
+                        <small>
+                          {schedule.marksSubmittedAt
+                            ? `Submitted ${new Date(schedule.marksSubmittedAt).toLocaleDateString()}`
+                            : 'Recently submitted'}
+                        </small>
+                      </span>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          setExamId(schedule.examId);
+                          setClassId(schedule.classId);
+                          setSectionId(schedule.sectionId);
+                          setSubjectId(schedule.subjectId);
+                          setScheduleId(schedule.id);
+                          setTab('Marks sheet');
+                        }}
+                      >
+                        Review
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="examinations-card examinations-published-card">
+              <div className="examinations-panel-heading">
+                <div>
+                  <h2>Recently published results</h2>
+                  <p>Results available to students and parents</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="quiet"
+                  onClick={() => setTab('Student report')}
+                >
+                  View results
+                </Button>
+              </div>
+              {publishedExams.length === 0 ? (
+                <EmptyState
+                  title="No published results yet"
+                  description="Published result cards will appear here."
+                />
+              ) : (
+                <ul className="examinations-overview-list examinations-published-list">
+                  {publishedExams.map((exam) => (
+                    <li key={exam.id}>
+                      <span className="examinations-overview-list-icon">
+                        <Award size={17} />
+                      </span>
+                      <span className="examinations-overview-list-copy">
+                        <strong>{exam.name}</strong>
+                        <small>
+                          {exam.startDate} – {exam.endDate} · Published{' '}
+                          {exam.resultsPublishedAt
+                            ? new Date(
+                                exam.resultsPublishedAt,
+                              ).toLocaleDateString()
+                            : ''}
+                        </small>
+                      </span>
+                      <span className="examinations-published-status">
+                        Published
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+        </section>
+      )}
+
+      {(tab === 'Exams' || tab === 'Schedules' || tab === 'Exam calendar') && (
         <section className="examinations-panel">
-          {canManageExams && pendingReviews.data?.items.length ? (
+          {tab === 'Schedules' &&
+          canManageExams &&
+          pendingReviews.data?.items.length ? (
             <div className="examinations-card" role="status">
               <div className="examinations-panel-heading">
                 <h2>Review pending</h2>
@@ -610,338 +1097,618 @@ export function ExaminationDashboard() {
                 {pendingReviews.data.items.map((schedule) => (
                   <li key={schedule.id}>
                     <div>
-                      <strong>{exams.find((exam) => exam.id === schedule.examId)?.name ?? 'Examination'}</strong>
-                      <span>{subjects.find((subject) => subject.id === schedule.subjectId)?.name ?? 'Subject'} - {classes.find((item) => item.id === schedule.classId)?.name ?? 'Class'} - {sections.find((item) => item.id === schedule.sectionId)?.name ?? 'Section'}</span>
+                      <strong>
+                        {exams.find((exam) => exam.id === schedule.examId)
+                          ?.name ?? 'Examination'}
+                      </strong>
+                      <span>
+                        {subjects.find(
+                          (subject) => subject.id === schedule.subjectId,
+                        )?.name ?? 'Subject'}{' '}
+                        -{' '}
+                        {classes.find((item) => item.id === schedule.classId)
+                          ?.name ?? 'Class'}{' '}
+                        -{' '}
+                        {sections.find((item) => item.id === schedule.sectionId)
+                          ?.name ?? 'Section'}
+                      </span>
                     </div>
-                    <Button type="button" variant="secondary" onClick={() => { setExamId(schedule.examId); setClassId(schedule.classId); setSectionId(schedule.sectionId); setSubjectId(schedule.subjectId); setScheduleId(schedule.id); setTab('Marks entry sheet'); }}>Review</Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        setExamId(schedule.examId);
+                        setClassId(schedule.classId);
+                        setSectionId(schedule.sectionId);
+                        setSubjectId(schedule.subjectId);
+                        setScheduleId(schedule.id);
+                        setTab('Marks sheet');
+                      }}
+                    >
+                      Review
+                    </Button>
                   </li>
                 ))}
               </ul>
             </div>
           ) : null}
-          {canManageExams && pendingReviews.isError && (
-            <ErrorState title="Review queue unavailable" description="Try again." onRetry={() => void pendingReviews.refetch()} />
+          {tab === 'Schedules' && canManageExams && pendingReviews.isError && (
+            <ErrorState
+              title="Review queue unavailable"
+              description="Try again."
+              onRetry={() => void pendingReviews.refetch()}
+            />
           )}
-          <div className="examinations-grid">
-            <section className="examinations-card">
-              <h2>{examEditId ? 'Update exam' : 'Create exam'}</h2>
-              <form
-                className="examinations-form"
-                onSubmit={examForm.handleSubmit(submitExam)}
-              >
-                <label>
-                  Exam name
-                  <input {...examForm.register('name')} disabled={!canManageExams} />
-                  {examForm.formState.errors.name && (
-                    <small>{examForm.formState.errors.name.message}</small>
-                  )}
-                </label>
-                <label>
-                  Exam type
-                  <select {...examForm.register('type')} disabled={!canManageExams}>
-                    <option value="midterm">Midterm</option>
-                    <option value="final">Final</option>
-                    <option value="quiz">Quiz (legacy)</option>
-                    <option value="monthly_test">Monthly Test</option>
-                    <option value="class_test">Class Test</option>
-                    <option value="mid_year">Mid-Year / Half-Yearly</option>
-                    <option value="send_up">Send-up / Pre-Board</option>
-                    <option value="annual">Annual Examination</option>
-                    <option value="practical">Practical Examination</option>
-                    <option value="viva">Viva / Oral</option>
-                    <option value="supplementary">Supplementary</option>
-                    <option value="improvement">Improvement</option>
-                  </select>
-                </label>
-                <label>
-                  Campus
-                  <select
-                    {...examForm.register('campusId')}
-                    disabled={!canManageExams}
-                  >
-                    <option value="">Select campus</option>
-                    {campuses.map((campus) => (
-                      <option key={campus.id} value={campus.id}>
-                        {campus.name}
-                      </option>
-                    ))}
-                  </select>
-                  {examForm.formState.errors.campusId && (
-                    <small>{examForm.formState.errors.campusId.message}</small>
-                  )}
-                </label>
-                <label>
-                  Academic year
-                  <select
-                    {...examForm.register('academicYearId', {
-                      onChange: (event) => {
-                        const nextYearId = event.target.value as string;
-                        const currentTermId = examForm.getValues('termId');
-                        if (currentTermId && !terms.some(
-                          (term) => term.id === currentTermId && term.academicYearId === nextYearId,
-                        )) examForm.setValue('termId', '', { shouldValidate: true });
-                      },
-                    })}
-                    disabled={!canManageExams}
-                  >
-                    <option value="">Select academic year</option>
-                    {years.map((year: AcademicYear) => (
-                      <option key={year.id} value={year.id}>
-                        {year.name}
-                      </option>
-                    ))}
-                  </select>
-                  {examForm.formState.errors.academicYearId && (
-                    <small>
-                      {examForm.formState.errors.academicYearId.message}
-                    </small>
-                  )}
-                </label>
-                <label>
-                  Term (optional)
-                  <select {...examForm.register('termId')} disabled={!canManageExams}>
-                    <option value="">Annual exam (no term)</option>
-                    {availableTerms.map((term: AcademicTerm) => (
-                      <option key={term.id} value={term.id}>
-                        {term.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="examinations-form-row">
-                  <label>
-                    Start date
-                    <input
-                      type="date"
-                      {...examForm.register('startDate')}
-                      disabled={!canManageExams}
-                    />
-                  </label>
-                  <label>
-                    End date
-                    <input
-                      type="date"
-                      {...examForm.register('endDate')}
-                      disabled={!canManageExams}
-                    />
-                  </label>
-                </div>
-                <div className="examinations-actions">
-                  {canManageExams && (
-                    <Button type="submit" disabled={saveExam.isPending}>
-                      {saveExam.isPending
-                        ? 'Saving…'
-                        : examEditId
-                          ? 'Update exam'
-                          : 'Create exam'}
-                    </Button>
-                  )}
-                  {examEditId && (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => {
-                        setExamEditId('');
-                        examForm.reset();
-                      }}
+          <div
+            className={`examinations-grid${tab === 'Exams' || tab === 'Schedules' ? ' examinations-grid-single examinations-grid-wide' : ''}`}
+          >
+            {(tab === 'Exams' || tab === 'Schedules') && (
+              <section className="examinations-card">
+                {tab === 'Exams' && (
+                  <>
+                    <h2>{examEditId ? 'Update exam' : 'Create exam'}</h2>
+                    <form
+                      className="examinations-form examinations-exam-form"
+                      onSubmit={examForm.handleSubmit(submitExam)}
                     >
-                      Cancel edit
-                    </Button>
-                  )}
-                </div>
-              </form>
-              <h3 className="examinations-subheading">Add a schedule</h3>
-              <p className="examinations-form-hint">Set the class, section, subject and exam timing.</p>
-              <SelectField label="Exam" value={examId} onChange={setExamId}>
-                <option value="">Select an exam</option>
-                {exams.map((exam) => (
-                  <option key={exam.id} value={exam.id}>
-                    {exam.name}
-                  </option>
-                ))}
-              </SelectField>
-              <form
-                className="examinations-form"
-                onSubmit={scheduleForm.handleSubmit(submitSchedule)}
-              >
-                <label>
-                  Class
-                  <select
-                    {...scheduleForm.register('classId')}
-                    disabled={!canManageExams || !examId}
-                    onChange={(event) => {
-                      scheduleForm.setValue('classId', event.target.value);
-                      scheduleForm.setValue('sectionId', '');
-                    }}
-                  >
-                    <option value="">Select class</option>
-                    {examClasses.map((item: AcademicClass) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Section
-                  <select
-                    {...scheduleForm.register('sectionId')}
-                    disabled={!canManageExams || !examId}
-                  >
-                    <option value="">Select section</option>
-                    {sections
-                      .filter(
-                        (item: AcademicSection) =>
-                          item.classId === scheduleForm.watch('classId'),
-                      )
-                      .map((item: AcademicSection) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <label>
-                  Subject
-                  <select
-                    {...scheduleForm.register('subjectId')}
-                    disabled={!canManageExams || !examId}
-                  >
-                    <option value="">Select subject</option>
-                    {subjects.map((item: AcademicSubject) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="examinations-form-row">
-                  <label>
-                    Date
-                    <input
-                      type="date"
-                      {...scheduleForm.register('date')}
-                      disabled={!canManageExams || !examId}
-                    />
-                  </label>
-                  <label>
-                    Start time
-                    <input
-                      type="time"
-                      {...scheduleForm.register('startTime')}
-                      disabled={!canManageExams || !examId}
-                    />
-                  </label>
-                </div>
-                <div className="examinations-form-row examinations-form-row-three">
-                  <label>
-                    Duration (min)
-                    <input
-                      type="number"
-                      min="1"
-                      {...scheduleForm.register('durationMinutes')}
-                      disabled={!canManageExams || !examId}
-                    />
-                  </label>
-                  <label>
-                    Total marks
-                    <input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      {...scheduleForm.register('totalMarks')}
-                      disabled={!canManageExams || !examId}
-                    />
-                  </label>
-                  <label>
-                    Passing marks
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      {...scheduleForm.register('passingMarks')}
-                      disabled={!canManageExams || !examId}
-                    />
-                  </label>
-                </div>
-                {scheduleForm.formState.errors.root && (
-                  <small>{scheduleForm.formState.errors.root.message}</small>
-                )}
-                <div className="examinations-actions">
-                  {canManageExams && (
-                    <Button
-                      type="submit"
-                      disabled={!examId || saveSchedule.isPending}
-                    >
-                      {scheduleEditId ? 'Update schedule' : 'Add schedule'}
-                    </Button>
-                  )}
-                  {scheduleEditId && (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => {
-                        setScheduleEditId('');
-                        scheduleForm.reset();
-                      }}
-                    >
-                      Cancel edit
-                    </Button>
-                  )}
-                </div>
-              </form>
-            </section>
-            <section className="examinations-card">
-              <h2>Exam calendar</h2>
-              <div className="examinations-filter-row">
-                <SelectField
-                  label="Campus filter"
-                  value={campusFilter}
-                  onChange={setCampusFilter}
-                >
-                  <option value="">All campuses</option>
-                  {campuses.map((campus) => (
-                    <option key={campus.id} value={campus.id}>
-                      {campus.name}
-                    </option>
-                  ))}
-                </SelectField>
-                <SelectField
-                  label="Term filter"
-                  value={termFilter}
-                  onChange={setTermFilter}
-                >
-                  <option value="">All terms</option>
-                  {terms.map((term: AcademicTerm) => (
-                    <option key={term.id} value={term.id}>
-                      {term.name}
-                    </option>
-                  ))}
-                </SelectField>
-              </div>
-              {visibleExams.length === 0 ? (
-                <EmptyState
-                  title="No exams yet"
-                  description="Create an exam to begin scheduling assessments."
-                />
-              ) : (
-                <ul className="examinations-record-list">
-                  {visibleExams.map((exam) => (
-                    <li key={exam.id}>
-                      <div>
-                        <strong>{examName(exam, years)}</strong>
-                        <span>
-                          {examTypeLabel(exam.type)} · {exam.termId ? (terms.find((term) => term.id === exam.termId)?.name ?? 'Term-based') : 'Annual (no term)'} · {exam.startDate} to {exam.endDate}
-                        </span>
+                      <label>
+                        Exam name
+                        <input
+                          {...examForm.register('name')}
+                          disabled={!canManageExams}
+                        />
+                        {examForm.formState.errors.name && (
+                          <small>
+                            {examForm.formState.errors.name.message}
+                          </small>
+                        )}
+                      </label>
+                      <label>
+                        Exam type
+                        <select
+                          {...examForm.register('type')}
+                          disabled={!canManageExams}
+                        >
+                          <option value="midterm">Midterm</option>
+                          <option value="final">Final</option>
+                          <option value="quiz">Quiz (legacy)</option>
+                          <option value="monthly_test">Monthly Test</option>
+                          <option value="class_test">Class Test</option>
+                          <option value="mid_year">
+                            Mid-Year / Half-Yearly
+                          </option>
+                          <option value="send_up">Send-up / Pre-Board</option>
+                          <option value="annual">Annual Examination</option>
+                          <option value="practical">
+                            Practical Examination
+                          </option>
+                          <option value="viva">Viva / Oral</option>
+                          <option value="supplementary">Supplementary</option>
+                          <option value="improvement">Improvement</option>
+                        </select>
+                      </label>
+                      <label>
+                        Campus
+                        <select
+                          {...examForm.register('campusId')}
+                          disabled={!canManageExams}
+                        >
+                          <option value="">Select campus</option>
+                          {campuses.map((campus) => (
+                            <option key={campus.id} value={campus.id}>
+                              {campus.name}
+                            </option>
+                          ))}
+                        </select>
+                        {examForm.formState.errors.campusId && (
+                          <small>
+                            {examForm.formState.errors.campusId.message}
+                          </small>
+                        )}
+                      </label>
+                      <label>
+                        Academic year
+                        <select
+                          {...examForm.register('academicYearId', {
+                            onChange: (event) => {
+                              const nextYearId = event.target.value as string;
+                              const currentTermId =
+                                examForm.getValues('termId');
+                              if (
+                                currentTermId &&
+                                !terms.some(
+                                  (term) =>
+                                    term.id === currentTermId &&
+                                    term.academicYearId === nextYearId,
+                                )
+                              )
+                                examForm.setValue('termId', '', {
+                                  shouldValidate: true,
+                                });
+                            },
+                          })}
+                          disabled={!canManageExams}
+                        >
+                          <option value="">Select academic year</option>
+                          {years.map((year: AcademicYear) => (
+                            <option key={year.id} value={year.id}>
+                              {year.name}
+                            </option>
+                          ))}
+                        </select>
+                        {examForm.formState.errors.academicYearId && (
+                          <small>
+                            {examForm.formState.errors.academicYearId.message}
+                          </small>
+                        )}
+                      </label>
+                      <label>
+                        Term (optional)
+                        <select
+                          {...examForm.register('termId')}
+                          disabled={!canManageExams}
+                        >
+                          <option value="">Annual exam (no term)</option>
+                          {availableTerms.map((term: AcademicTerm) => (
+                            <option key={term.id} value={term.id}>
+                              {term.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="examinations-form-row">
+                        <label>
+                          Start date
+                          <input
+                            type="date"
+                            {...examForm.register('startDate')}
+                            disabled={!canManageExams}
+                          />
+                        </label>
+                        <label>
+                          End date
+                          <input
+                            type="date"
+                            {...examForm.register('endDate')}
+                            disabled={!canManageExams}
+                          />
+                        </label>
                       </div>
-                      {canManageExams && (
-                        <div className="examinations-actions">
+                      <div className="examinations-actions examinations-form-submit-row">
+                        {canManageExams && (
+                          <Button type="submit" disabled={saveExam.isPending}>
+                            {saveExam.isPending
+                              ? 'Saving…'
+                              : examEditId
+                                ? 'Update exam'
+                                : 'Create exam'}
+                          </Button>
+                        )}
+                        {examEditId && (
                           <Button
                             type="button"
                             variant="secondary"
                             onClick={() => {
+                              setExamEditId('');
+                              examForm.reset();
+                            }}
+                          >
+                            Cancel edit
+                          </Button>
+                        )}
+                      </div>
+                    </form>
+                  </>
+                )}
+                {tab === 'Schedules' && (
+                  <>
+                    <h2>{scheduleEditId ? 'Edit schedule' : 'Add schedule'}</h2>
+                    <form
+                      className="examinations-form examinations-schedule-form"
+                      onSubmit={scheduleForm.handleSubmit(submitSchedule)}
+                    >
+                      <label>
+                        Exam
+                        <select
+                          value={examId}
+                          onChange={(event) => setExamId(event.target.value)}
+                          disabled={!canManageExams}
+                        >
+                          <option value="">Select an exam</option>
+                          {exams.map((exam) => (
+                            <option key={exam.id} value={exam.id}>
+                              {exam.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Class
+                        <select
+                          {...scheduleForm.register('classId')}
+                          disabled={!canManageExams || !examId}
+                          onChange={(event) => {
+                            scheduleForm.setValue(
+                              'classId',
+                              event.target.value,
+                            );
+                            scheduleForm.setValue('sectionId', '');
+                          }}
+                        >
+                          <option value="">Select class</option>
+                          {examClasses.map((item: AcademicClass) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        Section
+                        <select
+                          {...scheduleForm.register('sectionId')}
+                          disabled={!canManageExams || !examId}
+                        >
+                          <option value="">Select section</option>
+                          {sections
+                            .filter(
+                              (item: AcademicSection) =>
+                                item.classId === scheduleForm.watch('classId'),
+                            )
+                            .map((item: AcademicSection) => (
+                              <option key={item.id} value={item.id}>
+                                {item.name}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                      <label>
+                        Subject
+                        <select
+                          {...scheduleForm.register('subjectId')}
+                          disabled={!canManageExams || !examId}
+                        >
+                          <option value="">Select subject</option>
+                          {subjects.map((item: AcademicSubject) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="examinations-form-row">
+                        <label>
+                          Date
+                          <input
+                            type="date"
+                            {...scheduleForm.register('date')}
+                            disabled={!canManageExams || !examId}
+                          />
+                        </label>
+                        <label>
+                          Start time
+                          <input
+                            type="time"
+                            {...scheduleForm.register('startTime')}
+                            disabled={!canManageExams || !examId}
+                          />
+                        </label>
+                      </div>
+                      <div className="examinations-form-row examinations-form-row-three">
+                        <label>
+                          Duration (min)
+                          <input
+                            type="number"
+                            min="1"
+                            {...scheduleForm.register('durationMinutes')}
+                            disabled={!canManageExams || !examId}
+                          />
+                        </label>
+                        <label>
+                          Total marks
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            {...scheduleForm.register('totalMarks')}
+                            disabled={!canManageExams || !examId}
+                          />
+                        </label>
+                        <label>
+                          Passing marks
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            {...scheduleForm.register('passingMarks')}
+                            disabled={!canManageExams || !examId}
+                          />
+                        </label>
+                      </div>
+                      {scheduleForm.formState.errors.root && (
+                        <small>
+                          {scheduleForm.formState.errors.root.message}
+                        </small>
+                      )}
+                      <div className="examinations-actions examinations-form-submit-row">
+                        {canManageExams && (
+                          <Button
+                            type="submit"
+                            disabled={!examId || saveSchedule.isPending}
+                          >
+                            {scheduleEditId
+                              ? 'Update schedule'
+                              : 'Add schedule'}
+                          </Button>
+                        )}
+                        {scheduleEditId && (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => {
+                              setScheduleEditId('');
+                              scheduleForm.reset();
+                            }}
+                          >
+                            Cancel edit
+                          </Button>
+                        )}
+                      </div>
+                    </form>
+                  </>
+                )}
+              </section>
+            )}
+            {(tab === 'Schedules' || tab === 'Exam calendar') && (
+              <section className="examinations-card">
+                <h2>
+                  {tab === 'Exam calendar'
+                    ? 'Exam calendar'
+                    : 'Scheduled papers'}
+                </h2>
+                {tab === 'Exam calendar' && (
+                  <>
+                    <div className="examinations-filter-row">
+                      <SelectField
+                        label="Campus filter"
+                        value={campusFilter}
+                        onChange={setCampusFilter}
+                      >
+                        <option value="">All campuses</option>
+                        {campuses.map((campus) => (
+                          <option key={campus.id} value={campus.id}>
+                            {campus.name}
+                          </option>
+                        ))}
+                      </SelectField>
+                      <SelectField
+                        label="Term filter"
+                        value={termFilter}
+                        onChange={setTermFilter}
+                      >
+                        <option value="">All terms</option>
+                        {terms.map((term: AcademicTerm) => (
+                          <option key={term.id} value={term.id}>
+                            {term.name}
+                          </option>
+                        ))}
+                      </SelectField>
+                    </div>
+                    {visibleExams.length === 0 ? (
+                      <EmptyState
+                        title="No exams yet"
+                        description="Create an exam to begin scheduling assessments."
+                      />
+                    ) : (
+                      <ul className="examinations-record-list">
+                        {visibleExams.map((exam) => (
+                          <li key={exam.id}>
+                            <div>
+                              <strong>{examName(exam, years)}</strong>
+                              <span>
+                                {examTypeLabel(exam.type)} ·{' '}
+                                {exam.termId
+                                  ? (terms.find(
+                                      (term) => term.id === exam.termId,
+                                    )?.name ?? 'Term-based')
+                                  : 'Annual (no term)'}{' '}
+                                · {exam.startDate} to {exam.endDate}
+                              </span>
+                            </div>
+                            {canManageExams && (
+                              <div className="examinations-actions">
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  onClick={() => {
+                                    setExamForEdit(exam);
+                                    setExamId(exam.id);
+                                    setTab('Exams');
+                                  }}
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="quiet"
+                                  onClick={() => {
+                                    void removeExam
+                                      .mutateAsync(exam.id)
+                                      .catch((error: unknown) =>
+                                        setFormError(apiMessage(error)),
+                                      );
+                                  }}
+                                >
+                                  Delete
+                                </Button>
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                )}
+                {tab === 'Schedules' && selectedExam && (
+                  <>
+                    <h3 className="examinations-subheading">
+                      {selectedExam.name} · Schedules
+                    </h3>
+
+                    {examSchedules.isLoading ? (
+                      <LoadingState message="Loading schedules..." />
+                    ) : schedules.length === 0 ? (
+                      <EmptyState
+                        title="No schedules yet"
+                        description="Add a class, section, and subject schedule."
+                      />
+                    ) : (
+                      <ul className="examinations-record-list examinations-schedule-list">
+                        {schedules.map((schedule) => (
+                          <li key={schedule.id}>
+                            <div>
+                              <strong>
+                                {subjects.find(
+                                  (subject) =>
+                                    subject.id === schedule.subjectId,
+                                )?.name ?? 'Subject'}
+                              </strong>
+                              <span>
+                                {classes.find(
+                                  (item) => item.id === schedule.classId,
+                                )?.name ?? 'Class'}{' '}
+                                ·{' '}
+                                {sections.find(
+                                  (item) => item.id === schedule.sectionId,
+                                )?.name ?? 'Section'}{' '}
+                                · {schedule.date} {schedule.startTime}
+                              </span>
+                              <span>
+                                {schedule.marksReviewStatus === 'submitted'
+                                  ? 'Review pending'
+                                  : schedule.marksReviewStatus ===
+                                      'changes_requested'
+                                    ? 'Changes requested'
+                                    : 'Marks pending'}
+                              </span>
+                              <span>
+                                {schedule.totalMarks} marks · pass{' '}
+                                {schedule.passingMarks}
+                              </span>
+                            </div>
+                            {canManageExams && (
+                              <div className="examinations-actions">
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  onClick={() => setViewSchedule(schedule)}
+                                >
+                                  View
+                                </Button>
+                                {schedule.marksReviewStatus === 'submitted' &&
+                                  !selectedExam.resultsPublishedAt && (
+                                    <>
+                                      <Button
+                                        type="button"
+                                        variant="secondary"
+                                        onClick={() => {
+                                          setClassId(schedule.classId);
+                                          setSectionId(schedule.sectionId);
+                                          setSubjectId(schedule.subjectId);
+                                          setScheduleId(schedule.id);
+                                          setTab('Marks sheet');
+                                        }}
+                                      >
+                                        Review
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="quiet"
+                                        disabled={requestMarksChanges.isPending}
+                                        onClick={() => {
+                                          void requestMarksChanges
+                                            .mutateAsync(schedule.id)
+                                            .catch((error: unknown) =>
+                                              setFormError(apiMessage(error)),
+                                            );
+                                        }}
+                                      >
+                                        Request changes
+                                      </Button>
+                                    </>
+                                  )}
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  onClick={() => setScheduleForEdit(schedule)}
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="quiet"
+                                  onClick={() => {
+                                    void removeSchedule
+                                      .mutateAsync(schedule.id)
+                                      .catch((error: unknown) =>
+                                        setFormError(apiMessage(error)),
+                                      );
+                                  }}
+                                >
+                                  Delete
+                                </Button>
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                )}
+              </section>
+            )}
+          </div>
+          {tab === 'Exams' && (
+            <section className="examinations-card examinations-exam-list-card">
+              <div className="examinations-panel-heading">
+                <div>
+                  <h2>Created exams</h2>
+                  <p>Review, edit or schedule an examination</p>
+                </div>
+                <span className="examinations-review-count">
+                  {visibleExams.length}
+                </span>
+              </div>
+              {visibleExams.length === 0 ? (
+                <EmptyState
+                  title="No exams created yet"
+                  description="Create your first exam using the form above."
+                />
+              ) : (
+                <ul className="examinations-record-list">
+                  {visibleExams.map((exam) => (
+                    <li key={exam.id} className="examinations-exam-record">
+                      <div className="examinations-exam-record-copy">
+                        <strong>{exam.name}</strong>
+                        <span>Exam ID · {exam.id.slice(-8).toUpperCase()}</span>
+                      </div>
+                      {canManageExams && (
+                        <div className="examinations-actions examinations-exam-record-actions">
+                          <Button
+                            type="button"
+                            variant="quiet"
+                            className="examinations-exam-action"
+                            onClick={() => setViewExam(exam)}
+                          >
+                            View
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="quiet"
+                            className="examinations-exam-action"
+                            onClick={() => {
                               setExamForEdit(exam);
-                              setExamId(exam.id);
+                              setTab('Exams');
                             }}
                           >
                             Edit
@@ -949,6 +1716,19 @@ export function ExaminationDashboard() {
                           <Button
                             type="button"
                             variant="quiet"
+                            className="examinations-exam-action"
+                            onClick={() => {
+                              setExamId(exam.id);
+                              setScheduleEditId('');
+                              setTab('Schedules');
+                            }}
+                          >
+                            Schedule
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="quiet"
+                            className="examinations-exam-action is-delete"
                             onClick={() => {
                               void removeExam
                                 .mutateAsync(exam.id)
@@ -965,130 +1745,25 @@ export function ExaminationDashboard() {
                   ))}
                 </ul>
               )}
-              {selectedExam && (
-                <>
-                  <h3 className="examinations-subheading">
-                    Schedules · {selectedExam.name}
-                  </h3>
-                  <p className="examinations-readonly-note" role="status">
-                    {selectedExam.resultsPublishedAt
-                      ? `Results published on ${new Date(selectedExam.resultsPublishedAt).toLocaleString()}. Unpublish before editing marks or schedules.`
-                      : 'Results are in draft. Parents and students cannot see them until they are published.'}
-                  </p>
-                  {canManageExams && (
-                    <div className="examinations-actions">
-                      <Button
-                        type="button"
-                        variant={
-                          selectedExam.resultsPublishedAt
-                            ? 'secondary'
-                            : 'primary'
-                        }
-                        disabled={
-                          setResultsPublication.isPending ||
-                          (!selectedExam.resultsPublishedAt &&
-                            (examSchedules.isLoading || schedules.length === 0 || schedules.some((item) => item.marksReviewStatus !== 'submitted')))
-                        }
-                        onClick={() => {
-                          const published = !selectedExam.resultsPublishedAt;
-                          const message = published
-                            ? 'Publish results to parent and student portals?'
-                            : 'Hide results from parent and student portals?';
-                          if (!window.confirm(message)) return;
-                          setFormError('');
-                          void setResultsPublication
-                            .mutateAsync({ examId: selectedExam.id, published })
-                            .catch((error: unknown) =>
-                              setFormError(apiMessage(error)),
-                            );
-                        }}
-                      >
-                        {setResultsPublication.isPending
-                          ? 'Updating…'
-                          : selectedExam.resultsPublishedAt
-                            ? 'Unpublish results'
-                            : 'Publish results'}
-                      </Button>
-                    </div>
-                  )}
-                  {examSchedules.isLoading ? (
-                    <LoadingState message="Loading schedules..." />
-                  ) : schedules.length === 0 ? (
-                    <EmptyState
-                      title="No schedules yet"
-                      description="Add a class, section, and subject schedule."
-                    />
-                  ) : (
-                    <ul className="examinations-record-list">
-                      {schedules.map((schedule) => (
-                        <li key={schedule.id}>
-                          <div>
-                            <strong>
-                              {subjects.find(
-                                (subject) => subject.id === schedule.subjectId,
-                              )?.name ?? 'Subject'}
-                            </strong>
-                            <span>
-                              {classes.find(
-                                (item) => item.id === schedule.classId,
-                              )?.name ?? 'Class'}{' '}
-                              ·{' '}
-                              {sections.find(
-                                (item) => item.id === schedule.sectionId,
-                              )?.name ?? 'Section'}{' '}
-                              · {schedule.date} {schedule.startTime}
-                            </span>
-                            <span>{schedule.marksReviewStatus === 'submitted' ? 'Review pending' : schedule.marksReviewStatus === 'changes_requested' ? 'Changes requested' : 'Marks pending'}</span>
-                            <span>
-                              {schedule.totalMarks} marks · pass{' '}
-                              {schedule.passingMarks}
-                            </span>
-                          </div>
-                          {canManageExams && (
-                            <div className="examinations-actions">
-                              {schedule.marksReviewStatus === 'submitted' && !selectedExam.resultsPublishedAt && (
-                                <>
-                                  <Button type="button" variant="secondary" onClick={() => { setClassId(schedule.classId); setSectionId(schedule.sectionId); setSubjectId(schedule.subjectId); setScheduleId(schedule.id); setTab('Marks entry sheet'); }}>Review</Button>
-                                  <Button type="button" variant="quiet" disabled={requestMarksChanges.isPending} onClick={() => { void requestMarksChanges.mutateAsync(schedule.id).catch((error: unknown) => setFormError(apiMessage(error))); }}>Request changes</Button>
-                                </>
-                              )}
-<Button
-                                type="button"
-                                variant="secondary"
-                                onClick={() => setScheduleForEdit(schedule)}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="quiet"
-                                onClick={() => {
-                                  void removeSchedule
-                                    .mutateAsync(schedule.id)
-                                    .catch((error: unknown) =>
-                                      setFormError(apiMessage(error)),
-                                    );
-                                }}
-                              >
-                                Delete
-                              </Button>
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </>
-              )}
             </section>
-          </div>
+          )}
         </section>
       )}
 
-      {tab === 'Marks entry sheet' && (
+      {tab === 'Marks sheet' && (
         <section className="examinations-panel">
-          <div className="examinations-filter-toolbar">
-            <div className="examinations-filters">
+          <div className="examinations-filter-toolbar examinations-mark-filter-toolbar">
+            <div className="examinations-filter-heading">
+              <div>
+                <span>ASSESSMENT SELECTION</span>
+                <strong>Choose an assessment</strong>
+              </div>
+              <p>
+                Start with the exam, then narrow down to the scheduled class and
+                subject.
+              </p>
+            </div>
+            <div className="examinations-filters examinations-mark-filters">
               <SelectField
                 label="Exam"
                 value={examId}
@@ -1136,7 +1811,7 @@ export function ExaminationDashboard() {
                 onChange={setSubjectId}
               >
                 <option value="">Select subject</option>
-                {subjects.map((item: AcademicSubject) => (
+                {availableMarkSubjects.map((item: AcademicSubject) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
                   </option>
@@ -1185,36 +1860,138 @@ export function ExaminationDashboard() {
               description="There are no active students in this section for the exam academic year."
             />
           ) : (
-            <div className="examinations-card">
+            <div className="examinations-card examinations-mark-card">
               <div className="examinations-panel-heading">
                 <div>
-                  <h2>Marks entry</h2>
-                  <p>
-                    Enter marks out of {selectedSchedule.totalMarks}.
+                  <h2>Mark sheet</h2>
+                  <p className="examinations-mark-context">
+                    {selectedExam?.name ?? 'Exam'} ·{' '}
+                    {subjects.find(
+                      (item) => item.id === selectedSchedule.subjectId,
+                    )?.name ?? 'Subject'}{' '}
+                    ·{' '}
+                    {classes.find(
+                      (item) => item.id === selectedSchedule.classId,
+                    )?.name ?? 'Class'}{' '}
+                    ·{' '}
+                    {sections.find(
+                      (item) => item.id === selectedSchedule.sectionId,
+                    )?.name ?? 'Section'}{' '}
+                    · {selectedSchedule.date} · Total{' '}
+                    {selectedSchedule.totalMarks} · Pass{' '}
+                    {selectedSchedule.passingMarks} ·{' '}
+                    {selectedSchedule.durationMinutes} min
                   </p>
-                  {selectedSchedule.marksReviewStatus === 'submitted' && (
-                    <p role="status">Submitted � awaiting review</p>
-                  )}
-                  {selectedSchedule.marksReviewStatus === 'changes_requested' && (
-                    <p role="status">Changes requested � update and resubmit</p>
-                  )}
+                  <p className="examinations-mark-review-note" role="status">
+                    Status:{' '}
+                    {selectedSchedule.marksReviewStatus === 'submitted'
+                      ? 'Submitted for admin review'
+                      : selectedSchedule.marksReviewStatus ===
+                          'changes_requested'
+                        ? 'Changes requested — update and resubmit'
+                        : 'Draft — not submitted'}
+                  </p>
                 </div>
                 {canWrite && (
-                  <Button
-                    type="button"
-                    onClick={() => void submitMarkSheet()}
-                    disabled={
-                      saveMarks.isPending || submitMarksForReview.isPending || (access.data?.role === 'teacher' && selectedSchedule.marksReviewStatus === 'submitted') ||
-                      markSheet.data.items.some(
-                        (student) =>
-                          !marksByStudent[student.id]?.absent &&
-                          marksByStudent[student.id]?.marks === '',
-                      )
-                    }
-                  >
-                    {saveMarks.isPending ? 'Saving marks…' : 'Bulk save marks'}
-                  </Button>
+                  <div className="examinations-actions examinations-mark-actions">
+                    {isTeacher ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => void saveMarkDraft()}
+                          disabled={
+                            saveMarks.isPending ||
+                            submitMarksForReview.isPending ||
+                            selectedSchedule.marksReviewStatus ===
+                              'submitted' ||
+                            invalidMarkCount > 0
+                          }
+                        >
+                          {saveMarks.isPending ? 'Saving…' : 'Save draft'}
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => void submitMarkSheet()}
+                          disabled={
+                            saveMarks.isPending ||
+                            submitMarksForReview.isPending ||
+                            selectedSchedule.marksReviewStatus ===
+                              'submitted' ||
+                            markRemainingCount > 0 ||
+                            invalidMarkCount > 0
+                          }
+                        >
+                          {submitMarksForReview.isPending
+                            ? 'Submitting…'
+                            : 'Submit for review'}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        type="button"
+                        onClick={() => void saveMarkDraft()}
+                        disabled={saveMarks.isPending || invalidMarkCount > 0}
+                      >
+                        {saveMarks.isPending ? 'Saving…' : 'Save marks'}
+                      </Button>
+                    )}
+                  </div>
                 )}
+              </div>
+              <div
+                className="examinations-mark-stats"
+                aria-label="Marks entry progress"
+              >
+                <div>
+                  <span>Total students</span>
+                  <strong>{markRoster.length}</strong>
+                </div>
+                <div>
+                  <span>Marks entered</span>
+                  <strong>{markEnteredCount}</strong>
+                </div>
+                <div>
+                  <span>Absent</span>
+                  <strong>{markAbsentCount}</strong>
+                </div>
+                <div
+                  className={
+                    markRemainingCount > 0 ? 'is-pending' : 'is-complete'
+                  }
+                >
+                  <span>Remaining</span>
+                  <strong>{markRemainingCount}</strong>
+                </div>
+              </div>
+              <div
+                className="examinations-mark-progress"
+                role="progressbar"
+                aria-label="Marks entry completion"
+                aria-valuemin={0}
+                aria-valuemax={markRoster.length}
+                aria-valuenow={markEnteredCount + markAbsentCount}
+              >
+                <span
+                  style={{
+                    width: `${((markEnteredCount + markAbsentCount) / markRoster.length) * 100}%`,
+                  }}
+                />
+              </div>
+              {formError && (
+                <p className="examinations-form-error" role="alert">
+                  {formError}
+                </p>
+              )}
+              <div className="examinations-mark-list-heading">
+                <div>
+                  <strong>Student roster</strong>
+                  <span>
+                    {markRoster.length} enrolled students · Enter marks or mark
+                    absent
+                  </span>
+                </div>
+                <span>Out of {selectedSchedule.totalMarks}</span>
               </div>
               <div className="examinations-mark-list">
                 {markSheet.data.items.map((student, index) => {
@@ -1226,8 +2003,17 @@ export function ExaminationDashboard() {
                   return (
                     <article className="examinations-mark-row" key={student.id}>
                       <div className="examinations-mark-student">
-                        <span>{String(index + 1).padStart(2, '0')}</span>
-                        <strong>{studentName(student)}</strong>
+                        <span className="examinations-mark-index">
+                          {String(index + 1).padStart(2, '0')}
+                        </span>
+                        <div className="examinations-mark-student-details">
+                          <strong>{studentName(student)}</strong>
+                          <small>
+                            {student.registrationNumber
+                              ? `Admission No. ${student.registrationNumber}`
+                              : 'Admission No. —'}
+                          </small>
+                        </div>
                         {student.mark?.grade && (
                           <span className="examinations-grade-pill">
                             {student.mark.grade}
@@ -1242,8 +2028,23 @@ export function ExaminationDashboard() {
                           min="0"
                           max={selectedSchedule.totalMarks}
                           step="0.01"
+                          inputMode="decimal"
+                          aria-invalid={
+                            !current.absent &&
+                            current.marks.trim() !== '' &&
+                            (!Number.isFinite(Number(current.marks)) ||
+                              Number(current.marks) < 0 ||
+                              Number(current.marks) >
+                                selectedSchedule.totalMarks)
+                          }
                           value={current.marks}
-                          disabled={!canWrite || current.absent || (access.data?.role === 'teacher' && selectedSchedule.marksReviewStatus === 'submitted')}
+                          disabled={
+                            !canWrite ||
+                            current.absent ||
+                            (access.data?.role === 'teacher' &&
+                              selectedSchedule.marksReviewStatus ===
+                                'submitted')
+                          }
                           onChange={(event) =>
                             setMarksByStudent((previous) => ({
                               ...previous,
@@ -1254,12 +2055,27 @@ export function ExaminationDashboard() {
                             }))
                           }
                         />
+                        {!current.absent &&
+                          current.marks.trim() !== '' &&
+                          (!Number.isFinite(Number(current.marks)) ||
+                            Number(current.marks) < 0 ||
+                            Number(current.marks) >
+                              selectedSchedule.totalMarks) && (
+                            <small className="examinations-mark-validation">
+                              Enter 0 to {selectedSchedule.totalMarks}.
+                            </small>
+                          )}
                       </label>
                       <label className="examinations-absent">
                         <input
                           type="checkbox"
                           checked={current.absent}
-                          disabled={!canWrite || (access.data?.role === 'teacher' && selectedSchedule.marksReviewStatus === 'submitted')}
+                          disabled={
+                            !canWrite ||
+                            (access.data?.role === 'teacher' &&
+                              selectedSchedule.marksReviewStatus ===
+                                'submitted')
+                          }
                           onChange={(event) =>
                             setMarksByStudent((previous) => ({
                               ...previous,
@@ -1279,7 +2095,12 @@ export function ExaminationDashboard() {
                           aria-label={`Remarks for ${studentName(student)}`}
                           maxLength={500}
                           value={current.remarks}
-                          disabled={!canWrite || (access.data?.role === 'teacher' && selectedSchedule.marksReviewStatus === 'submitted')}
+                          disabled={
+                            !canWrite ||
+                            (access.data?.role === 'teacher' &&
+                              selectedSchedule.marksReviewStatus ===
+                                'submitted')
+                          }
                           onChange={(event) =>
                             setMarksByStudent((previous) => ({
                               ...previous,
@@ -1296,7 +2117,7 @@ export function ExaminationDashboard() {
                         variant="quiet"
                         onClick={() => openStudentReport(student.id)}
                       >
-                        Report
+                        View report
                       </Button>
                     </article>
                   );
@@ -1598,8 +2419,18 @@ export function ExaminationDashboard() {
 
       {tab === 'Student report' && (
         <section className="examinations-panel">
-          <div className="examinations-filter-toolbar">
-            <div className="examinations-report-select">
+          <div className="examinations-filter-toolbar examinations-report-filter-toolbar">
+            <div className="examinations-filter-heading">
+              <div>
+                <span>STUDENT LOOKUP</span>
+                <strong>Choose a result to review</strong>
+              </div>
+              <p>
+                Select an exam, class, section and student. The report includes
+                every scheduled subject for that student.
+              </p>
+            </div>
+            <div className="examinations-report-select examinations-report-filters">
               <SelectField
                 label="Exam"
                 value={reportExamId}
@@ -1613,6 +2444,37 @@ export function ExaminationDashboard() {
                 {exams.map((exam) => (
                   <option key={exam.id} value={exam.id}>
                     {exam.name}
+                  </option>
+                ))}
+              </SelectField>
+              <SelectField
+                label="Class"
+                value={currentClassId}
+                onChange={(value) => {
+                  setClassId(value);
+                  setSectionId('');
+                  setReportStudentId('');
+                }}
+              >
+                <option value="">Select class</option>
+                {examClasses.map((item: AcademicClass) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </SelectField>
+              <SelectField
+                label="Section"
+                value={currentSectionId}
+                onChange={(value) => {
+                  setSectionId(value);
+                  setReportStudentId('');
+                }}
+              >
+                <option value="">Select section</option>
+                {classSections.map((item: AcademicSection) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
                   </option>
                 ))}
               </SelectField>
@@ -1631,10 +2493,60 @@ export function ExaminationDashboard() {
               </SelectField>
             </div>
             <p className="examinations-helper-text">
-              The student list follows the class, section, and subject selected
-              on the Marks entry sheet.
+              Choose an exam, class, section, subject and student to preview the
+              complete subject-wise result record.
             </p>
           </div>
+          {canManageExams && selectedReportExam && (
+            <div className="examinations-result-publish-bar">
+              <div>
+                <strong>
+                  {selectedReportExam.resultsPublishedAt
+                    ? 'Results are published'
+                    : 'Results are not published'}
+                </strong>
+                <span>
+                  {selectedReportExam.resultsPublishedAt
+                    ? 'Parents and students can view this official result.'
+                    : 'Publish only after every scheduled subject has been reviewed and submitted.'}
+                </span>
+              </div>
+              <Button
+                type="button"
+                variant={
+                  selectedReportExam.resultsPublishedAt
+                    ? 'secondary'
+                    : 'primary'
+                }
+                disabled={
+                  setResultsPublication.isPending ||
+                  (!selectedReportExam.resultsPublishedAt &&
+                    (examSchedules.isLoading ||
+                      schedules.length === 0 ||
+                      schedules.some(
+                        (item) => item.marksReviewStatus !== 'submitted',
+                      )))
+                }
+                onClick={() => {
+                  const published = !selectedReportExam.resultsPublishedAt;
+                  const message = published
+                    ? 'Publish results to parent and student portals?'
+                    : 'Hide results from parent and student portals?';
+                  if (!window.confirm(message)) return;
+                  setFormError('');
+                  void setResultsPublication
+                    .mutateAsync({ examId: selectedReportExam.id, published })
+                    .catch((error: unknown) => setFormError(apiMessage(error)));
+                }}
+              >
+                {setResultsPublication.isPending
+                  ? 'Updating…'
+                  : selectedReportExam.resultsPublishedAt
+                    ? 'Unpublish results'
+                    : 'Publish results'}
+              </Button>
+            </div>
+          )}
           {report.isFetching && (
             <LoadingState message="Loading student report..." />
           )}
@@ -1652,94 +2564,460 @@ export function ExaminationDashboard() {
             />
           )}
           {report.data?.report && (
-            <article className="examinations-card report-card">
-              <header>
-                <div>
-                  <p className="eyebrow">
-                    {report.data.report.exam.type} assessment
-                  </p>
-                  <h2>{report.data.report.exam.name}</h2>
-                  <p>
-                    {report.data.report.exam.startDate} to{' '}
-                    {report.data.report.exam.endDate}
-                  </p>
-                </div>
-                <div className="examinations-report-badges">
-                  <span className="examinations-summary-badge">
-                    {report.data.report.percentage === null
-                      ? 'No marks'
-                      : `${report.data.report.percentage}% overall`}
-                  </span>
-                  <span className="examinations-grade-pill">
-                    {report.data.report.overallGrade ?? 'No grade'}
-                  </span>
-                </div>
-              </header>
-              <div className="report-summary">
-                <div>
-                  <span>Total obtained</span>
-                  <strong>
-                    {report.data.report.totalMarksObtained} /{' '}
-                    {report.data.report.totalMarksPossible}
-                  </strong>
-                </div>
-                <div>
-                  <span>Grading scale</span>
-                  <strong>
-                    {scales.find((item) => item.isActive)?.name ??
-                      'Not configured'}
-                  </strong>
-                </div>
+            <>
+              <div
+                className="examinations-result-actions"
+                aria-label="Result card actions"
+              >
+                <p>
+                  Ready to share? Print this result or choose “Save as PDF” in
+                  your browser’s print dialog.
+                </p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => window.print()}
+                >
+                  <Printer size={16} aria-hidden="true" />
+                  Print / Save PDF
+                </Button>
               </div>
-              <h3>Subject breakdown</h3>
-              {report.data.report.results.length === 0 ? (
-                <EmptyState
-                  title="No subject results"
-                  description="This student has no scheduled subjects for the selected exam."
-                />
-              ) : (
-                <div className="examinations-report-table-wrap">
-                  <table className="examinations-report-table">
-                    <thead>
-                      <tr>
-                        <th scope="col">Subject</th>
-                        <th scope="col">Marks obtained</th>
-                        <th scope="col">Total marks</th>
-                        <th scope="col">Grade</th>
-                        <th scope="col">Remarks</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {report.data.report.results.map((result) => (
-                        <tr key={result.schedule.id}>
-                          <th scope="row" data-label="Subject">
-                            {result.subjectName}
-                          </th>
-                          <td data-label="Marks obtained">
-                            {result.mark?.isAbsent
-                              ? 'Absent'
-                              : (result.mark?.marksObtained ?? '—')}
-                          </td>
-                          <td data-label="Total marks">
-                            {result.schedule.totalMarks}
-                          </td>
-                          <td data-label="Grade">
-                            {result.mark?.isAbsent
-                              ? '—'
-                              : (result.mark?.grade ?? '—')}
-                          </td>
-                          <td data-label="Remarks">
-                            {result.mark?.remarks || '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </article>
+              <article className="examinations-card report-card examinations-official-result">
+                <header className="examinations-result-card-header">
+                  <div className="examinations-result-brand">
+                    <span
+                      className="examinations-result-brand-mark"
+                      aria-hidden="true"
+                    >
+                      I
+                    </span>
+                    <div>
+                      <p className="eyebrow">INSTITUTEOS · ACADEMIC RECORD</p>
+                      <h2>
+                        {report.data.report.exam.resultsPublishedAt
+                          ? 'Official Result Card'
+                          : 'Result Preview'}
+                      </h2>
+                      <p>
+                        {report.data.report.exam.name} ·{' '}
+                        {examTypeLabel(report.data.report.exam.type)}
+                      </p>
+                      <p className="examinations-result-date">
+                        {report.data.report.exam.startDate} –{' '}
+                        {report.data.report.exam.endDate}
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={
+                      report.data.report.exam.resultsPublishedAt
+                        ? 'examinations-result-status is-published'
+                        : 'examinations-result-status is-pending'
+                    }
+                  >
+                    <span aria-hidden="true" />
+                    {report.data.report.exam.resultsPublishedAt
+                      ? 'Published result'
+                      : 'Admin preview · Not published'}
+                  </span>
+                </header>
+
+                <section className="examinations-result-student">
+                  <div className="examinations-result-section-heading">
+                    <span>STUDENT INFORMATION</span>
+                    <span>EXAM RECORD</span>
+                  </div>
+                  <div className="examinations-result-identity-grid">
+                    <div className="is-student-name">
+                      <span>Student name</span>
+                      <strong>
+                        {reportStudent
+                          ? studentName(reportStudent)
+                          : 'Student result'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Admission number</span>
+                      <strong>
+                        {reportStudent?.registrationNumber ?? '—'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Class</span>
+                      <strong>
+                        {classes.find((item) => item.id === currentClassId)
+                          ?.name ?? '—'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Section</span>
+                      <strong>
+                        {sections.find((item) => item.id === currentSectionId)
+                          ?.name ?? '—'}
+                      </strong>
+                    </div>
+                  </div>
+                </section>
+
+                <section
+                  className="examinations-result-performance"
+                  aria-label="Overall performance"
+                >
+                  <div className="examinations-result-metric is-primary">
+                    <span>Overall percentage</span>
+                    <strong>
+                      {!reportIsComplete ||
+                      report.data.report.percentage === null
+                        ? 'Pending'
+                        : `${report.data.report.percentage}%`}
+                    </strong>
+                    <small>
+                      {reportPendingCount > 0
+                        ? `${reportPendingCount} subject(s) awaiting marks`
+                        : `${reportAssessedCount} of ${reportResults.length} subjects assessed`}
+                    </small>
+                  </div>
+                  <div className="examinations-result-metric">
+                    <span>Marks recorded</span>
+                    <strong>{report.data.report.totalMarksObtained}</strong>
+                    <small>
+                      {reportIsComplete
+                        ? `Out of ${report.data.report.totalMarksPossible}`
+                        : 'Across assessed subjects only'}
+                    </small>
+                  </div>
+                  <div className="examinations-result-metric">
+                    <span>Overall grade</span>
+                    <strong>{report.data.report.overallGrade ?? '—'}</strong>
+                    <small>
+                      {scales.find((item) => item.isActive)?.name ??
+                        'Grading scale not configured'}
+                    </small>
+                  </div>
+                  <div className="examinations-result-metric">
+                    <span>Subjects assessed</span>
+                    <strong>
+                      {reportAssessedCount}/{reportResults.length}
+                    </strong>
+                    <small>
+                      {reportPendingCount} pending · {reportAbsentCount} absent
+                    </small>
+                  </div>
+                </section>
+
+                <section className="examinations-result-subjects">
+                  <div className="examinations-result-section-heading">
+                    <span>Subject-wise Performance</span>
+                    <span>
+                      {report.data.report.results.length}{' '}
+                      {report.data.report.results.length === 1
+                        ? 'subject'
+                        : 'subjects'}
+                    </span>
+                  </div>
+                  {report.data.report.results.length === 0 ? (
+                    <EmptyState
+                      title="No subject results"
+                      description="This student has no scheduled subjects for the selected exam."
+                    />
+                  ) : (
+                    <div className="examinations-report-table-wrap">
+                      <table className="examinations-report-table">
+                        <thead>
+                          <tr>
+                            <th scope="col">Subject</th>
+                            <th scope="col">Obtained</th>
+                            <th scope="col">Total</th>
+                            <th scope="col">Percentage</th>
+                            <th scope="col">Grade</th>
+                            <th scope="col">Remarks</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {report.data.report.results.map((result) => (
+                            <tr key={result.schedule.id}>
+                              <th scope="row" data-label="Subject">
+                                {result.subjectName}
+                              </th>
+                              <td data-label="Obtained Marks">
+                                {result.mark?.isAbsent
+                                  ? 'Absent'
+                                  : (result.mark?.marksObtained ?? 'Pending')}
+                              </td>
+                              <td data-label="Total Marks">
+                                {result.schedule.totalMarks}
+                              </td>
+                              <td data-label="Percentage">
+                                {result.mark?.isAbsent
+                                  ? '—'
+                                  : !result.mark
+                                    ? 'Pending'
+                                    : result.mark.percentage === null
+                                      ? '—'
+                                      : `${result.mark.percentage}%`}
+                              </td>
+                              <td data-label="Grade">
+                                {result.mark?.isAbsent
+                                  ? '—'
+                                  : !result.mark
+                                    ? 'Pending'
+                                    : (result.mark.grade ?? '—')}
+                              </td>
+                              <td data-label="Remarks">
+                                {result.mark?.remarks || '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <th scope="row" data-label="Summary">
+                              Total
+                            </th>
+                            <td data-label="Obtained">
+                              {report.data.report.totalMarksObtained}
+                            </td>
+                            <td data-label="Maximum">
+                              {report.data.report.totalMarksPossible}
+                            </td>
+                            <td data-label="Overall percentage">
+                              {reportIsComplete &&
+                              report.data.report.percentage !== null
+                                ? `${report.data.report.percentage}%`
+                                : 'Pending'}
+                            </td>
+                            <td data-label="Overall grade">
+                              {report.data.report.overallGrade ?? '—'}
+                            </td>
+                            <td data-label="Remarks">
+                              {reportPendingCount > 0
+                                ? `${reportPendingCount} subject(s) pending`
+                                : '—'}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </section>
+                <footer className="examinations-result-footer">
+                  <div
+                    className="examinations-result-signatures"
+                    aria-label="Verification signatures"
+                  >
+                    <div>
+                      <span>Class Teacher</span>
+                      <i />
+                    </div>
+                    <div>
+                      <span>Examination In-charge</span>
+                      <i />
+                    </div>
+                    <div>
+                      <span>Principal / Head</span>
+                      <i />
+                    </div>
+                  </div>
+                  <div className="examinations-result-footnote">
+                    <span>
+                      Generated from the institute examination records.
+                    </span>
+                    <strong>
+                      {report.data.report.exam.resultsPublishedAt
+                        ? 'Official published record'
+                        : 'Preview only · Not an official published result'}
+                    </strong>
+                  </div>
+                </footer>
+              </article>
+            </>
           )}
         </section>
+      )}
+      {viewSchedule && (
+        <div
+          className="examinations-detail-backdrop"
+          onClick={() => setViewSchedule(null)}
+        >
+          <section
+            className="examinations-detail-dialog examinations-schedule-detail-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="examinations-schedule-detail-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="examinations-detail-heading">
+              <div>
+                <p className="eyebrow">SCHEDULED PAPER</p>
+                <h2 id="examinations-schedule-detail-title">
+                  {subjects.find((item) => item.id === viewSchedule.subjectId)
+                    ?.name ?? 'Subject'}
+                </h2>
+                <p>
+                  {selectedExam?.name ?? 'Examination'} ·{' '}
+                  {classes.find((item) => item.id === viewSchedule.classId)
+                    ?.name ?? 'Class'}{' '}
+                  ·{' '}
+                  {sections.find((item) => item.id === viewSchedule.sectionId)
+                    ?.name ?? 'Section'}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="quiet"
+                aria-label="Close schedule details"
+                onClick={() => setViewSchedule(null)}
+              >
+                ×
+              </Button>
+            </header>
+            <div className="examinations-detail-grid">
+              <div>
+                <span>Exam date</span>
+                <strong>{viewSchedule.date}</strong>
+              </div>
+              <div>
+                <span>Start time</span>
+                <strong>{viewSchedule.startTime}</strong>
+              </div>
+              <div>
+                <span>Duration</span>
+                <strong>{viewSchedule.durationMinutes} minutes</strong>
+              </div>
+              <div>
+                <span>Total marks</span>
+                <strong>{viewSchedule.totalMarks}</strong>
+              </div>
+              <div>
+                <span>Passing marks</span>
+                <strong>{viewSchedule.passingMarks}</strong>
+              </div>
+              <div>
+                <span>Marks status</span>
+                <strong>
+                  {viewSchedule.marksReviewStatus === 'submitted'
+                    ? 'Submitted for review'
+                    : viewSchedule.marksReviewStatus === 'changes_requested'
+                      ? 'Changes requested'
+                      : 'Pending'}
+                </strong>
+              </div>
+            </div>
+            <div className="examinations-actions examinations-detail-actions">
+              {canManageExams && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setScheduleForEdit(viewSchedule);
+                    setViewSchedule(null);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                >
+                  Edit paper
+                </Button>
+              )}
+              <Button type="button" onClick={() => setViewSchedule(null)}>
+                Close
+              </Button>
+            </div>
+          </section>
+        </div>
+      )}
+      {viewExam && (
+        <div
+          className="examinations-detail-backdrop"
+          onClick={() => setViewExam(null)}
+        >
+          <section
+            className="examinations-detail-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="examinations-detail-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="examinations-detail-heading">
+              <div>
+                <p className="eyebrow">EXAM DETAILS</p>
+                <h2 id="examinations-detail-title">
+                  {examName(viewExam, years)}
+                </h2>
+                <p>{examTypeLabel(viewExam.type)}</p>
+              </div>
+              <Button
+                type="button"
+                variant="quiet"
+                aria-label="Close exam details"
+                onClick={() => setViewExam(null)}
+              >
+                ×
+              </Button>
+            </header>
+            <div className="examinations-detail-grid">
+              <div>
+                <span>Campus</span>
+                <strong>
+                  {campuses.find((item) => item.id === viewExam.campusId)
+                    ?.name ?? '—'}
+                </strong>
+              </div>
+              <div>
+                <span>Academic year</span>
+                <strong>
+                  {years.find((item) => item.id === viewExam.academicYearId)
+                    ?.name ?? '—'}
+                </strong>
+              </div>
+              <div>
+                <span>Term</span>
+                <strong>
+                  {terms.find((item) => item.id === viewExam.termId)?.name ??
+                    'Annual'}
+                </strong>
+              </div>
+              <div>
+                <span>Start date</span>
+                <strong>{viewExam.startDate}</strong>
+              </div>
+              <div>
+                <span>End date</span>
+                <strong>{viewExam.endDate}</strong>
+              </div>
+              <div>
+                <span>Result status</span>
+                <strong>
+                  {viewExam.resultsPublishedAt ? 'Published' : 'Not published'}
+                </strong>
+              </div>
+            </div>
+            <div className="examinations-actions examinations-detail-actions">
+              {canManageExams && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setViewExam(null);
+                    setExamForEdit(viewExam);
+                    setTab('Exams');
+                  }}
+                >
+                  Edit exam
+                </Button>
+              )}
+              <Button
+                type="button"
+                onClick={() => {
+                  setExamId(viewExam.id);
+                  setScheduleEditId('');
+                  setViewExam(null);
+                  setTab('Schedules');
+                }}
+              >
+                Manage schedule
+              </Button>
+            </div>
+          </section>
+        </div>
       )}
     </main>
   );

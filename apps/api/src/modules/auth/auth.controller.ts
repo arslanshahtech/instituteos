@@ -56,7 +56,8 @@ function loginLimit(limit: number) {
       response.status(429).json({
         error: {
           code: 'AUTH_RATE_LIMITED',
-          message: 'Too many attempts for this account. Please wait and try again.',
+          message:
+            'Too many attempts for this account. Please wait and try again.',
           requestId: response.locals.requestId,
         },
       });

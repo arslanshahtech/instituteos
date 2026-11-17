@@ -83,7 +83,9 @@ async function main() {
 }
 
 main().catch(async (error: unknown) => {
-  console.error(error instanceof Error ? error.message : 'Invitation verification failed.');
+  console.error(
+    error instanceof Error ? error.message : 'Invitation verification failed.',
+  );
   await mongoose.disconnect().catch(() => undefined);
   process.exitCode = 1;
 });

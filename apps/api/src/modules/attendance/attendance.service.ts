@@ -70,6 +70,7 @@ function enforceStudentAttendanceCutoff(
   settings: {
     timezone: string;
     markingCutoffTime: string;
+    teacherMarkingCutoffEnabled: boolean;
     allowAdminOverride: boolean;
   },
 ): void {
@@ -116,6 +117,7 @@ function enforceStudentAttendanceCutoff(
       'Past attendance can only be corrected by an authorized organization administrator.',
     );
   }
+  if (!settings.teacherMarkingCutoffEnabled) return;
   const currentTime = String(parts.hour) + ':' + String(parts.minute);
   if (currentTime < settings.markingCutoffTime) return;
   if (isOrganizationAdmin && settings.allowAdminOverride) return;
@@ -363,14 +365,11 @@ export class AttendanceService {
       submitted.set(studentId, record);
     }
     const rosterIds = new Set(roster.map((member) => member.id));
-    if (
-      submitted.size !== rosterIds.size ||
-      [...submitted.keys()].some((studentId) => !rosterIds.has(studentId))
-    ) {
+    if ([...submitted.keys()].some((studentId) => !rosterIds.has(studentId))) {
       throw new AppError(
         400,
         'ROSTER_MISMATCH',
-        'Attendance must include every active student in the selected section and no other students.',
+        'Attendance can only be recorded for active students in the selected section.',
       );
     }
     return this.repository.saveStudentAttendance(context.organizationId, {

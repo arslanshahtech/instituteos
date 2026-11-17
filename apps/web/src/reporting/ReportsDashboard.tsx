@@ -1,6 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
-  ArrowUpRight,
   CalendarCheck,
   Download,
   FileText,
@@ -8,13 +7,11 @@ import {
   WalletCards,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { listAcademicCampuses } from '../academics/academics-api.js';
 import { Button } from '../components/ui/Button.js';
 import { Dialog } from '../components/ui/Dialog.js';
 import { WorkspacePageHeading } from '../components/ui/WorkspacePrimitives.js';
-import { DataTable } from '../components/ui/DataTable.js';
-import { Pagination } from '../components/ui/Pagination.js';
 import {
   EmptyState,
   ErrorState,
@@ -23,30 +20,60 @@ import {
 } from '../components/ui/States.js';
 import { apiMessage, useOrganizationAccess } from '../staff/StaffPageShared.js';
 import { useToast } from '../components/ui/ToastProvider.js';
-import type {
-  AuditLog,
-  AuditLogFilters,
-  ReportRow,
-  ReportType,
-} from './reporting-api.js';
+import type { ReportFormat, ReportRow, ReportType } from './reporting-api.js';
 import {
   getReportRows,
-  useAuditLogs,
   useExportReport,
-  useOrganizationSummary,
+  useTransferHistory,
 } from './reporting-api.js';
 import './reporting.css';
 
-const pageSize = 20;
-const reportOptions: { value: ReportType; label: string }[] = [
-  { value: 'students', label: 'Students' },
-  { value: 'finance', label: 'Finance' },
-  { value: 'attendance', label: 'Attendance' },
+const dateFilterableReportTypes = new Set<ReportType>([
+  'students',
+  'staff',
+  'attendance',
+  'finance',
+  'payments',
+  'expenses',
+  'payroll',
+  'advances',
+  'exams',
+  'results',
+  'admissions',
+  'admission-inquiries',
+  'audit',
+]);
+const reportOptions: { value: ReportType; label: string; group: string }[] = [
+  { value: 'students', label: 'Student register', group: 'Students' },
+  { value: 'staff', label: 'Staff directory', group: 'Staff' },
+  { value: 'attendance', label: 'Attendance records', group: 'Attendance' },
+  { value: 'finance', label: 'Fee invoices & balances', group: 'Finance' },
+  { value: 'payments', label: 'Fee collection & payments', group: 'Finance' },
+  { value: 'expenses', label: 'Expense report', group: 'Finance' },
+  { value: 'payroll', label: 'Monthly payroll', group: 'Payroll' },
+  { value: 'advances', label: 'Salary advances', group: 'Payroll' },
+  { value: 'classes', label: 'Class register', group: 'Academics' },
+  { value: 'sections', label: 'Section register', group: 'Academics' },
+  { value: 'subjects', label: 'Subject register', group: 'Academics' },
+  { value: 'exams', label: 'Examination schedule', group: 'Examinations' },
+  {
+    value: 'results',
+    label: 'Student results & grades',
+    group: 'Examinations',
+  },
+  { value: 'admissions', label: 'Admission applications', group: 'Admissions' },
+  {
+    value: 'admission-inquiries',
+    label: 'Admission inquiries',
+    group: 'Admissions',
+  },
+  {
+    value: 'organization',
+    label: 'Campus & organization summary',
+    group: 'Organization',
+  },
+  { value: 'audit', label: 'Audit activity', group: 'Organization' },
 ];
-
-function shortId(value: string) {
-  return value.length > 14 ? `${value.slice(0, 8)}…${value.slice(-4)}` : value;
-}
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -58,29 +85,11 @@ function formatDate(value: string) {
       }).format(date);
 }
 
-function currency(value: string) {
-  const amount = Number(value);
-  return Number.isFinite(amount)
-    ? new Intl.NumberFormat(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(amount)
-    : value;
-}
-
-function auditMetadata(log: AuditLog) {
-  const count = Object.keys(log.metadata ?? {}).length;
-  return count ? `${count} ${count === 1 ? 'field' : 'fields'}` : 'No metadata';
-}
-
 export function ReportsDashboard() {
   const { organizationId = '' } = useParams();
   const access = useOrganizationAccess(organizationId);
   const canReadReports =
     access.data?.permissions.includes('reporting.read') ?? false;
-  const canReadAudit = access.data?.permissions.includes('audit.read') ?? false;
-  const canReadFinance =
-    access.data?.permissions.includes('finance.read') ?? false;
   const campusRestricted =
     access.data?.role === 'campus_admin' ||
     Boolean(access.data?.campusIds.length);
@@ -94,35 +103,34 @@ export function ReportsDashboard() {
     ),
     retry: false,
   });
-  const [filters, setFilters] = useState<AuditLogFilters>({
-    page: 1,
-    pageSize,
-  });
   const [campusFilter, setCampusFilter] = useState('');
   const [reportType, setReportType] = useState<ReportType>('students');
+  const [reportFormat, setReportFormat] = useState<ReportFormat>('xlsx');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [previewType, setPreviewType] = useState<ReportType | null>(null);
+  const getFiltersForReport = (type: ReportType) => ({
+    ...(campusFilter ? { campusId: campusFilter } : {}),
+    ...(dateFilterableReportTypes.has(type) && dateFrom ? { dateFrom } : {}),
+    ...(dateFilterableReportTypes.has(type) && dateTo ? { dateTo } : {}),
+  });
+  const previewFilters = getFiltersForReport(previewType ?? reportType);
   const preview = useQuery({
-    queryKey: ['reporting', organizationId, 'preview', previewType ?? 'none'],
+    queryKey: [
+      'reporting',
+      organizationId,
+      'preview',
+      previewType ?? 'none',
+      previewFilters,
+    ],
     queryFn: () => {
       if (!previewType) throw new Error('Choose a report type to preview.');
-      return getReportRows(organizationId, previewType);
+      return getReportRows(organizationId, previewType, previewFilters);
     },
     enabled: Boolean(access.data && canReadReports && previewType),
     retry: false,
   });
-  const summary = useOrganizationSummary(
-    organizationId,
-    campusFilter || undefined,
-    false,
-  );
-  const logs = useAuditLogs(
-    organizationId,
-    {
-      ...filters,
-      ...(campusFilter ? { campusId: campusFilter } : {}),
-    },
-    false,
-  );
+  const transferHistory = useTransferHistory(organizationId, canReadReports);
   const exportMutation = useExportReport(organizationId);
   const toast = useToast();
 
@@ -130,82 +138,61 @@ export function ReportsDashboard() {
   const availableCampuses = campusRestricted
     ? campusList.filter((campus) => access.data?.campusIds.includes(campus.id))
     : campusList;
-  const financeOptions = canReadFinance
-    ? reportOptions
-    : reportOptions.filter((option) => option.value !== 'finance');
-  const summaryData = summary.data?.summary;
-  const auditRows = logs.data?.items ?? [];
+  const reportPermissionByType: Record<ReportType, string> = {
+    students: 'student.read',
+    staff: 'staff.read',
+    attendance: 'attendance.read',
+    finance: 'finance.read',
+    payments: 'finance.read',
+    expenses: 'finance.read',
+    payroll: 'finance.read',
+    advances: 'finance.read',
+    classes: 'academics.read',
+    sections: 'academics.read',
+    subjects: 'academics.read',
+    exams: 'academics.read',
+    results: 'academics.read',
+    admissions: 'admission.read',
+    'admission-inquiries': 'admission.read',
+    organization: 'organization.read',
+    audit: 'audit.read',
+  };
+  const availableReportOptions = reportOptions.filter((option) =>
+    access.data?.permissions.includes(reportPermissionByType[option.value]),
+  );
+  const activeReportType = availableReportOptions.some(
+    (option) => option.value === reportType,
+  )
+    ? reportType
+    : (availableReportOptions[0]?.value ?? 'students');
   const shortcutCards = [
     {
       id: 'students-report',
       title: 'Student report',
-      description:
-        'Preview and export the organization’s current student records.',
+      description: 'Student register and profiles.',
       icon: Users,
       type: 'students' as const,
-      to: undefined,
     },
     {
       id: 'attendance-report',
       title: 'Attendance report',
-      description: 'Preview and export recorded attendance for review.',
+      description: 'Daily attendance and class records.',
       icon: CalendarCheck,
       type: 'attendance' as const,
-      to: undefined,
     },
-    ...(canReadFinance
+    ...(access.data?.permissions.includes('finance.read')
       ? [
           {
             id: 'finance-report',
             title: 'Fee collection report',
-            description:
-              'Preview and export fee and invoice records available to your role.',
+            description: 'Collected fees and payment records.',
             icon: WalletCards,
-            type: 'finance' as const,
-            to: undefined,
+            type: 'payments' as const,
           },
         ]
       : []),
-  ];
-  const auditColumns = useMemo(
-    () => [
-      {
-        header: 'Actor',
-        render: (log: AuditLog) => (
-          <span className="reporting-mono" title={log.actorId}>
-            {shortId(log.actorId)}
-          </span>
-        ),
-      },
-      {
-        header: 'Action',
-        render: (log: AuditLog) => (
-          <span className="reporting-action">
-            {log.action.replaceAll('_', ' ')}
-          </span>
-        ),
-      },
-      {
-        header: 'Entity',
-        render: (log: AuditLog) => (
-          <span>
-            {log.entityType}
-            {log.entityId ? ` · ${shortId(log.entityId)}` : ''}
-          </span>
-        ),
-      },
-      {
-        header: 'Timestamp',
-        render: (log: AuditLog) => formatDate(log.createdAt),
-      },
-      {
-        header: 'Metadata',
-        render: (log: AuditLog) => (
-          <span className="reporting-metadata-badge">{auditMetadata(log)}</span>
-        ),
-      },
-    ],
-    [],
+  ].filter((card) =>
+    availableReportOptions.some((option) => option.value === card.type),
   );
 
   if (access.isPending) {
@@ -230,12 +217,38 @@ export function ReportsDashboard() {
     );
   }
 
-  async function downloadReport(type: ReportType = reportType) {
-    try {
-      await exportMutation.mutateAsync({ type });
+  async function downloadReport(type: ReportType = activeReportType) {
+    if (!availableReportOptions.some((option) => option.value === type)) return;
+    if (
+      dateFilterableReportTypes.has(type) &&
+      dateFrom &&
+      dateTo &&
+      dateFrom > dateTo
+    ) {
       toast.showToast(
-        `${reportOptions.find((option) => option.value === type)?.label} report downloaded.`,
+        'Start date must be before or equal to end date.',
+        'info',
       );
+      return;
+    }
+    try {
+      const historyRecorded = await exportMutation.mutateAsync({
+        type,
+        format: reportFormat,
+        filters: getFiltersForReport(type),
+      });
+      const label =
+        reportOptions.find((option) => option.value === type)?.label ??
+        'Report';
+      if (!historyRecorded) {
+        toast.showToast(
+          label + ' report downloaded, but its history could not be saved.',
+          'info',
+        );
+        return;
+      }
+      await transferHistory.refetch();
+      toast.showToast(label + ' report downloaded.');
     } catch (error) {
       toast.showToast(apiMessage(error), 'info');
     }
@@ -245,61 +258,9 @@ export function ReportsDashboard() {
     <div className="reporting-page reference-live-module">
       <WorkspacePageHeading
         className="reporting-header"
-        eyebrow="Organization workspace"
-        title="Reports & Export"
-        description="Preview real organization reports and export the records available to your role."
-        aside={
-          <div className="reporting-toolbar">
-            <label className="reporting-field" htmlFor="report-campus">
-              Campus
-              <select
-                id="report-campus"
-                value={campusFilter}
-                onChange={(event) => {
-                  const val = event.target.value;
-                  setCampusFilter(val);
-                  setFilters((prev) => ({ ...prev, page: 1 }));
-                }}
-              >
-                <option value="">
-                  {campusRestricted ? 'All assigned campuses' : 'All campuses'}
-                </option>
-                {availableCampuses.map((campus) => (
-                  <option key={campus.id} value={campus.id}>
-                    {campus.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="reporting-field" htmlFor="report-type">
-              Export
-              <select
-                id="report-type"
-                value={reportType}
-                onChange={(event) => {
-                  const val = event.target.value as ReportType;
-                  setReportType(val);
-                }}
-              >
-                {financeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <Button
-              className="reporting-export-button"
-              disabled={exportMutation.isPending}
-              onClick={() => void downloadReport()}
-              type="button"
-              variant="primary"
-            >
-              <Download size={16} aria-hidden="true" />
-              {exportMutation.isPending ? 'Exporting…' : 'Export report'}
-            </Button>
-          </div>
-        }
+        eyebrow="Organization"
+        title="Import & Export"
+        description="Import records and export reports."
       />
 
       {campuses.error && (
@@ -311,240 +272,343 @@ export function ReportsDashboard() {
       )}
 
       <section
-        aria-label="Report and workspace shortcuts"
-        className="reporting-shortcuts-grid"
+        aria-label="Quick export reports"
+        className="reporting-shortcuts-section"
       >
-        {shortcutCards.map((card) => {
-          const Icon = card.icon;
-          const content = (
-            <>
-              <span className="reporting-shortcut-icon" aria-hidden="true">
-                <Icon size={17} />
-              </span>
-              <span className="reporting-shortcut-copy">
-                <strong>{card.title}</strong>
-                <small>{card.description}</small>
-              </span>
-              <span className="reporting-shortcut-arrow" aria-hidden="true">
-                {card.type ? (
-                  <Download size={15} />
-                ) : (
-                  <ArrowUpRight size={15} />
-                )}
-              </span>
-            </>
-          );
-          return (
-            <article
-              className="reporting-shortcut-card reporting-report-card"
-              key={card.id}
-            >
-              {content}
-              <div className="reporting-report-actions">
-                <Button
-                  onClick={() => setPreviewType(card.type)}
-                  type="button"
-                  variant="secondary"
-                >
-                  Preview
-                </Button>
-                <Button
-                  disabled={exportMutation.isPending}
-                  onClick={() => void downloadReport(card.type)}
-                  type="button"
-                  variant="primary"
-                >
-                  {exportMutation.isPending ? 'Exporting…' : 'Export'}
-                </Button>
-              </div>
-            </article>
-          );
-        })}
+        <div className="reporting-section-heading">
+          <h2>Export reports</h2>
+        </div>
+        <div className="reporting-shortcuts-grid">
+          {shortcutCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <article
+                className="reporting-shortcut-card reporting-report-card"
+                key={card.id}
+              >
+                <span className="reporting-shortcut-icon" aria-hidden="true">
+                  <Icon size={17} />
+                </span>
+                <span className="reporting-shortcut-copy">
+                  <strong>{card.title}</strong>
+                  <small>{card.description}</small>
+                </span>
+                <div className="reporting-report-actions">
+                  <Button
+                    onClick={() => setPreviewType(card.type)}
+                    type="button"
+                    variant="secondary"
+                  >
+                    Preview
+                  </Button>
+                  <Button
+                    disabled={exportMutation.isPending}
+                    onClick={() => void downloadReport(card.type)}
+                    type="button"
+                    variant="primary"
+                  >
+                    {exportMutation.isPending ? 'Exporting…' : 'Download'}
+                  </Button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
       </section>
 
       <section
-        aria-labelledby="report-summary-title"
-        className="reporting-section"
+        className="reporting-builder"
+        aria-labelledby="report-builder-title"
+      >
+        <div className="reporting-builder-heading">
+          <div>
+            <p className="section-kicker">Advanced options</p>
+            <h2 id="report-builder-title">Custom Export</h2>
+            <p>Select a report, format and date range.</p>
+          </div>
+          <span className="reporting-builder-count">
+            {availableReportOptions.length} available reports
+          </span>
+        </div>
+        <div className="reporting-builder-filters">
+          <label className="reporting-field" htmlFor="report-campus">
+            Campus
+            <select
+              id="report-campus"
+              value={campusFilter}
+              onChange={(event) => setCampusFilter(event.target.value)}
+            >
+              <option value="">
+                {campusRestricted ? 'All assigned campuses' : 'All campuses'}
+              </option>
+              {availableCampuses.map((campus) => (
+                <option key={campus.id} value={campus.id}>
+                  {campus.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="reporting-field" htmlFor="report-type">
+            Report
+            <select
+              id="report-type"
+              value={activeReportType}
+              disabled={availableReportOptions.length === 0}
+              onChange={(event) =>
+                setReportType(event.target.value as ReportType)
+              }
+            >
+              {[
+                'Students',
+                'Staff',
+                'Attendance',
+                'Finance',
+                'Payroll',
+                'Academics',
+                'Examinations',
+                'Admissions',
+                'Organization',
+              ].map((group) => (
+                <optgroup key={group} label={group}>
+                  {availableReportOptions
+                    .filter((option) => option.group === group)
+                    .map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+          <label className="reporting-field" htmlFor="report-format">
+            Format
+            <select
+              id="report-format"
+              value={reportFormat}
+              onChange={(event) =>
+                setReportFormat(event.target.value as ReportFormat)
+              }
+            >
+              <option value="xlsx">Excel (.xlsx)</option>
+              <option value="csv">CSV (.csv)</option>
+              <option value="pdf">PDF / Print</option>
+              <option value="json">JSON</option>
+            </select>
+          </label>
+          {dateFilterableReportTypes.has(activeReportType) ? (
+            <>
+              <label className="reporting-field" htmlFor="report-date-from">
+                Date from
+                <input
+                  id="report-date-from"
+                  type="date"
+                  value={dateFrom}
+                  max={dateTo || undefined}
+                  onChange={(event) => setDateFrom(event.target.value)}
+                />
+              </label>
+              <label className="reporting-field" htmlFor="report-date-to">
+                Date to
+                <input
+                  id="report-date-to"
+                  type="date"
+                  value={dateTo}
+                  min={dateFrom || undefined}
+                  onChange={(event) => setDateTo(event.target.value)}
+                />
+              </label>
+            </>
+          ) : (
+            <p className="reporting-filter-note">
+              Date filters are not available for this report.
+            </p>
+          )}
+          <div className="reporting-builder-actions">
+            <Button
+              onClick={() => {
+                setDateFrom('');
+                setDateTo('');
+                setCampusFilter('');
+              }}
+              type="button"
+              variant="secondary"
+            >
+              Clear filters
+            </Button>
+            <Button
+              disabled={availableReportOptions.length === 0}
+              onClick={() => setPreviewType(activeReportType)}
+              type="button"
+              variant="secondary"
+            >
+              Preview report
+            </Button>
+            <Button
+              disabled={
+                exportMutation.isPending || availableReportOptions.length === 0
+              }
+              onClick={() => void downloadReport(activeReportType)}
+              type="button"
+              variant="primary"
+            >
+              <Download size={15} aria-hidden="true" />
+              {exportMutation.isPending ? 'Exporting…' : 'Export report'}
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section
+        className="reporting-import-section"
+        aria-labelledby="report-import-title"
       >
         <div className="reporting-section-heading">
           <div>
-            <p className="section-kicker">At a glance</p>
-            <h2 id="report-summary-title">Organization summary</h2>
+            <h2 id="report-import-title">Import</h2>
           </div>
-          {campusFilter && (
-            <span className="reporting-scope-label">
-              {campusList.find((campus) => campus.id === campusFilter)?.name ??
-                'Selected campus'}
-            </span>
-          )}
+          <span className="reporting-scope-label">CSV / Excel templates</span>
         </div>
-        {summary.isPending ? (
-          <LoadingState message="Loading organization summary…" />
-        ) : summary.error ? (
-          <ErrorState
-            description={apiMessage(summary.error)}
-            onRetry={() => void summary.refetch()}
-          />
-        ) : summaryData ? (
-          <>
-            <div className="reporting-kpi-grid">
-              <article className="reporting-kpi">
-                <span>Active students</span>
-                <strong>
-                  {summaryData.activeStudentCount.toLocaleString()}
-                </strong>
-                <small>Currently enrolled</small>
+        <div className="reporting-import-grid">
+          {access.data.permissions.includes('student.create') && (
+            <article className="reporting-import-card">
+              <div className="reporting-shortcut-icon">
+                <Users size={17} />
+              </div>
+              <div>
+                <strong>Student register</strong>
+                <small>Validate columns and import student profiles.</small>
+              </div>
+              <Link
+                className="button button-secondary"
+                to={`/admin/organizations/${encodeURIComponent(organizationId)}/students/import`}
+              >
+                Import students
+              </Link>
+            </article>
+          )}
+          {access.data.permissions.includes('staff.create') && (
+            <article className="reporting-import-card">
+              <div className="reporting-shortcut-icon">
+                <FileText size={17} />
+              </div>
+              <div>
+                <strong>Staff directory</strong>
+                <small>Import staff profiles and employee details.</small>
+              </div>
+              <Link
+                className="button button-secondary"
+                to={`/admin/organizations/${encodeURIComponent(organizationId)}/staff/import`}
+              >
+                Import staff
+              </Link>
+            </article>
+          )}
+          {access.data.permissions.includes('academics.write') &&
+            access.data.permissions.includes('academics.read') &&
+            access.data.permissions.includes('campus.read') && (
+              <article className="reporting-import-card">
+                <div className="reporting-shortcut-icon">
+                  <CalendarCheck size={17} />
+                </div>
+                <div>
+                  <strong>Academic setup</strong>
+                  <small>Import classes, sections and subjects.</small>
+                </div>
+                <Link
+                  className="button button-secondary"
+                  to={`/admin/organizations/${encodeURIComponent(organizationId)}/academics/import`}
+                >
+                  Import academics
+                </Link>
               </article>
-              <article className="reporting-kpi">
-                <span>Active staff</span>
-                <strong>{summaryData.activeStaffCount.toLocaleString()}</strong>
-                <small>Current staff members</small>
-              </article>
-              <article className="reporting-kpi">
-                <span>Classes</span>
-                <strong>{summaryData.activeClassCount.toLocaleString()}</strong>
-                <small>Academic classes</small>
-              </article>
-              <article className="reporting-kpi reporting-kpi-attendance">
-                <span>Attendance today</span>
-                <strong>{summaryData.attendance.todayAttendanceRate}%</strong>
-                <small>
-                  {summaryData.attendance.recordsCount.toLocaleString()} records
-                </small>
-              </article>
-            </div>
-            <div className="reporting-finance-grid">
-              <article className="reporting-finance-card">
-                <span>Total invoiced</span>
-                <strong>{currency(summaryData.finance.totalInvoiced)}</strong>
-              </article>
-              <article className="reporting-finance-card">
-                <span>Total collected</span>
-                <strong>{currency(summaryData.finance.totalCollected)}</strong>
-              </article>
-              <article className="reporting-finance-card">
-                <span>Pending balance</span>
-                <strong>{currency(summaryData.finance.totalPending)}</strong>
-              </article>
-              <article className="reporting-finance-card reporting-finance-overdue">
-                <span>Overdue balance</span>
-                <strong>{currency(summaryData.finance.totalOverdue)}</strong>
-              </article>
-            </div>
-          </>
-        ) : (
-          <EmptyState title="No summary data" />
-        )}
+            )}
+        </div>
       </section>
 
-      <section aria-labelledby="audit-title" className="reporting-section">
+      <section
+        className="reporting-history"
+        aria-labelledby="reporting-history-title"
+      >
         <div className="reporting-section-heading">
-          <div className="reporting-audit-title">
-            <span
-              className="reporting-icon reporting-icon-muted"
-              aria-hidden="true"
-            >
-              <FileText size={18} />
-            </span>
-            <div>
-              <p className="section-kicker">Organization activity</p>
-              <h2 id="audit-title">Audit log</h2>
-            </div>
+          <div>
+            <h2 id="reporting-history-title">Import & Export History</h2>
           </div>
+          <Button
+            variant="secondary"
+            onClick={() => void transferHistory.refetch()}
+            disabled={transferHistory.isFetching}
+          >
+            {transferHistory.isFetching ? 'Refreshing…' : 'Refresh history'}
+          </Button>
         </div>
-        {!canReadAudit ? (
-          <PermissionDeniedState
-            title="Audit logs are not available to your role"
-            description="Your organization administrator can grant audit-log access."
+        {transferHistory.isPending ? (
+          <LoadingState message="Loading transfer history…" />
+        ) : transferHistory.isError ? (
+          <ErrorState
+            title="History unavailable"
+            description={apiMessage(transferHistory.error)}
+            onRetry={() => void transferHistory.refetch()}
+          />
+        ) : transferHistory.data.items.length === 0 ? (
+          <EmptyState
+            title="No import or export history yet"
+            description="Review imported and exported files and their results."
           />
         ) : (
-          <>
-            <div className="reporting-filters">
-              <label className="reporting-field" htmlFor="audit-action">
-                Action
-                <input
-                  id="audit-action"
-                  maxLength={100}
-                  placeholder="e.g. PAYMENT_RECORDED"
-                  value={filters.action ?? ''}
-                  onChange={(event) => {
-                    const val = event.target.value;
-                    setFilters((prev) => ({ ...prev, action: val, page: 1 }));
-                  }}
-                />
-              </label>
-              <label className="reporting-field" htmlFor="audit-entity">
-                Entity type
-                <input
-                  id="audit-entity"
-                  maxLength={100}
-                  placeholder="e.g. payment"
-                  value={filters.entityType ?? ''}
-                  onChange={(event) => {
-                    const val = event.target.value;
-                    setFilters((prev) => ({
-                      ...prev,
-                      entityType: val,
-                      page: 1,
-                    }));
-                  }}
-                />
-              </label>
-              <label className="reporting-field" htmlFor="audit-date-from">
-                From
-                <input
-                  id="audit-date-from"
-                  type="date"
-                  value={filters.dateFrom ?? ''}
-                  onChange={(event) => {
-                    const val = event.target.value;
-                    setFilters((prev) => ({ ...prev, dateFrom: val, page: 1 }));
-                  }}
-                />
-              </label>
-              <label className="reporting-field" htmlFor="audit-date-to">
-                To
-                <input
-                  id="audit-date-to"
-                  type="date"
-                  value={filters.dateTo ?? ''}
-                  onChange={(event) => {
-                    const val = event.target.value;
-                    setFilters((prev) => ({ ...prev, dateTo: val, page: 1 }));
-                  }}
-                />
-              </label>
-            </div>
-            {logs.isPending ? (
-              <LoadingState message="Loading audit activity…" />
-            ) : logs.error ? (
-              <ErrorState
-                description={apiMessage(logs.error)}
-                onRetry={() => void logs.refetch()}
-              />
-            ) : (
-              <>
-                <DataTable
-                  caption="Organization audit log"
-                  columns={auditColumns}
-                  rows={auditRows}
-                  rowKey={(log) => log.id}
-                  emptyTitle="No audit activity found"
-                  emptyDescription="Try changing the current filters."
-                />
-                {logs.data && logs.data.pagination.total > 0 && (
-                  <Pagination
-                    currentPage={filters.page}
-                    pageSize={pageSize}
-                    totalItems={logs.data.pagination.total}
-                    onPageChange={(page) =>
-                      setFilters((prev) => ({ ...prev, page }))
-                    }
-                  />
-                )}
-              </>
-            )}
-          </>
+          <div className="table-container reporting-history-table">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Transfer</th>
+                  <th>File</th>
+                  <th>Format</th>
+                  <th>Records</th>
+                  <th>Outcome</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transferHistory.data.items.map((item) => (
+                  <tr key={item.id}>
+                    <td data-label="Transfer">
+                      <div className="reporting-history-transfer">
+                        <span
+                          className={
+                            'reporting-direction reporting-direction-' +
+                            item.direction
+                          }
+                        >
+                          {item.direction}
+                        </span>
+                        <strong>{item.dataType}</strong>
+                      </div>
+                    </td>
+                    <td data-label="File">{item.fileName}</td>
+                    <td data-label="Format">{item.format.toUpperCase()}</td>
+                    <td data-label="Records">{item.totalRows}</td>
+                    <td data-label="Outcome">
+                      <div className="reporting-history-outcome">
+                        <span
+                          className={
+                            'reporting-history-status reporting-history-status-' +
+                            item.status
+                          }
+                        >
+                          {item.status}
+                        </span>
+                        <small>
+                          {item.createdRows} successful / {item.skippedRows}{' '}
+                          skipped / {item.failedRows} failed
+                        </small>
+                      </div>
+                    </td>
+                    <td data-label="Date">{formatDate(item.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
@@ -609,7 +673,7 @@ export function ReportsDashboard() {
               variant="primary"
             >
               <Download size={14} aria-hidden="true" />
-              Export CSV
+              Export {reportFormat.toUpperCase()}
             </Button>
           )}
         </div>

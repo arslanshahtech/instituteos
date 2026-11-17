@@ -1,6 +1,6 @@
 import { apiRequest } from '../api/client.js';
 
-export type HomeworkTestType = 'homework' | 'test';
+export type HomeworkTestType = 'homework' | 'class_test' | 'test';
 export type HomeworkTestStatus = 'draft' | 'published';
 
 export interface HomeworkTestRecord {

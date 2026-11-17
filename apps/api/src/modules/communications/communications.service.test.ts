@@ -128,4 +128,49 @@ describe('CommunicationsService', () => {
       service.getAnnouncement(context, announcementId),
     ).rejects.toMatchObject({ code: 'CAMPUS_FORBIDDEN' });
   });
+
+  it('prevents updating announcements belonging to another campus', async () => {
+    const repo = repository({
+      getAnnouncement: vi.fn().mockResolvedValue({
+        ...record,
+        campusId: otherCampusId,
+      }),
+    });
+    const service = new CommunicationsService(repo);
+
+    await expect(
+      service.updateAnnouncement(context, announcementId, {
+        title: 'Unauthorized update',
+      }),
+    ).rejects.toMatchObject({ code: 'CAMPUS_FORBIDDEN' });
+    expect(repo.updateAnnouncement).not.toHaveBeenCalled();
+  });
+
+  it('prevents deleting announcements belonging to another campus', async () => {
+    const repo = repository({
+      getAnnouncement: vi.fn().mockResolvedValue({
+        ...record,
+        campusId: otherCampusId,
+      }),
+    });
+    const service = new CommunicationsService(repo);
+
+    await expect(
+      service.deleteAnnouncement(context, announcementId),
+    ).rejects.toMatchObject({ code: 'CAMPUS_FORBIDDEN' });
+    expect(repo.deleteAnnouncement).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid date ranges before querying the repository', async () => {
+    const repo = repository();
+    const service = new CommunicationsService(repo);
+
+    expect(() =>
+      service.listAnnouncements(context, {
+        dateFrom: '2026-10-31',
+        dateTo: '2026-10-01',
+      }),
+    ).toThrow('Start date must not be after end date.');
+    expect(repo.listAnnouncements).not.toHaveBeenCalled();
+  });
 });

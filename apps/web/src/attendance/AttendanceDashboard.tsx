@@ -86,7 +86,11 @@ function isStudentAttendanceLocked(
     const today =
       String(parts.year) + '-' + String(parts.month) + '-' + String(parts.day);
     const currentTime = String(parts.hour) + ':' + String(parts.minute);
-    return date !== today || currentTime >= policy.markingCutoffTime;
+    return (
+      date !== today ||
+      (policy.teacherMarkingCutoffEnabled &&
+        currentTime >= policy.markingCutoffTime)
+    );
   } catch {
     return false;
   }
@@ -761,8 +765,8 @@ export function AttendanceDashboard() {
           title={view === 'classes' ? 'Classes' : 'Daily Register'}
           description={
             view === 'classes'
-              ? 'View class registers and monitor daily attendance.'
-              : 'Record and review daily attendance for your team.'
+              ? 'Track attendance across classes and sections.'
+              : 'Record and review staff attendance.'
           }
         >
           {view === 'classes' && (
@@ -1227,11 +1231,11 @@ export function AttendanceDashboard() {
               />
             ) : (
               <AttendanceStaffWorkspace
-                date={attendanceDate}
-                onDateChange={setAttendanceDate}
                 staff={staff}
                 records={staffMarkItems ?? []}
                 canWrite={canWriteAttendance}
+                date={attendanceDate}
+                onDateChange={setAttendanceDate}
                 isSaving={staffSave.isPending}
                 saveError={
                   staffSave.isError ? apiMessage(staffSave.error) : undefined

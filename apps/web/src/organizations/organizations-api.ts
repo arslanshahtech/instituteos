@@ -130,6 +130,12 @@ export function createOrganization(input: {
   }>('/organizations', { method: 'POST', body: JSON.stringify(input) });
 }
 
+export function getOrganizationProfile(organizationId: string) {
+  return apiRequest<{ organization: OrganizationProfile }>(
+    base(organizationId),
+  );
+}
+
 export function getOrganizationDashboard(organizationId: string) {
   return apiRequest<OrganizationDashboard>(`${base(organizationId)}/dashboard`);
 }
@@ -255,13 +261,14 @@ export function inviteMember(
     permissions?: string[];
   },
 ) {
-  return apiRequest<{ message: string }>(
-    `${base(organizationId)}/invitations`,
-    {
-      method: 'POST',
-      body: JSON.stringify(input),
-    },
-  );
+  return apiRequest<{
+    message: string;
+    emailSent: boolean;
+    whatsappShareUrl: string | null;
+  }>(`${base(organizationId)}/invitations`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 }
 
 export function acceptOrganizationInvitation(token: string) {

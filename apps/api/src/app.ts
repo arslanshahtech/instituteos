@@ -48,8 +48,15 @@ export function createApp(config: AppConfig = env) {
       limit: config.rateLimitMax,
       standardHeaders: 'draft-8',
       legacyHeaders: false,
+      // Health/readiness, session bootstrap, and tenant access verification
+      // are automatic read-only app bootstrap calls. Keep them out of the broad
+      // API quota; sensitive auth mutations retain stricter route-level limits.
       skip: (request) =>
-        request.path === '/health' || request.path === '/ready',
+        request.path === '/health' ||
+        request.path === '/ready' ||
+        (request.method === 'GET' &&
+          (request.path === '/auth/me' ||
+            /^\/organizations\/[^/]+\/context$/.test(request.path))),
       handler: (_request, response) => {
         response.status(429).json({
           error: {

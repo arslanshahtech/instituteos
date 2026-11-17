@@ -6,6 +6,7 @@ import {
   Eye,
   Pencil,
   Printer,
+  Search,
   Users,
   CheckCircle2,
   Clock3,
@@ -30,6 +31,14 @@ import { useSetStaffStatus, useStaffList } from './staff-queries.js';
 
 const PAGE_SIZE = 20;
 const EXPORT_PAGE_SIZE = 100;
+
+function staffMemberName(person: StaffRecord): string {
+  return `${person.firstName} ${person.lastName}`.trim();
+}
+
+function staffProfilePath(organizationId: string, staffId: string): string {
+  return `/admin/organizations/${encodeURIComponent(organizationId)}/staff/${encodeURIComponent(staffId)}`;
+}
 
 function csvValue(value: unknown): string {
   const raw = String(value ?? '');
@@ -150,7 +159,12 @@ export function StaffListPage() {
   const [status, setStatus] = useState<StaffStatus | ''>('');
   const [page, setPage] = useState(1);
   const [exportBusy, setExportBusy] = useState(false);
-  const [overviewCounts, setOverviewCounts] = useState({ total: 0, active: 0, onLeave: 0, inactive: 0 });
+  const [overviewCounts, setOverviewCounts] = useState({
+    total: 0,
+    active: 0,
+    onLeave: 0,
+    inactive: 0,
+  });
   const [overviewLoading, setOverviewLoading] = useState(true);
   const statusMutation = useSetStaffStatus(organizationId);
   const { showToast } = useToast();
@@ -164,12 +178,26 @@ export function StaffListPage() {
       listStaff(organizationId, { status: 'active', page: 1, pageSize: 1 }),
       listStaff(organizationId, { status: 'on_leave', page: 1, pageSize: 1 }),
       listStaff(organizationId, { status: 'inactive', page: 1, pageSize: 1 }),
-    ]).then(([all, active, onLeave, inactive]) => {
-      if (!cancelled) setOverviewCounts({ total: all.total, active: active.total, onLeave: onLeave.total, inactive: inactive.total });
-    }).catch(() => {
-      if (!cancelled) setOverviewCounts({ total: 0, active: 0, onLeave: 0, inactive: 0 });
-    }).finally(() => { if (!cancelled) setOverviewLoading(false); });
-    return () => { cancelled = true; };
+    ])
+      .then(([all, active, onLeave, inactive]) => {
+        if (!cancelled)
+          setOverviewCounts({
+            total: all.total,
+            active: active.total,
+            onLeave: onLeave.total,
+            inactive: inactive.total,
+          });
+      })
+      .catch(() => {
+        if (!cancelled)
+          setOverviewCounts({ total: 0, active: 0, onLeave: 0, inactive: 0 });
+      })
+      .finally(() => {
+        if (!cancelled) setOverviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [organizationId, access.data?.permissions]);
 
   useEffect(() => {
@@ -266,36 +294,93 @@ export function StaffListPage() {
             title="All staff members"
           />
 
-          <section className="staff-directory-overview" aria-label="Staff overview">
+          <section
+            className="staff-directory-overview"
+            aria-label="Staff overview"
+          >
             {[
-              { key: 'all', label: 'Total staff', value: overviewCounts.total, note: 'All employees in your school', icon: Users, tone: 'blue', filter: '' },
-              { key: 'active', label: 'Active staff', value: overviewCounts.active, note: 'Currently working', icon: CheckCircle2, tone: 'green', filter: 'active' },
-              { key: 'leave', label: 'On leave', value: overviewCounts.onLeave, note: 'Temporarily away', icon: Clock3, tone: 'violet', filter: 'on_leave' },
-              { key: 'inactive', label: 'Inactive staff', value: overviewCounts.inactive, note: 'Not currently active', icon: UserX, tone: 'amber', filter: 'inactive' },
+              {
+                key: 'all',
+                label: 'Total staff',
+                value: overviewCounts.total,
+                note: 'All employees in your school',
+                icon: Users,
+                filter: '',
+              },
+              {
+                key: 'active',
+                label: 'Active staff',
+                value: overviewCounts.active,
+                note: 'Currently working',
+                icon: CheckCircle2,
+                filter: 'active',
+              },
+              {
+                key: 'leave',
+                label: 'On leave',
+                value: overviewCounts.onLeave,
+                note: 'Temporarily away',
+                icon: Clock3,
+                filter: 'on_leave',
+              },
+              {
+                key: 'inactive',
+                label: 'Inactive staff',
+                value: overviewCounts.inactive,
+                note: 'Not currently active',
+                icon: UserX,
+                filter: 'inactive',
+              },
             ].map((card) => {
               const Icon = card.icon;
-              const selected = status === card.filter && (card.filter !== '' || !status);
+              const selected =
+                status === card.filter && (card.filter !== '' || !status);
               return (
-                <button key={card.key} type="button" className={`staff-overview-card staff-overview-${card.tone}${selected ? ' is-selected' : ''}`} aria-pressed={selected} onClick={() => { setStatus(card.filter as StaffStatus | ''); setPage(1); }}>
-                  <span className="staff-overview-card-top"><span>{card.label}</span><span className="staff-overview-icon"><Icon size={18} aria-hidden="true" /></span></span>
-                  <strong>{overviewLoading ? '?' : card.value.toLocaleString()}</strong>
-                  <span className="staff-overview-card-bottom"><span>{card.note}</span><ArrowUpRight size={16} aria-hidden="true" /></span>
+                <button
+                  key={card.key}
+                  type="button"
+                  className={`staff-overview-card${selected ? ' is-selected' : ''}`}
+                  aria-pressed={selected}
+                  onClick={() => {
+                    setStatus(card.filter as StaffStatus | '');
+                    setPage(1);
+                  }}
+                >
+                  <span className="staff-overview-card-top">
+                    <span>{card.label}</span>
+                    <span className="staff-overview-icon">
+                      <Icon size={18} aria-hidden="true" />
+                    </span>
+                  </span>
+                  <strong>
+                    {overviewLoading ? '?' : card.value.toLocaleString()}
+                  </strong>
+                  <span className="staff-overview-card-bottom">
+                    <span>{card.note}</span>
+                    <ArrowUpRight size={16} aria-hidden="true" />
+                  </span>
                 </button>
               );
             })}
           </section>
 
-          <section className="staff-directory-filter-box" aria-label="Staff search and filters">
+          <section
+            className="staff-directory-filter-box"
+            aria-label="Staff search and filters"
+          >
             <div className="staff-directory-filters">
               <label className="staff-directory-search">
                 <span>Search staff</span>
-                <input
-                  autoComplete="off"
-                  onChange={(event) => setSearchInput(event.target.value)}
-                  placeholder="Name, employee ID or designation"
-                  type="search"
-                  value={searchInput}
-                />
+                <span className="staff-directory-search-field">
+                  <input
+                    autoComplete="off"
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    placeholder="Name, employee ID or designation"
+                    type="search"
+                    value={searchInput}
+                  />
+                  <Search size={17} aria-hidden="true" />
+                </span>
               </label>
               <label>
                 <span>Staff Type</span>
@@ -328,7 +413,11 @@ export function StaffListPage() {
                 </select>
               </label>
               {hasFilters && (
-                <button className="staff-directory-clear" onClick={clearFilters} type="button">
+                <button
+                  className="staff-directory-clear"
+                  onClick={clearFilters}
+                  type="button"
+                >
                   Clear filters
                 </button>
               )}
@@ -369,8 +458,6 @@ export function StaffListPage() {
                   </div>
                 )}
               </div>
-
-
 
               {statusMutation.isError && (
                 <p className="form-error" role="alert">
@@ -454,9 +541,11 @@ export function StaffListPage() {
                     </thead>
                     <tbody>
                       {staff.data.items.map((person) => {
-                        const name =
-                          `${person.firstName} ${person.lastName}`.trim();
-                        const profilePath = `/admin/organizations/${encodeURIComponent(organizationId)}/staff/${encodeURIComponent(person.id)}`;
+                        const name = staffMemberName(person);
+                        const profilePath = staffProfilePath(
+                          organizationId,
+                          person.id,
+                        );
                         const initials =
                           `${person.firstName?.[0] ?? ''}${person.lastName?.[0] ?? ''}`.toUpperCase() ||
                           'S';
@@ -489,7 +578,9 @@ export function StaffListPage() {
                               {person.designation || '—'}
                             </td>
                             <td data-label="Staff Type">
-                              {person.staffType === 'teacher' ? 'Teacher' : 'Other Staff'}
+                              {person.staffType === 'teacher'
+                                ? 'Teacher'
+                                : 'Other Staff'}
                             </td>
                             <td data-label="Status">
                               <StaffStatusBadge status={person.status} />
@@ -567,6 +658,52 @@ export function StaffListPage() {
                     </tbody>
                   </table>
                 </div>
+                <section
+                  className="staff-directory-mobile-list"
+                  aria-label="Staff members"
+                >
+                  {staff.data.items.map((person) => {
+                    const name = staffMemberName(person);
+                    const profilePath = staffProfilePath(
+                      organizationId,
+                      person.id,
+                    );
+                    return (
+                      <article
+                        className="staff-directory-mobile-card"
+                        key={person.id}
+                      >
+                        <div className="staff-directory-mobile-card-heading">
+                          <div className="staff-directory-mobile-identity">
+                            <h3>{name}</h3>
+                            <p>
+                              {person.employeeCode
+                                ? `ID · ${person.employeeCode}`
+                                : 'Employee ID not assigned'}
+                            </p>
+                          </div>
+                          <StaffStatusBadge status={person.status} />
+                        </div>
+                        <div className="staff-directory-mobile-card-footer">
+                          <span>
+                            {person.designation ||
+                              (person.staffType === 'teacher'
+                                ? 'Teacher'
+                                : 'Other Staff')}
+                          </span>
+                          <Link
+                            className="staff-directory-mobile-view"
+                            aria-label={`View details for ${name}`}
+                            to={profilePath}
+                          >
+                            View details
+                            <ArrowUpRight size={15} aria-hidden="true" />
+                          </Link>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </section>
                 <div className="staff-directory-pagination">
                   <Pagination
                     currentPage={staff.data.page}

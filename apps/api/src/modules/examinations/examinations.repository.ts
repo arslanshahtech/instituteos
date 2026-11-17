@@ -71,9 +71,16 @@ function scheduleRecord(record: Record<string, unknown>): ExamScheduleRecord {
     durationMinutes: Number(record.durationMinutes),
     totalMarks: Number(record.totalMarks),
     passingMarks: Number(record.passingMarks),
-    marksReviewStatus: (record.marksReviewStatus as ExamScheduleRecord['marksReviewStatus']) ?? 'draft',
-    marksSubmittedAt: record.marksSubmittedAt instanceof Date ? iso(record.marksSubmittedAt) : null,
-    marksSubmittedBy: record.marksSubmittedBy ? String(record.marksSubmittedBy) : null,
+    marksReviewStatus:
+      (record.marksReviewStatus as ExamScheduleRecord['marksReviewStatus']) ??
+      'draft',
+    marksSubmittedAt:
+      record.marksSubmittedAt instanceof Date
+        ? iso(record.marksSubmittedAt)
+        : null,
+    marksSubmittedBy: record.marksSubmittedBy
+      ? String(record.marksSubmittedBy)
+      : null,
     createdAt: iso(record.createdAt as Date),
     updatedAt: iso(record.updatedAt as Date),
   };
@@ -390,13 +397,21 @@ export class MongoExaminationsRepository implements ExaminationsRepository {
 
   async listPendingMarksReviews(organizationId: string, campusIds?: string[]) {
     if (campusIds?.length === 0) return [];
-    const exams = await ExamModel.find({ organizationId: oid(organizationId), ...(scopedCampus(campusIds) ?? {}) }).select({ _id: 1 }).lean();
+    const exams = await ExamModel.find({
+      organizationId: oid(organizationId),
+      ...(scopedCampus(campusIds) ?? {}),
+    })
+      .select({ _id: 1 })
+      .lean();
     if (exams.length === 0) return [];
     const records = await ExamScheduleModel.find({
       organizationId: oid(organizationId),
       examId: { $in: exams.map((exam) => exam._id) },
       marksReviewStatus: 'submitted',
-    }).sort({ marksSubmittedAt: 1 }).limit(100).lean();
+    })
+      .sort({ marksSubmittedAt: 1 })
+      .limit(100)
+      .lean();
     return records.map(scheduleRecord);
   }
 
@@ -408,10 +423,24 @@ export class MongoExaminationsRepository implements ExaminationsRepository {
     return record ? scheduleRecord(record) : null;
   }
 
-  async setMarksReviewStatus(organizationId: string, scheduleId: string, status: ExamScheduleRecord['marksReviewStatus'], submittedByUserId: string | null) {
+  async setMarksReviewStatus(
+    organizationId: string,
+    scheduleId: string,
+    status: ExamScheduleRecord['marksReviewStatus'],
+    submittedByUserId: string | null,
+  ) {
     const record = await ExamScheduleModel.findOneAndUpdate(
       { _id: oid(scheduleId), organizationId: oid(organizationId) },
-      { $set: { marksReviewStatus: status, marksSubmittedAt: status === 'submitted' ? new Date() : null, marksSubmittedBy: status === 'submitted' && submittedByUserId ? oid(submittedByUserId) : null } },
+      {
+        $set: {
+          marksReviewStatus: status,
+          marksSubmittedAt: status === 'submitted' ? new Date() : null,
+          marksSubmittedBy:
+            status === 'submitted' && submittedByUserId
+              ? oid(submittedByUserId)
+              : null,
+        },
+      },
       { new: true, runValidators: true },
     ).lean();
     return record ? scheduleRecord(record) : null;
@@ -564,7 +593,12 @@ export class MongoExaminationsRepository implements ExaminationsRepository {
       organizationId: oid(organizationId),
       status: 'active',
     })
-      .select({ firstName: 1, lastName: 1, preferredName: 1 })
+      .select({
+        firstName: 1,
+        lastName: 1,
+        preferredName: 1,
+        registrationNumber: 1,
+      })
       .sort({ lastName: 1, firstName: 1 })
       .lean();
     const marks = await ExamMarkModel.find({
@@ -579,6 +613,9 @@ export class MongoExaminationsRepository implements ExaminationsRepository {
       id: String(student._id),
       firstName: String(student.firstName),
       lastName: String(student.lastName),
+      ...(student.registrationNumber
+        ? { registrationNumber: String(student.registrationNumber) }
+        : {}),
       ...(student.preferredName
         ? { preferredName: String(student.preferredName) }
         : {}),
@@ -604,11 +641,11 @@ export class MongoExaminationsRepository implements ExaminationsRepository {
       );
     await ExamMarkModel.bulkWrite(
       records.map((input) => {
-        const percentage = input.isAbsent
-          ? null
-          : Math.round(
-              ((input.marksObtained ?? 0) / schedule.totalMarks) * 10000,
-            ) / 100;
+        const percentage =
+          input.isAbsent || input.marksObtained === undefined
+            ? null
+            : Math.round((input.marksObtained / schedule.totalMarks) * 10000) /
+              100;
         const grade = percentage === null ? undefined : gradeFor(percentage);
         return {
           updateOne: {

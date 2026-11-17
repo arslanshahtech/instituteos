@@ -10,6 +10,7 @@ import {
 } from '../auth/auth.middleware.js';
 import { MongoAuthRepository } from '../auth/auth.repository.js';
 import { AuthService } from '../auth/auth.service.js';
+import { AuthUserModel } from '../auth/auth.model.js';
 import { MongoOrganizationAccessRepository } from '../tenancy/tenancy.repository.js';
 import type { OrganizationAccessRepository } from '../tenancy/tenancy.types.js';
 import {
@@ -1375,10 +1376,61 @@ export function createAcademicsRouter(
 
   router.get(
     `${base}/teacher-timetable/:staffId`,
-    ...protect,
+    ...protectAcademicRead,
     asyncHandler(async (request, response) => {
       const context = organizationContext(response);
       const staffId = routeId(request.params.staffId!, 'Teacher');
+      if (context.role === 'teacher') {
+        const requestContext = response.locals.organizationContext as
+          { userId?: string } | undefined;
+        if (!requestContext?.userId)
+          throw new AppError(401, 'UNAUTHENTICATED', 'Please sign in again.');
+        const organizationObjectId = new mongoose.Types.ObjectId(
+          context.organizationId,
+        );
+        const userObjectId = new mongoose.Types.ObjectId(requestContext.userId);
+        let linkedStaff = await StaffMemberModel.find({
+          organizationId: organizationObjectId,
+          userId: userObjectId,
+          status: 'active',
+        })
+          .select({ _id: 1 })
+          .limit(2)
+          .lean();
+        if (linkedStaff.length === 0) {
+          const user = await AuthUserModel.findById(userObjectId)
+            .select({ email: 1 })
+            .lean();
+          const email =
+            typeof user?.email === 'string'
+              ? user.email.trim().toLowerCase()
+              : '';
+          if (email)
+            linkedStaff = await StaffMemberModel.find({
+              organizationId: organizationObjectId,
+              email,
+              status: 'active',
+              $or: [
+                { userId: { $exists: false } },
+                { userId: null },
+                { userId: userObjectId },
+              ],
+            })
+              .select({ _id: 1 })
+              .limit(2)
+              .lean();
+        }
+        if (
+          linkedStaff.length !== 1 ||
+          String(linkedStaff[0]?._id) !== staffId
+        ) {
+          throw new AppError(
+            403,
+            'TEACHER_TIMETABLE_SCOPE_FORBIDDEN',
+            'Teachers can only view their own timetable.',
+          );
+        }
+      }
       const records = (await SectionTimetableModel.find({
         organizationId: new mongoose.Types.ObjectId(context.organizationId),
         $or: [

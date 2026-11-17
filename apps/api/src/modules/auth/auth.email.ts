@@ -30,6 +30,13 @@ function logDeliveryFailure(purpose: string, error?: unknown): void {
       ...(typeof details.command === 'string'
         ? { command: details.command }
         : {}),
+      ...(typeof details.response === 'string'
+        ? {
+            providerResponse: details.response
+              .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[email]')
+              .slice(0, 300),
+          }
+        : {}),
     }),
   );
 }

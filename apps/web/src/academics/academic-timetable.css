@@ -943,3 +943,552 @@
   min-width: 150px;
   max-width: 190px;
 }
+
+/* Mobile timetable overview and readable weekly details. */
+.academic-timetable-mobile-list,
+.academic-timetable-mobile-days {
+  display: none;
+}
+@media (max-width: 760px) {
+  .academic-timetable-heading:not(.academic-timetable-editor-heading) {
+    align-items: flex-start;
+    flex-direction: column;
+    text-align: left;
+    gap: 12px;
+  }
+  .academic-timetable-heading:not(.academic-timetable-editor-heading)
+    > div:first-child {
+    width: 100%;
+    text-align: left;
+  }
+  .academic-timetable-heading:not(.academic-timetable-editor-heading) h2 {
+    text-align: left;
+    font-size: 1.3rem;
+  }
+  .academic-timetable-heading:not(.academic-timetable-editor-heading) p {
+    margin-top: 4px;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    text-align: left;
+  }
+  .academic-timetable-heading:not(.academic-timetable-editor-heading)
+    .academic-timetable-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+  .academic-timetable-header-actions .button {
+    min-height: 36px;
+    padding: 7px 10px;
+    font-size: 0.78rem;
+  }
+  .academic-timetable-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+    padding: 11px;
+  }
+  .academic-timetable-search {
+    grid-column: 1 / -1;
+  }
+  .academic-timetable-search input,
+  .academic-timetable-filter-control select {
+    min-height: 40px;
+    font-size: 0.8rem;
+  }
+  .academic-timetable-table-wrap {
+    overflow: hidden;
+  }
+  .academic-timetable-table {
+    display: none;
+  }
+  .academic-timetable-mobile-list {
+    display: grid;
+    gap: 0;
+    padding: 10px;
+  }
+  .academic-timetable-mobile-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px 12px;
+    min-width: 0;
+    padding: 13px 3px;
+    border-bottom: 1px solid var(--border, #e2e8f0);
+  }
+  .academic-timetable-mobile-item:last-child {
+    border-bottom: 0;
+  }
+  .academic-timetable-mobile-item-copy {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+  }
+  .academic-timetable-mobile-item-copy > span {
+    color: var(--muted-foreground, #64748b);
+    font-size: 0.7rem;
+  }
+  .academic-timetable-mobile-item-copy h4 {
+    margin: 0;
+    color: var(--foreground, #1e293b);
+    font-size: 0.92rem;
+    line-height: 1.3;
+  }
+  .academic-timetable-mobile-item-copy small {
+    color: var(--muted-foreground, #64748b);
+    font-size: 0.7rem;
+  }
+  .academic-timetable-mobile-view {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 6px 9px;
+    border: 1px solid var(--border, #dbe3e9);
+    border-radius: 7px;
+    background: var(--card, #fff);
+    color: var(--foreground, #334155);
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .academic-timetable-mobile-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+  .academic-timetable-mobile-actions button {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 7px;
+    background: var(--card, #fff);
+    color: var(--muted-foreground, #64748b);
+  }
+  .academic-timetable-mobile-actions button.is-danger {
+    color: #dc2626;
+    border-color: #fecaca;
+  }
+  .academic-timetable-table-title {
+    min-height: 58px;
+    padding: 12px;
+    gap: 8px;
+  }
+  .academic-timetable-table-title h3 {
+    font-size: 0.9rem;
+  }
+  .academic-timetable-download {
+    min-height: 32px;
+    padding: 5px 8px;
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+  .academic-timetable-editor-heading {
+    align-items: flex-start;
+    flex-direction: row;
+    gap: 10px;
+  }
+  .academic-timetable-editor-title {
+    align-items: flex-start;
+    text-align: left;
+  }
+  .academic-timetable-editor-title > div {
+    min-width: 0;
+    text-align: left;
+  }
+  .academic-timetable-editor-heading h2 {
+    font-size: 1.08rem;
+    text-align: left;
+    overflow-wrap: anywhere;
+  }
+  .academic-timetable-editor-heading p {
+    margin-top: 4px;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    text-align: left;
+  }
+  .academic-timetable-editor-heading .academic-timetable-year {
+    flex: 0 0 auto;
+    gap: 5px;
+  }
+  .academic-timetable-editor-heading .academic-timetable-year span {
+    font-size: 0.7rem;
+  }
+  .academic-timetable-editor-heading .academic-timetable-year select {
+    min-width: 92px;
+    max-width: 112px;
+    min-height: 34px;
+    padding: 5px 6px;
+    font-size: 0.72rem;
+  }
+  .academic-section-timetable.is-viewing-timetable
+    .academic-editor-section-select
+    select {
+    display: none;
+  }
+  .academic-section-timetable.is-viewing-timetable
+    .academic-editor-section-select
+    .academic-timetable-field {
+    gap: 3px;
+    font-size: 0.7rem;
+    color: var(--muted-foreground, #64748b);
+  }
+  .academic-section-timetable.is-viewing-timetable
+    .academic-editor-section-select
+    > p {
+    margin-top: 4px;
+    font-size: 0.72rem;
+  }
+  .academic-section-timetable.is-viewing-timetable
+    .academic-weekly-schedule-heading {
+    align-items: flex-start;
+    gap: 8px;
+    padding-bottom: 12px;
+  }
+  .academic-section-timetable.is-viewing-timetable
+    .academic-weekly-schedule-heading
+    h3 {
+    font-size: 0.95rem;
+  }
+  .academic-section-timetable.is-viewing-timetable
+    .academic-weekly-schedule-heading
+    p {
+    max-width: 260px;
+    margin-top: 4px;
+    font-size: 0.7rem;
+    line-height: 1.35;
+  }
+  .academic-section-timetable.is-viewing-timetable
+    .academic-weekly-schedule-heading
+    > span {
+    flex: 0 0 auto;
+    font-size: 0.7rem;
+  }
+  .academic-section-timetable.is-viewing-timetable .academic-week-grid-wrap {
+    display: none;
+  }
+  .academic-timetable-mobile-days {
+    display: grid;
+    gap: 12px;
+  }
+  .academic-timetable-mobile-day {
+    min-width: 0;
+    padding: 11px;
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 9px;
+    background: var(--background, #f8fafc);
+  }
+  .academic-timetable-mobile-day > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .academic-timetable-mobile-day > header h4 {
+    margin: 0;
+    font-size: 0.82rem;
+  }
+  .academic-timetable-mobile-day > header span {
+    color: var(--muted-foreground, #64748b);
+    font-size: 0.67rem;
+  }
+  .academic-timetable-mobile-period {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 9px 0;
+    border-top: 1px solid var(--border, #e2e8f0);
+  }
+  .academic-timetable-mobile-period-time {
+    display: grid;
+    gap: 2px;
+    color: var(--muted-foreground, #64748b);
+    font-size: 0.64rem;
+    line-height: 1.2;
+  }
+  .academic-timetable-mobile-period-time strong {
+    color: var(--foreground, #334155);
+    font-size: 0.68rem;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+  }
+  .academic-timetable-mobile-period-info {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+  }
+  .academic-timetable-mobile-period-info strong {
+    overflow-wrap: anywhere;
+    color: var(--foreground, #1e293b);
+    font-size: 0.76rem;
+    line-height: 1.3;
+  }
+  .academic-timetable-mobile-period-info span,
+  .academic-timetable-mobile-period-info small {
+    overflow-wrap: anywhere;
+    color: var(--muted-foreground, #64748b);
+    font-size: 0.66rem;
+    line-height: 1.3;
+  }
+  .academic-timetable-mobile-period-number {
+    align-self: start;
+    color: var(--muted-foreground, #94a3b8);
+    font-size: 0.62rem;
+    font-weight: 700;
+  }
+  .academic-timetable-mobile-empty {
+    margin: 0;
+    padding: 9px 0 2px;
+    border-top: 1px solid var(--border, #e2e8f0);
+    color: var(--muted-foreground, #64748b);
+    font-size: 0.72rem;
+  }
+  .academic-section-timetable.is-viewing-timetable
+    .academic-timetable-form-actions {
+    justify-content: flex-start;
+  }
+}
+@media (max-width: 390px) {
+  .academic-timetable-editor-heading {
+    flex-direction: column;
+  }
+  .academic-timetable-editor-heading .academic-timetable-year {
+    margin-left: 45px;
+  }
+  .academic-timetable-mobile-period {
+    grid-template-columns: 66px minmax(0, 1fr) auto;
+    gap: 6px;
+  }
+}
+
+/* Final mobile timetable controls, details actions and period editor. */
+@media (max-width: 760px) {
+  .academic-timetable-heading:not(.academic-timetable-editor-heading)
+    .academic-timetable-header-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: flex-start;
+    gap: 8px;
+  }
+  .academic-timetable-header-actions .academic-timetable-create-button {
+    order: 1;
+  }
+  .academic-timetable-header-actions .academic-timetable-break-button {
+    order: 2;
+  }
+  .academic-timetable-header-actions .button {
+    width: auto;
+    min-width: 138px;
+    justify-content: center;
+  }
+  .academic-timetable-mobile-actions {
+    display: none !important;
+  }
+  .academic-timetable-detail-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .academic-timetable-detail-actions .button {
+    min-height: 36px;
+    padding: 7px 10px;
+    font-size: 0.78rem;
+  }
+  .academic-timetable-detail-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #fecaca !important;
+    border-radius: 8px;
+    background: #fff7f7 !important;
+    color: #dc2626 !important;
+  }
+  .academic-timetable-form-actions {
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .academic-timetable-form-actions > .button:first-child {
+    margin-right: auto;
+  }
+  .academic-timetable-mobile-days {
+    display: grid;
+    gap: 12px;
+  }
+  .academic-section-timetable .academic-week-grid-wrap {
+    display: none;
+  }
+  .academic-timetable-mobile-day {
+    display: grid;
+    gap: 0;
+  }
+  .academic-timetable-mobile-period {
+    grid-template-columns: 66px minmax(0, 1fr) auto;
+    align-items: start;
+  }
+  .academic-timetable-mobile-period-edit {
+    grid-column: 2 / -1;
+    justify-self: end;
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    border: 1px solid var(--border, #dbe3e9);
+    border-radius: 6px;
+    background: var(--card, #fff);
+    color: var(--foreground, #475569);
+    font: inherit;
+    font-size: 0.68rem;
+    font-weight: 600;
+  }
+  .academic-timetable-mobile-add-period {
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 9px;
+    padding: 7px 10px;
+    border: 1px dashed var(--border, #cbd5e1);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--primary, #0f766e);
+    font: inherit;
+    font-size: 0.74rem;
+    font-weight: 600;
+  }
+  .academic-timetable-overlay {
+    align-items: center;
+    padding: max(12px, env(safe-area-inset-top)) 12px
+      max(12px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+  }
+  .academic-period-dialog {
+    width: min(100%, 420px);
+    max-height: min(88dvh, 720px);
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 16px;
+    gap: 12px;
+    border-radius: 14px;
+  }
+  .academic-period-dialog > * {
+    min-width: 0;
+  }
+  .academic-period-dialog header {
+    align-items: flex-start;
+  }
+  .academic-period-dialog header > div {
+    min-width: 0;
+  }
+  .academic-period-dialog .academic-period-time-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .academic-period-dialog .academic-timetable-field input,
+  .academic-period-dialog .academic-timetable-field select,
+  .academic-period-dialog .academic-timetable-field textarea {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .academic-period-dialog footer {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+}
+@media (max-width: 390px) {
+  .academic-timetable-heading:not(.academic-timetable-editor-heading)
+    .academic-timetable-header-actions
+    .button {
+    min-width: 132px;
+    min-height: 35px;
+    font-size: 0.74rem;
+  }
+  .academic-period-dialog {
+    padding: 13px;
+  }
+  .academic-period-dialog .academic-period-time-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* Final mobile alignment for timetable header and view actions. */
+@media (max-width: 760px) {
+  .academic-timetable-heading:not(.academic-timetable-editor-heading) {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .academic-timetable-heading:not(.academic-timetable-editor-heading)
+    > div:first-child {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+  .academic-timetable-heading:not(.academic-timetable-editor-heading)
+    .academic-timetable-header-actions {
+    flex: 0 0 auto;
+    width: auto;
+    align-items: flex-end;
+    margin-left: auto;
+    gap: 9px;
+  }
+  .academic-timetable-header-actions .academic-timetable-create-button {
+    order: 1;
+  }
+  .academic-timetable-header-actions .academic-timetable-break-button {
+    order: 2;
+  }
+  .academic-section-timetable.is-viewing-timetable
+    .academic-timetable-form-actions {
+    justify-content: flex-end;
+  }
+  .academic-timetable-detail-actions {
+    margin-left: auto;
+    justify-content: flex-end;
+  }
+}
+@media (max-width: 390px) {
+  .academic-timetable-heading:not(.academic-timetable-editor-heading) {
+    gap: 8px;
+  }
+  .academic-timetable-heading:not(.academic-timetable-editor-heading) h2 {
+    font-size: 1.12rem;
+  }
+  .academic-timetable-heading:not(.academic-timetable-editor-heading) p {
+    max-width: 150px;
+    font-size: 0.7rem;
+  }
+  .academic-timetable-heading:not(.academic-timetable-editor-heading)
+    .academic-timetable-header-actions
+    .button {
+    min-width: 116px;
+    padding-inline: 7px;
+    font-size: 0.7rem;
+  }
+}
+
+/* The overview table already owns desktop deletion; expose the extra detail action on phones only. */
+.academic-timetable-detail-delete {
+  display: none;
+}
+@media (max-width: 760px) {
+  .academic-timetable-detail-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}

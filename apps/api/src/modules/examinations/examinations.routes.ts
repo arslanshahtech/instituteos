@@ -103,7 +103,20 @@ function queryId(value: unknown, field: string, optional = false) {
 }
 
 function examType(value: string | undefined): ExamType {
-  const allowedTypes: readonly ExamType[] = ['midterm', 'final', 'quiz', 'monthly_test', 'class_test', 'mid_year', 'send_up', 'annual', 'practical', 'viva', 'supplementary', 'improvement'];
+  const allowedTypes: readonly ExamType[] = [
+    'midterm',
+    'final',
+    'quiz',
+    'monthly_test',
+    'class_test',
+    'mid_year',
+    'send_up',
+    'annual',
+    'practical',
+    'viva',
+    'supplementary',
+    'improvement',
+  ];
   if (!value || !allowedTypes.includes(value as ExamType))
     throw new AppError(400, 'VALIDATION_ERROR', 'Select a valid exam type.');
   return value as ExamType;
@@ -317,7 +330,11 @@ export function createExaminationsRouter(
     `${base}/pending-reviews`,
     ...manageExams,
     asyncHandler(async (_request, response) => {
-      response.status(200).json({ items: await service.listPendingMarksReviews(organizationContext(response)) });
+      response.status(200).json({
+        items: await service.listPendingMarksReviews(
+          organizationContext(response),
+        ),
+      });
     }),
   );
 
@@ -531,7 +548,12 @@ export function createExaminationsRouter(
     ...enterMarks,
     csrfProtection,
     asyncHandler(async (request, response) => {
-      response.status(200).json({ schedule: await service.submitMarksForReview(organizationContext(response), routeId(request.params.scheduleId, 'Exam schedule')) });
+      response.status(200).json({
+        schedule: await service.submitMarksForReview(
+          organizationContext(response),
+          routeId(request.params.scheduleId, 'Exam schedule'),
+        ),
+      });
     }),
   );
 
@@ -541,8 +563,18 @@ export function createExaminationsRouter(
     csrfProtection,
     asyncHandler(async (request, response) => {
       const body = bodyObject(request.body);
-      if (body.action !== 'request_changes') throw new AppError(400, 'VALIDATION_ERROR', 'Choose a valid review action.');
-      response.status(200).json({ schedule: await service.requestMarksChanges(organizationContext(response), routeId(request.params.scheduleId, 'Exam schedule')) });
+      if (body.action !== 'request_changes')
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Choose a valid review action.',
+        );
+      response.status(200).json({
+        schedule: await service.requestMarksChanges(
+          organizationContext(response),
+          routeId(request.params.scheduleId, 'Exam schedule'),
+        ),
+      });
     }),
   );
 

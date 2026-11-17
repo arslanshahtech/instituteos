@@ -21,10 +21,18 @@ function appForRole(role: OrganizationRole) {
     listExams: vi.fn().mockResolvedValue([{ id: 'assigned-exam' }]),
     listPendingMarksReviews: vi.fn().mockResolvedValue([]),
     saveMarks: vi.fn().mockResolvedValue([{ id: 'mark-saved' }]),
-    submitMarksForReview: vi.fn().mockResolvedValue({ id: 'schedule', marksReviewStatus: 'submitted' }),
-    requestMarksChanges: vi.fn().mockResolvedValue({ id: 'schedule', marksReviewStatus: 'changes_requested' }),
+    submitMarksForReview: vi
+      .fn()
+      .mockResolvedValue({ id: 'schedule', marksReviewStatus: 'submitted' }),
+    requestMarksChanges: vi.fn().mockResolvedValue({
+      id: 'schedule',
+      marksReviewStatus: 'changes_requested',
+    }),
     createExam: vi.fn().mockResolvedValue({ id: 'new-exam' }),
-    setResultsPublication: vi.fn().mockResolvedValue({ id: 'exam', resultsPublishedAt: '2026-11-06T00:00:00.000Z' }),
+    setResultsPublication: vi.fn().mockResolvedValue({
+      id: 'exam',
+      resultsPublishedAt: '2026-11-06T00:00:00.000Z',
+    }),
   } as unknown as ExaminationsService;
   const accessRepository: OrganizationAccessRepository = {
     findActiveMembership: vi.fn().mockResolvedValue({
@@ -70,7 +78,9 @@ describe('Teacher examination authorization routes', () => {
 
   it('exposes the pending review queue to exam managers only', async () => {
     const { app, service } = appForRole('organization_owner');
-    const response = await request(app).get(`/${organizationId}/examinations/pending-reviews`);
+    const response = await request(app).get(
+      `/${organizationId}/examinations/pending-reviews`,
+    );
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ items: [] });
     expect(service.listPendingMarksReviews).toHaveBeenCalled();
@@ -113,12 +123,21 @@ describe('Teacher examination authorization routes', () => {
     expect(response.status).toBe(201);
     const submittedInput = vi.mocked(service.createExam).mock.calls[0]?.[1];
     expect(submittedInput).not.toHaveProperty('termId');
-    expect(submittedInput).toMatchObject({ name: 'Annual Examination', type: 'final' });
+    expect(submittedInput).toMatchObject({
+      name: 'Annual Examination',
+      type: 'final',
+    });
   });
 
   it('allows assigned teachers to submit marks for admin review', async () => {
     const { app, service } = appForRole('teacher');
-    const response = await request(app).post(`/${organizationId}/examinations/schedules/650000000000000000000013/marks/submission`).set('Cookie', `instituteos_csrf=${csrfToken}`).set('X-CSRF-Token', csrfToken).send({});
+    const response = await request(app)
+      .post(
+        `/${organizationId}/examinations/schedules/650000000000000000000013/marks/submission`,
+      )
+      .set('Cookie', `instituteos_csrf=${csrfToken}`)
+      .set('X-CSRF-Token', csrfToken)
+      .send({});
     expect(response.status).toBe(200);
     expect(service.submitMarksForReview).toHaveBeenCalled();
   });
@@ -146,7 +165,13 @@ describe('Teacher examination authorization routes', () => {
     const { app, service } = appForRole('teacher');
     const examId = '650000000000000000000015';
     const response = await request(app)
-      .patch('/' + organizationId + '/examinations/' + examId + '/results-publication')
+      .patch(
+        '/' +
+          organizationId +
+          '/examinations/' +
+          examId +
+          '/results-publication',
+      )
       .set('Cookie', 'instituteos_csrf=' + csrfToken)
       .set('X-CSRF-Token', csrfToken)
       .send({ published: true });
@@ -154,5 +179,4 @@ describe('Teacher examination authorization routes', () => {
     expect(response.status).toBe(403);
     expect(service.setResultsPublication).not.toHaveBeenCalled();
   });
-
 });

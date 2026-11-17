@@ -114,10 +114,17 @@ export class MongoPeopleRepository {
       filters.campusId = { $in: campusIds.map((id) => idObject(id)) };
     if (query.status) filters.status = query.status;
     if (query.classId || query.sectionId) {
-      const placementFilter: Record<string, unknown> = { organizationId: idObject(query.organizationId), status: 'active' };
+      const placementFilter: Record<string, unknown> = {
+        organizationId: idObject(query.organizationId),
+        status: 'active',
+      };
       if (query.classId) placementFilter.classId = idObject(query.classId);
-      if (query.sectionId) placementFilter.sectionId = idObject(query.sectionId);
-      const placedStudentIds = await StudentSectionPlacementModel.distinct('studentId', placementFilter);
+      if (query.sectionId)
+        placementFilter.sectionId = idObject(query.sectionId);
+      const placedStudentIds = await StudentSectionPlacementModel.distinct(
+        'studentId',
+        placementFilter,
+      );
       filters._id = { $in: placedStudentIds };
     }
     if (search) {
@@ -153,16 +160,24 @@ export class MongoPeopleRepository {
         preferredName: record.preferredName
           ? String(record.preferredName)
           : undefined,
-        registrationNumber: record.registrationNumber ? String(record.registrationNumber) : undefined,
+        registrationNumber: record.registrationNumber
+          ? String(record.registrationNumber)
+          : undefined,
         photoUrl: record.photoUrl ? String(record.photoUrl) : undefined,
         fatherName: record.fatherName ? String(record.fatherName) : undefined,
         motherName: record.motherName ? String(record.motherName) : undefined,
-        parentMobile: record.parentMobile ? String(record.parentMobile) : undefined,
-        nationality: record.nationality ? String(record.nationality) : undefined,
+        parentMobile: record.parentMobile
+          ? String(record.parentMobile)
+          : undefined,
+        nationality: record.nationality
+          ? String(record.nationality)
+          : undefined,
         religion: record.religion ? String(record.religion) : undefined,
         birthPlace: record.birthPlace ? String(record.birthPlace) : undefined,
         nationalId: record.nationalId ? String(record.nationalId) : undefined,
-        specialNeeds: record.specialNeeds ? String(record.specialNeeds) : undefined,
+        specialNeeds: record.specialNeeds
+          ? String(record.specialNeeds)
+          : undefined,
         dateOfBirth: record.dateOfBirth
           ? new Date(record.dateOfBirth).toISOString()
           : undefined,
@@ -209,16 +224,22 @@ export class MongoPeopleRepository {
       preferredName: record.preferredName
         ? String(record.preferredName)
         : undefined,
-      registrationNumber: record.registrationNumber ? String(record.registrationNumber) : undefined,
+      registrationNumber: record.registrationNumber
+        ? String(record.registrationNumber)
+        : undefined,
       photoUrl: record.photoUrl ? String(record.photoUrl) : undefined,
       fatherName: record.fatherName ? String(record.fatherName) : undefined,
       motherName: record.motherName ? String(record.motherName) : undefined,
-      parentMobile: record.parentMobile ? String(record.parentMobile) : undefined,
+      parentMobile: record.parentMobile
+        ? String(record.parentMobile)
+        : undefined,
       nationality: record.nationality ? String(record.nationality) : undefined,
       religion: record.religion ? String(record.religion) : undefined,
       birthPlace: record.birthPlace ? String(record.birthPlace) : undefined,
       nationalId: record.nationalId ? String(record.nationalId) : undefined,
-      specialNeeds: record.specialNeeds ? String(record.specialNeeds) : undefined,
+      specialNeeds: record.specialNeeds
+        ? String(record.specialNeeds)
+        : undefined,
       dateOfBirth: record.dateOfBirth
         ? new Date(record.dateOfBirth).toISOString()
         : undefined,
@@ -1015,7 +1036,8 @@ export class MongoPeopleRepository {
         employeeCode: record.employeeCode
           ? String(record.employeeCode)
           : undefined,
-        staffType: (record.staffType as StaffRecord['staffType']) ?? 'other_staff',
+        staffType:
+          (record.staffType as StaffRecord['staffType']) ?? 'other_staff',
         department: record.department ? String(record.department) : undefined,
         designation: record.designation
           ? String(record.designation)
@@ -1066,7 +1088,8 @@ export class MongoPeopleRepository {
       employeeCode: record.employeeCode
         ? String(record.employeeCode)
         : undefined,
-      staffType: (record.staffType as StaffRecord['staffType']) ?? 'other_staff',
+      staffType:
+        (record.staffType as StaffRecord['staffType']) ?? 'other_staff',
       department: record.department ? String(record.department) : undefined,
       designation: record.designation
         ? String(record.designation)
@@ -1099,6 +1122,36 @@ export class MongoPeopleRepository {
     organizationId: string,
     input: StaffInput,
   ): Promise<StaffRecord> {
+    const duplicateMatchers: Record<string, unknown>[] = [];
+    if (input.employeeCode?.trim()) {
+      duplicateMatchers.push({
+        employeeCode: {
+          $regex: '^' + escapeRegex(input.employeeCode.trim()) + '$',
+          $options: 'i',
+        },
+      });
+    }
+    if (input.email?.trim()) {
+      duplicateMatchers.push({
+        email: {
+          $regex: '^' + escapeRegex(input.email.trim()) + '$',
+          $options: 'i',
+        },
+      });
+    }
+    if (duplicateMatchers.length) {
+      const duplicate = await StaffMemberModel.exists({
+        organizationId: idObject(organizationId),
+        $or: duplicateMatchers,
+      });
+      if (duplicate) {
+        throw new AppError(
+          409,
+          'STAFF_DUPLICATE',
+          'A staff member with this employee code or email already exists in this organization.',
+        );
+      }
+    }
     if (
       input.campusId &&
       !(await CampusModel.exists({
@@ -1171,7 +1224,8 @@ export class MongoPeopleRepository {
       employeeCode: record.employeeCode
         ? String(record.employeeCode)
         : undefined,
-      staffType: (record.staffType as StaffRecord['staffType']) ?? 'other_staff',
+      staffType:
+        (record.staffType as StaffRecord['staffType']) ?? 'other_staff',
       department: record.department ? String(record.department) : undefined,
       designation: record.designation
         ? String(record.designation)

@@ -211,12 +211,8 @@ export function FamiliesListPage() {
     <main className="page-stack student-management-page reference-live-module families-page">
       <header className="families-heading">
         <div>
-          <span className="families-eyebrow">PEOPLE MANAGEMENT</span>
-          <h1>Families</h1>
-          <p>
-            Households grouped by family number. Link existing parents and their
-            students into one family.
-          </p>
+          <h1>Family</h1>
+          <p>Manage family groups and their linked students and parents.</p>
         </div>
         {canCreate && (
           <button
@@ -400,6 +396,96 @@ export function FamiliesListPage() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="families-mobile-list" aria-label="Family directory">
+          {families.isPending ? (
+            <LoadingState message="Loading families…" />
+          ) : families.isError ? (
+            <ErrorState
+              title="Families unavailable"
+              description={message(families.error)}
+              onRetry={() => void families.refetch()}
+            />
+          ) : families.data.items.length ? (
+            families.data.items.map((family) => (
+              <article className="families-mobile-card" key={family.id}>
+                <div className="families-mobile-card-heading">
+                  <div>
+                    <strong>{family.name || family.familyNumber}</strong>
+                    <small>{family.familyNumber}</small>
+                  </div>
+                  <span className="families-status">Active</span>
+                </div>
+                <div className="families-mobile-card-meta">
+                  <span>
+                    <GraduationCap size={15} /> {family.studentCount} students
+                  </span>
+                  <span>
+                    <UserRound size={15} /> {family.parentCount} parents
+                  </span>
+                  <span>
+                    <FileText size={15} /> {family.invoiceCount} invoices
+                  </span>
+                </div>
+                <div className="families-mobile-card-actions">
+                  <Link
+                    className="button button-primary"
+                    to={
+                      base(organizationId) +
+                      '/families/' +
+                      encodeURIComponent(family.id)
+                    }
+                  >
+                    <Eye size={15} /> View details
+                  </Link>
+                  {canCreate && (
+                    <>
+                      <button
+                        className="button button-secondary"
+                        type="button"
+                        aria-label={`Edit ${family.familyNumber}`}
+                        onClick={() =>
+                          window.dispatchEvent(
+                            new CustomEvent('instituteos-edit-family', {
+                              detail: family,
+                            }),
+                          )
+                        }
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        className="button button-secondary is-danger"
+                        type="button"
+                        aria-label={`Remove ${family.familyNumber}`}
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `Remove ${family.familyNumber}? Students, parents and invoices will be kept; only the family grouping will be removed.`,
+                            )
+                          )
+                            deleteMutation.mutate(family.id);
+                        }}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </article>
+            ))
+          ) : (
+            <EmptyState
+              title={
+                search ? 'No families match this search' : 'No families yet'
+              }
+              description={
+                search
+                  ? 'Try another family number, label or name.'
+                  : 'Create a family from an existing family contact and their linked students.'
+              }
+            />
+          )}
         </div>
         {families.data && (
           <Pagination
@@ -772,6 +858,45 @@ export function FamilyDetailPage() {
             </tbody>
           </table>
         </div>
+        <div className="families-detail-mobile-list">
+          {record.students.map((student) => (
+            <article className="families-person-card" key={student.id}>
+              <div className="families-person-card-heading">
+                <strong>{student.name}</strong>
+                <Link
+                  className="button button-secondary"
+                  to={
+                    base(organizationId) +
+                    '/students/' +
+                    encodeURIComponent(student.id)
+                  }
+                  aria-label={`View ${student.name}`}
+                >
+                  <Eye size={15} /> View
+                </Link>
+              </div>
+              <dl>
+                <div>
+                  <dt>Registration no.</dt>
+                  <dd>{student.registrationNumber || '—'}</dd>
+                </div>
+                <div>
+                  <dt>Class</dt>
+                  <dd>{student.className || '—'}</dd>
+                </div>
+                <div>
+                  <dt>Section</dt>
+                  <dd>{student.sectionName || '—'}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+          {!record.students.length && (
+            <p className="families-detail-empty">
+              No students linked to this family.
+            </p>
+          )}
+        </div>
       </section>
       <section className="families-detail-panel panel">
         <h2>Parents ({record.parents.length})</h2>
@@ -800,6 +925,37 @@ export function FamilyDetailPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="families-detail-mobile-list">
+          {record.parents.map((parent) => (
+            <article className="families-person-card" key={parent.id}>
+              <div className="families-person-card-heading">
+                <strong>{parent.name}</strong>
+                <span className="families-person-relationship">
+                  {parent.relationship || 'Family contact'}
+                </span>
+              </div>
+              <dl>
+                <div>
+                  <dt>Phone</dt>
+                  <dd>{parent.phone || '—'}</dd>
+                </div>
+                <div>
+                  <dt>Email</dt>
+                  <dd>{parent.email || '—'}</dd>
+                </div>
+                <div>
+                  <dt>CNIC</dt>
+                  <dd>{parent.cnic || '—'}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+          {!record.parents.length && (
+            <p className="families-detail-empty">
+              No parents linked to this family.
+            </p>
+          )}
         </div>
       </section>
     </main>

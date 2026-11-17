@@ -1,6 +1,6 @@
 .attendance-settings-page {
   display: grid;
-  gap: 22px;
+  gap: 18px;
   padding: 4px 0 28px;
 }
 
@@ -46,13 +46,13 @@
 
 .attendance-settings-page form {
   display: grid;
-  gap: 20px;
+  gap: 16px;
 }
 
 .attendance-settings-card {
   display: grid;
-  gap: 20px;
-  padding: 24px;
+  gap: 16px;
+  padding: 20px;
   border: 1px solid var(--border-subtle, #e2e8f0);
   border-radius: 16px;
   background: var(--surface, #fff);
@@ -67,7 +67,7 @@
 .attendance-settings-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px 22px;
+  gap: 16px 18px;
 }
 
 .attendance-settings-field {
@@ -111,7 +111,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 16px 0;
+  padding: 12px 0;
   border-top: 1px solid var(--border-subtle, #e2e8f0);
 }
 
@@ -138,7 +138,7 @@
 .attendance-settings-days {
   display: grid;
   gap: 12px;
-  padding-top: 18px;
+  padding-top: 14px;
   border-top: 1px solid var(--border-subtle, #e2e8f0);
 }
 

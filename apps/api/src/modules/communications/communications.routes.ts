@@ -62,7 +62,6 @@ const announcementManagers = [
 const messagingRoles = [
   'organization_owner',
   'organization_admin',
-  'principal_director',
   'teacher',
   'parent_guardian',
 ] as const;
@@ -276,6 +275,13 @@ const defaultVerificationAdapters: VerificationAdapters = {
     if (user?.status !== 'active' || typeof user.email !== 'string') {
       return false;
     }
+    const guardianMembership = await MembershipModel.exists({
+      organizationId: organizationObjectId,
+      userId: oid(guardianUserId),
+      role: 'parent_guardian',
+      status: 'active',
+    });
+    if (!guardianMembership) return false;
 
     const guardians = await GuardianModel.find({
       organizationId: organizationObjectId,
@@ -636,6 +642,206 @@ async function listParentMessagingContacts(
   });
 }
 
+interface MessagingContactGuardian {
+  userId: string;
+  displayName: string;
+}
+
+async function listTeacherMessagingContacts(
+  organizationId: string,
+  userId: string,
+) {
+  const organizationObjectId = oid(organizationId);
+  const user = await AuthUserModel.findOne({
+    _id: oid(userId),
+    status: 'active',
+  })
+    .select({ email: 1 })
+    .lean();
+  if (!user) return [];
+  const email =
+    typeof user.email === 'string' ? user.email.trim().toLowerCase() : '';
+  const [staff, activeYears] = await Promise.all([
+    StaffMemberModel.find({
+      organizationId: organizationObjectId,
+      status: 'active',
+      $or: [{ userId: oid(userId) }, ...(email ? [{ email }] : [])],
+    })
+      .select({ _id: 1 })
+      .limit(2)
+      .lean(),
+    AcademicYearModel.find({
+      organizationId: organizationObjectId,
+      status: 'active',
+    })
+      .select({ _id: 1 })
+      .lean(),
+  ]);
+  if (staff.length !== 1 || !activeYears.length) return [];
+  const yearIds = activeYears.map((year) => year._id);
+  const assignments = await TeacherAssignmentModel.find({
+    organizationId: organizationObjectId,
+    teacherStaffId: staff[0]!._id,
+    academicYearId: { $in: yearIds },
+  })
+    .select({ classId: 1, sectionId: 1, academicYearId: 1 })
+    .lean();
+  if (!assignments.length) return [];
+  const placements = await StudentSectionPlacementModel.find({
+    organizationId: organizationObjectId,
+    status: 'active',
+    academicYearId: { $in: yearIds },
+    $or: assignments.map((item) => ({
+      classId: item.classId,
+      sectionId: item.sectionId,
+      academicYearId: item.academicYearId,
+    })),
+  })
+    .select({ studentId: 1, classId: 1, sectionId: 1 })
+    .lean();
+  const studentIds = [
+    ...new Set(placements.map((item) => String(item.studentId))),
+  ];
+  if (!studentIds.length) return [];
+  const [students, links] = await Promise.all([
+    StudentModel.find({
+      organizationId: organizationObjectId,
+      status: 'active',
+      _id: { $in: studentIds.map(oid) },
+    })
+      .select({ _id: 1, firstName: 1, lastName: 1, guardianIds: 1 })
+      .lean(),
+    StudentGuardianLinkModel.find({
+      organizationId: organizationObjectId,
+      studentId: { $in: studentIds.map(oid) },
+    })
+      .select({ studentId: 1, guardianId: 1 })
+      .lean(),
+  ]);
+  const idsByStudent = new Map<string, Set<string>>();
+  for (const link of links) {
+    const key = String(link.studentId);
+    const ids = idsByStudent.get(key) ?? new Set<string>();
+    ids.add(String(link.guardianId));
+    idsByStudent.set(key, ids);
+  }
+  for (const student of students) {
+    const key = String(student._id);
+    const ids = idsByStudent.get(key) ?? new Set<string>();
+    for (const guardianId of student.guardianIds ?? [])
+      ids.add(String(guardianId));
+    idsByStudent.set(key, ids);
+  }
+  const guardianIds = [
+    ...new Set([...idsByStudent.values()].flatMap((ids) => [...ids])),
+  ];
+  const guardians = guardianIds.length
+    ? await GuardianModel.find({
+        organizationId: organizationObjectId,
+        _id: { $in: guardianIds.map(oid) },
+      })
+        .select({ _id: 1, email: 1 })
+        .lean()
+    : [];
+  const emails = [
+    ...new Set(
+      guardians
+        .map((item) =>
+          typeof item.email === 'string' ? item.email.trim().toLowerCase() : '',
+        )
+        .filter(Boolean),
+    ),
+  ];
+  const accounts = emails.length
+    ? await AuthUserModel.find({ email: { $in: emails }, status: 'active' })
+        .select({ _id: 1, email: 1, displayName: 1 })
+        .lean()
+    : [];
+  const memberships = accounts.length
+    ? await MembershipModel.find({
+        organizationId: organizationObjectId,
+        userId: { $in: accounts.map((item) => item._id) },
+        role: 'parent_guardian',
+        status: 'active',
+      })
+        .select({ userId: 1 })
+        .lean()
+    : [];
+  const activeIds = new Set(memberships.map((item) => String(item.userId)));
+  const accountByEmail = new Map(
+    accounts
+      .filter((item) => typeof item.email === 'string')
+      .map((item) => [String(item.email).trim().toLowerCase(), item]),
+  );
+  const guardianById = new Map(
+    guardians.map((item) => [String(item._id), item]),
+  );
+  const [classes, sections] = await Promise.all([
+    AcademicClassModel.find({
+      organizationId: organizationObjectId,
+      _id: { $in: placements.map((item) => item.classId) },
+    })
+      .select({ _id: 1, name: 1 })
+      .lean(),
+    AcademicSectionModel.find({
+      organizationId: organizationObjectId,
+      _id: { $in: placements.map((item) => item.sectionId) },
+    })
+      .select({ _id: 1, name: 1 })
+      .lean(),
+  ]);
+  const classNames = new Map(
+    classes.map((item) => [String(item._id), String(item.name)]),
+  );
+  const sectionNames = new Map(
+    sections.map((item) => [String(item._id), String(item.name)]),
+  );
+  const placementByStudent = new Map<string, (typeof placements)[number]>();
+  for (const placement of placements)
+    if (!placementByStudent.has(String(placement.studentId)))
+      placementByStudent.set(String(placement.studentId), placement);
+  return students
+    .map((student) => {
+      const studentId = String(student._id);
+      const linkedGuardians: MessagingContactGuardian[] = [
+        ...(idsByStudent.get(studentId) ?? []),
+      ].flatMap((guardianId) => {
+        const guardian = guardianById.get(guardianId);
+        const account = guardian?.email
+          ? accountByEmail.get(String(guardian.email).trim().toLowerCase())
+          : undefined;
+        return account && activeIds.has(String(account._id))
+          ? [
+              {
+                userId: String(account._id),
+                displayName: String(account.displayName),
+              },
+            ]
+          : [];
+      });
+      const placement = placementByStudent.get(studentId);
+      return {
+        studentId,
+        studentName: [student.firstName, student.lastName]
+          .filter(Boolean)
+          .join(' '),
+        className: placement
+          ? (classNames.get(String(placement.classId)) ?? 'Class')
+          : 'Class',
+        sectionName: placement
+          ? (sectionNames.get(String(placement.sectionId)) ?? 'Section')
+          : 'Section',
+        teachers: [],
+        guardians: [
+          ...new Map(
+            linkedGuardians.map((item) => [item.userId, item]),
+          ).values(),
+        ],
+      };
+    })
+    .filter((item) => item.guardians.length > 0);
+}
+
 export function createCommunicationsRouter(
   service: CommunicationsService = new CommunicationsService(
     new MongoAnnouncementRepository(),
@@ -661,6 +867,17 @@ export function createCommunicationsRouter(
     ),
   ] as const;
 
+  const protectParentAnnouncements = [
+    authenticate,
+    createOrganizationContextMiddleware(accessRepository),
+    requireOrganizationRole(['parent_guardian']),
+  ] as const;
+  const protectTeacherAnnouncements = [
+    authenticate,
+    createOrganizationContextMiddleware(accessRepository),
+    requireOrganizationRole(['teacher']),
+  ] as const;
+
   const protectMessaging = [
     authenticate,
     createOrganizationContextMiddleware(accessRepository),
@@ -670,10 +887,10 @@ export function createCommunicationsRouter(
       'communication.write',
     ),
   ] as const;
-  const protectParentMessaging = [
+  const protectContactDirectory = [
     authenticate,
     createOrganizationContextMiddleware(accessRepository),
-    requireOrganizationRole(['parent_guardian']),
+    requireOrganizationRole(['parent_guardian', 'teacher']),
   ] as const;
 
   // Announcements Routes
@@ -685,6 +902,51 @@ export function createCommunicationsRouter(
         items: await service.listAnnouncements(
           organizationContext(response),
           announcementQuery(request.query as Record<string, unknown>),
+        ),
+      });
+    }),
+  );
+
+  // Parent read-only feed: published notices for guardians only.
+  // Campus-specific notices are returned only when the parent's membership
+  // explicitly includes that campus.
+  router.get(
+    baseAnnouncements + '/parent-feed',
+    ...protectParentAnnouncements,
+    asyncHandler(async (_request, response) => {
+      const context = organizationContext(response);
+      const items = await service.listAnnouncements(context, {
+        status: 'published',
+      });
+      response.status(200).json({
+        items: items.filter(
+          (item) =>
+            item.status === 'published' &&
+            (item.targetAudience === 'all' ||
+              item.targetAudience === 'guardians') &&
+            (!item.campusId || context.campusIds.includes(item.campusId)),
+        ),
+      });
+    }),
+  );
+
+  // Teacher read-only feed: only published all-institute and staff notices.
+  // Campus-specific notices stay scoped to the teacher's active membership.
+  router.get(
+    baseAnnouncements + '/teacher-feed',
+    ...protectTeacherAnnouncements,
+    asyncHandler(async (_request, response) => {
+      const context = organizationContext(response);
+      const items = await service.listAnnouncements(context, {
+        status: 'published',
+      });
+      response.status(200).json({
+        items: items.filter(
+          (item) =>
+            item.status === 'published' &&
+            (item.targetAudience === 'all' ||
+              item.targetAudience === 'staff') &&
+            (!item.campusId || context.campusIds.includes(item.campusId)),
         ),
       });
     }),
@@ -749,15 +1011,14 @@ export function createCommunicationsRouter(
   // to their active class sections. IDs are returned only after tenant and relationship checks.
   router.get(
     '/:organizationId/communications/contacts',
-    ...protectParentMessaging,
+    ...protectContactDirectory,
     asyncHandler(async (_request, response) => {
       const ctx = organizationContext(response);
-      response.status(200).json({
-        items: await listParentMessagingContacts(
-          ctx.organizationId,
-          ctx.userId,
-        ),
-      });
+      const items =
+        ctx.role === 'teacher'
+          ? await listTeacherMessagingContacts(ctx.organizationId, ctx.userId)
+          : await listParentMessagingContacts(ctx.organizationId, ctx.userId);
+      response.status(200).json({ items });
     }),
   );
 
@@ -782,25 +1043,36 @@ export function createCommunicationsRouter(
     csrfProtection,
     asyncHandler(async (request, response) => {
       const ctx = organizationContext(response);
-      if (ctx.role !== 'parent_guardian') {
-        throw new AppError(
-          403,
-          'PARENT_ROLE_REQUIRED',
-          'Only a linked parent or guardian can start a new parent-teacher conversation.',
-        );
-      }
       const body = bodyObject(request.body);
-      const result = await messagingService.startConversation(
-        ctx.organizationId,
-        ctx.userId,
-        {
-          studentId: objectId(body.studentId, 'student'),
-          teacherUserId: objectId(body.teacherUserId, 'teacher'),
-          subjectTitle: text(body.subjectTitle, 'subject title', 120),
-          initialMessage: text(body.initialMessage, 'initial message', 2000),
-        },
-        ctx.campusIds[0],
-      );
+      const input = {
+        studentId: objectId(body.studentId, 'student'),
+        teacherUserId: objectId(body.teacherUserId, 'teacher'),
+        subjectTitle: text(body.subjectTitle, 'subject title', 120),
+        initialMessage: text(body.initialMessage, 'initial message', 2000),
+      };
+      const result =
+        ctx.role === 'teacher'
+          ? await messagingService.startTeacherConversation(
+              ctx.organizationId,
+              ctx.userId,
+              objectId(body.guardianUserId, 'guardian'),
+              input,
+              ctx.campusIds[0],
+            )
+          : ctx.role === 'parent_guardian'
+            ? await messagingService.startConversation(
+                ctx.organizationId,
+                ctx.userId,
+                input,
+                ctx.campusIds[0],
+              )
+            : (() => {
+                throw new AppError(
+                  403,
+                  'ROLE_REQUIRED',
+                  'Only teachers and linked parents can start a conversation.',
+                );
+              })();
       response.status(201).json(result);
     }),
   );

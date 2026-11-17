@@ -261,13 +261,17 @@ export function permissionsForOrganizationRole(
 export function permissionsForMembership(
   role: OrganizationRole,
   assignedPermissions?: readonly string[],
+  rolePolicyPermissions?: readonly string[],
 ): readonly OrganizationPermission[] {
   if (role === 'organization_owner')
     return permissionsForOrganizationRole(role);
-  if (role !== 'organization_admin' || assignedPermissions === undefined)
+  const selectedPermissions =
+    rolePolicyPermissions ??
+    (role === 'organization_admin' ? assignedPermissions : undefined);
+  if (selectedPermissions === undefined)
     return permissionsForOrganizationRole(role);
   const allowed = new Set<string>(ORGANIZATION_PERMISSIONS);
-  return [...new Set(assignedPermissions)].filter(
+  return [...new Set(selectedPermissions)].filter(
     (permission): permission is OrganizationPermission =>
       allowed.has(permission),
   );

@@ -21,7 +21,14 @@ function settingsRecord(
       record.localization as OrganizationSettingsRecord['localization'],
     notifications:
       record.notifications as OrganizationSettingsRecord['notifications'],
-    staffSetup: (record.staffSetup ?? { departments: [], designations: [], employmentTypes: [], workShifts: [], qualifications: [], documentTypes: [] }) as OrganizationSettingsRecord['staffSetup'],
+    staffSetup: (record.staffSetup ?? {
+      departments: [],
+      designations: [],
+      employmentTypes: [],
+      workShifts: [],
+      qualifications: [],
+      documentTypes: [],
+    }) as OrganizationSettingsRecord['staffSetup'],
     teacherSelfAttendance: (record.teacherSelfAttendance ?? {
       viewOwnAttendance: true,
       selfMarkingEnabled: false,

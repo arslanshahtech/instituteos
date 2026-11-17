@@ -352,107 +352,923 @@
   }
 }
 
-/* Align the live inbox/chat surface with the reference's warm, compact UI. */
-.communications-page {
-  gap: 14px;
-}
-
-.communications-section {
-  gap: 12px;
-  border-radius: 9px;
+/* Parent-teacher inbox: fixed composer with an independently scrolling chat. */
+.parent-teacher-inbox {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: min(820px, calc(100dvh - 190px));
+  min-height: 520px;
+  max-height: none;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
   background: #fff;
-  padding: 16px;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 5%);
 }
 
-.communications-section-heading h2 {
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 18px;
-  font-weight: 500;
+.parent-teacher-inbox .inbox-conversation-list {
+  display: flex;
+  width: 320px;
+  min-width: 280px;
+  flex: 0 0 320px;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--color-border);
+  background: #fff;
 }
 
-.communications-field {
-  color: #454951;
+.inbox-conversation-items {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.inbox-list-state,
+.inbox-chat-state {
+  display: grid;
+  min-height: 100%;
+  place-items: center;
+  margin: 0;
+  padding: 24px;
+  color: var(--color-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.inbox-list-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 34px 20px;
+  text-align: center;
+}
+
+.inbox-list-empty-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 13px;
+  background: #f8fafc;
+  color: #475569;
+}
+
+.inbox-list-empty > strong {
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.inbox-list-empty > p,
+.inbox-list-empty-detail {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.inbox-conversation-item {
+  display: grid;
+  width: 100%;
+  gap: 5px;
+  border: 0;
+  border-bottom: 1px solid #eef1f4;
+  border-left: 3px solid transparent;
+  background: #fff;
+  padding: 14px 16px;
+  color: var(--color-ink);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.inbox-conversation-item:hover,
+.inbox-conversation-item.is-selected {
+  background: #f8fafc;
+}
+
+.inbox-conversation-item.is-selected {
+  border-left-color: #0f172a;
+}
+
+.inbox-conversation-item strong {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.inbox-conversation-item > time {
+  color: var(--color-muted);
   font-size: 11px;
 }
 
-.communications-field input,
-.communications-field textarea {
-  border-radius: 7px;
+.inbox-conversation-item:focus-visible,
+.inbox-back-button:focus-visible {
+  outline: 2px solid #64748b;
+  outline-offset: -2px;
 }
 
-.communications-field input:focus,
-.communications-field textarea:focus {
-  outline-color: #292d35;
+.message-list-toolbar {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border);
+  padding: 10px 14px;
 }
 
-.communications-grid {
-  gap: 10px;
+.message-list-title {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
 }
 
-.announcement-card {
+.message-new-button {
+  min-height: 38px;
+  border: 1px solid var(--color-border-strong);
   border-radius: 9px;
-  padding: 13px;
-  box-shadow: none;
+  background: #fff;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 650;
 }
 
-.announcement-card-heading h3 {
+.parent-teacher-inbox .inbox-chat-panel {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+}
+
+.inbox-chat-header {
+  display: flex;
+  min-height: 72px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--color-border);
+  background: #fff;
+  padding: 12px 18px;
+}
+
+.inbox-chat-title {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 3px;
+}
+
+.inbox-chat-title h2 {
+  margin: 0;
+  color: #0f172a;
   font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
-.announcement-content {
+.inbox-chat-title > span {
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
+.inbox-student-switcher {
+  display: grid;
+  width: min(220px, 34%);
+  min-width: 140px;
+  flex: 0 1 220px;
+  gap: 4px;
+  color: var(--color-muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.inbox-student-switcher select {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 9px;
+  background: #fff;
+  padding: 6px 28px 6px 9px;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 12px;
+}
+
+.inbox-student-switcher select:focus-visible {
+  outline: 2px solid #64748b;
+  outline-offset: 2px;
+}
+
+.inbox-back-button {
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.parent-teacher-inbox .inbox-messages-body {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #fafaf9;
+  padding: 18px;
+}
+
+.inbox-message-row {
+  display: grid;
+  width: fit-content;
+  max-width: min(72%, 620px);
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.inbox-message-row.is-self {
+  align-self: flex-end;
+  justify-items: end;
+}
+
+.inbox-message-row.is-received {
+  align-self: flex-start;
+  justify-items: start;
+}
+
+.inbox-message-bubble {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  flex: 0 0 auto;
+  border: 1px solid #e7e5e4;
+  border-radius: 15px;
+  background: #fff;
+  padding: 10px 13px;
+  color: #111827;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 4%);
+  overflow-wrap: anywhere;
+}
+
+.inbox-message-row.is-self .inbox-message-bubble {
+  border-color: #dedbd6;
+  border-bottom-right-radius: 5px;
+}
+
+.inbox-message-row.is-received .inbox-message-bubble {
+  border-bottom-left-radius: 5px;
+}
+
+.inbox-message-sender {
+  margin-bottom: 4px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.inbox-message-content {
+  color: #111827;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.inbox-message-time {
+  display: block;
+  padding: 0 3px;
+  color: #78716c;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.inbox-reply-error {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  border-top: 1px solid #fecaca;
+  background: #fff7f7;
+  padding: 9px 14px;
+  color: #991b1b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.parent-teacher-inbox .inbox-reply-form {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 9px;
+  border-top: 1px solid var(--color-border);
+  background: #fff;
+  padding: 12px 14px;
+}
+
+.parent-teacher-inbox .inbox-reply-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid #d6d3d1;
+  border-radius: 11px;
+  background: #fff;
+  padding: 10px 13px;
+  color: #111827;
+  font: inherit;
+  font-size: 13px;
+}
+
+.parent-teacher-inbox .inbox-reply-input::placeholder {
+  color: #9a958d;
+}
+
+.parent-teacher-inbox .inbox-reply-input:focus {
+  border-color: #78716c;
+  outline: 2px solid rgb(120 113 108 / 16%);
+  outline-offset: 1px;
+}
+
+.parent-teacher-inbox .inbox-send-button {
+  display: inline-flex;
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: #171717;
+  color: #fff;
+}
+
+.parent-teacher-inbox .inbox-send-button:disabled {
+  opacity: 0.42;
+}
+
+@media (max-width: 800px) {
+  .parent-teacher-inbox {
+    height: calc(100dvh - 148px);
+    min-height: 440px;
+    max-height: none;
+  }
+
+  .parent-teacher-inbox .inbox-messages-body {
+    padding: 14px 12px;
+  }
+
+  .inbox-message-row {
+    max-width: 86%;
+  }
+
+  .inbox-message-bubble {
+    padding: 10px 12px;
+  }
+
+  .parent-teacher-inbox .inbox-reply-form {
+    padding: 10px;
+  }
+
+  .parent-teacher-inbox .inbox-reply-input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .parent-teacher-inbox {
+    height: calc(100dvh - 136px);
+    min-height: 420px;
+    border-radius: 11px;
+  }
+
+  .message-list-toolbar {
+    min-height: 54px;
+    padding: 8px 10px;
+  }
+
+  .inbox-chat-header {
+    min-height: 64px;
+    gap: 8px;
+    padding: 9px 10px;
+  }
+
+  .inbox-student-switcher {
+    width: 42%;
+    min-width: 112px;
+    flex-basis: 42%;
+  }
+
+  .inbox-student-switcher select {
+    min-height: 36px;
+    font-size: 11px;
+  }
+}
+
+.inbox-new-conversation-form {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.inbox-form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.inbox-form-control {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 9px;
+  background: #fff;
+  padding: 9px 11px;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.inbox-new-conversation-form textarea.inbox-form-control {
+  min-height: 104px;
+  resize: vertical;
+}
+
+.inbox-form-control:focus-visible {
+  border-color: #64748b;
+  outline: 2px solid rgb(100 116 139 / 18%);
+  outline-offset: 1px;
+}
+
+.inbox-form-error {
+  margin: 0;
+  color: #991b1b;
   font-size: 12px;
   line-height: 1.5;
 }
 
-.announcement-actions > .button {
-  min-height: 32px;
+.inbox-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
 }
 
-.communications-page .parent-teacher-inbox {
-  border-color: #e5e1d9 !important;
-  border-radius: 9px !important;
-  box-shadow: none !important;
+.inbox-chat-unavailable {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
 }
 
-.parent-teacher-inbox [style*='background-color: rgb(37, 99, 235)'] {
-  background-color: #292d35 !important;
+.inbox-chat-unavailable .inbox-back-button {
+  align-self: flex-start;
+  margin: 12px;
 }
 
-.parent-teacher-inbox [style*='border-left: 3px solid rgb(37, 99, 235)'] {
-  border-left-color: #292d35 !important;
+.inbox-chat-unavailable .inbox-chat-state {
+  flex: 1 1 auto;
 }
 
-.parent-teacher-inbox [style*='background-color: rgb(239, 246, 255)'] {
-  background-color: #f5f4f0 !important;
+.inbox-back-button {
+  display: none;
 }
 
-.parent-teacher-inbox [style*='color: rgb(37, 99, 235)'] {
-  color: #454951 !important;
+.parent-teacher-inbox {
+  height: min(760px, calc(100dvh - 190px));
+  min-height: 0;
+  flex: 1 1 auto;
 }
 
-.parent-teacher-inbox [style*='color: rgb(30, 64, 175)'] {
-  color: #292d35 !important;
+.parent-teacher-inbox .inbox-conversation-list {
+  width: 340px;
+  min-width: 280px;
+  flex: 0 0 340px;
 }
 
-@media (max-width: 768px) {
-  .communications-section {
-    padding: 12px;
-  }
+.parent-teacher-inbox .inbox-conversation-items {
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
 
+.parent-teacher-inbox .inbox-messages-body {
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+@media (max-width: 820px) {
   .parent-teacher-inbox {
-    min-height: 360px !important;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    flex: 1 1 auto;
+    border-radius: 12px;
+  }
+
+  .parent-teacher-inbox.is-conversation-open {
+    position: fixed;
+    z-index: 20;
+    inset: 64px 0 0;
+    width: 100vw;
+    height: calc(100dvh - 64px);
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .main-content:has(.parent-teacher-inbox.is-conversation-open) {
+    height: calc(100dvh - 64px);
+    padding: 0 !important;
+    overflow: hidden;
+  }
+
+  .communications-page:has(.parent-teacher-inbox.is-conversation-open) {
+    height: 100%;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .communications-page:has(.parent-teacher-inbox.is-conversation-open)
+    .communications-heading {
+    display: none;
+  }
+
+  .parent-teacher-inbox.is-list-only .inbox-chat-panel {
+    display: none;
+  }
+
+  .parent-teacher-inbox.is-conversation-open .inbox-conversation-list {
+    display: none;
+  }
+
+  .parent-teacher-inbox.is-conversation-open .inbox-chat-panel {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    flex: 1 1 100%;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .parent-teacher-inbox.is-conversation-open .inbox-back-button {
+    display: inline-grid;
+  }
+
+  .parent-teacher-inbox.is-conversation-open .inbox-chat-header {
+    min-height: 58px;
+    padding: 8px 14px;
+  }
+
+  .parent-teacher-inbox.is-conversation-open .inbox-messages-body {
+    min-height: 0;
+    flex: 1 1 auto;
+    overscroll-behavior: contain;
+  }
+
+  .parent-teacher-inbox.is-conversation-open .inbox-reply-form {
+    flex: 0 0 auto;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+
+  .app-frame:has(.parent-teacher-inbox.is-conversation-open) .app-footer {
+    display: none;
   }
 }
 
-@media (max-width: 760px) {
-  .communications-page {
-    gap: 16px;
+@media (min-width: 821px) {
+  .parent-teacher-inbox.is-conversation-open .inbox-conversation-list {
+    display: flex;
+    width: 340px;
+    min-width: 280px;
+    flex: 0 0 340px;
   }
-  .communications-workspace-tabs {
-    margin-bottom: 10px;
+
+  .parent-teacher-inbox.is-conversation-open .inbox-chat-panel {
+    width: auto;
+    flex: 1 1 0;
   }
-  .communications-workspace-tab {
-    padding: 11px 2px 10px;
-    font-size: 12px;
+}
+
+.parent-teacher-inbox .inbox-messages-body {
+  scrollbar-width: none;
+}
+
+.parent-teacher-inbox .inbox-messages-body::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  .app-frame:has(.parent-teacher-inbox.is-conversation-open) .topbar {
+    display: none;
+  }
+
+  .parent-teacher-inbox.is-conversation-open {
+    inset: 0;
+    height: 100dvh;
+  }
+
+  .main-content:has(.parent-teacher-inbox.is-conversation-open) {
+    height: 100dvh;
+  }
+}
+
+/* Parent portal student picker: keep the page title left and a compact selector right on every section. */
+.parent-portal-heading-with-picker {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+.parent-portal-heading-with-picker > div {
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: left;
+}
+.parent-portal-heading-with-picker h1 {
+  text-align: left;
+}
+.parent-portal-student-picker {
+  width: min(220px, 38%);
+  min-width: 150px;
+  flex: 0 1 220px;
+}
+.parent-portal-student-picker select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 9px;
+  background: #fff;
+  padding: 6px 30px 6px 11px;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+.parent-portal-student-picker select:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+/* Parent portal messages: one page heading/picker and a true full-height inbox. */
+.main-column:has(.parent-messages-workspace) {
+  height: 100dvh;
+  min-height: 0;
+}
+.main-column:has(.parent-messages-workspace) > .topbar {
+  flex: 0 0 66px;
+}
+.main-column:has(.parent-messages-workspace) > .main-content {
+  min-height: 0;
+  flex: 1 1 0%;
+}
+
+.main-content:has(.parent-messages-workspace) {
+  display: flex;
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  height: auto;
+  flex: 1 1 0%;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 18px clamp(20px, 2.4vw, 36px);
+}
+
+.parent-portal:has(.parent-messages-workspace) {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 0%;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.parent-portal-heading.parent-portal-messages-heading {
+  display: flex;
+  width: 100%;
+  min-height: 40px;
+  flex: 0 0 40px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+  text-align: left;
+}
+
+.parent-portal-messages-heading > div {
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.parent-portal-messages-heading h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.parent-messages-student-picker {
+  width: min(220px, 38%);
+  min-width: 150px;
+  flex: 0 1 220px;
+}
+
+.parent-messages-student-picker select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 9px;
+  background: #fff;
+  padding: 6px 30px 6px 11px;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.parent-messages-workspace {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+}
+
+.parent-messages-workspace .parent-teacher-inbox {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  flex: 1 1 0%;
+}
+
+.app-frame:has(.parent-messages-workspace) .app-footer {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  .main-content:has(.parent-messages-workspace) {
+    height: calc(100dvh - 64px);
+    padding: 12px 12px 14px;
+  }
+
+  .parent-portal:has(.parent-messages-workspace) {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 0%;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 10px;
+  }
+
+  .parent-portal:has(.parent-messages-workspace) > .parent-messages-workspace {
+    min-height: 0;
+    flex: 1 1 0%;
+    margin-top: 0;
+  }
+
+  .parent-portal-heading.parent-portal-messages-heading {
+    display: flex;
+    width: 100%;
+    min-height: 40px;
+    flex: 0 0 40px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    text-align: left;
+  }
+
+  .parent-portal-messages-heading > div {
+    flex: 1 1 auto;
+    text-align: left;
+  }
+
+  .parent-portal-messages-heading h1 {
+    font-size: 20px;
+    text-align: left;
+  }
+
+  .parent-messages-student-picker {
+    width: min(46%, 180px);
+    min-width: 0;
+    max-width: 180px;
+    flex: 0 1 180px;
+  }
+
+  .parent-messages-student-picker select {
+    min-height: 36px;
+    padding: 6px 26px 6px 9px;
+    font-size: 11px;
+  }
+
+  .parent-messages-workspace .parent-teacher-inbox {
+    height: calc(100dvh - 140px);
+    min-height: 0;
+    max-height: none;
+    flex: 1 1 0%;
+    border-radius: 11px;
+  }
+
+  .parent-portal:has(.parent-teacher-inbox.is-conversation-open) {
+    display: flex;
+    position: static;
+    height: 100%;
+    padding: 0;
+    gap: 0;
+  }
+
+  .parent-portal:has(.parent-teacher-inbox.is-conversation-open)
+    .parent-portal-messages-heading {
+    display: none;
+  }
+
+  .main-content:has(.parent-teacher-inbox.is-conversation-open) {
+    position: static;
+    width: 100%;
+    height: 100dvh;
+    min-height: 0;
+    padding: 0 !important;
+    overflow: hidden;
+  }
+
+  .app-frame:has(.parent-teacher-inbox.is-conversation-open) .topbar,
+  .app-frame:has(.parent-teacher-inbox.is-conversation-open) .app-footer {
+    display: none;
+  }
+
+  .parent-messages-workspace:has(.parent-teacher-inbox.is-conversation-open) {
+    height: 100%;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .parent-teacher-inbox.is-conversation-open {
+    position: fixed;
+    z-index: 50;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .live-role-dashboard.parent-portal .parent-portal-heading-with-picker {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 9px;
+  }
+
+  .live-role-dashboard.parent-portal .parent-portal-student-picker {
+    width: min(46%, 180px);
+    max-width: 180px;
   }
 }

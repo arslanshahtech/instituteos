@@ -39,6 +39,30 @@ const money = (amount: number) =>
   mongoose.Types.Decimal128.fromString(amount.toFixed(2));
 const decimalNumber = (value: unknown) => Number(value?.toString() ?? 0);
 const iso = (value: Date | string) => new Date(value).toISOString();
+
+function pakistanDateKey(value: Date): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Karachi',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(value);
+  const part = (type: string) =>
+    parts.find((item) => item.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+function isPastDueDate(dueDate: Date | string, now = new Date()): boolean {
+  const dueDateKey =
+    dueDate instanceof Date
+      ? dueDate.toISOString().slice(0, 10)
+      : dueDate.slice(0, 10);
+  return dueDateKey < pakistanDateKey(now);
+}
+
+function pakistanDayStart(now = new Date()): Date {
+  return new Date(`${pakistanDateKey(now)}T00:00:00.000Z`);
+}
 function feeStructureRecord(
   record: Record<string, unknown>,
 ): FeeStructureRecord {
@@ -108,16 +132,20 @@ function invoiceRecord(record: Record<string, unknown>): StudentInvoiceRecord {
   const calculatedStatus =
     paidAmount >= totalAmount
       ? 'paid'
-      : new Date(dueDate).getTime() < Date.now()
+      : isPastDueDate(dueDate)
         ? 'overdue'
         : paidAmount > 0
           ? 'partial'
           : 'unpaid';
 
   const rawPhone =
-    studentObject && typeof studentObject.phone === 'string'
-      ? studentObject.phone
-      : '';
+    studentObject &&
+    typeof studentObject.parentMobile === 'string' &&
+    studentObject.parentMobile.trim()
+      ? studentObject.parentMobile
+      : studentObject && typeof studentObject.phone === 'string'
+        ? studentObject.phone
+        : '';
 
   return {
     id: String(record._id),
@@ -265,19 +293,39 @@ export class MongoFinanceRepository implements FinanceRepository {
     campusIds?: string[],
   ): Promise<StudentInvoiceRecord[]> {
     const now = new Date();
+    const todayStart = pakistanDayStart(now);
     const statusFilter =
       query.status === 'overdue'
-        ? { status: { $ne: 'paid' }, dueDate: { $lt: now } }
+        ? { status: { $ne: 'paid' }, dueDate: { $lt: todayStart } }
         : query.status
           ? {
               status: query.status,
               ...(query.status === 'unpaid' || query.status === 'partial'
-                ? { dueDate: { $gte: now } }
+                ? { dueDate: { $gte: todayStart } }
                 : {}),
             }
           : {};
+    const sectionPlacements = query.sectionId
+      ? await StudentSectionPlacementModel.find({
+          organizationId: oid(organizationId),
+          sectionId: oid(query.sectionId),
+          ...(query.classId ? { classId: oid(query.classId) } : {}),
+        })
+          .select({ studentId: 1, academicYearId: 1 })
+          .lean()
+      : [];
+    if (query.sectionId && !sectionPlacements.length) return [];
+    const sectionPlacementMatch = query.sectionId
+      ? {
+          $or: sectionPlacements.map((placement) => ({
+            studentId: placement.studentId,
+            academicYearId: placement.academicYearId,
+          })),
+        }
+      : {};
     const records = await StudentInvoiceModel.find({
       organizationId: oid(organizationId),
+      ...sectionPlacementMatch,
       ...(campusIds ? { campusId: { $in: campusIds.map(oid) } } : {}),
       ...(query.campusId ? { campusId: oid(query.campusId) } : {}),
       ...(query.classId ? { classId: oid(query.classId) } : {}),
@@ -296,13 +344,35 @@ export class MongoFinanceRepository implements FinanceRepository {
           }
         : {}),
     })
-      .populate('studentId', 'firstName lastName phone')
+      .populate('studentId', 'firstName lastName phone parentMobile')
       .populate('feeStructureId', 'name')
       .sort({ issueDate: -1, invoiceNumber: 1 })
       .lean();
-    return records.map((record) =>
+    const invoices = records.map((record) =>
       invoiceRecord(record as unknown as Record<string, unknown>),
     );
+    if (!invoices.length) return [];
+    const placements = await StudentSectionPlacementModel.find({
+      organizationId: oid(organizationId),
+      studentId: { $in: invoices.map((invoice) => oid(invoice.studentId)) },
+      academicYearId: {
+        $in: invoices.map((invoice) => oid(invoice.academicYearId)),
+      },
+    })
+      .select({ studentId: 1, academicYearId: 1, sectionId: 1 })
+      .lean();
+    const sectionByStudentYear = new Map(
+      placements.map((placement) => [
+        `${String(placement.studentId)}:${String(placement.academicYearId)}`,
+        String(placement.sectionId),
+      ]),
+    );
+    return invoices.map((invoice) => ({
+      ...invoice,
+      sectionId: sectionByStudentYear.get(
+        `${invoice.studentId}:${invoice.academicYearId}`,
+      ),
+    }));
   }
 
   async listDailyCollections(
@@ -371,7 +441,7 @@ export class MongoFinanceRepository implements FinanceRepository {
       organizationId: oid(organizationId),
       ...(campusIds ? { campusId: { $in: campusIds.map(oid) } } : {}),
     })
-      .populate('studentId', 'firstName lastName phone')
+      .populate('studentId', 'firstName lastName phone parentMobile')
       .populate('feeStructureId', 'name')
       .lean();
     return record
@@ -501,7 +571,7 @@ export class MongoFinanceRepository implements FinanceRepository {
 
     const due = new Date(`${input.dueDate}T00:00:00.000Z`);
     const issued = new Date(`${issueDate}T00:00:00.000Z`);
-    const status = due < issued ? 'overdue' : 'unpaid';
+    const status = isPastDueDate(due, issued) ? 'overdue' : 'unpaid';
 
     if (!targetStudentIds.length) return [];
 
@@ -632,7 +702,7 @@ export class MongoFinanceRepository implements FinanceRepository {
 
     if (newPaidAmountNum >= invoice.totalAmount) {
       calculatedStatus = 'paid';
-    } else if (dueDateObj.getTime() < now.getTime()) {
+    } else if (isPastDueDate(dueDateObj, now)) {
       calculatedStatus = 'overdue';
     } else if (newPaidAmountNum > 0) {
       calculatedStatus = 'partial';
@@ -661,7 +731,7 @@ export class MongoFinanceRepository implements FinanceRepository {
       },
       { new: true },
     )
-      .populate('studentId', 'firstName lastName phone')
+      .populate('studentId', 'firstName lastName phone parentMobile')
       .populate('feeStructureId', 'name')
       .lean();
 
@@ -704,8 +774,9 @@ export class MongoFinanceRepository implements FinanceRepository {
       const studentDoc = await StudentModel.findById(
         oid(invoice.studentId),
       ).lean();
-      if (studentDoc && studentDoc.phone) {
-        recipientPhone = studentDoc.phone;
+      const fallbackPhone = studentDoc?.parentMobile || studentDoc?.phone;
+      if (fallbackPhone) {
+        recipientPhone = fallbackPhone;
       }
     }
 
@@ -939,7 +1010,7 @@ export class MongoFinanceRepository implements FinanceRepository {
       let newStatus: 'paid' | 'overdue' | 'partial' | 'unpaid' = 'unpaid';
       if (paid >= newNetTotal) {
         newStatus = 'paid';
-      } else if (dueDateObj.getTime() < now.getTime()) {
+      } else if (isPastDueDate(dueDateObj, now)) {
         newStatus = 'overdue';
       } else if (paid > 0) {
         newStatus = 'partial';
@@ -1189,7 +1260,7 @@ export class MongoFinanceRepository implements FinanceRepository {
     let newStatus: 'paid' | 'overdue' | 'partial' | 'unpaid' = 'unpaid';
     if (paid >= newNetTotal) {
       newStatus = 'paid';
-    } else if (dueDateObj.getTime() < now.getTime()) {
+    } else if (isPastDueDate(dueDateObj, now)) {
       newStatus = 'overdue';
     } else if (paid > 0) {
       newStatus = 'partial';
@@ -1209,7 +1280,7 @@ export class MongoFinanceRepository implements FinanceRepository {
       },
       { new: true },
     )
-      .populate('studentId', 'firstName lastName phone')
+      .populate('studentId', 'firstName lastName phone parentMobile')
       .populate('feeStructureId', 'name')
       .lean();
 

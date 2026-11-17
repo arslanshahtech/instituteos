@@ -24,7 +24,6 @@ export class MongoOrganizationAccessRepository implements OrganizationAccessRepo
       !mongoose.isValidObjectId(organizationId)
     )
       return null;
-
     const organizationObjectId = new Types.ObjectId(organizationId);
     const membership = await MembershipModel.findOne({
       organizationId: organizationObjectId,
@@ -33,16 +32,18 @@ export class MongoOrganizationAccessRepository implements OrganizationAccessRepo
     })
       .select('_id organizationId userId role campusIds permissions')
       .lean();
-    if (!membership) return null;
-    if (!ORGANIZATION_ROLES.includes(membership.role as OrganizationRole))
+    if (
+      !membership ||
+      !ORGANIZATION_ROLES.includes(membership.role as OrganizationRole)
+    )
       return null;
-
-    const organizationIsActive = await OrganizationModel.exists({
+    const organization = await OrganizationModel.findOne({
       _id: organizationObjectId,
       status: 'active',
-    });
-    if (!organizationIsActive) return null;
-
+    })
+      .select('rolePermissions')
+      .lean();
+    if (!organization) return null;
     return {
       membershipId: String(membership._id),
       organizationId: String(membership.organizationId),
@@ -52,6 +53,10 @@ export class MongoOrganizationAccessRepository implements OrganizationAccessRepo
       ...(Array.isArray(membership.permissions)
         ? { permissions: membership.permissions.map(String) }
         : {}),
+      rolePermissions: (organization.rolePermissions ?? {}) as Record<
+        string,
+        readonly string[]
+      >,
     };
   }
 
@@ -64,13 +69,9 @@ export class MongoOrganizationAccessRepository implements OrganizationAccessRepo
       !mongoose.isValidObjectId(organizationId)
     )
       return null;
-
     const organizationObjectId = new Types.ObjectId(organizationId);
-    const organizationExists = await OrganizationModel.exists({
-      _id: organizationObjectId,
-    });
-    if (!organizationExists) return null;
-
+    if (!(await OrganizationModel.exists({ _id: organizationObjectId })))
+      return null;
     return Boolean(
       await MembershipModel.exists({
         organizationId: organizationObjectId,
@@ -98,7 +99,6 @@ export class MongoOrganizationAccessRepository implements OrganizationAccessRepo
 
 export class TenantScopedRepository<T> {
   constructor(private readonly dataStore: OrganizationScopedDataStore<T>) {}
-
   findById(
     context: OrganizationContext,
     resourceId: string,
@@ -108,7 +108,6 @@ export class TenantScopedRepository<T> {
       resourceId,
     } satisfies OrganizationResourceFilter);
   }
-
   updateById(
     context: OrganizationContext,
     resourceId: string,

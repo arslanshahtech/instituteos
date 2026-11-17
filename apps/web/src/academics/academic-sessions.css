@@ -219,36 +219,6 @@
   color: #928d84;
   font-size: 10px;
 }
-.academic-session-description {
-  color: #77736d;
-  font-size: 11px;
-}
-.academic-session-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid #e8e5df;
-  border-radius: 999px;
-  padding: 4px 8px;
-  color: #77736d;
-  font-size: 10px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.academic-session-status > span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #a6a199;
-}
-.academic-session-status.is-current {
-  border-color: #d7e8dc;
-  background: #f2faf4;
-  color: #287346;
-}
-.academic-session-status.is-current > span {
-  background: #3d9b60;
-}
 .academic-session-actions {
   display: inline-flex;
   align-items: center;
@@ -290,7 +260,22 @@
 @media (max-width: 620px) {
   .academic-sessions-page .page-heading {
     align-items: flex-start;
-    flex-direction: column;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .academic-sessions-page .page-heading > div {
+    min-width: 0;
+  }
+  .academic-sessions-page .page-heading .button {
+    min-height: 38px;
+    flex: 0 0 auto;
+    padding-inline: 11px;
+    font-size: 12px;
+  }
+  .academic-sessions-page .page-heading .button svg {
+    width: 15px;
+    height: 15px;
   }
   .academic-sessions-search-panel {
     align-items: stretch;
@@ -299,7 +284,27 @@
 }
 @media (max-width: 420px) {
   .academic-sessions-metrics {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .academic-sessions-metrics .reference-metric-card {
+    min-height: 112px;
+    padding: 13px 12px;
+  }
+  .academic-sessions-metrics .reference-metric-card strong {
+    margin-top: 8px;
+    font-size: 24px;
+  }
+  .academic-sessions-metrics .reference-metric-card small {
+    max-width: 100%;
+    font-size: 10px;
+    line-height: 1.35;
+  }
+  .academic-sessions-metrics .reference-metric-icon {
+    top: 11px;
+    right: 11px;
+    width: 27px;
+    height: 27px;
   }
 }
 
@@ -397,4 +402,247 @@
   .academic-session-create-card {
     padding: 16px;
   }
+}
+
+.academic-sessions-table tbody td[data-label='Session'] {
+  min-width: 0;
+}
+.academic-sessions-table tbody td[data-label='Actions'] {
+  width: 1%;
+  white-space: nowrap;
+}
+.academic-session-actions .button:not(.button-quiet) {
+  min-height: 34px;
+  padding-inline: 12px;
+  font-size: 11px;
+}
+.academic-session-details {
+  display: grid;
+  gap: 18px;
+}
+.academic-session-details-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: #77736d;
+  font-size: 12px;
+}
+.academic-session-details-status > span:first-child {
+  border: 1px solid #e8e5df;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-weight: 600;
+}
+.academic-session-details-status > span.is-active {
+  border-color: #d7e8dc;
+  background: #f2faf4;
+  color: #287346;
+}
+.academic-session-details-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.academic-session-details-metrics > div {
+  display: grid;
+  gap: 5px;
+  border: 1px solid #e9e6e1;
+  border-radius: 10px;
+  background: #fdfcfb;
+  padding: 14px;
+}
+.academic-session-details-metrics strong {
+  color: #171715;
+  font-size: 24px;
+  line-height: 1;
+}
+.academic-session-details-metrics span {
+  color: #77736d;
+  font-size: 11px;
+}
+@media (max-width: 620px) {
+  .academic-sessions-table tbody tr {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+  }
+  .academic-sessions-table tbody td[data-label='Session'] {
+    grid-column: auto;
+  }
+  .academic-sessions-table tbody td[data-label='Actions'] {
+    grid-column: auto;
+    justify-content: flex-end;
+  }
+  .academic-session-actions {
+    gap: 4px;
+  }
+  .academic-session-actions .button:not(.button-quiet) {
+    min-height: 34px;
+    padding-inline: 9px;
+  }
+  .academic-session-details-metrics {
+    gap: 7px;
+  }
+  .academic-session-details-metrics > div {
+    padding: 11px 9px;
+  }
+  .academic-session-details-metrics strong {
+    font-size: 21px;
+  }
+}
+@media (max-width: 380px) {
+  .academic-sessions-table tbody tr {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .academic-sessions-table tbody td[data-label='Actions'] {
+    justify-content: flex-start;
+  }
+}
+
+.academic-session-class-list {
+  display: grid;
+  gap: 10px;
+}
+.academic-session-class-list h3 {
+  margin: 0;
+  color: #25231f;
+  font-size: 13px;
+  font-weight: 650;
+}
+.academic-session-class-list ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.academic-session-class-list li {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #e9e6e1;
+  border-radius: 9px;
+  background: #fff;
+  padding: 11px 12px;
+}
+.academic-session-class-list li strong {
+  color: #25231f;
+  font-size: 12px;
+}
+.academic-session-class-list li span,
+.academic-session-class-list > p {
+  margin: 0;
+  color: #77736d;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* Session list uses the full data table on desktop and purpose-built cards on mobile. */
+.academic-sessions-mobile-list {
+  display: none;
+}
+.academic-sessions-table .academic-session-description {
+  color: #77736d;
+  font-size: 11px;
+}
+.academic-sessions-table .academic-session-actions .button {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  border: 1px solid #e9e6e1;
+  border-radius: 8px;
+  background: #fff;
+}
+.academic-sessions-table .academic-session-actions .button:hover {
+  border-color: #d8d2c8;
+  background: #f7f5f1;
+}
+.academic-session-mobile-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e9e6e1;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #fff 0%, #fdfcfb 100%);
+  padding: 14px;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 3%);
+}
+.academic-session-mobile-card-main {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+.academic-session-mobile-label {
+  color: #8a8378;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+}
+.academic-session-mobile-card-main > strong {
+  overflow-wrap: anywhere;
+  color: #24221e;
+  font-size: 14px;
+  font-weight: 700;
+}
+.academic-session-mobile-card-main > small {
+  color: #89847c;
+  font-size: 10px;
+}
+.academic-session-mobile-card-main > small.is-current {
+  color: #287346;
+}
+.academic-session-mobile-card > .button {
+  min-height: 36px;
+  flex: 0 0 auto;
+  gap: 6px;
+  border-radius: 8px;
+  padding-inline: 10px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.academic-session-details-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid #eeeae4;
+}
+@media (max-width: 680px) {
+  .academic-sessions-desktop-list {
+    display: none;
+  }
+  .academic-sessions-mobile-list {
+    display: grid;
+    gap: 10px;
+    padding: 0 12px 14px;
+  }
+  .academic-sessions-table-heading {
+    padding: 15px 15px 13px;
+  }
+  .academic-session-mobile-card {
+    padding: 12px;
+  }
+}
+@media (max-width: 360px) {
+  .academic-session-mobile-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .academic-session-mobile-card > .button {
+    align-self: flex-end;
+  }
+}
+
+.academic-session-actions .academic-session-delete-button {
+  color: #dc2626;
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+}
+.academic-session-actions .academic-session-delete-button:hover {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: #fca5a5;
 }

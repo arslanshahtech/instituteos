@@ -1,6 +1,6 @@
 import mongoose, { Schema } from 'mongoose';
 
-export const HOMEWORK_TEST_TYPES = ['homework', 'test'] as const;
+export const HOMEWORK_TEST_TYPES = ['homework', 'class_test', 'test'] as const;
 export const HOMEWORK_TEST_STATUSES = ['draft', 'published'] as const;
 
 const homeworkTestSchema = new Schema(

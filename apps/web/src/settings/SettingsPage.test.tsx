@@ -3,14 +3,81 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsPage } from './SettingsPage.js';
 
+const rolePolicyState = vi.hoisted(() => ({
+  data: {
+    policies: {},
+    defaults: {
+      organization_admin: ['organization.read'],
+      teacher: ['attendance.read'],
+    },
+    roles: ['organization_admin', 'teacher'],
+    permissions: ['organization.read', 'attendance.read'],
+  },
+}));
+
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: () => ({
+    data: rolePolicyState.data,
+    isPending: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+  useMutation: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    isSuccess: false,
+  }),
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+}));
+
 const accessState = vi.hoisted(() => ({
   permissions: ['organization.read', 'organization.update'],
+}));
+
+const settingsState = vi.hoisted(() => ({
+  data: {
+    organizationId: 'org-1',
+    branding: { primaryColor: '#0f766e' },
+    contact: {},
+    localization: {
+      timezone: 'Asia/Karachi',
+      currency: 'PKR',
+      dateFormat: 'YYYY-MM-DD',
+    },
+    notifications: {
+      emailAlerts: true,
+      smsAlerts: false,
+      autoAttendanceAlerts: false,
+    },
+    staffSetup: {
+      departments: [],
+      designations: [],
+      employmentTypes: [],
+      workShifts: [],
+      qualifications: [],
+      documentTypes: [],
+    },
+    teacherSelfAttendance: {
+      viewOwnAttendance: true,
+      selfMarkingEnabled: false,
+      allowedStatuses: ['present'],
+    },
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+  mutate: vi.fn(),
 }));
 
 vi.mock('../staff/StaffPageShared.js', () => ({
   apiMessage: () => 'Settings request failed.',
   useOrganizationAccess: () => ({
-    data: { role: 'organization_owner', permissions: accessState.permissions },
+    data: {
+      role: accessState.permissions.includes('organization.read')
+        ? 'organization_owner'
+        : 'teacher',
+      permissions: accessState.permissions,
+    },
     error: null,
     isPending: false,
     refetch: vi.fn(),
@@ -19,21 +86,26 @@ vi.mock('../staff/StaffPageShared.js', () => ({
 
 vi.mock('./settings-api.js', () => ({
   useOrganizationSettings: () => ({
-    data: undefined,
+    data: { settings: settingsState.data },
     error: null,
     isPending: false,
     refetch: vi.fn(),
   }),
   useUpdateOrganizationSettings: () => ({
     error: null,
+    isError: false,
     isPending: false,
-    mutate: vi.fn(),
+    mutate: settingsState.mutate,
   }),
 }));
 
-function renderSettingsPage() {
+vi.mock('./ProfileSettingsPage.js', () => ({
+  ProfileSettingsPage: () => <div>Personal profile form</div>,
+}));
+
+function renderSettingsPage(initial = '/organizations/org-1/settings') {
   return render(
-    <MemoryRouter initialEntries={['/organizations/org-1/settings']}>
+    <MemoryRouter initialEntries={[initial]}>
       <Routes>
         <Route
           element={<SettingsPage />}
@@ -44,58 +116,91 @@ function renderSettingsPage() {
   );
 }
 
-describe('SettingsPage tabs', () => {
+describe('SettingsPage', () => {
   beforeEach(() => {
     accessState.permissions = ['organization.read', 'organization.update'];
+    settingsState.mutate.mockClear();
   });
 
-  it('shows a distinct settings section for each tab', () => {
+  it('shows only the three intended sections for the organization owner', () => {
     renderSettingsPage();
-
-    expect(
-      screen.getByRole('heading', { name: 'Institute information' }),
-    ).toBeInTheDocument();
-
-    const sections = [
-      ['Contact & details', 'Contact & details'],
-      ['Localization', 'Localization'],
-      ['Notifications', 'Notifications'],
-      ['Teacher attendance', 'Teacher self-attendance'],
-      ['Institute Info', 'Institute information'],
-    ];
-
-    for (const [tabLabel, heading] of sections) {
-      fireEvent.click(screen.getByRole('button', { name: tabLabel }));
+    for (const name of ['My Profile', 'Notifications', 'Roles & Permissions']) {
       expect(
-        screen.getByRole('heading', { name: heading }),
+        screen.getByRole('button', { name: new RegExp(name) }),
       ).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: tabLabel })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-      );
-      if (tabLabel === 'Teacher attendance') {
-        expect(
-          screen.getByRole('checkbox', {
-            name: /Allow teachers to view attendance history/,
-          }),
-        ).toBeChecked();
-        expect(
-          screen.getByRole('checkbox', {
-            name: /Allow teachers to mark their own attendance/,
-          }),
-        ).not.toBeChecked();
-      }
     }
+    for (const removedSection of [
+      'Institute Info',
+      'Localization',
+      'Staff Setup',
+      'Attendance',
+    ]) {
+      expect(
+        screen.queryByRole('button', {
+          name: new RegExp(removedSection),
+        }),
+      ).not.toBeInTheDocument();
+    }
+    expect(screen.getByText('Personal profile form')).toBeInTheDocument();
   });
 
-  it('keeps organization settings read-only when an Admin lacks organization.update', () => {
-    accessState.permissions = ['organization.read'];
+  it('saves notification preferences', () => {
     renderSettingsPage();
+    fireEvent.click(screen.getByRole('button', { name: /^Notifications/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /SMS alerts/ }));
+    expect(settingsState.mutate).toHaveBeenCalledWith({
+      notifications: {
+        emailAlerts: true,
+        smsAlerts: true,
+        autoAttendanceAlerts: false,
+      },
+    });
+  });
 
-    expect(screen.getByRole('status')).toHaveTextContent('read-only access');
-    expect(screen.getByLabelText('Logo URL')).toBeDisabled();
+  it('opens My Profile as a separate settings section', () => {
+    renderSettingsPage();
+    fireEvent.click(screen.getByRole('button', { name: /My Profile/ }));
+    expect(screen.getByText('Personal profile form')).toBeInTheDocument();
+  });
+
+  it('opens the owner-only role permissions matrix', () => {
+    renderSettingsPage();
+    fireEvent.click(
+      screen.getByRole('button', { name: /Roles & Permissions/ }),
+    );
     expect(
-      screen.queryByRole('button', { name: 'Save settings' }),
+      screen.getByRole('heading', { name: 'Roles & Permissions' }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Configure role')).toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', { name: 'View organization' }),
+    ).toBeChecked();
+  });
+
+  it('keeps organization settings read-only when organization.update is missing', () => {
+    accessState.permissions = ['organization.read'];
+    renderSettingsPage('/organizations/org-1/settings?tab=notifications');
+    expect(screen.getByRole('status')).toHaveTextContent('read-only access');
+    expect(
+      screen.getByRole('checkbox', { name: /Email alerts/ }),
+    ).toBeDisabled();
+  });
+
+  it('shows only My Profile to non-manager roles', () => {
+    accessState.permissions = ['profile.read'];
+    renderSettingsPage();
+    expect(screen.getByText('Personal profile form')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /My Profile/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('navigation', { name: 'Settings sections' }),
+    ).toHaveClass('settings-tabs-single');
+    expect(
+      screen.queryByRole('button', { name: /Notifications/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Roles & Permissions/ }),
     ).not.toBeInTheDocument();
   });
 });

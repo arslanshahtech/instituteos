@@ -57,6 +57,7 @@ export interface StudentInvoice {
   feeStructureId: string;
   feeStructureName: string;
   classId: string;
+  sectionId?: string;
   academicYearId: string;
   campusId: string;
   organizationId: string;
@@ -112,6 +113,7 @@ export interface FeeStructureInput {
 export interface InvoiceFilters {
   campusId?: string;
   classId?: string;
+  sectionId?: string;
   status?: InvoiceStatus;
   dateFrom?: string;
   dateTo?: string;
@@ -346,6 +348,7 @@ export interface FinanceExpense {
   organizationId: string;
   campusId?: string;
   description: string;
+  source?: 'manual' | 'payroll';
   category: ExpenseCategory;
   amount: number;
   paymentMethod: PaymentMethod;
@@ -431,6 +434,25 @@ export function createFinanceExpense(
   return apiRequest<{ expense: FinanceExpense }>(
     `${financePath(organizationId)}/expenses`,
     { method: 'POST', body: JSON.stringify(input) },
+  );
+}
+
+export function updateFinanceExpense(
+  organizationId: string,
+  expenseId: string,
+  input: {
+    description: string;
+    category: ExpenseCategory;
+    amount: number;
+    paymentMethod: PaymentMethod;
+    expenseDate: string;
+    campusId?: string;
+    reference?: string;
+  },
+) {
+  return apiRequest<{ expense: FinanceExpense }>(
+    `${financePath(organizationId)}/expenses/${encodeURIComponent(expenseId)}`,
+    { method: 'PUT', body: JSON.stringify(input) },
   );
 }
 

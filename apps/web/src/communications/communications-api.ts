@@ -47,8 +47,44 @@ export function listAnnouncements(
     ),
   );
   return apiRequest<{ items: Announcement[] }>(
-    `${communicationsPath(organizationId)}${query.size ? `?${query}` : ''}`,
+    communicationsPath(organizationId) + (query.size ? '?' + query : ''),
   );
+}
+
+export function listParentAnnouncements(organizationId: string) {
+  return apiRequest<{ items: Announcement[] }>(
+    communicationsPath(organizationId) + '/parent-feed',
+  );
+}
+
+export function useParentAnnouncements(
+  organizationId: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: [...communicationsQueryKey(organizationId), 'parent-feed'],
+    queryFn: () => listParentAnnouncements(organizationId),
+    enabled,
+    retry: false,
+  });
+}
+
+export function listTeacherAnnouncements(organizationId: string) {
+  return apiRequest<{ items: Announcement[] }>(
+    communicationsPath(organizationId) + '/teacher-feed',
+  );
+}
+
+export function useTeacherAnnouncements(
+  organizationId: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: [...communicationsQueryKey(organizationId), 'teacher-feed'],
+    queryFn: () => listTeacherAnnouncements(organizationId),
+    enabled,
+    retry: false,
+  });
 }
 
 export function createAnnouncement(
@@ -167,6 +203,7 @@ export interface DirectMessage {
 export interface StartConversationInput {
   studentId: string;
   teacherUserId: string;
+  guardianUserId?: string;
   subjectTitle: string;
   initialMessage: string;
 }
@@ -177,6 +214,7 @@ export interface ParentMessagingContact {
   className: string;
   sectionName: string;
   teachers: Array<{ userId: string; displayName: string }>;
+  guardians?: Array<{ userId: string; displayName: string }>;
 }
 
 const messagingThreadsPath = (organizationId: string) =>
@@ -249,6 +287,7 @@ export function useThreads(organizationId: string, enabled = true) {
     queryKey: messagingQueryKey(organizationId),
     queryFn: () => listThreads(organizationId),
     enabled: Boolean(organizationId) && enabled,
+    refetchInterval: 10000,
     retry: false,
   });
 }
@@ -262,6 +301,7 @@ export function useThreadDetail(
     queryKey: threadDetailQueryKey(organizationId, threadId ?? ''),
     queryFn: () => getThreadMessages(organizationId, threadId as string),
     enabled: Boolean(organizationId && threadId) && enabled,
+    refetchInterval: 10000,
     retry: false,
   });
 }

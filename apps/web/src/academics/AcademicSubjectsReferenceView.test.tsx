@@ -102,8 +102,8 @@ describe('AcademicSubjectsReferenceView', () => {
       />,
     );
     expect(screen.getByRole('heading', { name: 'Subjects' })).toBeTruthy();
-    expect(screen.getByText('Mathematics')).toBeTruthy();
-    expect(screen.getByText('Physics')).toBeTruthy();
+    expect(screen.getAllByText('Mathematics').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Physics').length).toBeGreaterThan(0);
     const table = screen.getByRole('table');
     expect(within(table).getByText('150')).toBeTruthy();
     expect(within(table).getByText('40.0%')).toBeTruthy();
@@ -130,13 +130,15 @@ describe('AcademicSubjectsReferenceView', () => {
       screen.getByRole('combobox', { name: 'Filter by class' }),
       { target: { value: 'class-2' } },
     );
-    expect(screen.getByText('Physics')).toBeTruthy();
-    expect(screen.queryByText('Mathematics')).toBeNull();
+    expect(screen.getAllByText('Physics').length).toBeGreaterThan(0);
+    expect(screen.queryAllByText('Mathematics')).toHaveLength(0);
     fireEvent.change(
       screen.getByRole('searchbox', { name: 'Search subjects' }),
       { target: { value: 'no-match' } },
     );
-    expect(screen.getByText('No matching subjects')).toBeTruthy();
+    expect(screen.getAllByText('No matching subjects').length).toBeGreaterThan(
+      0,
+    );
     fireEvent.change(
       screen.getByRole('combobox', { name: 'Filter by class' }),
       { target: { value: 'all' } },
@@ -151,6 +153,63 @@ describe('AcademicSubjectsReferenceView', () => {
     expect(onDelete).toHaveBeenCalledWith(subjects[0]);
     fireEvent.click(screen.getByRole('button', { name: /Add Subject/ }));
     expect(onCreate).toHaveBeenCalled();
+  });
+
+  it('renders mobile subject rows and opens complete subject details', () => {
+    const { container } = render(
+      <AcademicSubjectsReferenceView
+        subjects={[
+          {
+            ...subjects[0]!,
+            description: 'Core mathematics curriculum',
+            markComponents: [
+              {
+                key: 'theory',
+                label: 'Theory',
+                totalMarks: 80,
+                passingMarks: 32,
+                enabled: true,
+              },
+              {
+                key: 'practical',
+                label: 'Practical',
+                totalMarks: 20,
+                passingMarks: 8,
+                enabled: false,
+              },
+            ],
+          },
+        ]}
+        classes={classes}
+        schedules={schedules}
+        canWrite
+        onCreate={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    const cards = container.querySelectorAll(
+      '.academic-subjects-mobile-list .academic-subject-mobile-card',
+    );
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.textContent).toContain('Mathematics');
+    expect(cards[0]?.textContent).toContain('MATH');
+    expect(cards[0]?.textContent).toContain('Class 9');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'View details for Mathematics' }),
+    );
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.textContent).toContain('Subject code');
+    expect(dialog.textContent).toContain('Class 9');
+    expect(dialog.textContent).toContain('150');
+    expect(dialog.textContent).toContain('40.0%');
+    expect(dialog.textContent).toContain('Theory');
+    expect(dialog.textContent).toContain('Practical');
+    expect(dialog.textContent).toContain('Core mathematics curriculum');
+    expect(screen.getByRole('button', { name: 'Edit Subject' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Delete Subject' })).toBeTruthy();
   });
 
   it('keeps pagination summary and rows-per-page together', () => {

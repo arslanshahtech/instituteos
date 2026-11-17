@@ -1,6 +1,29 @@
 import type { AuditLogRecord } from '../audit/audit.types.js';
 
-export type ReportType = 'finance' | 'attendance' | 'students';
+export type ReportType =
+  | 'students'
+  | 'staff'
+  | 'attendance'
+  | 'finance'
+  | 'payments'
+  | 'expenses'
+  | 'payroll'
+  | 'advances'
+  | 'classes'
+  | 'sections'
+  | 'subjects'
+  | 'exams'
+  | 'results'
+  | 'admissions'
+  | 'admission-inquiries'
+  | 'organization'
+  | 'audit';
+
+export interface ReportFilters {
+  campusId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
 
 export interface OrganizationSummary {
   activeStudentCount: number;
@@ -39,7 +62,7 @@ export interface AuditLogPage {
   total: number;
 }
 
-export type ReportDataRow = Record<string, string | number | null>;
+export type ReportDataRow = Record<string, string | number | boolean | null>;
 
 export interface ReportingRepository {
   countActiveStudents(
@@ -71,5 +94,6 @@ export interface ReportingRepository {
     organizationId: string,
     reportType: ReportType,
     campusIds?: string[],
+    filters?: ReportFilters,
   ): Promise<ReportDataRow[]>;
 }

@@ -118,6 +118,64 @@ describe('MessagingService (Parent-Teacher Scoped Messaging)', () => {
     expect(mockRepo.createThread).not.toHaveBeenCalled();
   });
 
+  it('allows an assigned teacher to start a conversation with a verified linked guardian', async () => {
+    vi.mocked(mockVerifier.isTeacherAssignedToStudent).mockResolvedValue(true);
+    vi.mocked(mockVerifier.isGuardianLinkedToStudent).mockResolvedValue(true);
+    vi.mocked(mockRepo.createThread!).mockResolvedValue(mockThread);
+    vi.mocked(mockRepo.addMessage!).mockResolvedValue({
+      ...mockMessage,
+      senderUserId: teacherId,
+      senderRole: 'teacher',
+      content: 'Please discuss the homework progress.',
+    });
+
+    const result = await service.startTeacherConversation(
+      validOrgId,
+      teacherId,
+      guardianId,
+      {
+        studentId,
+        teacherUserId: teacherId,
+        subjectTitle: 'Homework progress',
+        initialMessage: 'Please discuss the homework progress.',
+      },
+    );
+
+    expect(result.thread.id).toBe(threadId);
+    expect(result.message.senderRole).toBe('teacher');
+    expect(mockVerifier.isTeacherAssignedToStudent).toHaveBeenCalledWith(
+      validOrgId,
+      teacherId,
+      studentId,
+    );
+    expect(mockVerifier.isGuardianLinkedToStudent).toHaveBeenCalledWith(
+      validOrgId,
+      guardianId,
+      studentId,
+    );
+    expect(mockRepo.createThread).toHaveBeenCalledWith(
+      validOrgId,
+      guardianId,
+      expect.objectContaining({ studentId, teacherUserId: teacherId }),
+      undefined,
+    );
+  });
+
+  it('rejects a teacher starting a conversation with a guardian not linked to the student', async () => {
+    vi.mocked(mockVerifier.isTeacherAssignedToStudent).mockResolvedValue(true);
+    vi.mocked(mockVerifier.isGuardianLinkedToStudent).mockResolvedValue(false);
+
+    await expect(
+      service.startTeacherConversation(validOrgId, teacherId, guardianId, {
+        studentId,
+        teacherUserId: teacherId,
+        subjectTitle: 'Homework',
+        initialMessage: 'Please call me.',
+      }),
+    ).rejects.toMatchObject({ code: 'GUARDIAN_NOT_LINKED' });
+    expect(mockRepo.createThread).not.toHaveBeenCalled();
+  });
+
   it('prevents non-participants from viewing thread messages', async () => {
     const unassociatedUserId = '650000000000000000000099';
     vi.mocked(mockRepo.findThreadById!).mockResolvedValue(mockThread);
@@ -159,5 +217,39 @@ describe('MessagingService (Parent-Teacher Scoped Messaging)', () => {
       'teacher',
       'Understood, we can meet tomorrow.',
     );
+  });
+
+  it('allows organization admins to inspect parent-teacher threads', async () => {
+    vi.mocked(mockRepo.findThreadById!).mockResolvedValue(mockThread);
+    vi.mocked(mockRepo.listMessages!).mockResolvedValue([mockMessage]);
+
+    const result = await service.getThreadMessages(
+      validOrgId,
+      '650000000000000000000099',
+      'organization_admin',
+      threadId,
+    );
+
+    expect(result.thread.id).toBe(threadId);
+    expect(result.messages).toEqual([mockMessage]);
+    expect(mockRepo.markMessagesRead).toHaveBeenCalledWith(
+      validOrgId,
+      threadId,
+      '650000000000000000000099',
+    );
+  });
+
+  it('does not grant principal-director access to private thread messages', async () => {
+    vi.mocked(mockRepo.findThreadById!).mockResolvedValue(mockThread);
+
+    await expect(
+      service.getThreadMessages(
+        validOrgId,
+        '650000000000000000000099',
+        'principal_director',
+        threadId,
+      ),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockRepo.listMessages).not.toHaveBeenCalled();
   });
 });

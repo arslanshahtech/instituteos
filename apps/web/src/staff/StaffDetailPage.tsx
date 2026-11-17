@@ -16,6 +16,7 @@ import {
   StaffHeading,
   StaffStatusBadge,
   apiMessage,
+  staffFormErrorMessage,
   campusName,
   useCampusChoices,
   useOrganizationAccess,
@@ -47,7 +48,13 @@ export function StaffDetailPage() {
     .toISOString()
     .slice(0, 10);
   const attendance = useQuery({
-    queryKey: ['staff-profile-attendance', organizationId, staffId, dateFrom, dateTo],
+    queryKey: [
+      'staff-profile-attendance',
+      organizationId,
+      staffId,
+      dateFrom,
+      dateTo,
+    ],
     queryFn: () =>
       listStaffAttendance(organizationId, { staffId, dateFrom, dateTo }),
     enabled: Boolean(
@@ -81,12 +88,21 @@ export function StaffDetailPage() {
   const person: StaffRecord = staff.data.staff;
   const campusChoices = campuses.data?.campuses ?? [];
   const fullName = `${person.firstName} ${person.lastName}`.trim();
-  const initials = `${person.firstName.charAt(0)}${person.lastName.charAt(0)}`.toUpperCase();
+  const initials =
+    `${person.firstName.charAt(0)}${person.lastName.charAt(0)}`.toUpperCase();
   const attendanceItems = attendance.data?.items ?? [];
-  const present = attendanceItems.filter((item) => item.status === 'present').length;
-  const absent = attendanceItems.filter((item) => item.status === 'absent').length;
-  const halfDay = attendanceItems.filter((item) => item.status === 'half-day').length;
-  const onLeave = attendanceItems.filter((item) => item.status === 'on-leave').length;
+  const present = attendanceItems.filter(
+    (item) => item.status === 'present',
+  ).length;
+  const absent = attendanceItems.filter(
+    (item) => item.status === 'absent',
+  ).length;
+  const halfDay = attendanceItems.filter(
+    (item) => item.status === 'half-day',
+  ).length;
+  const onLeave = attendanceItems.filter(
+    (item) => item.status === 'on-leave',
+  ).length;
   const marked = present + absent + halfDay + onLeave;
   const attendanceDays = present + absent + halfDay;
   const attendanceRate = attendanceDays
@@ -94,14 +110,23 @@ export function StaffDetailPage() {
     : null;
   const monthlyAttendance = new Map<
     string,
-    { label: string; present: number; absent: number; halfDay: number; leave: number }
+    {
+      label: string;
+      present: number;
+      absent: number;
+      halfDay: number;
+      leave: number;
+    }
   >();
   for (const item of attendanceItems) {
     const date = new Date(`${item.date.slice(0, 10)}T12:00:00`);
     if (Number.isNaN(date.getTime())) continue;
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const month = monthlyAttendance.get(key) ?? {
-      label: new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' }).format(date),
+      label: new Intl.DateTimeFormat('en', {
+        month: 'long',
+        year: 'numeric',
+      }).format(date),
       present: 0,
       absent: 0,
       halfDay: 0,
@@ -135,11 +160,13 @@ export function StaffDetailPage() {
   };
 
   const formatDate = (value?: string) =>
-    value ? new Date(value).toLocaleDateString('en-PK', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    }) : 'Not added';
+    value
+      ? new Date(value).toLocaleDateString('en-PK', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        })
+      : 'Not added';
 
   const tabItems = [
     ['overview', 'Overview'],
@@ -160,31 +187,40 @@ export function StaffDetailPage() {
           >
             <span aria-hidden="true">←</span>
           </Link>
-          <div className="staff-profile-avatar" aria-hidden="true">{initials}</div>
+          <div className="staff-profile-avatar" aria-hidden="true">
+            {initials}
+          </div>
           <div className="staff-profile-identity-copy">
             <div className="staff-profile-name-line">
               <h1>{fullName}</h1>
               <StaffStatusBadge status={person.status} />
             </div>
             <p>
-              {person.designation || (person.staffType === 'teacher' ? 'Teacher' : 'Other Staff')}
-              {person.createdAt ? ` · Profile added ${formatDate(person.createdAt)}` : ''}
+              {person.designation ||
+                (person.staffType === 'teacher' ? 'Teacher' : 'Other Staff')}
+              {person.createdAt
+                ? ` · Profile added ${formatDate(person.createdAt)}`
+                : ''}
               {person.phone ? ` · ${person.phone}` : ''}
             </p>
-            {person.email && <span className="staff-profile-email">{person.email}</span>}
+            {person.email && (
+              <span className="staff-profile-email">{person.email}</span>
+            )}
           </div>
         </div>
         <div className="staff-profile-header-actions">
-          {canUpdate && person.status !== 'terminated' && person.status !== 'inactive' && (
-            <button
-              className="staff-profile-secondary-action"
-              type="button"
-              onClick={markAsLeft}
-              disabled={statusMutation.isPending}
-            >
-              {statusMutation.isPending ? 'Updating…' : 'Mark as left'}
-            </button>
-          )}
+          {canUpdate &&
+            person.status !== 'terminated' &&
+            person.status !== 'inactive' && (
+              <button
+                className="staff-profile-secondary-action"
+                type="button"
+                onClick={markAsLeft}
+                disabled={statusMutation.isPending}
+              >
+                {statusMutation.isPending ? 'Updating…' : 'Mark as left'}
+              </button>
+            )}
           {canUpdate && (
             <Link
               className="staff-profile-primary-action"
@@ -196,7 +232,10 @@ export function StaffDetailPage() {
         </div>
       </div>
 
-      <section className="staff-profile-summary-grid" aria-label="Staff summary">
+      <section
+        className="staff-profile-summary-grid"
+        aria-label="Staff summary"
+      >
         <article className="staff-profile-summary-card">
           <div className="staff-profile-summary-label">Monthly salary</div>
           <strong>Not added</strong>
@@ -210,7 +249,11 @@ export function StaffDetailPage() {
         <article className="staff-profile-summary-card is-success">
           <div className="staff-profile-summary-label">Attendance</div>
           <strong>
-            {attendance.isPending ? '—' : attendanceRate === null ? 'No data' : `${attendanceRate}%`}
+            {attendance.isPending
+              ? '—'
+              : attendanceRate === null
+                ? 'No data'
+                : `${attendanceRate}%`}
           </strong>
           <p>
             {attendance.isError
@@ -221,14 +264,20 @@ export function StaffDetailPage() {
           </p>
         </article>
         <article className="staff-profile-summary-card is-leave">
-          <div className="staff-profile-summary-label">Leave in {new Date().getFullYear()}</div>
+          <div className="staff-profile-summary-label">
+            Leave in {new Date().getFullYear()}
+          </div>
           <strong>Not available</strong>
           <p>Leave balances are not configured</p>
         </article>
       </section>
 
       <section className="staff-profile-workspace panel">
-        <nav className="staff-profile-tabs" role="tablist" aria-label="Staff profile sections">
+        <nav
+          className="staff-profile-tabs"
+          role="tablist"
+          aria-label="Staff profile sections"
+        >
           {tabItems.map(([id, label]) => (
             <button
               key={id}
@@ -254,27 +303,83 @@ export function StaffDetailPage() {
               <section className="staff-profile-info-card">
                 <h2>Personal details</h2>
                 <dl>
-                  <div><dt>Full name</dt><dd>{fullName}</dd></div>
-                  <div><dt>Father's name</dt><dd>Not added</dd></div>
-                  <div><dt>CNIC number</dt><dd>Not added</dd></div>
-                  <div><dt>Blood group</dt><dd>Not added</dd></div>
-                  <div className="is-wide"><dt>Email</dt><dd>{person.email || 'Not added'}</dd></div>
-                  <div><dt>Date of birth</dt><dd>{formatDate(person.dateOfBirth)}</dd></div>
-                  <div><dt>Gender</dt><dd>{person.gender || 'Not added'}</dd></div>
+                  <div>
+                    <dt>Full name</dt>
+                    <dd>{fullName}</dd>
+                  </div>
+                  <div>
+                    <dt>Father's name</dt>
+                    <dd>Not added</dd>
+                  </div>
+                  <div>
+                    <dt>CNIC number</dt>
+                    <dd>Not added</dd>
+                  </div>
+                  <div>
+                    <dt>Blood group</dt>
+                    <dd>Not added</dd>
+                  </div>
+                  <div className="is-wide">
+                    <dt>Email</dt>
+                    <dd>{person.email || 'Not added'}</dd>
+                  </div>
+                  <div>
+                    <dt>Date of birth</dt>
+                    <dd>{formatDate(person.dateOfBirth)}</dd>
+                  </div>
+                  <div>
+                    <dt>Gender</dt>
+                    <dd>{person.gender || 'Not added'}</dd>
+                  </div>
                 </dl>
               </section>
               <section className="staff-profile-info-card">
                 <h2>Employment</h2>
                 <dl>
-                  <div><dt>Staff type</dt><dd>{person.staffType === 'teacher' ? 'Teacher' : 'Other Staff'}</dd></div>
-                  <div><dt>Record created</dt><dd>{formatDate(person.createdAt)}</dd></div>
-                  <div><dt>Experience</dt><dd>Not added</dd></div>
-                  <div><dt>Designation</dt><dd>{person.designation || person.role || 'Not added'}</dd></div>
-                  <div><dt>Department</dt><dd>{person.department || 'Not added'}</dd></div>
-                  <div><dt>Monthly salary</dt><dd>Not added</dd></div>
-                  <div><dt>Qualifications</dt><dd>{person.qualification || person.qualifications?.join(', ') || 'Not added'}</dd></div>
-                  <div><dt>Subjects / specialization</dt><dd>{person.subjects?.join(', ') || 'Not added'}</dd></div>
-                  <div><dt>Campus</dt><dd>{campusName(person.campusId, campusChoices)}</dd></div>
+                  <div>
+                    <dt>Staff type</dt>
+                    <dd>
+                      {person.staffType === 'teacher'
+                        ? 'Teacher'
+                        : 'Other Staff'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Record created</dt>
+                    <dd>{formatDate(person.createdAt)}</dd>
+                  </div>
+                  <div>
+                    <dt>Experience</dt>
+                    <dd>Not added</dd>
+                  </div>
+                  <div>
+                    <dt>Designation</dt>
+                    <dd>{person.designation || person.role || 'Not added'}</dd>
+                  </div>
+                  <div>
+                    <dt>Department</dt>
+                    <dd>{person.department || 'Not added'}</dd>
+                  </div>
+                  <div>
+                    <dt>Monthly salary</dt>
+                    <dd>Not added</dd>
+                  </div>
+                  <div>
+                    <dt>Qualifications</dt>
+                    <dd>
+                      {person.qualification ||
+                        person.qualifications?.join(', ') ||
+                        'Not added'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Subjects / specialization</dt>
+                    <dd>{person.subjects?.join(', ') || 'Not added'}</dd>
+                  </div>
+                  <div>
+                    <dt>Campus</dt>
+                    <dd>{campusName(person.campusId, campusChoices)}</dd>
+                  </div>
                 </dl>
               </section>
               <section className="staff-profile-info-card staff-profile-contact-card">
@@ -283,11 +388,22 @@ export function StaffDetailPage() {
                   <span>Emergency contact details can be added later</span>
                 </div>
                 <dl>
-                  <div><dt>Contact number 1</dt><dd>{person.phone || 'Not added'}</dd></div>
-                  <div><dt>Contact number 2</dt><dd>Not added</dd></div>
-                  <div><dt>Address</dt><dd>Not added</dd></div>
+                  <div>
+                    <dt>Contact number 1</dt>
+                    <dd>{person.phone || 'Not added'}</dd>
+                  </div>
+                  <div>
+                    <dt>Contact number 2</dt>
+                    <dd>Not added</dd>
+                  </div>
+                  <div>
+                    <dt>Address</dt>
+                    <dd>Not added</dd>
+                  </div>
                 </dl>
-                <p className="staff-profile-muted-note">No emergency contact details have been added.</p>
+                <p className="staff-profile-muted-note">
+                  No emergency contact details have been added.
+                </p>
               </section>
             </div>
           )}
@@ -297,7 +413,10 @@ export function StaffDetailPage() {
               <div className="staff-profile-section-heading">
                 <div>
                   <h2>Attendance</h2>
-                  <p>Attendance records from 1 January {new Date().getFullYear()} to today.</p>
+                  <p>
+                    Attendance records from 1 January {new Date().getFullYear()}{' '}
+                    to today.
+                  </p>
                 </div>
                 <Link
                   className="staff-profile-inline-link"
@@ -317,29 +436,71 @@ export function StaffDetailPage() {
               ) : (
                 <>
                   <div className="staff-profile-attendance-stats">
-                    <div><span>Present</span><strong>{present}</strong></div>
-                    <div><span>Absent</span><strong className="is-danger">{absent}</strong></div>
-                    <div><span>Half-day</span><strong className="is-warning">{halfDay}</strong></div>
-                    <div><span>On leave</span><strong>{onLeave}</strong></div>
-                    <div><span>Not marked</span><strong>—</strong></div>
+                    <div>
+                      <span>Present</span>
+                      <strong>{present}</strong>
+                    </div>
+                    <div>
+                      <span>Absent</span>
+                      <strong className="is-danger">{absent}</strong>
+                    </div>
+                    <div>
+                      <span>Half-day</span>
+                      <strong className="is-warning">{halfDay}</strong>
+                    </div>
+                    <div>
+                      <span>On leave</span>
+                      <strong>{onLeave}</strong>
+                    </div>
+                    <div>
+                      <span>Not marked</span>
+                      <strong>—</strong>
+                    </div>
                   </div>
                   <section className="staff-profile-info-card staff-profile-monthly-card">
                     <div className="staff-profile-card-heading">
-                      <div><h2>By month</h2><p>Most recent first.</p></div>
+                      <div>
+                        <h2>By month</h2>
+                        <p>Most recent first.</p>
+                      </div>
                     </div>
                     {months.length ? (
                       <div className="staff-profile-table-wrap">
                         <table className="staff-profile-data-table">
-                          <thead><tr><th>Month</th><th>Present</th><th>Absent</th><th>Half-day</th><th>Leave</th><th>Rate</th></tr></thead>
+                          <thead>
+                            <tr>
+                              <th>Month</th>
+                              <th>Present</th>
+                              <th>Absent</th>
+                              <th>Half-day</th>
+                              <th>Leave</th>
+                              <th>Rate</th>
+                            </tr>
+                          </thead>
                           <tbody>
                             {months.map((month) => {
-                              const total = month.present + month.absent + month.halfDay;
-                              const rate = total ? Math.round(((month.present + month.halfDay * 0.5) / total) * 100) : 0;
+                              const total =
+                                month.present + month.absent + month.halfDay;
+                              const rate = total
+                                ? Math.round(
+                                    ((month.present + month.halfDay * 0.5) /
+                                      total) *
+                                      100,
+                                  )
+                                : 0;
                               return (
                                 <tr key={month.label}>
                                   <th scope="row">{month.label}</th>
-                                  <td>{month.present}</td><td>{month.absent || '—'}</td><td>{month.halfDay || '—'}</td><td>{month.leave || '—'}</td>
-                                  <td><span className="staff-profile-rate"><span style={{ width: `${rate}%` }} /></span><small>{rate}%</small></td>
+                                  <td>{month.present}</td>
+                                  <td>{month.absent || '—'}</td>
+                                  <td>{month.halfDay || '—'}</td>
+                                  <td>{month.leave || '—'}</td>
+                                  <td>
+                                    <span className="staff-profile-rate">
+                                      <span style={{ width: `${rate}%` }} />
+                                    </span>
+                                    <small>{rate}%</small>
+                                  </td>
                                 </tr>
                               );
                             })}
@@ -349,7 +510,9 @@ export function StaffDetailPage() {
                     ) : (
                       <div className="staff-profile-empty-state compact">
                         <strong>No attendance records yet</strong>
-                        <p>Staff attendance will appear here after it is marked.</p>
+                        <p>
+                          Staff attendance will appear here after it is marked.
+                        </p>
                       </div>
                     )}
                   </section>
@@ -361,11 +524,17 @@ export function StaffDetailPage() {
           {activeTab === 'leave' && (
             <div className="staff-profile-tab-content">
               <div className="staff-profile-section-heading">
-                <div><h2>Leave</h2><p>Leave balances and requests for this staff member.</p></div>
+                <div>
+                  <h2>Leave</h2>
+                  <p>Leave balances and requests for this staff member.</p>
+                </div>
               </div>
               <div className="staff-profile-empty-state">
                 <strong>Leave management is not connected yet</strong>
-                <p>InstituteOS does not currently store staff leave balances or leave requests, so no balance is shown here.</p>
+                <p>
+                  InstituteOS does not currently store staff leave balances or
+                  leave requests, so no balance is shown here.
+                </p>
               </div>
             </div>
           )}
@@ -373,11 +542,17 @@ export function StaffDetailPage() {
           {activeTab === 'salary' && (
             <div className="staff-profile-tab-content">
               <div className="staff-profile-section-heading">
-                <div><h2>Salary</h2><p>Monthly salary history and payment status.</p></div>
+                <div>
+                  <h2>Salary</h2>
+                  <p>Monthly salary history and payment status.</p>
+                </div>
               </div>
               <div className="staff-profile-empty-state">
                 <strong>Payroll records are not configured yet</strong>
-                <p>Salary, paid amounts and outstanding dues will appear here when staff payroll is added to InstituteOS.</p>
+                <p>
+                  Salary, paid amounts and outstanding dues will appear here
+                  when staff payroll is added to InstituteOS.
+                </p>
               </div>
             </div>
           )}
@@ -385,11 +560,20 @@ export function StaffDetailPage() {
           {activeTab === 'documents' && (
             <div className="staff-profile-tab-content">
               <div className="staff-profile-section-heading">
-                <div><h2>Documents</h2><p>Staff documents are private and visible only to authorized administrators.</p></div>
+                <div>
+                  <h2>Documents</h2>
+                  <p>
+                    Staff documents are private and visible only to authorized
+                    administrators.
+                  </p>
+                </div>
               </div>
               <div className="staff-profile-empty-state">
                 <strong>Staff document storage is not connected yet</strong>
-                <p>Contracts, degrees, CNIC copies and other staff documents cannot be uploaded from this profile yet.</p>
+                <p>
+                  Contracts, degrees, CNIC copies and other staff documents
+                  cannot be uploaded from this profile yet.
+                </p>
               </div>
             </div>
           )}
@@ -403,7 +587,10 @@ export function StaffCreatePage() {
   const { organizationId = '' } = useParams();
   const navigate = useNavigate();
   const access = useOrganizationAccess(organizationId);
-  const setup = useOrganizationSettings(organizationId, Boolean(access.data?.permissions.includes('organization.read')));
+  const setup = useOrganizationSettings(
+    organizationId,
+    Boolean(access.data?.permissions.includes('organization.read')),
+  );
   const campuses = useCampusChoices(organizationId, access.data);
   const mutation = useCreateStaff(organizationId);
   const { showToast } = useToast();
@@ -430,16 +617,31 @@ export function StaffCreatePage() {
       {(organizationAccess) => (
         <main className="page-stack student-management-page staff-management-page">
           <StaffHeading
-            description="Add an employee or teacher record to this organization."
+            description="Create a staff profile for this organization."
             organizationId={organizationId}
             backTo={`/admin/organizations/${encodeURIComponent(organizationId)}/staff`}
             title="Add staff member"
           />
           <section className="student-form-panel panel">
             <StaffForm
-              setupOptions={{ departments: setup.data?.settings.staffSetup.departments.filter((item) => item.isActive).map((item) => item.name) ?? [], designations: setup.data?.settings.staffSetup.designations.filter((item) => item.isActive).map((item) => item.name) ?? [], qualifications: setup.data?.settings.staffSetup.qualifications.filter((item) => item.isActive).map((item) => item.name) ?? [] }}
+              setupOptions={{
+                departments:
+                  setup.data?.settings.staffSetup.departments
+                    .filter((item) => item.isActive)
+                    .map((item) => item.name) ?? [],
+                designations:
+                  setup.data?.settings.staffSetup.designations
+                    .filter((item) => item.isActive)
+                    .map((item) => item.name) ?? [],
+                qualifications:
+                  setup.data?.settings.staffSetup.qualifications
+                    .filter((item) => item.isActive)
+                    .map((item) => item.name) ?? [],
+              }}
               campusError={
-                campuses.isError ? apiMessage(campuses.error) : undefined
+                campuses.isError
+                  ? staffFormErrorMessage(campuses.error, 'campus')
+                  : undefined
               }
               campuses={campuses.data?.campuses ?? []}
               canAssignCampus={organizationAccess.permissions.includes(
@@ -449,7 +651,9 @@ export function StaffCreatePage() {
               isSaving={mutation.isPending}
               onSubmit={submit}
               saveError={
-                mutation.isError ? apiMessage(mutation.error) : undefined
+                mutation.isError
+                  ? staffFormErrorMessage(mutation.error)
+                  : undefined
               }
             />
           </section>
@@ -463,7 +667,10 @@ export function StaffEditPage() {
   const { organizationId = '', staffId = '' } = useParams();
   const navigate = useNavigate();
   const access = useOrganizationAccess(organizationId);
-  const setup = useOrganizationSettings(organizationId, Boolean(access.data?.permissions.includes('organization.read')));
+  const setup = useOrganizationSettings(
+    organizationId,
+    Boolean(access.data?.permissions.includes('organization.read')),
+  );
   const campuses = useCampusChoices(organizationId, access.data);
   const staff = useStaff(
     organizationId,
@@ -512,9 +719,24 @@ export function StaffEditPage() {
             <section className="student-form-panel panel">
               <StaffForm
                 staff={staff.data.staff}
-                setupOptions={{ departments: setup.data?.settings.staffSetup.departments.filter((item) => item.isActive).map((item) => item.name) ?? [], designations: setup.data?.settings.staffSetup.designations.filter((item) => item.isActive).map((item) => item.name) ?? [], qualifications: setup.data?.settings.staffSetup.qualifications.filter((item) => item.isActive).map((item) => item.name) ?? [] }}
+                setupOptions={{
+                  departments:
+                    setup.data?.settings.staffSetup.departments
+                      .filter((item) => item.isActive)
+                      .map((item) => item.name) ?? [],
+                  designations:
+                    setup.data?.settings.staffSetup.designations
+                      .filter((item) => item.isActive)
+                      .map((item) => item.name) ?? [],
+                  qualifications:
+                    setup.data?.settings.staffSetup.qualifications
+                      .filter((item) => item.isActive)
+                      .map((item) => item.name) ?? [],
+                }}
                 campusError={
-                  campuses.isError ? apiMessage(campuses.error) : undefined
+                  campuses.isError
+                    ? staffFormErrorMessage(campuses.error, 'campus')
+                    : undefined
                 }
                 campuses={campuses.data?.campuses ?? []}
                 canAssignCampus={organizationAccess.permissions.includes(
@@ -524,7 +746,9 @@ export function StaffEditPage() {
                 isSaving={mutation.isPending}
                 onSubmit={submit}
                 saveError={
-                  mutation.isError ? apiMessage(mutation.error) : undefined
+                  mutation.isError
+                    ? staffFormErrorMessage(mutation.error)
+                    : undefined
                 }
               />
             </section>

@@ -321,7 +321,11 @@ export class MongoAcademicsRepository implements AcademicsRepository {
   ): Promise<AcademicYearRecord> {
     try {
       if (!input.startDate || !input.endDate)
-        throw new AppError(400, 'VALIDATION_ERROR', 'Academic session dates must be generated before saving.');
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'Academic session dates must be generated before saving.',
+        );
       const record = await AcademicYearModel.create({
         organizationId: oid(organizationId),
         ...input,
